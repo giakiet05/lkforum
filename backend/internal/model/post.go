@@ -10,7 +10,7 @@ type Post struct {
 	ID            primitive.ObjectID `bson:"_id,omitempty" json:"id"`
 	AuthorID      primitive.ObjectID `bson:"author_id" json:"author_id"`
 	CommunityID   primitive.ObjectID `bson:"community_id" json:"community_id"`
-	Type          string             `bson:"type" json:"type"`
+	Type          PostType           `bson:"type" json:"type"`
 	Content       *PostContent       `bson:"content,omitempty" json:"content,omitempty"`
 	VotesCount    *VotesCount        `bson:"votes_count" json:"votes_count"`
 	CommentsCount int                `bson:"comments_count,omitempty" json:"comments_count,omitempty"`
@@ -18,6 +18,14 @@ type Post struct {
 	UpdatedAt     *time.Time         `bson:"updated_at,omitempty" json:"updated_at,omitempty"`
 	IsDeleted     bool               `bson:"is_deleted,omitempty" json:"is_deleted,omitempty"`
 }
+
+type PostType string
+
+const (
+	PostTypeText  PostType = "text"
+	PostTypePoll  PostType = "poll"
+	PostTypeVideo PostType = "video"
+)
 
 type PostContent struct {
 	Text  string `bson:"text,omitempty" json:"text,omitempty"`

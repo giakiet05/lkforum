@@ -11,10 +11,17 @@ type User struct {
 	Username    string             `bson:"username" json:"username"`
 	Email       string             `bson:"email,omitempty" json:"email,omitempty"`
 	Password    string             `bson:"password" json:"password"`
-	Role        string             `bson:"role" json:"role"`
+	Role        Role               `bson:"role" json:"role"`
 	RoleContent RoleContent        `bson:"role_content,omitempty" json:"role_content,omitempty"`
 	CreateAt    time.Time          `bson:"create_at,omitempty" json:"create_at,omitempty"`
 }
+
+type Role string
+
+const (
+	UserRole  Role = "user"
+	AdminRole Role = "admin"
+)
 
 type RoleContent struct {
 	User  *UserRoleContent  `bson:"user,omitempty" json:"user,omitempty"`
