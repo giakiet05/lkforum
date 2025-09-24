@@ -2,6 +2,8 @@ package repo
 
 import (
 	"context"
+
+	"github.com/giakiet05/lkforum/internal/config"
 	"github.com/giakiet05/lkforum/internal/model"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -20,9 +22,7 @@ func NewUserRepo(db *mongo.Database) UserRepo {
 }
 
 func (r *userRepo) GetAll(ctx context.Context) ([]*model.User, error) {
-	collection := r.db.Collection("users")
-
-	cursor, err := collection.Find(ctx, bson.M{})
+	cursor, err := config.UserCollection.Find(ctx, bson.M{})
 	if err != nil {
 		return nil, err
 	}
