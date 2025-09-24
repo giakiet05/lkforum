@@ -1,11 +1,12 @@
 package main
 
 import (
+	"log"
+	"os"
+
 	"github.com/giakiet05/lkforum/internal/bootstrap"
 	"github.com/giakiet05/lkforum/internal/config"
 	"github.com/gin-gonic/gin"
-	"log"
-	"os"
 )
 
 func main() {
