@@ -12,7 +12,7 @@ type UserRegisterRequest struct {
 
 func FromUser(u *model.User) UserResponse {
 	return UserResponse{
-		ID:       u.ID,
+		ID:       u.ID.Hex(),
 		Username: u.Username,
 		Email:    u.Email,
 	}

@@ -14,16 +14,16 @@ import (
 var (
 	Client                    *mongo.Client
 	Database                  *mongo.Database
-	UsersCollection           *mongo.Collection
-	PostsCollection           *mongo.Collection
-	CommunitiesCollection     *mongo.Collection
-	CommentsCollection        *mongo.Collection
-	VotesCollection           *mongo.Collection
-	NotificationsCollection   *mongo.Collection
-	ReportsCollection         *mongo.Collection
-	MembershipsCollection     *mongo.Collection
-	LikedPostsCollection      *mongo.Collection
-	SavedPostsCollection      *mongo.Collection
+	UserCollection            *mongo.Collection
+	PostCollection            *mongo.Collection
+	CommunityCollection       *mongo.Collection
+	CommentCollection         *mongo.Collection
+	VoteCollection            *mongo.Collection
+	NotificationCollection    *mongo.Collection
+	ReportCollection          *mongo.Collection
+	MembershipCollection      *mongo.Collection
+	LikedPostCollection       *mongo.Collection
+	SavedPostCollection       *mongo.Collection
 	UserPostHistoryCollection *mongo.Collection
 )
 
@@ -47,8 +47,30 @@ func NewMongoClient() *mongo.Client {
 	log.Println("Connected to MongoDB successfully!")
 	Client = client
 
-	dbName := os.Getenv("MONGO_DB")
+	dbName := os.Getenv("DB_NAME")
+	if dbName == "" {
+		log.Fatal("DB_NAME environment variable is not set")
+	}
+
+	// Check if database actually exists
+	dbs, err := client.ListDatabaseNames(ctx, struct{}{})
+	if err != nil {
+		log.Fatalf("Could not list databases: %v", err)
+	}
+
+	found := false
+	for _, db := range dbs {
+		if db == dbName {
+			found = true
+			break
+		}
+	}
+	if !found {
+		log.Fatalf("Database %q does not exist on this MongoDB server", dbName)
+	}
+
 	Database = client.Database(dbName)
+	log.Printf("Using database: %s\n", dbName)
 
 	if err := initCollections(ctx); err != nil {
 		log.Fatalf("Collection initialization failed: %v", err)
@@ -64,16 +86,16 @@ func initCollections(ctx context.Context) error {
 	}
 
 	required := map[string]**mongo.Collection{
-		"users":             &UsersCollection,
-		"posts":             &PostsCollection,
-		"communities":       &CommunitiesCollection,
-		"comments":          &CommentsCollection,
-		"votes":             &VotesCollection,
-		"notifications":     &NotificationsCollection,
-		"reports":           &ReportsCollection,
-		"memberships":       &MembershipsCollection,
-		"liked_posts":       &LikedPostsCollection,
-		"saved_posts":       &SavedPostsCollection,
+		"users":             &UserCollection,
+		"posts":             &PostCollection,
+		"communities":       &CommunityCollection,
+		"comments":          &CommentCollection,
+		"votes":             &VoteCollection,
+		"notifications":     &NotificationCollection,
+		"reports":           &ReportCollection,
+		"memberships":       &MembershipCollection,
+		"liked_posts":       &LikedPostCollection,
+		"saved_posts":       &SavedPostCollection,
 		"user_post_history": &UserPostHistoryCollection,
 	}
 

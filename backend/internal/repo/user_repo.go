@@ -22,7 +22,7 @@ func NewUserRepo(db *mongo.Database) UserRepo {
 }
 
 func (r *userRepo) GetAll(ctx context.Context) ([]*model.User, error) {
-	cursor, err := config.UsersCollection.Find(ctx, bson.M{})
+	cursor, err := config.UserCollection.Find(ctx, bson.M{})
 	if err != nil {
 		return nil, err
 	}
