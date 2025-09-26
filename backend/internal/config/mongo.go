@@ -25,6 +25,8 @@ var (
 	LikedPostCollection       *mongo.Collection
 	SavedPostCollection       *mongo.Collection
 	UserPostHistoryCollection *mongo.Collection
+	ConversationCollection    *mongo.Collection
+	MessageCollection         *mongo.Collection
 )
 
 // NewMongoClient creates and returns a new MongoDB client
@@ -97,6 +99,8 @@ func initCollections(ctx context.Context) error {
 		"liked_posts":       &LikedPostCollection,
 		"saved_posts":       &SavedPostCollection,
 		"user_post_history": &UserPostHistoryCollection,
+		"conversations":     &ConversationCollection,
+		"messages":          &MessageCollection,
 	}
 
 	existing := make(map[string]bool, len(collections))
