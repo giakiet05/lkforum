@@ -12,24 +12,30 @@ import (
 )
 
 var (
-	Client                    *mongo.Client
-	Database                  *mongo.Database
-	UserCollection            *mongo.Collection
-	PostCollection            *mongo.Collection
-	CommunityCollection       *mongo.Collection
-	CommentCollection         *mongo.Collection
-	VoteCollection            *mongo.Collection
-	NotificationCollection    *mongo.Collection
-	ReportCollection          *mongo.Collection
-	MembershipCollection      *mongo.Collection
-	LikedPostCollection       *mongo.Collection
-	SavedPostCollection       *mongo.Collection
-	UserPostHistoryCollection *mongo.Collection
+	Client   *mongo.Client
+	Database *mongo.Database
+)
+
+const (
+	UserColName            = "users"
+	PostColName            = "posts"
+	CommunityColName       = "communities"
+	CommentColName         = "comments"
+	VoteColName            = "votes"
+	NotificationColName    = "notifications"
+	ReportColName          = "reports"
+	MembershipColName      = "memberships"
+	LikedPostColName       = "liked_posts"
+	SavedPostColName       = "saved_posts"
+	UserPostHistoryColName = "user_post_history"
 )
 
 // NewMongoClient creates and returns a new MongoDB client
 func NewMongoClient() *mongo.Client {
 	uri := os.Getenv("MONGO_URI") // e.g. mongodb://user:pass@localhost:27017
+	if uri == "" {
+		log.Fatal("MONGO_URI environment variable is not set")
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -52,51 +58,35 @@ func NewMongoClient() *mongo.Client {
 		log.Fatal("DB_NAME environment variable is not set")
 	}
 
-	// Check if database actually exists
-	dbs, err := client.ListDatabaseNames(ctx, struct{}{})
-	if err != nil {
-		log.Fatalf("Could not list databases: %v", err)
-	}
-
-	found := false
-	for _, db := range dbs {
-		if db == dbName {
-			found = true
-			break
-		}
-	}
-	if !found {
-		log.Fatalf("Database %q does not exist on this MongoDB server", dbName)
-	}
-
 	Database = client.Database(dbName)
-	log.Printf("Using database: %s\n", dbName)
 
-	if err := initCollections(ctx); err != nil {
-		log.Fatalf("Collection initialization failed: %v", err)
+	// Verify required collections exist
+	if err := verifyCollections(ctx, Database); err != nil {
+		log.Fatalf("Collection verification failed: %v", err)
 	}
 
+	log.Printf("Using database: %s\n", dbName)
 	return client
 }
 
-func initCollections(ctx context.Context) error {
-	collections, err := Database.ListCollectionNames(ctx, struct{}{})
+func verifyCollections(ctx context.Context, db *mongo.Database) error {
+	collections, err := db.ListCollectionNames(ctx, struct{}{})
 	if err != nil {
 		return fmt.Errorf("failed to list collections: %w", err)
 	}
 
-	required := map[string]**mongo.Collection{
-		"users":             &UserCollection,
-		"posts":             &PostCollection,
-		"communities":       &CommunityCollection,
-		"comments":          &CommentCollection,
-		"votes":             &VoteCollection,
-		"notifications":     &NotificationCollection,
-		"reports":           &ReportCollection,
-		"memberships":       &MembershipCollection,
-		"liked_posts":       &LikedPostCollection,
-		"saved_posts":       &SavedPostCollection,
-		"user_post_history": &UserPostHistoryCollection,
+	required := []string{
+		UserColName,
+		PostColName,
+		CommunityColName,
+		CommentColName,
+		VoteColName,
+		NotificationColName,
+		ReportColName,
+		MembershipColName,
+		LikedPostColName,
+		SavedPostColName,
+		UserPostHistoryColName,
 	}
 
 	existing := make(map[string]bool, len(collections))
@@ -104,14 +94,12 @@ func initCollections(ctx context.Context) error {
 		existing[c] = true
 	}
 
-	// Assign collection handles if they exist, otherwise fail
-	for name, ref := range required {
+	for _, name := range required {
 		if !existing[name] {
 			return fmt.Errorf("required collection %q does not exist in database", name)
 		}
-		*ref = Database.Collection(name)
 	}
 
-	log.Println("All required collections verified and initialized")
+	log.Println("All required collections verified")
 	return nil
 }

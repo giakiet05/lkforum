@@ -14,15 +14,15 @@ type UserRepo interface {
 }
 
 type userRepo struct {
-	db *mongo.Database
+	userCollection *mongo.Collection
 }
 
 func NewUserRepo(db *mongo.Database) UserRepo {
-	return &userRepo{db: db}
+	return &userRepo{userCollection: db.Collection(config.UserColName)}
 }
 
 func (r *userRepo) GetAll(ctx context.Context) ([]*model.User, error) {
-	cursor, err := config.UserCollection.Find(ctx, bson.M{})
+	cursor, err := r.userCollection.Find(ctx, bson.M{})
 	if err != nil {
 		return nil, err
 	}

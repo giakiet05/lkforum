@@ -15,6 +15,8 @@ type Community struct {
 	Setting     CommunitySetting   `bson:"setting,omitempty" json:"setting,omitempty"`
 	Moderators  []Moderator        `bson:"moderators,omitempty" json:"moderators,omitempty"`
 	CreateAt    time.Time          `bson:"create_at,omitempty" json:"create_at,omitempty"`
+	IsDeleted   bool               `bson:"is_deleted,omitempty" json:"is_deleted,omitempty"`
+	IsBanned    bool               `bson:"is_banned,omitempty" json:"is_banned,omitempty"`
 }
 
 type CommunitySetting struct {
