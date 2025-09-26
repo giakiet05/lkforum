@@ -37,7 +37,7 @@ type UserRoleContent struct {
 
 type AdminRoleContent struct {
 	Name        string             `bson:"name,omitempty" json:"name,omitempty"`
-	Permissions []string           `bson:"permissions,omitempty" json:"permissions,omitempty"`
+	Permissions []string           `bson:"permissions,omitempty" json:"permissions,omitempty"` //Chua quyet dinh se lam sao
 	CreateAt    *time.Time         `bson:"update_at,omitempty" json:"update_at,omitempty"`
 	CreateBy    primitive.ObjectID `bson:"create_by,omitempty" json:"create_by,omitempty"`
 }

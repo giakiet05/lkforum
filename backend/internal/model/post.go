@@ -7,15 +7,18 @@ import (
 )
 
 type Post struct {
-	ID          primitive.ObjectID `bson:"_id,omitempty" json:"id"`
-	AuthorID    primitive.ObjectID `bson:"author_id" json:"author_id"`
-	CommunityID primitive.ObjectID `bson:"community_id" json:"community_id"`
-	Type        PostType           `bson:"type" json:"type"`
-	Content     *PostContent       `bson:"content,omitempty" json:"content,omitempty"`
-	VotesCount  *VotesCount        `bson:"votes_count" json:"votes_count"`
-	CreatedAt   time.Time          `bson:"created_at,omitempty" json:"created_at,omitempty"`
-	UpdatedAt   *time.Time         `bson:"updated_at,omitempty" json:"updated_at,omitempty"`
-	IsDeleted   bool               `bson:"is_deleted,omitempty" json:"is_deleted,omitempty"`
+	ID             primitive.ObjectID `bson:"_id,omitempty" json:"id"`
+	AuthorID       primitive.ObjectID `bson:"author_id" json:"author_id"`
+	AuthorUsername string             `bson:"author_username,omitempty" json:"author_username,omitempty"`
+	AuthorAvatar   string             `bson:"author_avatar,omitempty" json:"author_avatar,omitempty"`
+	CommunityID    primitive.ObjectID `bson:"community_id" json:"community_id"`
+	CommunityName  string             `bson:"community_name,omitempty" json:"community_name,omitempty"`
+	Type           PostType           `bson:"type" json:"type"`
+	Content        *PostContent       `bson:"content,omitempty" json:"content,omitempty"`
+	VotesCount     *VotesCount        `bson:"votes_count" json:"votes_count"`
+	CreatedAt      time.Time          `bson:"created_at,omitempty" json:"created_at,omitempty"`
+	UpdatedAt      *time.Time         `bson:"updated_at,omitempty" json:"updated_at,omitempty"`
+	IsDeleted      bool               `bson:"is_deleted,omitempty" json:"is_deleted,omitempty"`
 }
 
 type PostType string
@@ -33,14 +36,14 @@ type PostContent struct {
 }
 
 type Poll struct {
-	Question string   `bson:"question,omitempty" json:"question,omitempty"`
-	Options  []Option `bson:"options,omitempty" json:"options,omitempty"`
+	Question string       `bson:"question,omitempty" json:"question,omitempty"`
+	Options  []PollOption `bson:"options,omitempty" json:"options,omitempty"`
 }
 
-type Option struct {
+type PollOption struct {
 	ID      primitive.ObjectID `bson:"_id,omitempty" json:"id,omitempty"`
 	Content string             `bson:"text" json:"text"`
-	Vote    int                `bson:"vote" json:"vote"`
+	Votes   int                `bson:"vote" json:"vote"`
 }
 
 type Video struct {
