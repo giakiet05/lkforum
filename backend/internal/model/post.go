@@ -7,16 +7,15 @@ import (
 )
 
 type Post struct {
-	ID            primitive.ObjectID `bson:"_id,omitempty" json:"id"`
-	AuthorID      primitive.ObjectID `bson:"author_id" json:"author_id"`
-	CommunityID   primitive.ObjectID `bson:"community_id" json:"community_id"`
-	Type          PostType           `bson:"type" json:"type"`
-	Content       *PostContent       `bson:"content,omitempty" json:"content,omitempty"`
-	VotesCount    *VotesCount        `bson:"votes_count" json:"votes_count"`
-	CommentsCount int                `bson:"comments_count,omitempty" json:"comments_count,omitempty"`
-	CreatedAt     time.Time          `bson:"created_at,omitempty" json:"created_at,omitempty"`
-	UpdatedAt     *time.Time         `bson:"updated_at,omitempty" json:"updated_at,omitempty"`
-	IsDeleted     bool               `bson:"is_deleted,omitempty" json:"is_deleted,omitempty"`
+	ID          primitive.ObjectID `bson:"_id,omitempty" json:"id"`
+	AuthorID    primitive.ObjectID `bson:"author_id" json:"author_id"`
+	CommunityID primitive.ObjectID `bson:"community_id" json:"community_id"`
+	Type        PostType           `bson:"type" json:"type"`
+	Content     *PostContent       `bson:"content,omitempty" json:"content,omitempty"`
+	VotesCount  *VotesCount        `bson:"votes_count" json:"votes_count"`
+	CreatedAt   time.Time          `bson:"created_at,omitempty" json:"created_at,omitempty"`
+	UpdatedAt   *time.Time         `bson:"updated_at,omitempty" json:"updated_at,omitempty"`
+	IsDeleted   bool               `bson:"is_deleted,omitempty" json:"is_deleted,omitempty"`
 }
 
 type PostType string
