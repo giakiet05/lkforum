@@ -1,6 +1,8 @@
 package bootstrap
 
 import (
+	"os"
+
 	"github.com/giakiet05/lkforum/internal/config"
 	"github.com/giakiet05/lkforum/internal/controller"
 	"github.com/giakiet05/lkforum/internal/repo"
@@ -8,15 +10,16 @@ import (
 	"github.com/giakiet05/lkforum/internal/service"
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/mongo"
-	"os"
 )
 
 type Repos struct {
 	repo.UserRepo
+	repo.CommunityRepo
 }
 
 type Services struct {
 	service.UserService
+	service.CommunityService
 }
 
 type Controllers struct {
@@ -26,7 +29,8 @@ type Controllers struct {
 // initRepos initializes repositories with the given database
 func initRepos(db *mongo.Database) *Repos {
 	return &Repos{
-		UserRepo: repo.NewUserRepo(db),
+		UserRepo:      repo.NewUserRepo(db),
+		CommunityRepo: repo.NewCommunityRepo(db),
 	}
 }
 
