@@ -20,7 +20,7 @@ type CommunityRepo interface {
 	GetByModeratorId(ctx context.Context, moderatorId primitive.ObjectID) ([]*model.Community, error)
 	Update(ctx context.Context, communityID primitive.ObjectID, updates bson.M) (*model.Community, error)
 	Replace(ctx context.Context, community *model.Community) error
-	Delete(ctx context.Context, community *model.Community) error
+	Delete(ctx context.Context, communityID primitive.ObjectID) error
 }
 
 type communityRepo struct {
@@ -117,14 +117,14 @@ func (c *communityRepo) Replace(ctx context.Context, community *model.Community)
 	return nil
 }
 
-func (c *communityRepo) Delete(ctx context.Context, community *model.Community) error {
-	res, err := c.communityCollection.DeleteOne(ctx, bson.M{"_id": community.ID})
+func (c *communityRepo) Delete(ctx context.Context, communityID primitive.ObjectID) error {
+	res, err := c.communityCollection.DeleteOne(ctx, bson.M{"_id": communityID})
 	if err != nil {
 		return fmt.Errorf("failed to delete community: %w", err)
 	}
 
 	if res.DeletedCount == 0 {
-		return fmt.Errorf("no community found with id %v", community.ID)
+		return fmt.Errorf("no community found with id %v", communityID.Hex())
 	}
 
 	return nil

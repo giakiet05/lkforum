@@ -13,16 +13,23 @@ type Community struct {
 	Avatar      *string            `bson:"avatar,omitempty" json:"avatar,omitempty"`
 	Banner      *string            `bson:"banner,omitempty" json:"banner,omitempty"`
 	Setting     CommunitySetting   `bson:"setting,omitempty" json:"setting,omitempty"`
-	Moderators  []*Moderator       `bson:"moderators,omitempty" json:"moderators,omitempty"`
+	Moderators  []Moderator        `bson:"moderators,omitempty" json:"moderators,omitempty"`
 	CreateAt    time.Time          `bson:"create_at,omitempty" json:"create_at,omitempty"`
+	CreateBy    primitive.ObjectID `bson:"create_by,omitempty" json:"create_by,omitempty"`
 	IsDeleted   bool               `bson:"is_deleted,omitempty" json:"is_deleted,omitempty"`
 	IsBanned    bool               `bson:"is_banned,omitempty" json:"is_banned,omitempty"`
 }
 
 type CommunitySetting struct {
-	IsPrivate            bool `bson:"is_private,omitempty" json:"is_private,omitempty"`
-	PostApprovalRequired bool `bson:"post_approval_required,omitempty" json:"post_approval_required,omitempty"`
-	JoinApprovalRequired bool `bson:"join_approval_required,omitempty" json:"join_approval_required,omitempty"`
+	IsPrivate           bool `bson:"isPrivate" json:"isPrivate"` // visible only to members
+	AllowPosts          bool `bson:"allowPosts" json:"allowPosts"`
+	AllowComments       bool `bson:"allowComments" json:"allowComments"`
+	AllowMedia          bool `bson:"allowMedia" json:"allowMedia"`
+	PostRequireApproval bool `bson:"requireApproval" json:"requireApproval"`         // new posts need moderator approval
+	JoinRequireApproval bool `bson:"joinRequireApproval" json:"joinRequireApproval"` // new member need moderator approval
+	MaxPostLength       int  `bson:"maxPostLength,omitempty" json:"maxPostLength,omitempty"`
+
+	Rules []string `bson:"rules,omitempty" json:"rules,omitempty"`
 }
 
 type Moderator struct {
