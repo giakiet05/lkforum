@@ -13,7 +13,7 @@ type Community struct {
 	Avatar      *string            `bson:"avatar,omitempty" json:"avatar,omitempty"`
 	Banner      *string            `bson:"banner,omitempty" json:"banner,omitempty"`
 	Setting     CommunitySetting   `bson:"setting,omitempty" json:"setting,omitempty"`
-	Moderators  []Moderator        `bson:"moderators,omitempty" json:"moderators,omitempty"`
+	Moderators  []*Moderator       `bson:"moderators,omitempty" json:"moderators,omitempty"`
 	CreateAt    time.Time          `bson:"create_at,omitempty" json:"create_at,omitempty"`
 	IsDeleted   bool               `bson:"is_deleted,omitempty" json:"is_deleted,omitempty"`
 	IsBanned    bool               `bson:"is_banned,omitempty" json:"is_banned,omitempty"`

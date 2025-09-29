@@ -8,7 +8,7 @@ type CreateCommunityRequest struct {
 	Avatar      *string                `json:"avatar,omitempty"`
 	Banner      *string                `json:"banner,omitempty"`
 	Setting     model.CommunitySetting `json:"setting,omitempty"`
-	Moderators  []model.Moderator      `json:"moderators,omitempty"`
+	Moderators  []*model.Moderator     `json:"moderators,omitempty"`
 }
 
 type UpdateCommunityRequest struct {
@@ -18,5 +18,4 @@ type UpdateCommunityRequest struct {
 	Avatar      *string                 `json:"avatar,omitempty"`
 	Banner      *string                 `json:"banner,omitempty"`
 	Setting     *model.CommunitySetting `json:"setting,omitempty"`
-	Moderators  *[]model.Moderator      `json:"moderators,omitempty"`
 }

@@ -8,7 +8,6 @@ import (
 	"github.com/giakiet05/lkforum/internal/model"
 	"github.com/giakiet05/lkforum/internal/repo"
 	"github.com/giakiet05/lkforum/internal/util"
-	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -16,8 +15,9 @@ type CommunityService interface {
 	CreateCommunity(req *dto.CreateCommunityRequest) (*model.Community, error)
 	GetAllCommunities() ([]*model.Community, error)
 	GetCommunityById(id string) (*model.Community, error)
-	GetCommunitiesByModeratorId(moderatorId string) ([]*model.Community, error)
-	UpdateOneCommunity(req *dto.UpdateCommunityRequest) (*model.Community, error)
+	GetCommunitiesByModeratorId(moderatorID string) ([]*model.Community, error)
+	UpdateOneCommunity(req *dto.UpdateCommunityRequest, userID string) (*model.Community, error)
+	IsModerator(userID string, community *model.Community) (bool, error)
 }
 
 type communityService struct {
@@ -63,11 +63,11 @@ func (c *communityService) GetCommunityById(id string) (*model.Community, error)
 	return c.communityRepo.GetById(ctx, objectID)
 }
 
-func (c *communityService) GetCommunitiesByModeratorId(moderatorId string) ([]*model.Community, error) {
+func (c *communityService) GetCommunitiesByModeratorId(moderatorID string) ([]*model.Community, error) {
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
 
-	objectID, err := primitive.ObjectIDFromHex(moderatorId)
+	objectID, err := primitive.ObjectIDFromHex(moderatorID)
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +75,7 @@ func (c *communityService) GetCommunitiesByModeratorId(moderatorId string) ([]*m
 	return c.communityRepo.GetByModeratorId(ctx, objectID)
 }
 
-func (c *communityService) UpdateOneCommunity(req *dto.UpdateCommunityRequest) (*model.Community, error) {
+func (c *communityService) UpdateOneCommunity(req *dto.UpdateCommunityRequest, userID string) (*model.Community, error) {
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
 
@@ -84,31 +84,60 @@ func (c *communityService) UpdateOneCommunity(req *dto.UpdateCommunityRequest) (
 		return nil, err
 	}
 
-	updates := bson.M{}
+	community, err := c.communityRepo.GetById(ctx, communityID)
+	if err != nil {
+		return nil, err
+	}
+
+	ok, err := c.IsModerator(userID, community)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, fmt.Errorf("user is not a moderator of the community")
+	}
+
+	var updateCount = 0
 	if req.Name != nil {
-		updates["name"] = *req.Name
+		community.Name = *req.Name
+		updateCount++
 	}
 	if req.Description != nil {
-		updates["description"] = *req.Description
+		community.Description = req.Description
+		updateCount++
 	}
 	if req.Avatar != nil {
-		updates["avatar"] = *req.Avatar
+		community.Avatar = req.Avatar
+		updateCount++
 	}
 	if req.Banner != nil {
-		updates["banner"] = *req.Banner
+		community.Banner = req.Banner
+		updateCount++
 	}
 	if req.Setting != nil {
-		updates["setting"] = *req.Setting
-	}
-	if req.Moderators != nil {
-		updates["moderators"] = *req.Moderators
+		community.Setting = *req.Setting
+		updateCount++
 	}
 
-	if len(updates) == 0 {
+	if updateCount == 0 {
 		return nil, fmt.Errorf("no fields to update")
 	}
+ 
+	return community, c.communityRepo.Replace(ctx, community)
+}
 
-	return c.communityRepo.UpdateOne(ctx, communityID, updates)
+func (c *communityService) IsModerator(userID string, community *model.Community) (bool, error) {
+	objectID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return false, fmt.Errorf("invalid user id: %s", userID)
+	}
+
+	for _, m := range community.Moderators {
+		if m.UserID == objectID {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func NewCommunityService(communityRepo repo.CommunityRepo) CommunityService {

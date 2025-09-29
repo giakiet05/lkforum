@@ -18,7 +18,8 @@ type CommunityRepo interface {
 	GetAll(ctx context.Context) ([]*model.Community, error)
 	GetById(ctx context.Context, id primitive.ObjectID) (*model.Community, error)
 	GetByModeratorId(ctx context.Context, moderatorId primitive.ObjectID) ([]*model.Community, error)
-	UpdateOne(ctx context.Context, communityID primitive.ObjectID, updates bson.M) (*model.Community, error)
+	Update(ctx context.Context, communityID primitive.ObjectID, updates bson.M) (*model.Community, error)
+	Replace(ctx context.Context, community *model.Community) error
 	Delete(ctx context.Context, community *model.Community) error
 }
 
@@ -88,7 +89,7 @@ func (c *communityRepo) GetById(ctx context.Context, id primitive.ObjectID) (*mo
 	return &community, nil
 }
 
-func (c *communityRepo) UpdateOne(ctx context.Context, communityID primitive.ObjectID, updates bson.M) (*model.Community, error) {
+func (c *communityRepo) Update(ctx context.Context, communityID primitive.ObjectID, updates bson.M) (*model.Community, error) {
 	filter := bson.M{"_id": communityID}
 	update := bson.M{"$set": updates}
 
@@ -103,10 +104,28 @@ func (c *communityRepo) UpdateOne(ctx context.Context, communityID primitive.Obj
 	return &updated, nil
 }
 
+func (c *communityRepo) Replace(ctx context.Context, community *model.Community) error {
+	res, err := c.communityCollection.ReplaceOne(ctx, bson.M{"_id": community.ID}, community)
+	if err != nil {
+		return fmt.Errorf("failed to replace community: %w", err)
+	}
+
+	if res.MatchedCount == 0 {
+		return fmt.Errorf("no document found with id %v", community.ID)
+	}
+
+	return nil
+}
+
 func (c *communityRepo) Delete(ctx context.Context, community *model.Community) error {
-	_, err := c.communityCollection.DeleteOne(ctx, bson.M{"_id": community.ID})
+	res, err := c.communityCollection.DeleteOne(ctx, bson.M{"_id": community.ID})
 	if err != nil {
 		return fmt.Errorf("failed to delete community: %w", err)
 	}
+
+	if res.DeletedCount == 0 {
+		return fmt.Errorf("no community found with id %v", community.ID)
+	}
+
 	return nil
 }
