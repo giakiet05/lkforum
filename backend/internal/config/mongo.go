@@ -12,8 +12,8 @@ import (
 )
 
 var (
-	Client   *mongo.Client
-	Database *mongo.Database
+	Client *mongo.Client
+	db     *mongo.Database
 )
 
 const (
@@ -53,17 +53,16 @@ func NewMongoClient() *mongo.Client {
 	}
 
 	log.Println("Connected to MongoDB successfully!")
-	Client = client
 
 	dbName := os.Getenv("DB_NAME")
 	if dbName == "" {
 		log.Fatal("DB_NAME environment variable is not set")
 	}
 
-	Database = client.Database(dbName)
+	db = client.Database(dbName)
 
 	// Verify required collections exist
-	if err := verifyCollections(ctx, Database); err != nil {
+	if err := verifyCollections(ctx, db); err != nil {
 		log.Fatalf("Collection verification failed: %v", err)
 	}
 

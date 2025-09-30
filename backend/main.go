@@ -18,7 +18,10 @@ func main() {
 	}
 
 	// Initialize Gin router
-	r := bootstrap.Init()
+	r, err := bootstrap.Init()
+	if err != nil {
+		log.Fatalf("failed to initialize application: %v", err)
+	}
 
 	// CORS middleware
 	allowOrigin := os.Getenv("FRONTEND_URL")

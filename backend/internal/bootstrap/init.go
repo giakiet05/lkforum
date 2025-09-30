@@ -1,6 +1,7 @@
 package bootstrap
 
 import (
+	"log"
 	"os"
 
 	"github.com/giakiet05/lkforum/internal/config"
@@ -50,27 +51,44 @@ func initControllers(services *Services) *Controllers {
 
 // initRoutes sets up the routes for the Gin engine
 func initRoutes(controllers *Controllers, r *gin.Engine) {
+	//Test route
 	r.GET("/ping", func(c *gin.Context) {
 		c.JSON(200, gin.H{"message": "pong"})
 	})
 
+	//Test API group
 	api := r.Group("/api")
+	api.GET("/", func(c *gin.Context) {
+		c.JSON(200, gin.H{"message": "Welcome to LKForum API!"})
+	})
 
+	//Register more routes here
 	route.RegisterUserRoutes(api, &controllers.UserController)
 }
 
-// Init inits the app
-func Init() *gin.Engine {
-	//redisClient := config.NewRedisClient()
-	mongoClient := config.NewMongoClient()           //Connect to MongoDB (contains many databases)
-	db := mongoClient.Database(os.Getenv("DB_NAME")) //Choose a specific database
+// Init initializes all application components
+func Init() (*gin.Engine, error) {
+	// Create Redis client once
+	redisClient := config.NewRedisClient()
 
+	// Initialize token service first for JWT blacklisting
+	if err := InitializeTokenService(redisClient); err != nil {
+		// Log error but continue - the system will work without Redis, just without token invalidation
+		log.Printf("Warning: Token invalidation service not available: %v\n", err)
+	}
+
+	// Connect to MongoDB
+	client := config.NewMongoClient()
+	db := client.Database(os.Getenv("DB_NAME"))
+	router := gin.Default()
+
+	// Initialize other components
 	repos := initRepos(db)
 	services := initServices(repos)
 	controllers := initControllers(services)
+	initRoutes(controllers, router)
 
-	r := gin.Default()
-	initRoutes(controllers, r)
+	// Setup router
 
-	return r
+	return router, nil
 }
