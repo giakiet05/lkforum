@@ -25,6 +25,7 @@ type UserService interface {
 	GetUserByEmail(email string) (*model.User, error)
 	ChangePassword(userID, oldPassword, newPassword string) error
 	GetUsers(page, pageSize int) (*dto.PaginatedUsersResponse, error)
+	RefreshToken(refreshToken string) (string, string, error)
 }
 
 type userService struct {
@@ -231,4 +232,28 @@ func (s *userService) GetUsers(page, pageSize int) (*dto.PaginatedUsersResponse,
 			Total:    total,
 		},
 	}, nil
+}
+
+func (s *userService) RefreshToken(refreshToken string) (string, string, error) {
+	userID, err := auth.ParseRefreshToken(refreshToken)
+	if err != nil {
+		return "", "", err
+	}
+
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
+	user, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return "", "", apperror.ErrUserNotFound
+		}
+		return "", "", err
+	}
+
+	accessToken, newRefreshToken, err := auth.GenerateToken(user.ID.Hex(), string(user.Role))
+	if err != nil {
+		return "", "", err
+	}
+
+	return accessToken, newRefreshToken, nil
 }

@@ -2,8 +2,8 @@ package auth
 
 import (
 	"context"
-	"errors"
 	"fmt"
+	"github.com/giakiet05/lkforum/internal/apperror"
 	"github.com/giakiet05/lkforum/internal/config"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
@@ -109,24 +109,24 @@ func ParseAccessToken(tokenStr string) (AuthUser, error) {
 	})
 
 	if err != nil {
-		return AuthUser{}, err
+		return AuthUser{}, apperror.ErrInvalidToken
 	}
 	if !token.Valid {
-		return AuthUser{}, errors.New("invalid token")
+		return AuthUser{}, apperror.ErrInvalidToken
 	}
 
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok {
-		return AuthUser{}, errors.New("invalid claims")
+		return AuthUser{}, apperror.ErrInvalidClaims
 	}
 
 	// Verify issuer and audience explicitly
 	if iss, ok := claims["iss"].(string); !ok || iss != issuer {
-		return AuthUser{}, errors.New("invalid issuer")
+		return AuthUser{}, apperror.ErrInvalidIssuer
 	}
 
 	if aud, ok := claims["aud"].(string); !ok || aud != audience {
-		return AuthUser{}, errors.New("invalid audience")
+		return AuthUser{}, apperror.ErrInvalidAudience
 	}
 
 	userID, _ := claims["sub"].(string)
@@ -136,7 +136,7 @@ func ParseAccessToken(tokenStr string) (AuthUser, error) {
 	if TokenSvc != nil {
 		ctx := context.Background()
 		if !TokenSvc.IsUserValid(ctx, userID) {
-			return AuthUser{}, errors.New("token has been invalidated")
+			return AuthUser{}, apperror.ErrTokenInvalidated
 		}
 	}
 
@@ -153,24 +153,24 @@ func ParseRefreshToken(tokenStr string) (string, error) {
 	})
 
 	if err != nil {
-		return "", err
+		return "", apperror.ErrInvalidToken
 	}
 	if !token.Valid {
-		return "", errors.New("invalid token")
+		return "", apperror.ErrInvalidToken
 	}
 
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok {
-		return "", errors.New("invalid claims")
+		return "", apperror.ErrInvalidClaims
 	}
 
 	// Verify issuer and audience explicitly
 	if iss, ok := claims["iss"].(string); !ok || iss != issuer {
-		return "", errors.New("invalid issuer")
+		return "", apperror.ErrInvalidIssuer
 	}
 
 	if aud, ok := claims["aud"].(string); !ok || aud != audience {
-		return "", errors.New("invalid audience")
+		return "", apperror.ErrInvalidAudience
 	}
 
 	userID, _ := claims["sub"].(string)
@@ -179,7 +179,7 @@ func ParseRefreshToken(tokenStr string) (string, error) {
 	if TokenSvc != nil {
 		ctx := context.Background()
 		if !TokenSvc.IsUserValid(ctx, userID) {
-			return "", errors.New("token has been invalidated")
+			return "", apperror.ErrTokenInvalidated
 		}
 	}
 
@@ -191,7 +191,14 @@ func IsOwner(c *gin.Context, ownerID string) bool {
 	if !exists {
 		return false
 	}
-	//Get ID from authUser
-	userID := (authUser.(AuthUser)).ID
-	return userID == ownerID
+	user := authUser.(AuthUser)
+	return user.ID == ownerID
+}
+
+func IsAdmin(c *gin.Context) bool {
+	authUser, exists := c.Get("authUser")
+	if !exists {
+		return false
+	}
+	return authUser.(AuthUser).Role == "admin"
 }
