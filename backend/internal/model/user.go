@@ -14,6 +14,7 @@ type User struct {
 	Role        Role               `bson:"role" json:"role"`
 	RoleContent RoleContent        `bson:"role_content,omitempty" json:"role_content,omitempty"`
 	CreateAt    time.Time          `bson:"create_at,omitempty" json:"create_at,omitempty"`
+	DeletedAt   *time.Time         `bson:"deleted_at,omitempty" json:"deleted_at,omitempty"`
 }
 
 type Role string
