@@ -7,21 +7,15 @@ import (
 )
 
 func RegisterUserRoutes(rg *gin.RouterGroup, c *controller.UserController) {
-	// Public routes
-	users := rg.Group("/users")             // Get all users (paginated)
-	users.POST("/register", c.RegisterUser) // Register new user
-	users.POST("/login", c.Login)           // Login
+	users := rg.Group("/users")
 
 	// Protected routes (require authentication)
-	authUsers := users.Group("/")
-	authUsers.Use(middleware.AuthMiddleware())
+	users.Use(middleware.AuthMiddleware())
 	{
-		authUsers.GET("", c.GetUsers)
-		authUsers.GET("/:id", c.GetUserByID)
-		// Get user by ID
-		authUsers.PUT("/:id", c.UpdateUser)                     // Update user
-		authUsers.PUT("/:id/change-password", c.ChangePassword) // Change password
-
-		authUsers.DELETE("/:id", c.DeleteUser) // Delete user
+		users.GET("", c.GetUsers)
+		users.GET(":id", c.GetUserByID)
+		users.PUT(":id", c.UpdateUser)
+		users.PUT(":id/change-password", c.ChangePassword)
+		users.DELETE(":id", c.DeleteUser)
 	}
 }

@@ -63,6 +63,7 @@ func initRoutes(controllers *Controllers, r *gin.Engine) {
 	})
 
 	//Register more routes here
+	route.RegisterAuthRoutes(api, &controllers.UserController)
 	route.RegisterUserRoutes(api, &controllers.UserController)
 }
 
