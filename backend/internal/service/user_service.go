@@ -11,11 +11,12 @@ import (
 	"github.com/giakiet05/lkforum/internal/util"
 	"go.mongodb.org/mongo-driver/mongo"
 	"golang.org/x/crypto/bcrypt"
+	"regexp"
 )
 
 type UserService interface {
 	RegisterUser(username, email, password string) (*model.User, string, string, error)
-	Login(identifier, password, loginType string) (*model.User, string, string, error)
+	Login(identifier, password string) (*model.User, string, string, error)
 	UpdateUser(user *model.User) (*model.User, error)
 	DeleteUser(id string) error
 
@@ -116,12 +117,15 @@ func (s *userService) RegisterUser(username, email, password string) (*model.Use
 	return createdUser, accessToken, refreshToken, nil
 }
 
-func (s *userService) Login(identifier, password, loginType string) (*model.User, string, string, error) {
+func (s *userService) Login(identifier, password string) (*model.User, string, string, error) {
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
 	var user *model.User
 	var err error
-	if loginType == "email" {
+
+	// Use regex to check if identifier is an email
+	isEmail := isEmail(identifier)
+	if isEmail {
 		user, err = s.userRepo.GetByEmail(ctx, identifier)
 	} else {
 		user, err = s.userRepo.GetByUsername(ctx, identifier)
@@ -256,4 +260,10 @@ func (s *userService) RefreshToken(refreshToken string) (string, string, error) 
 	}
 
 	return accessToken, newRefreshToken, nil
+}
+
+// isEmail checks if the given string is a valid email address format
+func isEmail(s string) bool {
+	var emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
+	return emailRegex.MatchString(s)
 }
