@@ -83,6 +83,23 @@ func Init() (*gin.Engine, error) {
 	db := client.Database(os.Getenv("DB_NAME"))
 	router := gin.Default()
 
+	// Register CORS middleware before any routes or other middleware
+	allowOrigin := os.Getenv("FRONTEND_URL")
+	if allowOrigin == "" {
+		allowOrigin = "http://localhost:5173"
+	}
+	router.Use(func(c *gin.Context) {
+		c.Writer.Header().Set("Access-Control-Allow-Origin", allowOrigin)
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(204)
+			return
+		}
+		c.Next()
+	})
+
 	// Initialize other components
 	repos := initRepos(db)
 	services := initServices(repos)

@@ -83,7 +83,7 @@ func (c *UserController) Login(ctx *gin.Context) {
 		return
 	}
 
-	user, accessToken, refreshToken, err := c.service.Login(req.Identifier, req.Password, req.LoginType)
+	user, accessToken, refreshToken, err := c.service.Login(req.Identifier, req.Password)
 	if err != nil {
 		if errors.Is(err, apperror.ErrInvalidCredentials) {
 			ctx.JSON(http.StatusUnauthorized, dto.ErrorResponse{Code: apperror.Code(err), Error: err.Error()})
