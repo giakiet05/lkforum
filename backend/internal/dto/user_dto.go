@@ -13,7 +13,6 @@ type UserRegisterRequest struct {
 type UserLoginRequest struct {
 	Identifier string `json:"identifier" binding:"required"` // Username or Email
 	Password   string `json:"password" binding:"required"`
-	LoginType  string `json:"login_type" binding:"required,oneof=username email"`
 }
 
 type UserUpdateRequest struct {
