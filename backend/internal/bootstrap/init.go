@@ -25,6 +25,7 @@ type Services struct {
 
 type Controllers struct {
 	controller.UserController
+	controller.CommunityController
 }
 
 // initRepos initializes repositories with the given database
@@ -38,14 +39,16 @@ func initRepos(db *mongo.Database) *Repos {
 // initServices Initialize services with the given repositories
 func initServices(repos *Repos) *Services {
 	return &Services{
-		UserService: service.NewUserService(repos.UserRepo),
+		UserService:      service.NewUserService(repos.UserRepo),
+		CommunityService: service.NewCommunityService(repos.CommunityRepo),
 	}
 }
 
 // initControllers Initialize controllers with the given services
 func initControllers(services *Services) *Controllers {
 	return &Controllers{
-		UserController: *controller.NewUserController(services.UserService),
+		UserController:      *controller.NewUserController(services.UserService),
+		CommunityController: *controller.NewCommunityController(services.CommunityService),
 	}
 }
 
@@ -65,6 +68,7 @@ func initRoutes(controllers *Controllers, r *gin.Engine) {
 	//Register more routes here
 	route.RegisterAuthRoutes(api, &controllers.UserController)
 	route.RegisterUserRoutes(api, &controllers.UserController)
+	route.RegisterCommunityRoutes(api, &controllers.CommunityController)
 }
 
 // Init initializes all application components

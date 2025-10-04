@@ -2,6 +2,7 @@ package repo
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/giakiet05/lkforum/internal/config"
@@ -9,6 +10,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type MembershipRepo interface {
@@ -16,9 +18,8 @@ type MembershipRepo interface {
 	//GetAll(ctx context.Context) ([]*model.Membership, error)
 	GetByID(ctx context.Context, id string) (*model.Membership, error)
 	GetByUserID(ctx context.Context, userID string) ([]*model.Membership, error)
-	GetByCommunityID(ctx context.Context, communityID string) ([]*model.Membership, error)
-	GetByRole(ctx context.Context, role model.CommunityRole) ([]*model.Membership, error)
-	Update(ctx context.Context, membership *model.Membership) (*model.Membership, error)
+	GetByCommunityIDPaginated(ctx context.Context, communityID string, page int, pageSize int) ([]*model.Membership, int64, error)
+	Replace(ctx context.Context, membership *model.Membership) error
 	Delete(ctx context.Context, id string) error
 }
 
@@ -29,7 +30,7 @@ type membershipRepo struct {
 func (m *membershipRepo) Create(ctx context.Context, membership *model.Membership) (*model.Membership, error) {
 	result, err := m.membershipCollection.InsertOne(ctx, membership)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create membership: %w", err)
 	}
 
 	if oid, ok := result.InsertedID.(primitive.ObjectID); ok {
@@ -39,10 +40,20 @@ func (m *membershipRepo) Create(ctx context.Context, membership *model.Membershi
 }
 
 func (m *membershipRepo) GetByID(ctx context.Context, id string) (*model.Membership, error) {
-	cursor, err := m.membershipCollection.Find(ctx, bson.M{"_id": id})
+	membershipObjectID, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return nil, err
 	}
+
+	cursor, err := m.membershipCollection.Find(ctx, bson.M{"_id": membershipObjectID})
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return nil, fmt.Errorf(`membership with id %s not found`, id)
+		}
+
+		return nil, fmt.Errorf("failed to get membership by id: %w", err)
+	}
+	defer cursor.Close(ctx)
 
 	var membership *model.Membership
 	if err := cursor.Decode(&membership); err != nil {
@@ -53,10 +64,16 @@ func (m *membershipRepo) GetByID(ctx context.Context, id string) (*model.Members
 }
 
 func (m *membershipRepo) GetByUserID(ctx context.Context, userID string) ([]*model.Membership, error) {
-	cursor, err := m.membershipCollection.Find(ctx, bson.M{"user_id": userID})
+	userObjectID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
 		return nil, err
 	}
+
+	cursor, err := m.membershipCollection.Find(ctx, bson.M{"user_id": userObjectID})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get membership by user id: %w", err)
+	}
+	defer cursor.Close(ctx)
 
 	var memberships []*model.Membership
 	if err := cursor.Decode(&memberships); err != nil {
@@ -66,25 +83,57 @@ func (m *membershipRepo) GetByUserID(ctx context.Context, userID string) ([]*mod
 	return memberships, nil
 }
 
-func (m *membershipRepo) GetByCommunityID(ctx context.Context, communityID string) ([]*model.Membership, error) {
-	//TODO implement me
-	panic("implement me")
+func (m *membershipRepo) GetByCommunityIDPaginated(ctx context.Context, communityID string, page int, pageSize int) ([]*model.Membership, int64, error) {
+	communityObjectID, err := primitive.ObjectIDFromHex(communityID)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	skip := (page - 1) * pageSize
+	filter := bson.M{"community_id": communityObjectID}
+	opts := options.Find().SetSkip(int64(skip)).SetLimit(int64(pageSize))
+
+	cursor, err := m.membershipCollection.Find(ctx, filter, opts)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get memberships by community id: %w", err)
+	}
+	defer cursor.Close(ctx)
+
+	var memberships []*model.Membership
+	if err := cursor.Decode(&memberships); err != nil {
+		return nil, 0, err
+	}
+
+	count, err := m.membershipCollection.CountDocuments(ctx, filter)
+	if err != nil {
+		return nil, -1, fmt.Errorf("failed to query communities: %w", err)
+	}
+
+	return memberships, count, nil
 }
 
-func (m *membershipRepo) GetByRole(ctx context.Context, role model.CommunityRole) ([]*model.Membership, error) {
-	//TODO implement me
-	panic("implement me")
-}
+func (m *membershipRepo) Replace(ctx context.Context, membership *model.Membership) error {
+	result, err := m.membershipCollection.ReplaceOne(ctx, bson.M{"_id": membership.ID}, membership)
+	if err != nil {
+		return fmt.Errorf("failed to update membership: %w", err)
+	}
 
-func (m *membershipRepo) Update(ctx context.Context, membership *model.Membership) (*model.Membership, error) {
-	//TODO implement me
-	panic("implement me")
+	if result.MatchedCount == 0 {
+		return fmt.Errorf("no document found with id %v", membership.ID)
+	}
+
+	return nil
 }
 
 func (m *membershipRepo) Delete(ctx context.Context, membershipID string) error {
-	result, err := m.membershipCollection.DeleteOne(ctx, bson.M{"_id": membershipID})
+	membershipObjectID, err := primitive.ObjectIDFromHex(membershipID)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to parse id: %w", err)
+	}
+
+	result, err := m.membershipCollection.DeleteOne(ctx, bson.M{"_id": membershipObjectID})
+	if err != nil {
+		return fmt.Errorf("failed to delete membership: %w", err)
 	}
 
 	if result.DeletedCount == 0 {

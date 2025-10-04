@@ -13,14 +13,15 @@ import (
 
 type CommunityService interface {
 	CreateCommunity(req *dto.CreateCommunityRequest, userID string) (*model.Community, error)
-	GetAllCommunities() ([]*model.Community, error)
 	GetCommunityByID(id string) (*model.Community, error)
-	GetCommunitiesByModeratorID(moderatorID string) ([]*model.Community, error)
+	GetCommunitiesFilter(name string, description string, createFrom time.Time, page int, pageSize int) (*dto.PaginatedCommunitiesResponse, error)
+	GetCommunitiesByModeratorIDPaginated(moderatorID string, page int, pageSize int) (*dto.PaginatedCommunitiesResponse, error)
+	GetAllCommunitiesPaginated(page int, pageSize int) (*dto.PaginatedCommunitiesResponse, error)
 	UpdateCommunity(req *dto.UpdateCommunityRequest, userID string) (*model.Community, error)
 	AddModerator(req *dto.AddModeratorRequest, userID string) error
 	RemoveModerator(req *dto.RemoveModeratorRequest, userID string) error
-	IsModerator(userID string, community *model.Community) (bool, error)
-	DeleteCommunityByID(communityID string) error
+	IsModerator(community *model.Community, userID string) (bool, error)
+	DeleteCommunityByID(communityID string, userID string) error
 }
 
 type communityService struct {
@@ -37,65 +38,99 @@ func (c *communityService) CreateCommunity(req *dto.CreateCommunityRequest, user
 	}
 
 	community := &model.Community{
-		Name:        req.Name,
-		Description: req.Description,
-		Avatar:      req.Avatar,
-		Banner:      req.Banner,
-		Setting:     req.Setting,
-		Moderators:  req.Moderators,
-		CreateAt:    time.Now(),
-		CreateBy:    userObjectID,
-		IsDeleted:   false,
-		IsBanned:    false,
+		Name:           req.Name,
+		Description:    req.Description,
+		Avatar:         req.Avatar,
+		Banner:         req.Banner,
+		Setting:        req.Setting,
+		Moderators:     req.Moderators,
+		CreateAt:       time.Now(),
+		CreateByID:     userObjectID,
+		CreateByName:   req.CreatorName,
+		CreateByAvatar: req.CreatorAvatar,
+		IsDeleted:      false,
+		IsBanned:       false,
 	}
 	return c.communityRepo.Create(ctx, community)
-}
-
-func (c *communityService) GetAllCommunities() ([]*model.Community, error) {
-	ctx, cancel := util.NewDefaultDBContext()
-	defer cancel()
-
-	return c.communityRepo.GetAll(ctx)
 }
 
 func (c *communityService) GetCommunityByID(id string) (*model.Community, error) {
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
 
-	communityObjectID, err := primitive.ObjectIDFromHex(id)
-	if err != nil {
-		return nil, err
-	}
-
-	return c.communityRepo.GetById(ctx, communityObjectID)
+	return c.communityRepo.GetByID(ctx, id)
 }
 
-func (c *communityService) GetCommunitiesByModeratorID(moderatorID string) ([]*model.Community, error) {
+func (c *communityService) GetCommunitiesFilter(
+	name string,
+	description string,
+	createFrom time.Time,
+	page int,
+	pageSize int,
+) (*dto.PaginatedCommunitiesResponse, error) {
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
 
-	modObjectID, err := primitive.ObjectIDFromHex(moderatorID)
-	if err != nil {
-		return nil, err
+	communities, total, err := c.communityRepo.GetFilter(ctx, name, description, createFrom, page, pageSize)
+	communitiesResponses := dto.FromCommunities(communities)
+
+	var response = &dto.PaginatedCommunitiesResponse{
+		Communities: communitiesResponses,
+		Pagination: dto.Pagination{
+			Total: total,
+			Page:  page,
+		},
 	}
 
-	return c.communityRepo.GetByModeratorId(ctx, modObjectID)
+	return response, err
+}
+
+func (c *communityService) GetCommunitiesByModeratorIDPaginated(moderatorID string, page int, pageSize int) (*dto.PaginatedCommunitiesResponse, error) {
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
+
+	communities, total, err := c.communityRepo.GetByModeratorIDPaginated(ctx, moderatorID, page, pageSize)
+	communitiesResponses := dto.FromCommunities(communities)
+
+	var response = &dto.PaginatedCommunitiesResponse{
+		Communities: communitiesResponses,
+		Pagination: dto.Pagination{
+			Total: total,
+			Page:  page,
+		},
+	}
+
+	return response, err
+}
+
+func (c *communityService) GetAllCommunitiesPaginated(page int, pageSize int) (*dto.PaginatedCommunitiesResponse, error) {
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
+
+	communities, total, err := c.communityRepo.GetAllPaginated(ctx, page, pageSize)
+	communitiesResponses := dto.FromCommunities(communities)
+
+	var response = &dto.PaginatedCommunitiesResponse{
+		Communities: communitiesResponses,
+		Pagination: dto.Pagination{
+			Total: total,
+			Page:  page,
+		},
+	}
+
+	return response, err
 }
 
 func (c *communityService) UpdateCommunity(req *dto.UpdateCommunityRequest, userID string) (*model.Community, error) {
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
 
-	communityID, err := primitive.ObjectIDFromHex(req.CommunityID)
-	if err != nil {
-		return nil, err
-	}
-	community, err := c.communityRepo.GetById(ctx, communityID)
+	community, err := c.communityRepo.GetByID(ctx, req.CommunityID)
 	if err != nil {
 		return nil, err
 	}
 
-	ok, err := c.IsModerator(userID, community)
+	ok, err := c.IsModerator(community, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -136,16 +171,12 @@ func (c *communityService) AddModerator(req *dto.AddModeratorRequest, userID str
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
 
-	communityID, err := primitive.ObjectIDFromHex(req.CommunityID)
-	if err != nil {
-		return err
-	}
-	community, err := c.communityRepo.GetById(ctx, communityID)
+	community, err := c.communityRepo.GetByID(ctx, req.CommunityID)
 	if err != nil {
 		return err
 	}
 
-	ok, err := c.IsModerator(userID, community)
+	ok, err := c.IsModerator(community, userID)
 	if err != nil {
 		return err
 	}
@@ -154,8 +185,8 @@ func (c *communityService) AddModerator(req *dto.AddModeratorRequest, userID str
 	}
 
 	var newModerators []model.Moderator
-	for _, id := range req.AddedModeratorID {
-		ok, err := c.IsModerator(id, community)
+	for _, modDTO := range req.AddedModerator {
+		ok, err := c.IsModerator(community, modDTO.ModeratorID)
 		if err != nil {
 			return err
 		}
@@ -163,11 +194,17 @@ func (c *communityService) AddModerator(req *dto.AddModeratorRequest, userID str
 			continue
 		}
 
-		objectID, err := primitive.ObjectIDFromHex(id)
+		objectID, err := primitive.ObjectIDFromHex(modDTO.ModeratorID)
 		if err != nil {
-			return fmt.Errorf("invalid new moderator id: %s", id)
+			return fmt.Errorf("invalid new moderator id: %s", modDTO.ModeratorID)
 		}
-		newModerators = append(newModerators, model.Moderator{UserID: objectID, AssignedAt: time.Now()})
+		newModerators = append(
+			newModerators,
+			model.Moderator{
+				UserID:     objectID,
+				Username:   modDTO.Username,
+				AssignedAt: time.Now(),
+			})
 	}
 
 	if len(newModerators) == 0 {
@@ -182,16 +219,12 @@ func (c *communityService) RemoveModerator(req *dto.RemoveModeratorRequest, user
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
 
-	communityID, err := primitive.ObjectIDFromHex(req.CommunityID)
-	if err != nil {
-		return err
-	}
-	community, err := c.communityRepo.GetById(ctx, communityID)
+	community, err := c.communityRepo.GetByID(ctx, req.CommunityID)
 	if err != nil {
 		return err
 	}
 
-	ok, err := c.IsModerator(userID, community)
+	ok, err := c.IsModerator(community, userID)
 	if err != nil {
 		return err
 	}
@@ -199,13 +232,13 @@ func (c *communityService) RemoveModerator(req *dto.RemoveModeratorRequest, user
 		return fmt.Errorf("user is not a moderator of the community")
 	}
 
-	for _, id := range req.RemovedModeratorID {
-		if userID == id {
+	for _, modDTO := range req.RemovedModerator {
+		if userID == modDTO.ModeratorID {
 			return fmt.Errorf("cannot remove yourself as a moderator")
 		}
 
 		for i, mod := range community.Moderators {
-			if mod.UserID.Hex() == id {
+			if mod.UserID.Hex() == modDTO.ModeratorID {
 				community.Moderators = append(community.Moderators[:i], community.Moderators[i+1:]...)
 				break
 			}
@@ -215,19 +248,27 @@ func (c *communityService) RemoveModerator(req *dto.RemoveModeratorRequest, user
 	return c.communityRepo.Replace(ctx, community)
 }
 
-func (c *communityService) DeleteCommunityByID(communityID string) error {
+func (c *communityService) DeleteCommunityByID(communityID string, userID string) error {
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
 
-	communityObjectID, err := primitive.ObjectIDFromHex(communityID)
+	community, err := c.communityRepo.GetByID(ctx, communityID)
 	if err != nil {
 		return err
 	}
 
-	return c.communityRepo.Delete(ctx, communityObjectID)
+	ok, err := c.IsModerator(community, userID)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return fmt.Errorf("user is not a moderator of the community")
+	}
+
+	return c.communityRepo.Delete(ctx, communityID)
 }
 
-func (c *communityService) IsModerator(userID string, community *model.Community) (bool, error) {
+func (c *communityService) IsModerator(community *model.Community, userID string) (bool, error) {
 	objectID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
 		return false, fmt.Errorf("invalid user id: %s", userID)

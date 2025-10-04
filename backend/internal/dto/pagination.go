@@ -10,3 +10,8 @@ type PaginatedUsersResponse struct {
 	Users      []UserResponse `json:"users"`
 	Pagination Pagination     `json:"pagination"`
 }
+
+type PaginatedCommunitiesResponse struct {
+	Communities []CommunityResponse `json:"communities"`
+	Pagination  Pagination          `json:"pagination"`
+}
