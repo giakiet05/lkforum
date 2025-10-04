@@ -15,16 +15,20 @@ import (
 
 type MembershipRepo interface {
 	Create(ctx context.Context, membership *model.Membership) (*model.Membership, error)
-	//GetAll(ctx context.Context) ([]*model.Membership, error)
 	GetByID(ctx context.Context, id string) (*model.Membership, error)
-	GetByUserID(ctx context.Context, userID string) ([]*model.Membership, error)
-	GetByCommunityIDPaginated(ctx context.Context, communityID string, page int, pageSize int) ([]*model.Membership, int64, error)
-	Replace(ctx context.Context, membership *model.Membership) error
+	GetByUserID(ctx context.Context, userID string) ([]model.Membership, error)
+	GetAllPaginated(ctx context.Context, page int, pageSize int) ([]model.Membership, int64, error)
+	GetByCommunityIDPaginated(ctx context.Context, communityID string, page int, pageSize int) ([]model.Membership, int64, error)
 	Delete(ctx context.Context, id string) error
+	CountMembersByCommunityID(ctx context.Context, moderatorID string) (int64, error)
 }
 
 type membershipRepo struct {
 	membershipCollection *mongo.Collection
+}
+
+func NewMembershipRepo(db *mongo.Database) MembershipRepo {
+	return &membershipRepo{membershipCollection: db.Collection(config.MembershipColName)}
 }
 
 func (m *membershipRepo) Create(ctx context.Context, membership *model.Membership) (*model.Membership, error) {
@@ -63,7 +67,7 @@ func (m *membershipRepo) GetByID(ctx context.Context, id string) (*model.Members
 	return membership, nil
 }
 
-func (m *membershipRepo) GetByUserID(ctx context.Context, userID string) ([]*model.Membership, error) {
+func (m *membershipRepo) GetByUserID(ctx context.Context, userID string) ([]model.Membership, error) {
 	userObjectID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
 		return nil, err
@@ -75,15 +79,38 @@ func (m *membershipRepo) GetByUserID(ctx context.Context, userID string) ([]*mod
 	}
 	defer cursor.Close(ctx)
 
-	var memberships []*model.Membership
-	if err := cursor.Decode(&memberships); err != nil {
+	var memberships []model.Membership
+	if err := cursor.All(ctx, &memberships); err != nil {
 		return nil, err
 	}
 
 	return memberships, nil
 }
 
-func (m *membershipRepo) GetByCommunityIDPaginated(ctx context.Context, communityID string, page int, pageSize int) ([]*model.Membership, int64, error) {
+func (m *membershipRepo) GetAllPaginated(ctx context.Context, page int, pageSize int) ([]model.Membership, int64, error) {
+	skip := (page - 1) * pageSize
+	opts := options.Find().SetSkip(int64(skip)).SetLimit(int64(pageSize))
+
+	cursor, err := m.membershipCollection.Find(ctx, bson.M{}, opts)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get all memberships: %w", err)
+	}
+	defer cursor.Close(ctx)
+
+	var memberships []model.Membership
+	if err := cursor.All(ctx, &memberships); err != nil {
+		return nil, 0, fmt.Errorf("failed to decode memberships: %w", err)
+	}
+
+	count, err := m.membershipCollection.CountDocuments(ctx, bson.M{})
+	if err != nil {
+		return nil, -1, fmt.Errorf("failed to count memberships: %w", err)
+	}
+
+	return memberships, count, nil
+}
+
+func (m *membershipRepo) GetByCommunityIDPaginated(ctx context.Context, communityID string, page int, pageSize int) ([]model.Membership, int64, error) {
 	communityObjectID, err := primitive.ObjectIDFromHex(communityID)
 	if err != nil {
 		return nil, 0, err
@@ -99,8 +126,8 @@ func (m *membershipRepo) GetByCommunityIDPaginated(ctx context.Context, communit
 	}
 	defer cursor.Close(ctx)
 
-	var memberships []*model.Membership
-	if err := cursor.Decode(&memberships); err != nil {
+	var memberships []model.Membership
+	if err := cursor.All(ctx, &memberships); err != nil {
 		return nil, 0, err
 	}
 
@@ -110,19 +137,6 @@ func (m *membershipRepo) GetByCommunityIDPaginated(ctx context.Context, communit
 	}
 
 	return memberships, count, nil
-}
-
-func (m *membershipRepo) Replace(ctx context.Context, membership *model.Membership) error {
-	result, err := m.membershipCollection.ReplaceOne(ctx, bson.M{"_id": membership.ID}, membership)
-	if err != nil {
-		return fmt.Errorf("failed to update membership: %w", err)
-	}
-
-	if result.MatchedCount == 0 {
-		return fmt.Errorf("no document found with id %v", membership.ID)
-	}
-
-	return nil
 }
 
 func (m *membershipRepo) Delete(ctx context.Context, membershipID string) error {
@@ -143,6 +157,17 @@ func (m *membershipRepo) Delete(ctx context.Context, membershipID string) error 
 	return nil
 }
 
-func NewMembershipRepo(db *mongo.Database) MembershipRepo {
-	return &membershipRepo{membershipCollection: db.Collection(config.MembershipColName)}
+func (m *membershipRepo) CountMembersByCommunityID(ctx context.Context, moderatorID string) (int64, error) {
+	communityObjectID, err := primitive.ObjectIDFromHex(moderatorID)
+	if err != nil {
+		return -1, err
+	}
+
+	filter := bson.M{"community_id": communityObjectID}
+	count, err := m.membershipCollection.CountDocuments(ctx, filter)
+	if err != nil {
+		return -1, err
+	}
+
+	return count, nil
 }

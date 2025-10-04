@@ -47,20 +47,14 @@ type CommunityResponse struct {
 	Banner      string                 `json:"banner"`
 	Setting     model.CommunitySetting `json:"setting"`
 	Moderators  []model.Moderator      `json:"moderators"`
+	PostCount   int64                  `json:"post_count"`
+	MemberCount int64                  `json:"member_count"`
 }
 
 func FromCommunities(communities []model.Community) []CommunityResponse {
 	var communityResponses []CommunityResponse
 	for _, community := range communities {
-		communityResponses = append(communityResponses, CommunityResponse{
-			ID:          community.ID.Hex(),
-			Name:        community.Name,
-			Description: *community.Description,
-			Avatar:      *community.Avatar,
-			Banner:      *community.Banner,
-			Setting:     community.Setting,
-			Moderators:  community.Moderators,
-		})
+		communityResponses = append(communityResponses, *FromCommunity(&community))
 	}
 	return communityResponses
 }
@@ -74,5 +68,7 @@ func FromCommunity(community *model.Community) *CommunityResponse {
 		Banner:      *community.Banner,
 		Setting:     community.Setting,
 		Moderators:  community.Moderators,
+		PostCount:   community.PostCount,
+		MemberCount: community.MemberCount,
 	}
 }

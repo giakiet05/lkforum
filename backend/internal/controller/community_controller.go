@@ -47,6 +47,10 @@ func (c *CommunityController) CreateCommunity(ctx *gin.Context) {
 
 func (c *CommunityController) GetCommunityByID(ctx *gin.Context) {
 	communityID := ctx.Param("community_id")
+	if communityID == "" {
+		ctx.JSON(http.StatusBadRequest, dto.ErrorResponse{Code: "INVALID_REQUEST", Error: communityID})
+		return
+	}
 
 	community, err := c.communityService.GetCommunityByID(communityID)
 	if err != nil {

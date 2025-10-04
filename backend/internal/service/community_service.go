@@ -28,6 +28,10 @@ type communityService struct {
 	communityRepo repo.CommunityRepo
 }
 
+func NewCommunityService(communityRepo repo.CommunityRepo) CommunityService {
+	return &communityService{communityRepo: communityRepo}
+}
+
 func (c *communityService) CreateCommunity(req *dto.CreateCommunityRequest, userID string) (*model.Community, error) {
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
@@ -72,6 +76,9 @@ func (c *communityService) GetCommunitiesFilter(
 	defer cancel()
 
 	communities, total, err := c.communityRepo.GetFilter(ctx, name, description, createFrom, page, pageSize)
+	if err != nil {
+		return nil, err
+	}
 	communitiesResponses := dto.FromCommunities(communities)
 
 	var response = &dto.PaginatedCommunitiesResponse{
@@ -90,6 +97,9 @@ func (c *communityService) GetCommunitiesByModeratorIDPaginated(moderatorID stri
 	defer cancel()
 
 	communities, total, err := c.communityRepo.GetByModeratorIDPaginated(ctx, moderatorID, page, pageSize)
+	if err != nil {
+		return nil, err
+	}
 	communitiesResponses := dto.FromCommunities(communities)
 
 	var response = &dto.PaginatedCommunitiesResponse{
@@ -108,6 +118,9 @@ func (c *communityService) GetAllCommunitiesPaginated(page int, pageSize int) (*
 	defer cancel()
 
 	communities, total, err := c.communityRepo.GetAllPaginated(ctx, page, pageSize)
+	if err != nil {
+		return nil, err
+	}
 	communitiesResponses := dto.FromCommunities(communities)
 
 	var response = &dto.PaginatedCommunitiesResponse{
@@ -280,8 +293,4 @@ func (c *communityService) IsModerator(community *model.Community, userID string
 		}
 	}
 	return false, nil
-}
-
-func NewCommunityService(communityRepo repo.CommunityRepo) CommunityService {
-	return &communityService{communityRepo: communityRepo}
 }

@@ -30,6 +30,12 @@ type communityRepo struct {
 	communityCollection *mongo.Collection
 }
 
+func NewCommunityRepo(db *mongo.Database) CommunityRepo {
+	return &communityRepo{
+		communityCollection: db.Collection(config.CommunityColName),
+	}
+}
+
 func (c *communityRepo) Create(ctx context.Context, community *model.Community) (*model.Community, error) {
 	result, err := c.communityCollection.InsertOne(ctx, community)
 	if err != nil {
@@ -235,6 +241,34 @@ func (c *communityRepo) Delete(ctx context.Context, communityID string) error {
 	return nil
 }
 
-func NewCommunityRepo(db *mongo.Database) CommunityRepo {
-	return &communityRepo{communityCollection: db.Collection(config.CommunityColName)}
+/*
+func (c *communityRepo) CountPostsByCommunityID(ctx context.Context, communityID string) (int64, error) {
+	communityObjectID, err := primitive.ObjectIDFromHex(communityID)
+	if err != nil {
+		return -1, err
+	}
+
+	filter := bson.M{"community_id": communityObjectID}
+	count, err := c.postCollection.CountDocuments(ctx, filter)
+	if err != nil {
+		return -1, err
+	}
+
+	return count, nil
 }
+
+func (c *communityRepo) CountMembersByCommunityID(ctx context.Context, moderatorID string) (int64, error) {
+	communityObjectID, err := primitive.ObjectIDFromHex(moderatorID)
+	if err != nil {
+		return -1, err
+	}
+
+	filter := bson.M{"community_id": communityObjectID}
+	count, err := c.membershipCollection.CountDocuments(ctx, filter)
+	if err != nil {
+		return -1, err
+	}
+
+	return count, nil
+}
+*/
