@@ -28,3 +28,9 @@ func Code(err error) string {
 	}
 	return ErrInternal.Code
 }
+func NewError(originalErr error, code, message string) *AppError {
+	return &AppError{
+		Code:    code,
+		Message: message,
+	}
+}
