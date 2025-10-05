@@ -49,8 +49,7 @@ type AddPollOptionRequest struct {
 	Options []string `json:"options" validate:"required"`
 }
 type UpdatePollOptionRequest struct {
-	OptionID string `json:"option_id" validate:"required"`
-	Text     string `json:"text" validate:"required,min=3,max=300"`
+	Text string `json:"text" validate:"required,min=3,max=300"`
 }
 type RemovePollOptionRequest struct {
 	OptionIDs []string `json:"option_ids" validate:"required"`
