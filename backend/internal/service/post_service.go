@@ -43,7 +43,7 @@ type PostService interface {
 	// Quản lý Poll (chi tiết)
 	UpdatePollDetails(ctx context.Context, postID, userID primitive.ObjectID, req *dto.UpdatePollRequest) (*dto.PollResponse, error)
 	AddPollOptions(ctx context.Context, userID, postID primitive.ObjectID, req *dto.AddPollOptionRequest) (*dto.PollResponse, error)
-	UpdatePollOption(ctx context.Context, userID primitive.ObjectID, req *dto.UpdatePollOptionRequest) (*dto.PollResponse, error)
+	UpdatePollOption(ctx context.Context, userID, postID, optionID primitive.ObjectID, newText string) (*dto.PollResponse, error)
 	RemovePollOptions(ctx context.Context, userID, postID primitive.ObjectID, req *dto.RemovePollOptionRequest) (*dto.PollResponse, error)
 
 	// Tính năng cho người dùng
@@ -303,16 +303,8 @@ func (s *postService) AddPollOptions(ctx context.Context, userID, postID primiti
 	return s.getUpdatedPollResponse(ctx, postID, userID)
 }
 
-func (s *postService) UpdatePollOption(ctx context.Context, userID primitive.ObjectID, req *dto.UpdatePollOptionRequest) (*dto.PollResponse, error) {
-	postID, err := primitive.ObjectIDFromHex(req.OptionID) // Giả sử req có PostID
-	if err != nil {
-		return nil, ErrInvalidInput
-	}
-	optionID, err := primitive.ObjectIDFromHex(req.OptionID)
-	if err != nil {
-		return nil, ErrInvalidInput
-	}
-
+func (s *postService) UpdatePollOption(ctx context.Context, userID, postID, optionID primitive.ObjectID, newText string) (*dto.PollResponse, error) {
+	// 1. Kiểm tra quyền hạn của người dùng
 	post, err := s.postRepo.GetByID(ctx, postID)
 	if err != nil {
 		return nil, err
@@ -321,12 +313,14 @@ func (s *postService) UpdatePollOption(ctx context.Context, userID primitive.Obj
 		return nil, ErrPermissionDenied
 	}
 
-	if err := s.postPollRepo.UpdatePollOption(ctx, postID, optionID, req.Text); err != nil {
+	// 2. Gọi đến repository để cập nhật
+	if err := s.postPollRepo.UpdatePollOption(ctx, postID, optionID, newText); err != nil {
 		return nil, err
 	}
+
+	// 3. Lấy lại thông tin poll mới nhất và trả về
 	return s.getUpdatedPollResponse(ctx, postID, userID)
 }
-
 func (s *postService) RemovePollOptions(ctx context.Context, userID, postID primitive.ObjectID, req *dto.RemovePollOptionRequest) (*dto.PollResponse, error) {
 	post, err := s.postRepo.GetByID(ctx, postID)
 	if err != nil {
