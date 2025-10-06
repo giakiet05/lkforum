@@ -22,7 +22,7 @@ const (
 	CommunityColName       = "communities"
 	CommentColName         = "comments"
 	VoteColName            = "votes"
-	PollVoteColName        = "pollvotes"
+	PollVoteColName        = "poll_votes"
 	NotificationColName    = "notifications"
 	ReportColName          = "reports"
 	MembershipColName      = "memberships"

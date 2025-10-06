@@ -1,7 +1,6 @@
 package model
 
 import (
-	"errors"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"

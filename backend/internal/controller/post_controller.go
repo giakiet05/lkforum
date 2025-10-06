@@ -337,11 +337,11 @@ func (c *PostController) UpdatePollOption(ctx *gin.Context) {
 	}
 
 	// 2. Lấy postID và optionID từ URL
-	postID, ok := c.parseObjectID(ctx, ctx.Param("id"), "post ID")
+	postID, ok := c.parseObjectID(ctx, ctx.Param("id"))
 	if !ok {
 		return
 	}
-	optionID, ok := c.parseObjectID(ctx, ctx.Param("optionID"), "option ID")
+	optionID, ok := c.parseObjectID(ctx, ctx.Param("optionID"))
 	if !ok {
 		return
 	}
@@ -352,9 +352,12 @@ func (c *PostController) UpdatePollOption(ctx *gin.Context) {
 		handlePostServiceError(ctx, apperror.NewError(err, "INVALID_REQUEST", "Invalid option text"))
 		return
 	}
-
+	userID, ok := c.getAuthUserID(ctx)
+	if !ok {
+		return
+	}
 	// 4. Gọi đến service với các tham số đã được tách biệt rõ ràng
-	pollResponse, err := c.service.UpdatePollOption(ctx.Request.Context(), authUser.ID, postID, optionID, req.Text)
+	pollResponse, err := c.service.UpdatePollOption(ctx.Request.Context(), userID, postID, optionID, req.Text)
 	if err != nil {
 		handlePostServiceError(ctx, err)
 		return
