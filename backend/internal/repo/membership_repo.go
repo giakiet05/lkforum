@@ -20,15 +20,21 @@ type MembershipRepo interface {
 	GetAllPaginated(ctx context.Context, page int, pageSize int) ([]model.Membership, int64, error)
 	GetByCommunityIDPaginated(ctx context.Context, communityID string, page int, pageSize int) ([]model.Membership, int64, error)
 	Delete(ctx context.Context, id string) error
-	CountMembersByCommunityID(ctx context.Context, moderatorID string) (int64, error)
+
+	CountMembersByCommunityID(ctx context.Context, communityID string) (int64, error)
+	UpdateCommunityMemberCount(ctx context.Context, communityID string, count int64) error
 }
 
 type membershipRepo struct {
 	membershipCollection *mongo.Collection
+	communityCollection  *mongo.Collection
 }
 
 func NewMembershipRepo(db *mongo.Database) MembershipRepo {
-	return &membershipRepo{membershipCollection: db.Collection(config.MembershipColName)}
+	return &membershipRepo{
+		membershipCollection: db.Collection(config.MembershipColName),
+		communityCollection:  db.Collection(config.CommunityColName),
+	}
 }
 
 func (m *membershipRepo) Create(ctx context.Context, membership *model.Membership) (*model.Membership, error) {
@@ -157,8 +163,8 @@ func (m *membershipRepo) Delete(ctx context.Context, membershipID string) error 
 	return nil
 }
 
-func (m *membershipRepo) CountMembersByCommunityID(ctx context.Context, moderatorID string) (int64, error) {
-	communityObjectID, err := primitive.ObjectIDFromHex(moderatorID)
+func (m *membershipRepo) CountMembersByCommunityID(ctx context.Context, communityID string) (int64, error) {
+	communityObjectID, err := primitive.ObjectIDFromHex(communityID)
 	if err != nil {
 		return -1, err
 	}
@@ -170,4 +176,25 @@ func (m *membershipRepo) CountMembersByCommunityID(ctx context.Context, moderato
 	}
 
 	return count, nil
+}
+
+func (m *membershipRepo) UpdateCommunityMemberCount(ctx context.Context, communityID string, count int64) error {
+	communityObjectID, err := primitive.ObjectIDFromHex(communityID)
+	if err != nil {
+		return fmt.Errorf("invalid community id: %w", err)
+	}
+
+	filter := bson.M{"_id": communityObjectID}
+	update := bson.M{"$set": bson.M{"member_count": count}}
+
+	res, err := m.communityCollection.UpdateOne(ctx, filter, update)
+	if err != nil {
+		return fmt.Errorf("failed to update community %s: %w", communityID, err)
+	}
+
+	if res.MatchedCount == 0 {
+		return fmt.Errorf("community not found: %s", communityID)
+	}
+
+	return nil
 }

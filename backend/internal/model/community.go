@@ -14,8 +14,8 @@ type Community struct {
 	Banner         *string            `bson:"banner,omitempty" json:"banner,omitempty"`
 	Setting        CommunitySetting   `bson:"setting,omitempty" json:"setting,omitempty"`
 	Moderators     []Moderator        `bson:"moderators,omitempty" json:"moderators,omitempty"`
-	MemberCount    int64              `bson:"memberCount,omitempty" json:"memberCount,omitempty"`
-	PostCount      int64              `bson:"postCount,omitempty" json:"postCount,omitempty"`
+	MemberCount    int64              `bson:"member_count,omitempty" json:"member_count,omitempty"`
+	PostCount      int64              `bson:"post_count,omitempty" json:"post_count,omitempty"`
 	CreateAt       time.Time          `bson:"create_at,omitempty" json:"create_at,omitempty"`
 	CreateByID     primitive.ObjectID `bson:"create_by_id,omitempty" json:"create_by_id,omitempty"`
 	CreateByName   string             `bson:"create_by_name,omitempty" json:"create_by_name,omitempty"`
