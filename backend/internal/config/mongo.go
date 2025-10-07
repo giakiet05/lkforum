@@ -21,6 +21,8 @@ const (
 	PostColName            = "posts"
 	CommunityColName       = "communities"
 	CommentColName         = "comments"
+	ConversationColName    = "conversations"
+	MessageColName         = "messages"
 	VoteColName            = "votes"
 	NotificationColName    = "notifications"
 	ReportColName          = "reports"
@@ -79,6 +81,8 @@ func verifyCollections(ctx context.Context, db *mongo.Database) error {
 		PostColName,
 		CommunityColName,
 		CommentColName,
+		ConversationColName,
+		MessageColName,
 		VoteColName,
 		NotificationColName,
 		ReportColName,
