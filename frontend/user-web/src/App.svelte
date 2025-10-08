@@ -5,8 +5,9 @@
 
 <main>
   <nav>
-    <!-- <a href="/#/">Home</a> | -->
-    <a href="/#/login">Login</a>
+    <a href="/#/">Home</a> |
+    <a href="/#/login">Login</a> |
+    <a href="/#/register">register</a>
   </nav>
   <Router {routes} />
 </main>

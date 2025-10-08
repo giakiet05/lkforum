@@ -1,23 +1,56 @@
 <script lang="ts">
-  // Đường dẫn import đã chính xác
   import Button from "../components/Button.svelte";
+  import { login } from "../services/auth-service";
+  import { push } from "svelte-spa-router";
 
-  let username = "";
+  // form fields
+  let identifier = ""; // username hoặc email tuỳ backend
   let password = "";
 
-  let showPassword = false; // Mặc định là ẩn mật khẩu
+  // UI state
+  let loading = false;
+  let error: string | null = null;
+  let showPassword = false;
 
-  function togglePasswordVisibility() {
-    showPassword = !showPassword; // Đảo ngược trạng thái true/false
+  // Validator đơn giản
+  function validate() {
+    if (!identifier || !password) {
+      error = "Vui lòng nhập tên đăng nhập và mật khẩu";
+      return false;
+    }
+    error = null;
+    return true;
   }
-  function handleLoginSubmit() {
-    console.log("Login submitted with:", { username, password });
-    alert(`Đăng nhập với:\nUsername: ${username}\nPassword: ${password}`);
+
+  // Chuyển đổi hiển thị mật khẩu
+  function toggleShowPasswordVisibility() {
+    showPassword = !showPassword;
+  }
+
+  // Xử lý submit form
+  async function handleLoginSubmit() {
+    if (!validate()) return;
+    loading = true;
+    error = null;
+
+    try {
+      await login({ identifier, password }); // service đã lưu token và set store
+      // redirect sau khi login thành công
+      push("/");
+    } catch (err: any) {
+      console.error("Login error:", err);
+      if (typeof err === "string") error = err;
+      else if (err && (err.message || err.error))
+        error = err.message || err.error;
+      else error = "Lỗi khi đăng nhập. Vui lòng thử lại.";
+    } finally {
+      loading = false;
+    }
   }
 
   function handleGoogleLogin() {
-    console.log("Attempting Google Login...");
-    alert("Bắt đầu đăng nhập với Google!");
+    // Google để sau
+    alert("Google login sẽ làm sau");
   }
 </script>
 
@@ -36,27 +69,31 @@
       <p>Đăng nhập để tiếp tục khám phá.</p>
 
       <form on:submit|preventDefault={handleLoginSubmit} class="login-form">
+        <!-- input identifier -->
         <div class="input-group">
-          <label for="username">Tên đăng nhập</label>
+          <label for="identifier">Tên đăng nhập</label>
           <input
+            id="identifier"
             type="text"
-            id="username"
-            bind:value={username}
+            bind:value={identifier}
             placeholder="Nhập tên đăng nhập của bạn"
           />
         </div>
 
+        <!-- password-group -->
         <div class="input-group password-group">
           <label for="password">Mật khẩu</label>
           <input
-            type={showPassword ? "text" : "password"}
             id="password"
+            type={showPassword ? "text" : "password"}
             bind:value={password}
             placeholder="Mật khẩu"
           />
           <span
             class="password-toggle-icon"
-            on:click={togglePasswordVisibility}
+            on:click={toggleShowPasswordVisibility}
+            role="button"
+            aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
           >
             {#if showPassword}
               <svg
@@ -69,10 +106,10 @@
                 stroke-width="2"
                 stroke-linecap="round"
                 stroke-linejoin="round"
-                ><path
-                  d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"
-                /><circle cx="12" cy="12" r="3" /></svg
               >
+                <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
             {:else}
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -84,17 +121,30 @@
                 stroke-width="2"
                 stroke-linecap="round"
                 stroke-linejoin="round"
-                ><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" /><path
-                  d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"
-                /><path
-                  d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"
-                /><line x1="2" x2="22" y1="2" y2="22" /></svg
               >
+                <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" />
+                <path
+                  d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"
+                />
+                <path
+                  d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"
+                />
+                <line x1="2" x2="22" y1="2" y2="22" />
+              </svg>
             {/if}
           </span>
         </div>
 
-        <Button type="submit" label="Đăng Nhập" variant="primary" />
+        {#if error}
+          <div class="error" role="alert">{error}</div>
+        {/if}
+
+        <Button
+          type="submit"
+          label={loading ? "Đang đăng nhập..." : "Đăng Nhập"}
+          variant="primary"
+          disabled={loading}
+        />
       </form>
 
       <div class="separator">
@@ -225,7 +275,7 @@
 
   .decorative-section {
     flex: 0 0 50%; /* Chỉnh lại cho bố cục 50/50 */
-    background-image: url("https://images.unsplash.com/photo-1557683316-973673baf926?q=80&w=2029&auto=format&fit=crop");
+    background-image: url("/background.png");
     background-size: cover;
     background-position: center;
   }
