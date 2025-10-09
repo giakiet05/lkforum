@@ -10,42 +10,52 @@ import (
 	route "github.com/giakiet05/lkforum/internal/route/user"
 	"github.com/giakiet05/lkforum/internal/service"
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type Repos struct {
 	repo.UserRepo
 	repo.CommunityRepo
+	repo.MembershipRepo
 }
 
 type Services struct {
 	service.UserService
 	service.CommunityService
+	service.MembershipService
 }
 
 type Controllers struct {
 	controller.UserController
+	controller.CommunityController
+	controller.MembershipController
 }
 
 // initRepos initializes repositories with the given database
 func initRepos(db *mongo.Database) *Repos {
 	return &Repos{
-		UserRepo:      repo.NewUserRepo(db),
-		CommunityRepo: repo.NewCommunityRepo(db),
+		UserRepo:       repo.NewUserRepo(db),
+		CommunityRepo:  repo.NewCommunityRepo(db),
+		MembershipRepo: repo.NewMembershipRepo(db),
 	}
 }
 
 // initServices Initialize services with the given repositories
-func initServices(repos *Repos) *Services {
+func initServices(repos *Repos, redisClient *redis.Client) *Services {
 	return &Services{
-		UserService: service.NewUserService(repos.UserRepo),
+		UserService:       service.NewUserService(repos.UserRepo),
+		CommunityService:  service.NewCommunityService(repos.CommunityRepo),
+		MembershipService: service.NewMembershipService(repos.MembershipRepo, redisClient),
 	}
 }
 
 // initControllers Initialize controllers with the given services
 func initControllers(services *Services) *Controllers {
 	return &Controllers{
-		UserController: *controller.NewUserController(services.UserService),
+		UserController:       *controller.NewUserController(services.UserService),
+		CommunityController:  *controller.NewCommunityController(services.CommunityService),
+		MembershipController: *controller.NewMembershipController(services.MembershipService),
 	}
 }
 
@@ -65,6 +75,8 @@ func initRoutes(controllers *Controllers, r *gin.Engine) {
 	//Register more routes here
 	route.RegisterAuthRoutes(api, &controllers.UserController)
 	route.RegisterUserRoutes(api, &controllers.UserController)
+	route.RegisterCommunityRoutes(api, &controllers.CommunityController)
+	route.RegisterMembershipRoutes(api, &controllers.MembershipController)
 }
 
 // Init initializes all application components
@@ -102,7 +114,7 @@ func Init() (*gin.Engine, error) {
 
 	// Initialize other components
 	repos := initRepos(db)
-	services := initServices(repos)
+	services := initServices(repos, redisClient)
 	controllers := initControllers(services)
 	initRoutes(controllers, router)
 
