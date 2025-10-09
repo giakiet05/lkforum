@@ -1,99 +1,140 @@
 <script lang="ts">
   import Button from "../components/Button.svelte";
-  import { login } from "../services/auth-service";
   import { push } from "svelte-spa-router";
 
-  // form fields
-  let identifier = ""; // username hoặc email tuỳ backend
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
+
+  // Các biến cho form đăng ký
+  let email = "";
+  let username = "";
   let password = "";
+  let confirmPassword = "";
+  let showPassword = false;
 
   // UI state
   let loading = false;
   let error: string | null = null;
-  let showPassword = false;
 
-  // Validator đơn giản
-  function validate() {
-    if (!identifier || !password) {
-      error = "Vui lòng nhập tên đăng nhập và mật khẩu";
-      return false;
-    }
-    error = null;
-    return true;
-  }
-
-  // Chuyển đổi hiển thị mật khẩu
-  function toggleShowPasswordVisibility() {
+  function togglePasswordVisibility() {
     showPassword = !showPassword;
   }
 
-  // Xử lý submit form
-  async function handleLoginSubmit() {
-    if (!validate()) return;
+  async function handleRegisterSubmit() {
+    // validate cơ bản
+    if (!email || !username || !password || !confirmPassword) {
+      error = "Vui lòng điền đầy đủ thông tin";
+      return;
+    }
+    if (password !== confirmPassword) {
+      error = "Mật khẩu xác nhận không khớp!";
+      return;
+    }
+
     loading = true;
     error = null;
 
     try {
-      await login({ identifier, password }); // service đã lưu token và set store
-      // redirect sau khi login thành công
-      push("/");
+      const res = await fetch(`${API_BASE_URL}/api/auth/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, username, password }),
+      });
+
+      if (!res.ok) {
+        let errObj: any = {};
+        try {
+          errObj = await res.json();
+        } catch {
+          try {
+            const text = await res.text();
+            errObj = { error: text || `HTTP ${res.status}` };
+          } catch {
+            errObj = { error: `HTTP ${res.status}` };
+          }
+        }
+        throw errObj.error || errObj.message || "Lỗi đăng ký";
+      }
+
+      const data = await res.json();
+
+      // Nếu backend trả token -> lưu và điều hướng về trang chính
+      if (data.access_token) {
+        localStorage.setItem("access_token", data.access_token);
+      }
+      if (data.refresh_token) {
+        localStorage.setItem("refresh_token", data.refresh_token);
+      }
+      if (data.user) {
+        localStorage.setItem("user", JSON.stringify(data.user));
+      }
+
+      if (data.access_token) {
+        push("/");
+      } else {
+        alert(data.message || "Đăng ký thành công. Vui lòng đăng nhập.");
+        push("/login");
+      }
     } catch (err: any) {
-      console.error("Login error:", err);
+      console.error("Register error:", err);
       if (typeof err === "string") error = err;
       else if (err && (err.message || err.error))
         error = err.message || err.error;
-      else error = "Lỗi khi đăng nhập. Vui lòng thử lại.";
+      else error = "Lỗi khi đăng ký. Vui lòng thử lại.";
     } finally {
       loading = false;
     }
   }
-
-  function handleGoogleLogin() {
-    // Google để sau
-    alert("Google login sẽ làm sau");
-  }
 </script>
 
-<div class="login-page">
+<div class="register-page">
   <div class="center-image-container">
     <img src="/discuss.jpg" alt="Brand Logo" class="center-image" />
   </div>
 
-  <div class="login-form-section">
+  <div class="form-section">
     <a href="/" class="brand-logo">
       <img src="/LKlogo.jpg" alt="LKForum Logo" />
       <span>LKForum</span>
     </a>
     <div class="form-wrapper">
-      <h2 style="color:black;">Đăng nhập với LKForum</h2>
-      <p>Đăng nhập để tiếp tục khám phá.</p>
+      <h2 style="color:black;">Tạo tài khoản mới</h2>
+      <p>Tham gia cộng đồng LKForum ngay hôm nay.</p>
 
-      <form on:submit|preventDefault={handleLoginSubmit} class="login-form">
-        <!-- input identifier -->
+      <form
+        on:submit|preventDefault={handleRegisterSubmit}
+        class="register-form"
+      >
         <div class="input-group">
-          <label for="identifier">Tên đăng nhập</label>
+          <label for="email">Email</label>
           <input
-            id="identifier"
-            type="text"
-            bind:value={identifier}
-            placeholder="Nhập tên đăng nhập của bạn"
+            type="email"
+            id="email"
+            bind:value={email}
+            placeholder="Nhập email của bạn"
           />
         </div>
 
-        <!-- password-group -->
+        <div class="input-group">
+          <label for="username">Tên đăng nhập</label>
+          <input
+            type="text"
+            id="username"
+            bind:value={username}
+            placeholder="Chọn một tên đăng nhập"
+          />
+        </div>
+
         <div class="input-group password-group">
           <label for="password">Mật khẩu</label>
           <input
-            id="password"
             type={showPassword ? "text" : "password"}
+            id="password"
             bind:value={password}
-            placeholder="Mật khẩu"
+            placeholder="Tạo mật khẩu"
           />
           <span
             class="password-toggle-icon"
-            on:click={toggleShowPasswordVisibility}
-            role="button"
-            aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+            on:click={togglePasswordVisibility}
           >
             {#if showPassword}
               <svg
@@ -106,10 +147,10 @@
                 stroke-width="2"
                 stroke-linecap="round"
                 stroke-linejoin="round"
+                ><path
+                  d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"
+                /><circle cx="12" cy="12" r="3" /></svg
               >
-                <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
-                <circle cx="12" cy="12" r="3" />
-              </svg>
             {:else}
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -121,18 +162,24 @@
                 stroke-width="2"
                 stroke-linecap="round"
                 stroke-linejoin="round"
-              >
-                <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" />
-                <path
+                ><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" /><path
                   d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"
-                />
-                <path
+                /><path
                   d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"
-                />
-                <line x1="2" x2="22" y1="2" y2="22" />
-              </svg>
+                /><line x1="2" x2="22" y1="2" y2="22" /></svg
+              >
             {/if}
           </span>
+        </div>
+
+        <div class="input-group">
+          <label for="confirmPassword">Xác nhận mật khẩu</label>
+          <input
+            type="password"
+            id="confirmPassword"
+            bind:value={confirmPassword}
+            placeholder="Nhập lại mật khẩu"
+          />
         </div>
 
         {#if error}
@@ -141,24 +188,14 @@
 
         <Button
           type="submit"
-          label={loading ? "Đang đăng nhập..." : "Đăng Nhập"}
+          label={loading ? "Đang đăng ký..." : "Đăng Ký"}
           variant="primary"
           disabled={loading}
         />
       </form>
 
-      <div class="separator">
-        <span>HOẶC</span>
-      </div>
-
-      <Button
-        label="Đăng nhập với Google"
-        variant="google"
-        on:click={handleGoogleLogin}
-      />
-
-      <div class="signup-link">
-        Chưa có tài khoản? <a href="/register">Đăng ký ngay</a>
+      <div class="signin-link">
+        Đã có tài khoản? <a href="/">Đăng nhập</a>
       </div>
     </div>
   </div>
@@ -167,7 +204,9 @@
 </div>
 
 <style>
-  .login-page {
+  /* Gần như toàn bộ style được sao chép từ trang Login để đồng nhất */
+  /* Đổi tên class để tránh xung đột nếu cần, nhưng ở đây chúng ta giữ nguyên */
+  .register-page {
     display: flex;
     width: 100vw;
     height: 100vh;
@@ -175,14 +214,12 @@
     position: relative;
     overflow: hidden;
   }
-
   .center-image-container {
     position: absolute;
     left: 50%;
     top: 50%;
     transform: translate(-50%, -50%);
     z-index: 10;
-    /* Không cần background, padding hay bo tròn cho khung nữa */
   }
   .center-image {
     display: block;
@@ -196,8 +233,8 @@
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
     object-fit: cover;
   }
-
-  .login-form-section {
+  .form-section {
+    /* Đổi tên từ login-form-section */
     flex: 0 0 50%;
     display: flex;
     flex-direction: column; /* Xếp dọc */
@@ -210,7 +247,7 @@
   .form-wrapper {
     width: 100%;
     max-width: 450px;
-    padding-right: 12%;
+    padding-right: 12%; /* Sửa lại: Dùng % để nó co dãn theo */
   }
   .form-wrapper h2 {
     font-family: var(--font-secondary);
@@ -219,10 +256,9 @@
     color: var(--text-color);
     margin-bottom: 0.5rem;
   }
-  .form-wrapper {
-    width: 100%;
-    max-width: 450px;
-    /* Bỏ padding-right */
+  .form-wrapper p {
+    color: #666;
+    margin-bottom: 2.5rem;
   }
   .input-group {
     margin-bottom: 1.5rem;
@@ -241,75 +277,40 @@
     font-size: 1em;
     box-sizing: border-box;
     background-color: transparent;
-    transition: border-color 0.3s ease; /* Thêm hiệu ứng chuyển động */
+    transition: border-color 0.3s ease;
   }
-
-  /* Style khi người dùng nhấn (focus) vào ô input */
   .input-group input:focus {
-    outline: none; /* Bỏ viền outline mặc định */
-    border-bottom-color: var(--primary-color); /* Đổi màu gạch chân */
+    outline: none;
+    border-bottom-color: var(--primary-color);
   }
-  .separator {
-    display: flex;
-    align-items: center;
-    text-align: center;
-    color: #aaa;
-    margin: 2rem 0;
-  }
-  .separator::before,
-  .separator::after {
-    content: "";
-    flex: 1;
-    border-bottom: 1px solid var(--border-color);
-  }
-  .separator:not(:empty)::before {
-    margin-right: 0.5em;
-  }
-  .separator:not(:empty)::after {
-    margin-left: 0.5em;
-  }
-  .signup-link {
+  .signin-link {
+    /* Đổi tên từ signup-link */
     text-align: center;
     margin-top: 2rem;
     color: #555;
   }
-  .signup-link a {
+  .signin-link a {
     color: var(--primary-color);
     text-decoration: none;
     font-weight: 600;
   }
-
   .decorative-section {
-    flex: 0 0 50%; /* Chỉnh lại cho bố cục 50/50 */
+    flex: 0 0 50%;
     background-image: url("/background.png");
     background-size: cover;
     background-position: center;
   }
-
-  @media (max-width: 900px) {
-    .decorative-section {
-      display: none;
-    }
-    .login-form-section {
-      flex-basis: 100%;
-    }
-    .center-image-container {
-      display: none;
-    }
-  }
   .password-group {
     position: relative;
   }
-
   .password-toggle-icon {
     position: absolute;
-    top: 55%; /* Điều chỉnh để căn giữa với ô input */
+    top: 55%;
     right: 10px;
     transform: translateY(-50%);
     cursor: pointer;
     color: #888;
   }
-  /* CSS CHO LOGO */
   .brand-logo {
     /* Bỏ position: absolute */
     display: flex;
@@ -318,16 +319,40 @@
     text-decoration: none;
     margin-bottom: 5rem; /* Tạo khoảng cách với form */
   }
-
   .brand-logo img {
     width: 80px;
     height: 80px;
   }
-
   .brand-logo span {
     font-size: 1.5em;
     font-weight: 700;
-    color: var(--darkblue--color);
+    color: #213547;
     font-family: var(--font-secondary);
+  }
+
+  @media (max-width: 900px) {
+    /* Ẩn tấm ảnh ở giữa và phần nền trang trí */
+    .center-image-container,
+    .decorative-section {
+      display: none;
+    }
+
+    /* Cho form chiếm toàn bộ chiều rộng màn hình */
+    .form-section {
+      flex: 1; /* Hoặc flex: 0 0 100%; */
+      justify-content: center;
+      padding: 2rem;
+    }
+
+    /* Điều chỉnh lại padding cho form để cân đối hơn */
+    .form-wrapper {
+      padding-right: 0;
+      max-width: 100%;
+    }
+
+    /* Căn giữa lại link đăng nhập */
+    .signin-link {
+      text-align: center;
+    }
   }
 </style>
