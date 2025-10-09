@@ -17,7 +17,6 @@ type CreateCommunityRequest struct {
 
 type UpdateCommunityRequest struct {
 	CommunityID string                  `json:"id" binding:"required"`
-	Name        *string                 `json:"name,omitempty" binding:"min=3,max=50"`
 	Description *string                 `json:"description,omitempty" binding:"max=500"`
 	Avatar      *string                 `json:"avatar,omitempty"`
 	Banner      *string                 `json:"banner,omitempty"`
@@ -35,8 +34,8 @@ type AddModeratorRequest struct {
 }
 
 type RemoveModeratorRequest struct {
-	CommunityID      string         `json:"id" binding:"required"`
-	RemovedModerator []ModeratorDTO `json:"removed_moderator" binding:"required"`
+	CommunityID      string   `json:"id" binding:"required"`
+	RemovedModerator []string `json:"removed_moderator" binding:"required"`
 }
 
 type CommunityResponse struct {

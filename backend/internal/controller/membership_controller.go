@@ -67,7 +67,7 @@ func (m *MembershipController) GetMembershipByUserID(ctx *gin.Context) {
 		return
 	}
 
-	memberships, err := m.membershipService.GetMembershipByUserID(userID)
+	memberships, err := m.membershipService.GetMembershipsByUserID(userID)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, dto.ErrorResponse{Code: apperror.Code(err), Error: ""})
 		return

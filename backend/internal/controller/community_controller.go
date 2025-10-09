@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 	"time"
@@ -54,6 +55,11 @@ func (c *CommunityController) GetCommunityByID(ctx *gin.Context) {
 
 	community, err := c.communityService.GetCommunityByID(communityID)
 	if err != nil {
+		if errors.Is(err, apperror.ErrCommunityNotFound) {
+			ctx.JSON(http.StatusNotFound, dto.ErrorResponse{Code: apperror.Code(err), Error: err.Error()})
+			return
+		}
+
 		ctx.JSON(http.StatusInternalServerError, dto.ErrorResponse{Code: apperror.Code(err), Error: err.Error()})
 		return
 	}

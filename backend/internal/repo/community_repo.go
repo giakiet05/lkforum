@@ -2,7 +2,6 @@ package repo
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -16,7 +15,6 @@ import (
 
 type CommunityRepo interface {
 	Create(ctx context.Context, community *model.Community) (*model.Community, error)
-	//GetAll(ctx context.Context) ([]*model.Community, error)
 	GetByID(ctx context.Context, id string) (*model.Community, error)
 	GetFilter(ctx context.Context, name string, description string, createFrom time.Time, page int, pageSize int) ([]model.Community, int64, error)
 	GetByModeratorIDPaginated(ctx context.Context, moderatorID string, page int, pageSize int) ([]model.Community, int64, error)
@@ -24,22 +22,26 @@ type CommunityRepo interface {
 	Update(ctx context.Context, communityID string, updates bson.M) (*model.Community, error)
 	Replace(ctx context.Context, community *model.Community) error
 	Delete(ctx context.Context, communityID string) error
+
+	IsUserExist(ctx context.Context, userID string) (bool, error)
 }
 
 type communityRepo struct {
 	communityCollection *mongo.Collection
+	userCollection      *mongo.Collection
 }
 
 func NewCommunityRepo(db *mongo.Database) CommunityRepo {
 	return &communityRepo{
 		communityCollection: db.Collection(config.CommunityColName),
+		userCollection:      db.Collection(config.UserColName),
 	}
 }
 
 func (c *communityRepo) Create(ctx context.Context, community *model.Community) (*model.Community, error) {
 	result, err := c.communityCollection.InsertOne(ctx, community)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create community: %w", err)
+		return nil, err
 	}
 
 	if oid, ok := result.InsertedID.(primitive.ObjectID); ok {
@@ -48,23 +50,6 @@ func (c *communityRepo) Create(ctx context.Context, community *model.Community) 
 
 	return community, nil
 }
-
-/*
-func (c *communityRepo) GetAll(ctx context.Context) ([]*model.Community, error) {
-	cursor, err := c.communityCollection.Find(ctx, bson.D{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to query communities: %w", err)
-	}
-	defer cursor.Close(ctx)
-
-	var communities []*model.Community
-	if err := cursor.All(ctx, &communities); err != nil {
-		return nil, fmt.Errorf("failed to decode communities: %w", err)
-	}
-
-	return communities, nil
-}
-*/
 
 func (c *communityRepo) GetByID(ctx context.Context, id string) (*model.Community, error) {
 	communityObjectID, err := primitive.ObjectIDFromHex(id)
@@ -75,10 +60,7 @@ func (c *communityRepo) GetByID(ctx context.Context, id string) (*model.Communit
 	var community model.Community
 	err = c.communityCollection.FindOne(ctx, bson.M{"_id": communityObjectID}).Decode(&community)
 	if err != nil {
-		if errors.Is(err, mongo.ErrNoDocuments) {
-			return nil, fmt.Errorf(`community with id %s not found`, communityObjectID)
-		}
-		return nil, fmt.Errorf("failed to query community: %w", err)
+		return nil, err
 	}
 
 	return &community, nil
@@ -143,18 +125,18 @@ func (c *communityRepo) GetByModeratorIDPaginated(
 
 	cursor, err := c.communityCollection.Find(ctx, filter, options.Find().SetSkip(int64(skip)), options.Find().SetLimit(int64(pageSize)))
 	if err != nil {
-		return nil, -1, fmt.Errorf("failed to query communities: %w", err)
+		return nil, -1, err
 	}
 	defer cursor.Close(ctx)
 
 	var communities []model.Community
 	if err := cursor.All(ctx, &communities); err != nil {
-		return nil, -1, fmt.Errorf("failed to decode communities: %w", err)
+		return nil, -1, err
 	}
 
 	count, err := c.communityCollection.CountDocuments(ctx, filter)
 	if err != nil {
-		return nil, -1, fmt.Errorf("failed to query communities: %w", err)
+		return nil, -1, err
 	}
 
 	return communities, count, nil
@@ -173,18 +155,18 @@ func (c *communityRepo) GetAllPaginated(
 
 	cursor, err := c.communityCollection.Find(ctx, filter, options.Find().SetSkip(int64(skip)), options.Find().SetLimit(int64(pageSize)))
 	if err != nil {
-		return nil, -1, fmt.Errorf("failed to query communities: %w", err)
+		return nil, -1, err
 	}
 	defer cursor.Close(ctx)
 
 	var communities []model.Community
 	if err := cursor.All(ctx, &communities); err != nil {
-		return nil, -1, fmt.Errorf("failed to decode communities: %w", err)
+		return nil, -1, err
 	}
 
 	count, err := c.communityCollection.CountDocuments(ctx, filter)
 	if err != nil {
-		return nil, -1, fmt.Errorf("failed to query communities: %w", err)
+		return nil, -1, err
 	}
 
 	return communities, count, nil
@@ -204,7 +186,7 @@ func (c *communityRepo) Update(ctx context.Context, communityID string, updates 
 	var updated model.Community
 	err = c.communityCollection.FindOneAndUpdate(ctx, filter, update, opts).Decode(&updated)
 	if err != nil {
-		return nil, fmt.Errorf("failed to update community: %w", err)
+		return nil, err
 	}
 
 	return &updated, nil
@@ -213,7 +195,7 @@ func (c *communityRepo) Update(ctx context.Context, communityID string, updates 
 func (c *communityRepo) Replace(ctx context.Context, community *model.Community) error {
 	res, err := c.communityCollection.ReplaceOne(ctx, bson.M{"_id": community.ID}, community)
 	if err != nil {
-		return fmt.Errorf("failed to replace community: %w", err)
+		return err
 	}
 
 	if res.MatchedCount == 0 {
@@ -231,7 +213,7 @@ func (c *communityRepo) Delete(ctx context.Context, communityID string) error {
 
 	res, err := c.communityCollection.DeleteOne(ctx, bson.M{"_id": communityObjectID})
 	if err != nil {
-		return fmt.Errorf("failed to delete community: %w", err)
+		return err
 	}
 
 	if res.DeletedCount == 0 {
@@ -241,34 +223,19 @@ func (c *communityRepo) Delete(ctx context.Context, communityID string) error {
 	return nil
 }
 
-/*
-func (c *communityRepo) CountPostsByCommunityID(ctx context.Context, communityID string) (int64, error) {
-	communityObjectID, err := primitive.ObjectIDFromHex(communityID)
+func (c *communityRepo) IsUserExist(ctx context.Context, userID string) (bool, error) {
+	userObjectID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
-		return -1, err
+		return false, err
 	}
 
-	filter := bson.M{"community_id": communityObjectID}
-	count, err := c.postCollection.CountDocuments(ctx, filter)
+	count, err := c.userCollection.CountDocuments(ctx, bson.M{"_id": userObjectID})
 	if err != nil {
-		return -1, err
+		return false, err
+	}
+	if count == 0 {
+		return false, nil
 	}
 
-	return count, nil
+	return true, nil
 }
-
-func (c *communityRepo) CountMembersByCommunityID(ctx context.Context, moderatorID string) (int64, error) {
-	communityObjectID, err := primitive.ObjectIDFromHex(moderatorID)
-	if err != nil {
-		return -1, err
-	}
-
-	filter := bson.M{"community_id": communityObjectID}
-	count, err := c.membershipCollection.CountDocuments(ctx, filter)
-	if err != nil {
-		return -1, err
-	}
-
-	return count, nil
-}
-*/
