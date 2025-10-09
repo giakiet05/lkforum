@@ -186,26 +186,31 @@
   }
   .center-image {
     display: block;
-    width: 500px; /* Tăng kích thước ảnh cho ấn tượng hơn */
-    height: auto; /* Giữ đúng tỷ lệ ảnh */
-    border-radius: 12px; /* Bo góc nhẹ cho đẹp */
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2); /* Đổ bóng trực tiếp cho ảnh */
+    /* Sửa lại: Dùng vw (viewport width) để ảnh co dãn theo màn hình */
+    width: 25vw; /* Chiếm khoảng 25% chiều rộng màn hình */
+    max-width: 450px; /* Nhưng không bao giờ to quá 450px */
+    min-width: 250px; /* Và không bao giờ nhỏ hơn 250px */
+
+    height: auto;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
     object-fit: cover;
   }
 
   .login-form-section {
-    flex: 0 0 50%; /* Chỉnh lại cho bố cục 50/50 */
+    flex: 0 0 50%;
     display: flex;
-    position: relative;
-    justify-content: flex-start;
-    align-items: center;
-    background-color: var(white);
-    padding: 2rem;
+    flex-direction: column; /* Xếp dọc */
+    justify-content: center; /* Căn giữa theo chiều dọc */
+    align-items: flex-start; /* Căn trái */
+    background-color: white;
+    padding: 2rem 4rem; /* Tăng padding để đẹp hơn */
+    box-sizing: border-box; /* Thêm vào để padding không làm vỡ layout */
   }
   .form-wrapper {
     width: 100%;
     max-width: 450px;
-    padding-right: 5rem;
+    padding-right: 12%;
   }
   .form-wrapper h2 {
     font-family: var(--font-secondary);
@@ -214,9 +219,10 @@
     color: var(--text-color);
     margin-bottom: 0.5rem;
   }
-  .form-wrapper p {
-    color: #666;
-    margin-bottom: 2.5rem;
+  .form-wrapper {
+    width: 100%;
+    max-width: 450px;
+    /* Bỏ padding-right */
   }
   .input-group {
     margin-bottom: 1.5rem;
@@ -305,13 +311,12 @@
   }
   /* CSS CHO LOGO */
   .brand-logo {
-    position: absolute;
-    top: 2rem;
-    left: 2rem;
+    /* Bỏ position: absolute */
     display: flex;
     align-items: center;
     gap: 0.75rem;
     text-decoration: none;
+    margin-bottom: 5rem; /* Tạo khoảng cách với form */
   }
 
   .brand-logo img {

@@ -1,3 +1,7 @@
+html {
+  font-size: 13px; /* Mặc định là 16px, giảm xuống 14px để thu nhỏ khoảng 12.5% */
+}
+
 :root {
 
   --font-primary: 'Nunito Sans', sans-serif;

@@ -223,7 +223,11 @@
   }
   .center-image {
     display: block;
-    width: 500px;
+    /* Sửa lại: Dùng vw (viewport width) để ảnh co dãn theo màn hình */
+    width: 25vw; /* Chiếm khoảng 25% chiều rộng màn hình */
+    max-width: 450px; /* Nhưng không bao giờ to quá 450px */
+    min-width: 250px; /* Và không bao giờ nhỏ hơn 250px */
+
     height: auto;
     border-radius: 12px;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
@@ -231,18 +235,19 @@
   }
   .form-section {
     /* Đổi tên từ login-form-section */
-    position: relative;
     flex: 0 0 50%;
     display: flex;
-    justify-content: flex-start;
-    align-items: center;
+    flex-direction: column; /* Xếp dọc */
+    justify-content: center; /* Căn giữa theo chiều dọc */
+    align-items: flex-start; /* Căn trái */
     background-color: white;
-    padding: 2rem;
+    padding: 2rem 4rem; /* Tăng padding để đẹp hơn */
+    box-sizing: border-box; /* Thêm vào để padding không làm vỡ layout */
   }
   .form-wrapper {
     width: 100%;
     max-width: 450px;
-    padding-right: 5rem;
+    padding-right: 12%; /* Sửa lại: Dùng % để nó co dãn theo */
   }
   .form-wrapper h2 {
     font-family: var(--font-secondary);
@@ -307,13 +312,12 @@
     color: #888;
   }
   .brand-logo {
-    position: absolute;
-    top: 2rem;
-    left: 2rem;
+    /* Bỏ position: absolute */
     display: flex;
     align-items: center;
     gap: 0.75rem;
     text-decoration: none;
+    margin-bottom: 5rem; /* Tạo khoảng cách với form */
   }
   .brand-logo img {
     width: 80px;
