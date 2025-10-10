@@ -34,7 +34,9 @@ type PostService interface {
 
 	// Tương tác (Vote)
 	VoteOnPost(ctx context.Context, userID, postID primitive.ObjectID, voteValue bool) (*dto.VotesCountResponse, error)
+	RemovePostVote(ctx context.Context, userID, postID primitive.ObjectID) (*dto.VotesCountResponse, error)
 	VoteOnPoll(ctx context.Context, userID, postID, optionID primitive.ObjectID) (*dto.PollResponse, error)
+	RemovePollVote(ctx context.Context, userID, postID primitive.ObjectID) (*dto.PollResponse, error)
 
 	// Quản lý Image (chi tiết)
 	AddImagesToPost(ctx context.Context, userID, postID primitive.ObjectID, req *dto.AddImageRequest) ([]dto.ImageResponse, error)
@@ -49,6 +51,14 @@ type PostService interface {
 	// Tính năng cho người dùng
 	BookmarkPost(ctx context.Context, userID, postID primitive.ObjectID) error
 	RemoveBookmark(ctx context.Context, userID, postID primitive.ObjectID) error
+
+	//GetMembersCount(communityID string) (int64, error)
+	//increaseMembersCount(communityID string) error
+	//decreaseMembersCount(communityID string) error
+	//ensureMembersCountExists(communityID string) (string, error)
+	//
+	//StartRedisToMongoMembershipSync()
+	//syncMemberCounts() error
 }
 
 // --- postService Implementation ---
@@ -192,6 +202,32 @@ func (s *postService) VoteOnPost(ctx context.Context, userID, postID primitive.O
 
 	return mapVotesToResponse(updatedPost.VotesCount), nil
 }
+func (s *postService) RemovePostVote(ctx context.Context, userID, postID primitive.ObjectID) (*dto.VotesCountResponse, error) {
+
+	// 1. Gọi PostVoteRepo để xóa vote. Logic transaction được xử lý ở tầng Repo.
+	if err := s.postVoteRepo.RemoveVote(ctx, postID, userID); err != nil {
+		return nil, err
+	}
+
+	// 2. Lấy lại thông tin post để có số vote đã cập nhật
+	post, err := s.postRepo.GetByID(ctx, postID)
+	if err != nil {
+		return nil, err
+	}
+
+	if post.VotesCount == nil {
+		return &dto.VotesCountResponse{Up: 0, Down: 0, Score: 0}, nil
+	}
+
+	// 3. Tạo và trả về DTO response
+	response := &dto.VotesCountResponse{
+		Up:    post.VotesCount.Up,
+		Down:  post.VotesCount.Down,
+		Score: post.VotesCount.Up - post.VotesCount.Down,
+	}
+
+	return response, nil
+}
 
 // VoteOnPoll xử lý vote cho poll
 func (s *postService) VoteOnPoll(ctx context.Context, userID, postID, optionID primitive.ObjectID) (*dto.PollResponse, error) {
@@ -212,6 +248,29 @@ func (s *postService) VoteOnPoll(ctx context.Context, userID, postID, optionID p
 	userPollVotes, _ := s.postPollRepo.GetUserPollVotes(ctx, postID, userID)
 
 	return mapPollToResponse(updatedPost.Content.Poll, userPollVotes), nil
+}
+
+func (s *postService) RemovePollVote(ctx context.Context, userID, postID primitive.ObjectID) (*dto.PollResponse, error) {
+	// 1. Gọi PostPollRepo để xóa tất cả các vote của user cho poll này.
+	if err := s.postPollRepo.RemovePollVote(ctx, postID, userID); err != nil {
+		return nil, err
+	}
+
+	// 2. Lấy lại thông tin post để có trạng thái poll đã cập nhật
+	post, err := s.postRepo.GetByID(ctx, postID)
+	if err != nil {
+		return nil, err
+	}
+
+	// 3. Kiểm tra xem đây có thực sự là một poll hợp lệ không
+	if post.Type != model.PostTypePoll || post.Content == nil || post.Content.Poll == nil {
+		return nil, errors.New("post is not a valid poll")
+	}
+
+	// 4. Tạo và trả về DTO response (sử dụng lại hàm helper `mapPollModelToResponse`)
+	response := mapPollToResponse(post.Content.Poll, []*model.PollVote{})
+
+	return response, nil
 }
 
 // === Quản lý Image ===

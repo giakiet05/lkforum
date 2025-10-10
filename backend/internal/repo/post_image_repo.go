@@ -15,7 +15,6 @@ import (
 type PostImageRepo interface {
 	AddImages(ctx context.Context, postID primitive.ObjectID, images []model.Image) error
 	RemoveImages(ctx context.Context, postID primitive.ObjectID, imageIDs []primitive.ObjectID) error
-	UpdateImage(ctx context.Context, postID, imageID primitive.ObjectID, alt, thumbnail string) error
 	GetPostImages(ctx context.Context, postID primitive.ObjectID) ([]model.Image, error)
 }
 
@@ -58,34 +57,6 @@ func (r *postImageRepo) RemoveImages(ctx context.Context, postID primitive.Objec
 	update := bson.M{
 		"$pull": bson.M{
 			"content.images": bson.M{"_id": bson.M{"$in": imageIDs}},
-		},
-	}
-
-	result, err := r.postCollection.UpdateOne(ctx, filter, update)
-	if err != nil {
-		return err
-	}
-
-	if result.MatchedCount == 0 {
-		return ErrPostNotFound
-	}
-
-	return nil
-}
-
-// UpdateImage cập nhật thông tin của một ảnh cụ thể trong một bài đăng.
-func (r *postImageRepo) UpdateImage(ctx context.Context, postID, imageID primitive.ObjectID, alt, thumbnail string) error {
-	// SỬA: Filter sử dụng đường dẫn "content.images._id"
-	filter := bson.M{
-		"_id":                postID,
-		"content.images._id": imageID,
-	}
-
-	// SỬA: Toán tử vị trí '$' được áp dụng cho đường dẫn "content.images.$"
-	update := bson.M{
-		"$set": bson.M{
-			"content.images.$.alt":       alt,
-			"content.images.$.thumbnail": thumbnail,
 		},
 	}
 

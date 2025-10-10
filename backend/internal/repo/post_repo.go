@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/giakiet05/lkforum/internal/config"
+	"github.com/giakiet05/lkforum/internal/dto"
 	"github.com/giakiet05/lkforum/internal/model"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -31,6 +32,7 @@ type PostRepo interface {
 	SoftDelete(ctx context.Context, id primitive.ObjectID) error
 	IncrementCommentsCount(ctx context.Context, postID primitive.ObjectID) error
 	DecrementCommentsCount(ctx context.Context, postID primitive.ObjectID) error
+	Find(ctx context.Context, query *dto.GetPostsQuery) ([]*model.Post, error)
 }
 
 type postRepo struct {
@@ -238,6 +240,75 @@ func (r *postRepo) findPosts(ctx context.Context, filter bson.M, sort string, li
 		posts = []*model.Post{}
 	}
 
+	return posts, nil
+}
+func (r *postRepo) Find(ctx context.Context, query *dto.GetPostsQuery) ([]*model.Post, error) {
+	filter := bson.M{"is_deleted": false}
+	findOptions := options.Find()
+
+	// 1. Filtering
+	if query.CommunityID != "" {
+		communityObjID, err := primitive.ObjectIDFromHex(query.CommunityID)
+		if err == nil {
+			filter["community_id"] = communityObjID
+		}
+	}
+	if query.AuthorID != "" {
+		authorObjID, err := primitive.ObjectIDFromHex(query.AuthorID)
+		if err == nil {
+			filter["author_id"] = authorObjID
+		}
+	}
+	if query.Type != "" {
+		filter["type"] = query.Type
+	}
+
+	// 2. Sorting
+	var sortDoc bson.D
+
+	switch query.Sort {
+	case "hot":
+		// Logic sắp xếp 'hot' thường phức tạp, ở đây ta đơn giản hóa
+		// bằng cách sắp xếp theo score (up - down) hoặc upvotes và thời gian.
+		sortDoc = bson.D{{"votes_count.up", -1}, {"created_at", -1}}
+	case "top":
+		// Sắp xếp theo số lượt upvote cao nhất
+		sortDoc = bson.D{{"votes_count.up", -1}}
+	case "controversial":
+		// Triển khai logic sắp xếp gây tranh cãi nếu cần
+		// Ví dụ: sortDoc = ...
+		// Mặc định, ta sẽ quay về sắp xếp theo bài mới nhất
+		sortDoc = bson.D{{"created_at", -1}}
+	case "new":
+		fallthrough // Chạy tiếp xuống case default
+	default:
+		// Sắp xếp theo bài mới nhất
+		sortDoc = bson.D{{"created_at", -1}}
+	}
+
+	findOptions.SetSort(sortDoc)
+
+	// 3. Pagination
+	if query.Page == 0 {
+		query.Page = 1
+	}
+	if query.Limit == 0 {
+		query.Limit = 10 // Giá trị mặc định
+	}
+	skip := (query.Page - 1) * query.Limit
+	findOptions.SetSkip(int64(skip))
+	findOptions.SetLimit(int64(query.Limit))
+
+	var posts []*model.Post
+	cursor, err := r.postCollection.Find(ctx, filter, findOptions)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	if err = cursor.All(ctx, &posts); err != nil {
+		return nil, err
+	}
 	return posts, nil
 }
 
