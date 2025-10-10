@@ -2,8 +2,8 @@ package dto
 
 // ErrorResponse represents a standard error response.
 type ErrorResponse struct {
-	Code  string `json:"code"`
-	Error string `json:"error"`
+	ErrorCode string `json:"error_code"`
+	Message   string `json:"message"`
 }
 
 // SuccessResponse represents a successful operation (use for POST/PUT/DELETE, except special cases).
