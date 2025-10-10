@@ -1,14 +1,14 @@
 package controller
 
 import (
-	"errors"
+	"net/http"
+	"strconv"
+
 	"github.com/giakiet05/lkforum/internal/apperror"
 	"github.com/giakiet05/lkforum/internal/auth"
 	"github.com/giakiet05/lkforum/internal/dto"
 	"github.com/giakiet05/lkforum/internal/service"
 	"github.com/gin-gonic/gin"
-	"net/http"
-	"strconv"
 )
 
 type UserController struct {
@@ -41,10 +41,9 @@ func (c *UserController) GetUsers(ctx *gin.Context) {
 	// Call the service
 	response, err := c.service.GetUsers(page, pageSize)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, dto.ErrorResponse{Code: apperror.Code(err), Error: err.Error()})
+		ctx.JSON(apperror.StatusFromError(err), dto.ErrorResponse{ErrorCode: apperror.Code(err), Message: apperror.Message(err)})
 		return
 	}
-
 	ctx.JSON(http.StatusOK, response)
 }
 
@@ -53,17 +52,13 @@ func (c *UserController) RegisterUser(ctx *gin.Context) {
 	var req dto.UserRegisterRequest
 
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, dto.ErrorResponse{Code: "INVALID_REQUEST", Error: err.Error()})
+		ctx.JSON(apperror.StatusFromError(apperror.ErrBadRequest), dto.ErrorResponse{ErrorCode: apperror.ErrBadRequest.Code, Message: apperror.Message(err)})
 		return
 	}
 
 	user, accessToken, refreshToken, err := c.service.RegisterUser(req.Username, req.Email, req.Password)
 	if err != nil {
-		if errors.Is(err, apperror.ErrUsernameExists) || errors.Is(err, apperror.ErrEmailExists) {
-			ctx.JSON(http.StatusConflict, dto.ErrorResponse{Code: apperror.Code(err), Error: err.Error()})
-		} else {
-			ctx.JSON(http.StatusInternalServerError, dto.ErrorResponse{Code: apperror.Code(err), Error: err.Error()})
-		}
+		ctx.JSON(apperror.StatusFromError(err), dto.ErrorResponse{ErrorCode: apperror.Code(err), Message: apperror.Message(err)})
 		return
 	}
 
@@ -79,17 +74,13 @@ func (c *UserController) Login(ctx *gin.Context) {
 	var req dto.UserLoginRequest
 
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, dto.ErrorResponse{Code: "INVALID_REQUEST", Error: err.Error()})
+		ctx.JSON(apperror.StatusFromError(apperror.ErrBadRequest), dto.ErrorResponse{ErrorCode: apperror.ErrBadRequest.Code, Message: apperror.Message(err)})
 		return
 	}
 
 	user, accessToken, refreshToken, err := c.service.Login(req.Identifier, req.Password)
 	if err != nil {
-		if errors.Is(err, apperror.ErrInvalidCredentials) {
-			ctx.JSON(http.StatusUnauthorized, dto.ErrorResponse{Code: apperror.Code(err), Error: err.Error()})
-		} else {
-			ctx.JSON(http.StatusInternalServerError, dto.ErrorResponse{Code: apperror.Code(err), Error: err.Error()})
-		}
+		ctx.JSON(apperror.StatusFromError(err), dto.ErrorResponse{ErrorCode: apperror.Code(err), Message: apperror.Message(err)})
 		return
 	}
 
@@ -104,29 +95,23 @@ func (c *UserController) Login(ctx *gin.Context) {
 func (c *UserController) UpdateUser(ctx *gin.Context) {
 	userID := ctx.Param("id")
 	if !auth.IsOwner(ctx, userID) && !auth.IsAdmin(ctx) {
-		ctx.JSON(http.StatusForbidden, dto.ErrorResponse{Code: "FORBIDDEN", Error: "Not authorized to update this user"})
+		ctx.JSON(apperror.StatusFromError(apperror.ErrForbidden), dto.ErrorResponse{ErrorCode: apperror.ErrForbidden.Code, Message: apperror.ErrForbidden.Message})
 		return
 	}
 
 	var req dto.UserUpdateRequest
 
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, dto.ErrorResponse{Code: "INVALID_REQUEST", Error: err.Error()})
+		ctx.JSON(apperror.StatusFromError(apperror.ErrBadRequest), dto.ErrorResponse{ErrorCode: apperror.ErrBadRequest.Code, Message: apperror.Message(err)})
 		return
 	}
 
-	// Get the current user first
 	currentUser, err := c.service.GetUserByID(userID)
 	if err != nil {
-		if errors.Is(err, apperror.ErrUserNotFound) {
-			ctx.JSON(http.StatusNotFound, dto.ErrorResponse{Code: apperror.Code(err), Error: err.Error()})
-		} else {
-			ctx.JSON(http.StatusInternalServerError, dto.ErrorResponse{Code: apperror.Code(err), Error: err.Error()})
-		}
+		ctx.JSON(apperror.StatusFromError(err), dto.ErrorResponse{ErrorCode: apperror.Code(err), Message: apperror.Message(err)})
 		return
 	}
 
-	// Update fields that were provided
 	if req.Username != "" {
 		currentUser.Username = req.Username
 	}
@@ -136,11 +121,7 @@ func (c *UserController) UpdateUser(ctx *gin.Context) {
 
 	updatedUser, err := c.service.UpdateUser(currentUser)
 	if err != nil {
-		if errors.Is(err, apperror.ErrUserNotFound) {
-			ctx.JSON(http.StatusNotFound, dto.ErrorResponse{Code: apperror.Code(err), Error: err.Error()})
-		} else {
-			ctx.JSON(http.StatusInternalServerError, dto.ErrorResponse{Code: apperror.Code(err), Error: err.Error()})
-		}
+		ctx.JSON(apperror.StatusFromError(err), dto.ErrorResponse{ErrorCode: apperror.Code(err), Message: apperror.Message(err)})
 		return
 	}
 
@@ -151,17 +132,13 @@ func (c *UserController) UpdateUser(ctx *gin.Context) {
 func (c *UserController) DeleteUser(ctx *gin.Context) {
 	userID := ctx.Param("id")
 	if !auth.IsOwner(ctx, userID) && !auth.IsAdmin(ctx) {
-		ctx.JSON(http.StatusForbidden, dto.ErrorResponse{Code: "FORBIDDEN", Error: "Not authorized to delete this user"})
+		ctx.JSON(apperror.StatusFromError(apperror.ErrForbidden), dto.ErrorResponse{ErrorCode: apperror.ErrForbidden.Code, Message: apperror.ErrForbidden.Message})
 		return
 	}
 
 	err := c.service.DeleteUser(userID)
 	if err != nil {
-		if errors.Is(err, apperror.ErrUserNotFound) {
-			ctx.JSON(http.StatusNotFound, dto.ErrorResponse{Code: apperror.Code(err), Error: err.Error()})
-		} else {
-			ctx.JSON(http.StatusInternalServerError, dto.ErrorResponse{Code: apperror.Code(err), Error: err.Error()})
-		}
+		ctx.JSON(apperror.StatusFromError(err), dto.ErrorResponse{ErrorCode: apperror.Code(err), Message: apperror.Message(err)})
 		return
 	}
 
@@ -177,11 +154,7 @@ func (c *UserController) GetUserByID(ctx *gin.Context) {
 
 	user, err := c.service.GetUserByID(userID)
 	if err != nil {
-		if errors.Is(err, apperror.ErrUserNotFound) {
-			ctx.JSON(http.StatusNotFound, dto.ErrorResponse{Code: apperror.Code(err), Error: err.Error()})
-		} else {
-			ctx.JSON(http.StatusInternalServerError, dto.ErrorResponse{Code: apperror.Code(err), Error: err.Error()})
-		}
+		ctx.JSON(apperror.StatusFromError(err), dto.ErrorResponse{ErrorCode: apperror.Code(err), Message: apperror.Message(err)})
 		return
 	}
 
@@ -194,11 +167,7 @@ func (c *UserController) GetUserByUsername(ctx *gin.Context) {
 
 	user, err := c.service.GetUserByUsername(username)
 	if err != nil {
-		if errors.Is(err, apperror.ErrUserNotFound) {
-			ctx.JSON(http.StatusNotFound, dto.ErrorResponse{Code: apperror.Code(err), Error: err.Error()})
-		} else {
-			ctx.JSON(http.StatusInternalServerError, dto.ErrorResponse{Code: apperror.Code(err), Error: err.Error()})
-		}
+		ctx.JSON(apperror.StatusFromError(err), dto.ErrorResponse{ErrorCode: apperror.Code(err), Message: apperror.Message(err)})
 		return
 	}
 
@@ -208,29 +177,22 @@ func (c *UserController) GetUserByUsername(ctx *gin.Context) {
 // ChangePassword handles password changes
 func (c *UserController) ChangePassword(ctx *gin.Context) {
 	userID := ctx.Param("id")
-	// Check if the authenticated user is the owner
 	authUser, exists := ctx.Get("authUser")
 	if !exists || authUser.(auth.AuthUser).ID != userID {
-		ctx.JSON(http.StatusForbidden, dto.ErrorResponse{Code: "FORBIDDEN", Error: "Not authorized to change this user's password"})
+		ctx.JSON(apperror.StatusFromError(apperror.ErrForbidden), dto.ErrorResponse{ErrorCode: apperror.ErrForbidden.Code, Message: apperror.ErrForbidden.Message})
 		return
 	}
 
 	var req dto.ChangePasswordRequest
 
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, dto.ErrorResponse{Code: "INVALID_REQUEST", Error: err.Error()})
+		ctx.JSON(apperror.StatusFromError(apperror.ErrBadRequest), dto.ErrorResponse{ErrorCode: apperror.ErrBadRequest.Code, Message: apperror.Message(err)})
 		return
 	}
 
 	err := c.service.ChangePassword(userID, req.OldPassword, req.NewPassword)
 	if err != nil {
-		if errors.Is(err, apperror.ErrUserNotFound) {
-			ctx.JSON(http.StatusNotFound, dto.ErrorResponse{Code: apperror.Code(err), Error: err.Error()})
-		} else if errors.Is(err, apperror.ErrInvalidCredentials) {
-			ctx.JSON(http.StatusUnauthorized, dto.ErrorResponse{Code: apperror.Code(err), Error: err.Error()})
-		} else {
-			ctx.JSON(http.StatusInternalServerError, dto.ErrorResponse{Code: apperror.Code(err), Error: err.Error()})
-		}
+		ctx.JSON(apperror.StatusFromError(err), dto.ErrorResponse{ErrorCode: apperror.Code(err), Message: apperror.Message(err)})
 		return
 	}
 
@@ -247,28 +209,18 @@ func (c *UserController) RefreshToken(ctx *gin.Context) {
 	}
 	var req RefreshRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, dto.ErrorResponse{
-			Code:  "INVALID_REQUEST",
-			Error: "Invalid request payload",
+		ctx.JSON(apperror.StatusFromError(apperror.ErrBadRequest), dto.ErrorResponse{
+			ErrorCode: apperror.ErrBadRequest.Code,
+			Message:   apperror.ErrBadRequest.Message,
 		})
 		return
 	}
 
 	accessToken, refreshToken, err := c.service.RefreshToken(req.RefreshToken)
 	if err != nil {
-		code := apperror.Code(err)
-		status := http.StatusInternalServerError
-		if code == "INVALID_TOKEN" {
-			status = http.StatusUnauthorized
-		} else if code == "USER_NOT_FOUND" {
-			status = http.StatusNotFound
-		} else if err.Error() == "user account is inactive" {
-			status = http.StatusForbidden
-			code = "USER_INACTIVE"
-		}
-		ctx.JSON(status, dto.ErrorResponse{
-			Code:  code,
-			Error: err.Error(),
+		ctx.JSON(apperror.StatusFromError(err), dto.ErrorResponse{
+			ErrorCode: apperror.Code(err),
+			Message:   apperror.Message(err),
 		})
 		return
 	}
