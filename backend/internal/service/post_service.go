@@ -67,6 +67,7 @@ type postService struct {
 	postVoteRepo  repo.PostVoteRepo
 	postPollRepo  repo.PostPollRepo
 	postImageRepo repo.PostImageRepo
+	communityRepo repo.CommunityRepo
 	// --- Placeholder Repositories ---
 	// communityRepo repo.CommunityRepo
 	// bookmarkRepo  repo.BookmarkRepo
@@ -158,9 +159,14 @@ func (s *postService) UpdatePost(ctx context.Context, postID, userID primitive.O
 	}
 
 	// Cập nhật các trường
-	post.Title = req.Title
+	if req.Title != "" {
+		post.Title = req.Title
+	}
+
 	if post.Content != nil {
-		post.Content.Text = req.Text
+		if req.Text != "" {
+			post.Content.Text = req.Text
+		}
 	}
 
 	if err := s.postRepo.Update(ctx, post); err != nil {

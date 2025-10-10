@@ -2,13 +2,14 @@ package controller
 
 import (
 	"errors"
+	"net/http"
+	"strconv"
+
 	"github.com/giakiet05/lkforum/internal/apperror"
 	"github.com/giakiet05/lkforum/internal/auth"
 	"github.com/giakiet05/lkforum/internal/dto"
 	"github.com/giakiet05/lkforum/internal/service"
 	"github.com/gin-gonic/gin"
-	"net/http"
-	"strconv"
 )
 
 type UserController struct {
@@ -16,6 +17,7 @@ type UserController struct {
 }
 
 func NewUserController(service service.UserService) *UserController {
+
 	return &UserController{service: service}
 }
 

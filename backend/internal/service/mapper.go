@@ -48,6 +48,16 @@ func mapCreateRequestToPostModel(req *dto.CreatePostRequest, authorID primitive.
 			ExpiresAt:     req.Poll.ExpiresAt,
 			AllowMultiple: req.Poll.AllowMultiple,
 		}
+	case model.PostTypeVideo:
+		// Thêm bước kiểm tra để đảm bảo an toàn
+		if req.Video == nil {
+			return nil, errors.New("video data is required for video type post")
+		}
+		post.Content.Video = &model.Video{
+			URL:       req.Video.URL,
+			Thumbnail: req.Video.Thumbnail,
+		}
+
 	}
 	return post, nil
 }
@@ -70,9 +80,9 @@ func mapPostModelToResponse(post *model.Post, userVote *model.Vote, userPollVote
 	}
 
 	if post.Content != nil {
-		res.Content = &dto.PostContentResponse{
-			Text: post.Content.Text,
-			// Mapping cho Images, Poll, Video...
+		res.Content = &dto.PostContentResponse{}
+		if post.Content.Text != "" {
+			res.Content.Text = post.Content.Text
 		}
 		if len(post.Content.Images) > 0 {
 			res.Content.Images = make([]dto.ImageResponse, len(post.Content.Images))
@@ -82,6 +92,14 @@ func mapPostModelToResponse(post *model.Post, userVote *model.Vote, userPollVote
 		}
 		if post.Content.Poll != nil {
 			res.Content.Poll = mapPollToResponse(post.Content.Poll, userPollVotes)
+		}
+		if post.Content.Video != nil {
+			res.Content.Video = &dto.VideoResponse{
+				URL:       post.Content.Video.URL,
+				Thumbnail: post.Content.Video.Thumbnail,
+				// Giả sử VideoResponse có ID, nếu không thì bỏ qua
+				// ID: post.Content.Video.ID.Hex(),
+			}
 		}
 	}
 

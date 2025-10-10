@@ -30,8 +30,8 @@ type CreatePollRequest struct {
 }
 
 type UpdatePostRequest struct {
-	Title string `json:"title" validate:"required,min=3,max=300"`
-	Text  string `json:"text" validate:"required,min=3,max=300"`
+	Title string `json:"title" validate:"max=300"`
+	Text  string `json:"text" validate:"max=300"`
 }
 type AddImageRequest struct {
 	Images []ImageUploadRequest `json:"images" validate:"required,min=1,dive,min=1"`

@@ -18,26 +18,36 @@ type Repos struct {
 	repo.UserRepo
 	repo.CommunityRepo
 	repo.MembershipRepo
+	repo.PostRepo
+	repo.PostPollRepo
+	repo.PostImageRepo
+	repo.PostVoteRepo
 }
 
 type Services struct {
 	service.UserService
 	service.CommunityService
 	service.MembershipService
+	service.PostService
 }
 
 type Controllers struct {
 	controller.UserController
 	controller.CommunityController
 	controller.MembershipController
+	controller.PostController
 }
 
 // initRepos initializes repositories with the given database
-func initRepos(db *mongo.Database) *Repos {
+func initRepos(client *mongo.Client, db *mongo.Database) *Repos {
 	return &Repos{
 		UserRepo:       repo.NewUserRepo(db),
 		CommunityRepo:  repo.NewCommunityRepo(db),
 		MembershipRepo: repo.NewMembershipRepo(db),
+		PostRepo:       repo.NewPostRepo(db),
+		PostVoteRepo:   repo.NewPostVoteRepo(client, db),
+		PostImageRepo:  repo.NewPostImageRepo(db),
+		PostPollRepo:   repo.NewPostPollRepo(client, db),
 	}
 }
 
@@ -47,6 +57,7 @@ func initServices(repos *Repos, redisClient *redis.Client) *Services {
 		UserService:       service.NewUserService(repos.UserRepo),
 		CommunityService:  service.NewCommunityService(repos.CommunityRepo),
 		MembershipService: service.NewMembershipService(repos.MembershipRepo, redisClient),
+		PostService:       service.NewPostService(repos.PostRepo, repos.PostVoteRepo, repos.PostPollRepo, repos.PostImageRepo),
 	}
 }
 
@@ -56,6 +67,7 @@ func initControllers(services *Services) *Controllers {
 		UserController:       *controller.NewUserController(services.UserService),
 		CommunityController:  *controller.NewCommunityController(services.CommunityService),
 		MembershipController: *controller.NewMembershipController(services.MembershipService),
+		PostController:       *controller.NewPostController(services.PostService),
 	}
 }
 
@@ -77,6 +89,7 @@ func initRoutes(controllers *Controllers, r *gin.Engine) {
 	route.RegisterUserRoutes(api, &controllers.UserController)
 	route.RegisterCommunityRoutes(api, &controllers.CommunityController)
 	route.RegisterMembershipRoutes(api, &controllers.MembershipController)
+	route.RegisterPostRoutes(api, &controllers.PostController)
 }
 
 // Init initializes all application components
@@ -113,7 +126,7 @@ func Init() (*gin.Engine, error) {
 	})
 
 	// Initialize other components
-	repos := initRepos(db)
+	repos := initRepos(client, db)
 	services := initServices(repos, redisClient)
 	controllers := initControllers(services)
 	initRoutes(controllers, router)

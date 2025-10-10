@@ -112,6 +112,10 @@ func (c *PostController) UpdatePost(ctx *gin.Context) {
 		handlePostServiceError(ctx, apperror.NewError(err, "INVALID_REQUEST", "Invalid request payload"))
 		return
 	}
+	if req.Title == "" && req.Text == "" {
+		handlePostServiceError(ctx, apperror.NewError(nil, "INVALID_REQUEST", "Invalid request payload"))
+		return
+	}
 	userID, ok := c.getAuthUserID(ctx)
 	if !ok {
 		return
