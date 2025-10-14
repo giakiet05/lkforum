@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 
@@ -16,6 +17,7 @@ type UserController struct {
 }
 
 func NewUserController(service service.UserService) *UserController {
+
 	return &UserController{service: service}
 }
 

@@ -22,6 +22,12 @@ func Code(err error) string {
 	}
 	return ErrInternal.Code
 }
+func NewError(originalErr error, code, message string) *AppError {
+	return &AppError{
+		Code:    code,
+		Message: message,
+	}
+}
 
 // Message extracts the error Message from an error, returning the AppError Message if it's an AppError, otherwise returns a generic internal error Message
 func Message(err error) string {
