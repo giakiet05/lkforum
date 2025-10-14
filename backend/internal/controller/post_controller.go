@@ -445,7 +445,7 @@ func handlePostServiceError(ctx *gin.Context, err error) {
 		status = http.StatusUnauthorized
 	}
 
-	ctx.JSON(status, dto.ErrorResponse{Code: code, Error: err.Error()})
+	ctx.JSON(status, dto.ErrorResponse{ErrorCode: code, Message: err.Error()})
 }
 func (c *PostController) getAuthUserID(ctx *gin.Context) (primitive.ObjectID, bool) {
 	// Bước 1: Lấy thông tin user từ context
