@@ -75,7 +75,7 @@ type PostResponse struct {
 }
 
 type PostContentResponse struct {
-	Text   string          `json:"text"`
+	Text   string          `json:"text,omitempty"`
 	Images []ImageResponse `json:"images,omitempty"`
 	Poll   *PollResponse   `json:"poll,omitempty"`
 	Video  *VideoResponse  `json:"video,omitempty"`
@@ -112,9 +112,11 @@ type VideoResponse struct {
 type GetPostsQuery struct {
 	CommunityID string `query:"community_id"`
 	AuthorID    string `query:"author_id"`
-	Type        string `query:"type" validate:"oneof= text image video poll"`
-	Sort        string `query:"sort" validate:"oneof=hot new top controversial"`
-	TimeFrame   string `query:"time" validate:"oneof= hour day week month year all"`
-	Page        int    `query:"page" validate:"min=1"`
-	Limit       int    `query:"limit" validate:"min=1,max=50"`
+	Type        string `query:"type" validate:"omitempty,oneof=text image video poll"`
+	Sort        string `query:"sort" validate:"omitempty,oneof=hot new top controversial"`
+	TimeFrame   string `query:"time" validate:"omitempty,oneof=hour day week month year all"`
+
+	// Đảm bảo 2 dòng này chính xác 100%
+	Page  int `query:"page" validate:"omitempty,min=1"`
+	Limit int `query:"limit" validate:"omitempty,min=1,max=100"`
 }

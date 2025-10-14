@@ -107,7 +107,7 @@ func Init() (*gin.Engine, error) {
 	client := config.NewMongoClient()
 	db := client.Database(os.Getenv("DB_NAME"))
 	router := gin.Default()
-
+	
 	// Register CORS middleware before any routes or other middleware
 	allowOrigin := os.Getenv("FRONTEND_URL")
 	if allowOrigin == "" {

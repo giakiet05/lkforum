@@ -17,6 +17,7 @@ type PostVoteRepo interface {
 	Vote(ctx context.Context, vote *model.Vote) error
 	RemoveVote(ctx context.Context, postID, userID primitive.ObjectID) error
 	GetUserVote(ctx context.Context, postID, userID primitive.ObjectID) (*model.Vote, error)
+	FindUserVotesOnPosts(ctx context.Context, userID primitive.ObjectID, postIDs []primitive.ObjectID) (map[primitive.ObjectID]string, error)
 }
 type postVoteRepo struct {
 	client         *mongo.Client
@@ -50,6 +51,53 @@ func (r *postVoteRepo) GetUserVote(ctx context.Context, postID, userID primitive
 		return nil, err
 	}
 	return &vote, nil
+}
+func (r *postVoteRepo) FindUserVotesOnPosts(ctx context.Context, userID primitive.ObjectID, postIDs []primitive.ObjectID) (map[primitive.ObjectID]string, error) {
+	if len(postIDs) == 0 {
+		return make(map[primitive.ObjectID]string), nil
+	}
+
+	// 1. Cập nhật bộ lọc (filter)
+	// Tìm tất cả các document có:
+	// - user_id trùng với userID
+	// - target_type phải là "post"
+	// - VÀ target_id nằm trong danh sách postIDs ($in)
+	filter := bson.M{
+		"user_id":     userID,
+		"target_type": model.VoteTargetPost, // Lọc chính xác các vote cho bài đăng
+		"target_id": bson.M{
+			"$in": postIDs,
+		},
+	}
+
+	cursor, err := r.voteCollection.Find(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	userVotesMap := make(map[primitive.ObjectID]string)
+
+	for cursor.Next(ctx) {
+		var vote model.Vote
+		if err := cursor.Decode(&vote); err != nil {
+			continue
+		}
+
+		// 2. Chuyển đổi giá trị bool sang string
+		// Giả định: true = upvote, false = downvote
+		if vote.Value {
+			userVotesMap[vote.TargetID] = string(model.VoteTypeUp)
+		} else {
+			userVotesMap[vote.TargetID] = string(model.VoteTypeDown)
+		}
+	}
+
+	if err := cursor.Err(); err != nil {
+		return nil, err
+	}
+
+	return userVotesMap, nil
 }
 
 // Vote xử lý việc bỏ phiếu, thay đổi phiếu hoặc hủy phiếu.

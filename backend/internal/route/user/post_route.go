@@ -13,9 +13,19 @@ import (
 func RegisterPostRoutes(rg *gin.RouterGroup, c *controller.PostController) {
 	posts := rg.Group("/posts")
 
-	// Các route yêu cầu xác thực
+	// --- 👁️ Public / Optional Auth Routes ---
+	// Các route này ai cũng có thể truy cập.
+	// Dùng AuthOptional để làm giàu dữ liệu (VD: trạng thái vote) cho người đã đăng nhập.
+	{
+
+	}
+
+	// --- 🛡️ Private / Required Auth Routes ---
+	// Các route này yêu cầu phải đăng nhập.
 	posts.Use(middleware.AuthMiddleware())
 	{
+		posts.GET("", c.GetPosts)        // Xem danh sách bài đăng
+		posts.GET("/:id", c.GetPostByID) // Xem chi tiết một bài đăng
 		posts.POST("", c.CreatePost)
 		posts.PUT("/:id", c.UpdatePost)
 		posts.DELETE("/:id", c.DeletePost)
@@ -32,8 +42,6 @@ func RegisterPostRoutes(rg *gin.RouterGroup, c *controller.PostController) {
 		posts.PUT("/:id/poll", c.UpdatePollDetails)
 		posts.POST("/:id/poll/options", c.AddPollOptions)
 		posts.DELETE("/:id/poll/options", c.RemovePollOptions)
-
-		// Route này cần sửa logic service
 		posts.PUT("/:id/poll/options/:optionID", c.UpdatePollOption)
 	}
 }

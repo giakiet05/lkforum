@@ -31,5 +31,5 @@ func main() {
 	for _, ri := range r.Routes() {
 		println(ri.Method, ri.Path)
 	}
-
+	
 }

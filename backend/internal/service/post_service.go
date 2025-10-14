@@ -5,12 +5,15 @@ package service
 import (
 	"context"
 	"errors"
+	"math"
 	"time"
 
 	"github.com/giakiet05/lkforum/internal/dto"
 	"github.com/giakiet05/lkforum/internal/model"
 	"github.com/giakiet05/lkforum/internal/repo"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 // --- Định nghĩa Lỗi ---
@@ -30,7 +33,7 @@ type PostService interface {
 	DeletePost(ctx context.Context, postID, userID primitive.ObjectID) error
 
 	// Lấy danh sách (Feed)
-	GetPosts(ctx context.Context, userID primitive.ObjectID, query *dto.GetPostsQuery) ([]*dto.PostResponse, error)
+	GetPosts(ctx context.Context, userID primitive.ObjectID, query *dto.GetPostsQuery) (*PaginatedPostsResponse, error)
 
 	// Tương tác (Vote)
 	VoteOnPost(ctx context.Context, userID, postID primitive.ObjectID, voteValue bool) (*dto.VotesCountResponse, error)
@@ -87,6 +90,14 @@ func NewPostService(
 	}
 }
 
+type PaginatedPostsResponse struct {
+	CurrentPage int                 `json:"currentPage"`
+	TotalPages  int64               `json:"totalPages"`
+	TotalPosts  int64               `json:"totalPosts"`
+	HasNextPage bool                `json:"hasNextPage"`
+	Posts       []*dto.PostResponse `json:"posts"`
+}
+
 // CreatePost tạo bài đăng mới
 func (s *postService) CreatePost(ctx context.Context, userID primitive.ObjectID, req *dto.CreatePostRequest) (*dto.PostResponse, error) {
 	postModel, err := mapCreateRequestToPostModel(req, userID)
@@ -100,7 +111,7 @@ func (s *postService) CreatePost(ctx context.Context, userID primitive.ObjectID,
 	}
 
 	// Khi mới tạo, không có thông tin vote của user
-	return mapPostModelToResponse(createdPost, nil, nil), nil
+	return mapPostModelToResponse(createdPost, "", nil), nil
 }
 
 // GetPostByID lấy chi tiết một bài đăng
@@ -113,38 +124,182 @@ func (s *postService) GetPostByID(ctx context.Context, postID, userID primitive.
 	// Lấy thông tin phụ để làm giàu DTO
 	userVote, _ := s.postVoteRepo.GetUserVote(ctx, postID, userID)
 	userPollVotes, _ := s.postPollRepo.GetUserPollVotes(ctx, postID, userID)
-
-	return mapPostModelToResponse(post, userVote, userPollVotes), nil
+	var userVoteStr string
+	if userVote != nil {
+		if userVote.Value {
+			userVoteStr = "up"
+		} else {
+			userVoteStr = "down"
+		}
+	}
+	return mapPostModelToResponse(post, userVoteStr, userPollVotes), nil
 }
 
-// GetPosts lấy danh sách bài đăng theo nhiều tiêu chí
-func (s *postService) GetPosts(ctx context.Context, userID primitive.ObjectID, query *dto.GetPostsQuery) ([]*dto.PostResponse, error) {
-	var posts []*model.Post
-	var err error
+func (s *postService) GetPosts(ctx context.Context, userID primitive.ObjectID, query *dto.GetPostsQuery) (*PaginatedPostsResponse, error) {
+	// 1. Service xây dựng bộ lọc động dựa trên query DTO.
+	filter := s.buildFilter(query)
 
-	// TODO: Cần có logic để lấy danh sách postID mà user đã vote để truyền xuống mapper
-
-	if query.CommunityID != "" {
-		communityID, _ := primitive.ObjectIDFromHex(query.CommunityID)
-		posts, err = s.postRepo.GetByCommunityID(ctx, communityID, query.Sort, query.TimeFrame, query.Limit, (query.Page-1)*query.Limit)
-	} else if query.AuthorID != "" {
-		authorID, _ := primitive.ObjectIDFromHex(query.AuthorID)
-		posts, err = s.postRepo.GetByAuthorID(ctx, authorID, query.Limit, (query.Page-1)*query.Limit)
-	} else {
-		posts, err = s.postRepo.GetFeed(ctx, query.Sort, query.TimeFrame, query.Limit, (query.Page-1)*query.Limit)
+	// 2. Lấy tổng số bài đăng khớp với bộ lọc để tính toán phân trang.
+	totalPosts, err := s.postRepo.Count(ctx, filter)
+	if err != nil {
+		return nil, err // Nếu không đếm được thì trả về lỗi
 	}
 
+	// Nếu không có bài đăng nào, trả về kết quả rỗng ngay lập tức để tiết kiệm chi phí.
+	if totalPosts == 0 {
+		return &PaginatedPostsResponse{
+			CurrentPage: query.Page,
+			TotalPosts:  0,
+			TotalPages:  0,
+			HasNextPage: false,
+			Posts:       []*dto.PostResponse{},
+		}, nil
+	}
+
+	// 3. Service xây dựng các tùy chọn truy vấn (sắp xếp, phân trang).
+	findOptions := s.buildFindOptions(query)
+
+	// 4. Gọi hàm Find của Repository để lấy dữ liệu.
+	posts, err := s.postRepo.Find(ctx, filter, findOptions)
 	if err != nil {
 		return nil, err
 	}
 
-	// Chuyển đổi hàng loạt sang DTO
+	// Chuẩn bị các slice ID để truy vấn thông tin vote
+	postIDs := make([]primitive.ObjectID, len(posts))
+	var pollPostIDs []primitive.ObjectID
+	for i, p := range posts {
+		postIDs[i] = p.ID
+		if p.Type == model.PostTypePoll {
+			pollPostIDs = append(pollPostIDs, p.ID)
+		}
+	}
+
+	// 5. Lấy thông tin upvote/downvote của người dùng.
+	userVotes := make(map[primitive.ObjectID]string)
+	if !userID.IsZero() {
+		userVotes, err = s.postVoteRepo.FindUserVotesOnPosts(ctx, userID, postIDs)
+		if err != nil {
+			// Ghi log lỗi nhưng không dừng request
+		}
+	}
+
+	// 6. Lấy thông tin poll vote của người dùng.
+	userPollVotesMap := make(map[primitive.ObjectID][]*model.PollVote)
+	// Chỉ gọi DB nếu có bài poll và user đã đăng nhập
+	if len(pollPostIDs) > 0 && !userID.IsZero() {
+		userPollVotesMap, err = s.postPollRepo.FindUserVotesOnPolls(ctx, userID, pollPostIDs)
+		if err != nil {
+			// Ghi log lỗi nhưng không dừng request
+		}
+	}
+
+	// 7. Chuyển đổi (map) model sang DTO.
 	responses := make([]*dto.PostResponse, len(posts))
 	for i, post := range posts {
-		// Trong danh sách, ta có thể không cần lấy chi tiết vote của user để tối ưu hiệu năng
-		responses[i] = mapPostModelToResponse(post, nil, nil)
+		userVoteStr := userVotes[post.ID]
+		userPollVotes := userPollVotesMap[post.ID]
+		responses[i] = mapPostModelToResponse(post, userVoteStr, userPollVotes)
 	}
-	return responses, nil
+
+	// 8. Tính toán các thông tin phân trang cuối cùng và trả về.
+	totalPages := int64(math.Ceil(float64(totalPosts) / float64(query.Limit)))
+
+	return &PaginatedPostsResponse{
+		CurrentPage: query.Page,
+		TotalPosts:  totalPosts,
+		TotalPages:  totalPages,
+		HasNextPage: query.Page < int(totalPages),
+		Posts:       responses,
+	}, nil
+}
+
+// buildFilter là hàm helper để tạo bộ lọc động.
+func (s *postService) buildFilter(query *dto.GetPostsQuery) bson.M {
+	filter := bson.M{"is_deleted": bson.M{"$ne": true}}
+
+	if query.CommunityID != "" {
+		if communityID, err := primitive.ObjectIDFromHex(query.CommunityID); err == nil {
+			filter["community_id"] = communityID
+		}
+	}
+
+	if query.AuthorID != "" {
+		if authorID, err := primitive.ObjectIDFromHex(query.AuthorID); err == nil {
+			filter["author_id"] = authorID
+		}
+	}
+
+	if query.Type != "" {
+		filter["type"] = query.Type
+	}
+
+	// Logic nghiệp vụ: Chỉ áp dụng bộ lọc thời gian cho các kiểu sort "top" hoặc "controversial".
+	if query.Sort == "top" || query.Sort == "controversial" {
+		if timeFilter := createTimeFilter(query.TimeFrame); timeFilter != nil {
+			for key, value := range timeFilter {
+				filter[key] = value
+			}
+		}
+	}
+
+	return filter
+}
+
+// buildFindOptions là hàm helper để tạo các tùy chọn truy vấn (sắp xếp, phân trang).
+func (s *postService) buildFindOptions(query *dto.GetPostsQuery) *options.FindOptions {
+	opts := options.Find()
+
+	// Phân trang
+	limit := query.Limit
+	offset := (query.Page - 1) * limit
+	opts.SetLimit(int64(limit))
+	opts.SetSkip(int64(offset))
+
+	// Sắp xếp
+	var sortDoc bson.D
+	switch query.Sort {
+	case "top":
+		sortDoc = bson.D{{Key: "votes_count.up", Value: -1}, {Key: "created_at", Value: -1}}
+	// Thêm các case "hot", "controversial" ở đây nếu cần.
+	// Để có sort "hot" chính xác, bạn cần dùng Aggregation Pipeline.
+	case "new":
+		fallthrough
+	default:
+		sortDoc = bson.D{{Key: "created_at", Value: -1}}
+	}
+	opts.SetSort(sortDoc)
+
+	return opts
+}
+
+// --- HÀM TIỆN ÍCH (UTILITY) ---
+
+// createTimeFilter là một hàm tiện ích tạo ra bộ lọc thời gian.
+func createTimeFilter(timeFrame string) bson.M {
+	if timeFrame == "" || timeFrame == "all" {
+		return nil
+	}
+
+	now := time.Now()
+	var startTime time.Time
+
+	switch timeFrame {
+	case "hour":
+		startTime = now.Add(-1 * time.Hour)
+	case "day":
+		startTime = now.Add(-24 * time.Hour)
+	case "week":
+		startTime = now.AddDate(0, 0, -7)
+	case "month":
+		startTime = now.AddDate(0, -1, 0)
+	case "year":
+		startTime = now.AddDate(-1, 0, 0)
+	default:
+		return nil
+	}
+
+	return bson.M{"created_at": bson.M{"$gte": startTime}}
 }
 
 // UpdatePost cập nhật bài đăng
@@ -173,7 +328,7 @@ func (s *postService) UpdatePost(ctx context.Context, postID, userID primitive.O
 		return nil, err
 	}
 
-	return mapPostModelToResponse(post, nil, nil), nil
+	return mapPostModelToResponse(post, "", nil), nil
 }
 
 // DeletePost xóa một bài đăng

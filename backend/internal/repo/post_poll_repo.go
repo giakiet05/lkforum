@@ -25,6 +25,7 @@ type PostPollRepo interface {
 	RemovePollOptions(ctx context.Context, postID primitive.ObjectID, optionIDs []primitive.ObjectID) error
 	UpdatePollOption(ctx context.Context, postID, optionID primitive.ObjectID, text string) error
 	CanEditPoll(ctx context.Context, postID primitive.ObjectID) (bool, error)
+	FindUserVotesOnPolls(ctx context.Context, userID primitive.ObjectID, postIDs []primitive.ObjectID) (map[primitive.ObjectID][]*model.PollVote, error)
 }
 type postPollRepo struct {
 	client             *mongo.Client // Cần client để tạo session cho transaction
@@ -38,6 +39,40 @@ func NewPostPollRepo(client *mongo.Client, db *mongo.Database) PostPollRepo {
 		postCollection:     db.Collection(config.PostColName),
 		pollVoteCollection: db.Collection(config.PollVoteColName), // Thêm collection cho poll votes
 	}
+}
+func (r *postPollRepo) FindUserVotesOnPolls(ctx context.Context, userID primitive.ObjectID, postIDs []primitive.ObjectID) (map[primitive.ObjectID][]*model.PollVote, error) {
+	if len(postIDs) == 0 {
+		return make(map[primitive.ObjectID][]*model.PollVote), nil
+	}
+
+	filter := bson.M{
+		"user_id": userID,
+		"post_id": bson.M{
+			"$in": postIDs,
+		},
+	}
+
+	cursor, err := r.pollVoteCollection.Find(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	// Nhóm các poll votes theo PostID
+	userPollVotesMap := make(map[primitive.ObjectID][]*model.PollVote)
+	for cursor.Next(ctx) {
+		var vote model.PollVote
+		if err := cursor.Decode(&vote); err != nil {
+			continue
+		}
+		userPollVotesMap[vote.PostID] = append(userPollVotesMap[vote.PostID], &vote)
+	}
+
+	if err := cursor.Err(); err != nil {
+		return nil, err
+	}
+
+	return userPollVotesMap, nil
 }
 
 // GetUserPollVotes lấy tất cả các phiếu bầu của một người dùng cho một bài đăng.

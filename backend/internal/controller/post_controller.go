@@ -2,6 +2,7 @@ package controller
 
 import (
 	"errors"
+	"log"
 	"net/http"
 
 	"github.com/giakiet05/lkforum/internal/apperror"
@@ -72,7 +73,7 @@ func (c *PostController) GetPosts(ctx *gin.Context) {
 		handlePostServiceError(ctx, apperror.NewError(err, "INVALID_QUERY", "Invalid query parameters"))
 		return
 	}
-
+	log.Printf("DEBUG: Received query parameters: %+v\n", query)
 	// Set defaults
 	if query.Page == 0 {
 		query.Page = 1

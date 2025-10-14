@@ -63,7 +63,7 @@ func mapCreateRequestToPostModel(req *dto.CreatePostRequest, authorID primitive.
 }
 
 // mapPostModelToResponse chuyển đổi model từ DB thành DTO để trả về cho client.
-func mapPostModelToResponse(post *model.Post, userVote *model.Vote, userPollVotes []*model.PollVote) *dto.PostResponse {
+func mapPostModelToResponse(post *model.Post, userVoteStr string, userPollVotes []*model.PollVote) *dto.PostResponse {
 	res := &dto.PostResponse{
 		ID:             post.ID.Hex(),
 		AuthorID:       post.AuthorID.Hex(),
@@ -78,7 +78,9 @@ func mapPostModelToResponse(post *model.Post, userVote *model.Vote, userPollVote
 		CreatedAt:      post.CreatedAt,
 		UpdatedAt:      post.UpdatedAt,
 	}
-
+	if len(userVoteStr) > 0 {
+		res.UserVote = userVoteStr
+	}
 	if post.Content != nil {
 		res.Content = &dto.PostContentResponse{}
 		if post.Content.Text != "" {
@@ -103,13 +105,6 @@ func mapPostModelToResponse(post *model.Post, userVote *model.Vote, userPollVote
 		}
 	}
 
-	if userVote != nil {
-		if userVote.Value {
-			res.UserVote = "up"
-		} else {
-			res.UserVote = "down"
-		}
-	}
 	return res
 }
 
