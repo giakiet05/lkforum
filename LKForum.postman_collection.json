@@ -1,0 +1,535 @@
+{
+	"info": {
+		"_postman_id": "0553cb3d-955a-4966-bb00-e626b4422b92",
+		"name": "LKForum API Demo",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "45262258",
+		"_collection_link": "https://de-a-long.postman.co/workspace/De-A-Long-Workspace~55d40047-fa43-4f7f-8412-e1e0824f0d87/collection/45262258-0553cb3d-955a-4966-bb00-e626b4422b92?action=share&source=collection_link&creator=45262258"
+	},
+	"item": [
+		{
+			"name": "auth",
+			"item": [
+				{
+					"name": "Register",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"",
+									"pm.test(\"Response status code is 201\", function () {",
+									"    pm.expect(pm.response.code).to.equal(201);",
+									"});",
+									"",
+									"",
+									"pm.test(\"Response has the required fields\", function () {",
+									"    const responseData = pm.response.json();",
+									"    ",
+									"    pm.expect(responseData).to.be.an('object');",
+									"    pm.expect(responseData).to.have.all.keys('user', 'access_token', 'refresh_token');",
+									"});",
+									"",
+									"",
+									"pm.test(\"User object contains valid fields\", function () {",
+									"    const responseData = pm.response.json();",
+									"    ",
+									"    pm.expect(responseData).to.be.an('object');",
+									"    pm.expect(responseData.user).to.exist.and.to.be.an('object');",
+									"    ",
+									"    pm.expect(responseData.user).to.have.all.keys('id', 'username', 'email', 'role');",
+									"    ",
+									"    pm.expect(responseData.user.id).to.be.a('string').that.is.not.empty;",
+									"    pm.expect(responseData.user.username).to.be.a('string').that.is.not.empty;",
+									"    pm.expect(responseData.user.email).to.be.a('string').that.matches(/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/, \"Email format is invalid\");",
+									"    pm.expect(responseData.user.role).to.be.a('string').that.is.not.empty;",
+									"});",
+									"",
+									"",
+									"pm.test(\"Email is in a valid format\", function () {",
+									"    const responseData = pm.response.json();",
+									"    ",
+									"    pm.expect(responseData).to.be.an('object');",
+									"    pm.expect(responseData.user).to.exist.and.to.be.an('object');",
+									"    pm.expect(responseData.user.email).to.exist.and.to.match(/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/, \"Email format is invalid\");",
+									"});",
+									"",
+									"",
+									"pm.test(\"Access token and refresh token must be non-empty strings\", function () {",
+									"    const responseData = pm.response.json();",
+									"",
+									"    pm.expect(responseData.access_token).to.exist.and.to.be.a('string').and.to.have.lengthOf.at.least(1, \"Access token should not be empty\");",
+									"    pm.expect(responseData.refresh_token).to.exist.and.to.be.a('string').and.to.have.lengthOf.at.least(1, \"Refresh token should not be empty\");",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"username\": \"ankhoi\",\n    \"email\": \"voankhoi@gmail.com\",\n    \"password\": \"1234567890\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/register",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"register"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "Register",
+							"originalRequest": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"username\": \"giakiet07\",\n    \"email\": \"hello2@gmail.com\",\n    \"password\": \"abcd1234\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_url}}/api/auth/register",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"auth",
+										"register"
+									]
+								}
+							},
+							"status": "Created",
+							"code": 201,
+							"_postman_previewlanguage": null,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 02 Oct 2025 13:57:27 GMT"
+								},
+								{
+									"key": "Content-Length",
+									"value": "697"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"user\": {\n        \"id\": \"68de84c74f105f04cbb7c0ee\",\n        \"username\": \"giakiet07\",\n        \"email\": \"hello2@gmail.com\",\n        \"role\": \"user\"\n    },\n    \"access_token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiIiLCJleHAiOjE3NTk0MTcwNDcsImlhdCI6MTc1OTQxMzQ0NywiaXNzIjoiIiwianRpIjoiOTAzNGQxMDgtMWYyMS00MjIyLWI1M2QtYTZiZjUwODA0NWM5Iiwicm9sZSI6InVzZXIiLCJzdWIiOiI2OGRlODRjNzRmMTA1ZjA0Y2JiN2MwZWUifQ.m0bgOAAZdAvyrezVolMxX_WtjKXT67XG3tPje3tXDYM\",\n    \"refresh_token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiIiLCJleHAiOjE3NjAwMTgyNDcsImlhdCI6MTc1OTQxMzQ0NywiaXNzIjoiIiwianRpIjoiNzA4NTVjZTItODk3OC00YjEzLTg3NGItZjhmOGY1ZWU4ZmQ4Iiwic3ViIjoiNjhkZTg0Yzc0ZjEwNWYwNGNiYjdjMGVlIiwidHlwZSI6InJlZnJlc2gifQ.xeVlKamTG7X7bjLY2UQW0r3l7Zjcta4ZvY9DWKpBK6g\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Login - Tests (put in Login request Tests tab)\r",
+									"let res = pm.response.json();\r",
+									"\r",
+									"pm.test(\"Status is 200\", () => pm.response.to.have.status(200));\r",
+									"pm.test(\"Has user object\", () => pm.expect(res).to.have.property(\"user\"));\r",
+									"pm.test(\"Has tokens\", () => {\r",
+									"  pm.expect(res).to.have.property(\"access_token\");\r",
+									"  pm.expect(res).to.have.property(\"refresh_token\");\r",
+									"});\r",
+									"\r",
+									"// Save tokens to environment for subsequent requests\r",
+									"pm.environment.set(\"access_token\", res.access_token);\r",
+									"pm.environment.set(\"refresh_token\", res.refresh_token);\r",
+									"pm.environment.set(\"user_id\", res.user && res.user.id);"
+								],
+								"type": "text/javascript",
+								"packages": {},
+								"requests": {}
+							}
+						},
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript",
+								"packages": {},
+								"requests": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"identifier\": \"ankhoi\",\n    \"password\": \"1234567890\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/login",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"login"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Refresh token",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Response status code is 200\", function () {",
+									"    pm.expect(pm.response.code).to.equal(200);",
+									"});",
+									"",
+									"",
+									"pm.test(\"Response contains access_token and refresh_token fields\", function () {",
+									"    const responseData = pm.response.json();",
+									"    ",
+									"    pm.expect(responseData).to.have.all.keys('access_token', 'refresh_token');",
+									"});",
+									"",
+									"",
+									"pm.test(\"Access token is a non-empty string\", function () {",
+									"    const responseData = pm.response.json();",
+									"    ",
+									"    pm.expect(responseData).to.be.an('object');",
+									"    pm.expect(responseData.access_token).to.exist.and.to.be.a('string').and.to.have.lengthOf.at.least(1, \"Access token should not be empty\");",
+									"});",
+									"",
+									"",
+									"pm.test(\"Refresh token must be a non-empty string\", function () {",
+									"    const responseData = pm.response.json();",
+									"    ",
+									"    pm.expect(responseData).to.be.an('object');",
+									"    pm.expect(responseData.refresh_token).to.exist.and.to.be.a('string').and.to.have.lengthOf.at.least(1, \"Value should not be empty\");",
+									"});",
+									"",
+									"",
+									"pm.test(\"Response time is less than 200ms\", function () {",
+									"    pm.expect(pm.response.responseTime).to.be.below(200);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "Bearer {{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"refresh_token\": \"{{refresh_token}}\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/refresh",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"refresh"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "Refresh token",
+							"originalRequest": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"refresh_token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiIiLCJleHAiOjE3NTk4NDY3MTgsImlhdCI6MTc1OTI0MTkxOCwiaXNzIjoiIiwianRpIjoiMjk4YTE2Y2EtZGZmZC00MzkzLWIwZDktYzU0YTQxZmEwYzk1Iiwic3ViIjoiNjhkYThmYjVjODBjZDYzNjdlZGMwODBiIiwidHlwZSI6InJlZnJlc2gifQ.LR0fF45RcfRsBPW2ArOgkfDHFDrYwiNuWay61Wq_ql0\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_url}}/api/auth/refresh",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"auth",
+										"refresh"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": null,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 02 Oct 2025 13:58:19 GMT"
+								},
+								{
+									"key": "Content-Length",
+									"value": "592"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"access_token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiIiLCJleHAiOjE3NTk0MTcwOTksImlhdCI6MTc1OTQxMzQ5OSwiaXNzIjoiIiwianRpIjoiMWE2ODU5MzgtNGZiYi00MjNmLWEzZDktNmY3YTkyNWNlODAzIiwicm9sZSI6InVzZXIiLCJzdWIiOiI2OGRhOGZiNWM4MGNkNjM2N2VkYzA4MGIifQ.Rzp5MFDCG_ds0VhZetxbW1RRJ32ddt5ux8sXgXMbxY4\",\n    \"refresh_token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiIiLCJleHAiOjE3NjAwMTgyOTksImlhdCI6MTc1OTQxMzQ5OSwiaXNzIjoiIiwianRpIjoiOTIzNWM4YzktZTI4MC00OThmLTgzYWUtMzg3ZjNiMDUzODE0Iiwic3ViIjoiNjhkYThmYjVjODBjZDYzNjdlZGMwODBiIiwidHlwZSI6InJlZnJlc2gifQ.7fz7476iFJQvI1TopULIy3_7jD4saewbFksv6nZOzXY\"\n}"
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "users",
+			"item": [
+				{
+					"name": "Get users by ID",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript",
+								"packages": {},
+								"requests": {}
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"",
+									"pm.test(\"Response status code is 200\", function () {",
+									"    pm.expect(pm.response.code).to.equal(200);",
+									"});",
+									"",
+									"",
+									"pm.test(\"Response contains required fields\", function () {",
+									"    const responseData = pm.response.json();",
+									"    ",
+									"    pm.expect(responseData).to.be.an('object');",
+									"    pm.expect(responseData).to.have.all.keys('id', 'username', 'email', 'role');",
+									"});",
+									"",
+									"",
+									"pm.test(\"Username is a non-empty string\", function () {",
+									"    const responseData = pm.response.json();",
+									"    ",
+									"    pm.expect(responseData).to.be.an('object');",
+									"    pm.expect(responseData.username).to.exist.and.to.be.a('string').and.to.have.lengthOf.at.least(1, \"Username should not be empty\");",
+									"});",
+									"",
+									"",
+									"pm.test(\"Email must be in a valid format\", function () {",
+									"    const responseData = pm.response.json();",
+									"    ",
+									"    pm.expect(responseData).to.be.an('object');",
+									"    pm.expect(responseData.email).to.match(/^[\\w-\\.]+@([\\w-]+\\.)+[\\w-]{2,4}$/, \"Email format is invalid\");",
+									"});",
+									"",
+									"",
+									"pm.test(\"Role is one of the expected values\", function () {",
+									"    const responseData = pm.response.json();",
+									"    ",
+									"    pm.expect(responseData).to.be.an('object');",
+									"    pm.expect([\"admin\", \"user\", \"guest\"]).to.include(responseData.role);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/users/{{user_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"users",
+								"{{user_id}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Soft delete user by ID",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript",
+								"packages": {},
+								"requests": {}
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"",
+									"pm.test(\"Response status code is 200\", function () {",
+									"    pm.expect(pm.response.code).to.equal(200);",
+									"});",
+									"",
+									"",
+									"pm.test(\"Response has required fields\", function () {",
+									"    const responseData = pm.response.json();",
+									"    ",
+									"    pm.expect(responseData).to.be.an('object');",
+									"    pm.expect(responseData).to.have.all.keys('id', 'message');",
+									"});",
+									"",
+									"",
+									"pm.test(\"Message confirms successful deletion\", function () {",
+									"    const responseData = pm.response.json();",
+									"    ",
+									"    pm.expect(responseData).to.be.an('object');",
+									"    pm.expect(responseData.message).to.exist.and.to.be.a('string').and.to.have.lengthOf.at.least(1, \"Message should not be empty\");",
+									"});",
+									"",
+									"",
+									"pm.test(\"Response time is less than 200ms\", function () {",
+									"    pm.expect(pm.response.responseTime).to.be.below(200);",
+									"});",
+									"",
+									"",
+									"pm.test(\"Content-Type is application/json\", function () {",
+									"    pm.expect(pm.response.headers.get('Content-Type')).to.eql('application/json');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/users/{{user_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"users",
+								"{{user_id}}"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"requests": {},
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"requests": {},
+				"exec": [
+					""
+				]
+			}
+		}
+	]
+}

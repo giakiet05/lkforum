@@ -23,19 +23,19 @@ func NewCommunityController(communityService service.CommunityService) *Communit
 func (c *CommunityController) CreateCommunity(ctx *gin.Context) {
 	var req dto.CreateCommunityRequest
 	if err := ctx.ShouldBind(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, dto.ErrorResponse{Code: "INVALID_REQUEST", Error: err.Error()})
+		ctx.JSON(apperror.StatusFromError(apperror.ErrBadRequest), dto.ErrorResponse{ErrorCode: apperror.ErrBadRequest.Code, Message: apperror.Message(err)})
 		return
 	}
 
 	authUser, exists := ctx.Get("authUser")
 	if !exists {
-		ctx.JSON(http.StatusForbidden, dto.ErrorResponse{Code: "FORBIDDEN", Error: "Invalid jwt token"})
+		ctx.JSON(apperror.StatusFromError(apperror.ErrForbidden), dto.ErrorResponse{ErrorCode: apperror.ErrForbidden.Code, Message: apperror.ErrForbidden.Message})
 		return
 	}
 
 	community, err := c.communityService.CreateCommunity(&req, authUser.(auth.AuthUser).ID)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, dto.ErrorResponse{Code: apperror.Code(err), Error: err.Error()})
+		ctx.JSON(apperror.StatusFromError(err), dto.ErrorResponse{ErrorCode: apperror.Code(err), Message: apperror.Message(err)})
 		return
 	}
 
@@ -48,13 +48,13 @@ func (c *CommunityController) CreateCommunity(ctx *gin.Context) {
 func (c *CommunityController) GetCommunityByID(ctx *gin.Context) {
 	communityID := ctx.Param("community_id")
 	if communityID == "" {
-		ctx.JSON(http.StatusBadRequest, dto.ErrorResponse{Code: "INVALID_REQUEST", Error: communityID})
+		ctx.JSON(apperror.StatusFromError(apperror.ErrBadRequest), dto.ErrorResponse{ErrorCode: apperror.ErrBadRequest.Code, Message: apperror.ErrBadRequest.Message})
 		return
 	}
 
 	community, err := c.communityService.GetCommunityByID(communityID)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, dto.ErrorResponse{Code: apperror.Code(err), Error: err.Error()})
+		ctx.JSON(apperror.StatusFromError(err), dto.ErrorResponse{ErrorCode: apperror.Code(err), Message: apperror.Message(err)})
 		return
 	}
 
@@ -84,14 +84,14 @@ func (c *CommunityController) GetCommunitiesFilter(ctx *gin.Context) {
 		if err == nil {
 			createFrom = t
 		} else {
-			ctx.JSON(http.StatusInternalServerError, dto.ErrorResponse{Code: apperror.Code(err), Error: err.Error()})
+			ctx.JSON(apperror.StatusFromError(apperror.ErrBadRequest), dto.ErrorResponse{ErrorCode: apperror.ErrBadRequest.Code, Message: apperror.ErrBadRequest.Message})
 			return
 		}
 	}
 
 	response, err := c.communityService.GetCommunitiesFilter(name, description, createFrom, page, pageSize)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, dto.ErrorResponse{Code: apperror.Code(err), Error: err.Error()})
+		ctx.JSON(apperror.StatusFromError(err), dto.ErrorResponse{ErrorCode: apperror.Code(err), Message: apperror.Message(err)})
 		return
 	}
 
@@ -101,7 +101,7 @@ func (c *CommunityController) GetCommunitiesFilter(ctx *gin.Context) {
 func (c *CommunityController) GetCommunityByModeratorID(ctx *gin.Context) {
 	moderatorID := ctx.Param("moderator_id")
 	if moderatorID == "" {
-		ctx.JSON(http.StatusBadRequest, dto.ErrorResponse{Code: "INVALID_REQUEST", Error: moderatorID})
+		ctx.JSON(apperror.StatusFromError(apperror.ErrBadRequest), dto.ErrorResponse{ErrorCode: apperror.ErrBadRequest.Code, Message: apperror.ErrBadRequest.Message})
 		return
 	}
 
@@ -120,7 +120,7 @@ func (c *CommunityController) GetCommunityByModeratorID(ctx *gin.Context) {
 
 	response, err := c.communityService.GetCommunitiesByModeratorIDPaginated(moderatorID, page, pageSize)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, dto.ErrorResponse{Code: apperror.Code(err), Error: err.Error()})
+		ctx.JSON(apperror.StatusFromError(err), dto.ErrorResponse{ErrorCode: apperror.Code(err), Message: apperror.Message(err)})
 		return
 	}
 
@@ -143,7 +143,7 @@ func (c *CommunityController) GetAllCommunities(ctx *gin.Context) {
 
 	response, err := c.communityService.GetAllCommunitiesPaginated(page, pageSize)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, dto.ErrorResponse{Code: apperror.Code(err), Error: err.Error()})
+		ctx.JSON(apperror.StatusFromError(err), dto.ErrorResponse{ErrorCode: apperror.Code(err), Message: apperror.Message(err)})
 		return
 	}
 
@@ -153,19 +153,19 @@ func (c *CommunityController) GetAllCommunities(ctx *gin.Context) {
 func (c *CommunityController) UpdateCommunity(ctx *gin.Context) {
 	var req dto.UpdateCommunityRequest
 	if err := ctx.ShouldBind(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, dto.ErrorResponse{Code: "INVALID_REQUEST", Error: err.Error()})
+		ctx.JSON(apperror.StatusFromError(apperror.ErrBadRequest), dto.ErrorResponse{ErrorCode: apperror.ErrBadRequest.Code, Message: apperror.Message(err)})
 		return
 	}
 
 	authUser, exists := ctx.Get("authUser")
 	if !exists {
-		ctx.JSON(http.StatusForbidden, dto.ErrorResponse{Code: "FORBIDDEN", Error: "Invalid jwt token"})
+		ctx.JSON(apperror.StatusFromError(apperror.ErrForbidden), dto.ErrorResponse{ErrorCode: apperror.ErrForbidden.Code, Message: apperror.ErrForbidden.Message})
 		return
 	}
 
 	community, err := c.communityService.UpdateCommunity(&req, authUser.(auth.AuthUser).ID)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, dto.ErrorResponse{Code: apperror.Code(err), Error: err.Error()})
+		ctx.JSON(apperror.StatusFromError(err), dto.ErrorResponse{ErrorCode: apperror.Code(err), Message: apperror.Message(err)})
 		return
 	}
 
@@ -178,19 +178,19 @@ func (c *CommunityController) UpdateCommunity(ctx *gin.Context) {
 func (c *CommunityController) AddModerator(ctx *gin.Context) {
 	var req *dto.AddModeratorRequest
 	if err := ctx.ShouldBind(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, dto.ErrorResponse{Code: "INVALID_REQUEST", Error: err.Error()})
+		ctx.JSON(apperror.StatusFromError(apperror.ErrBadRequest), dto.ErrorResponse{ErrorCode: apperror.ErrBadRequest.Code, Message: apperror.Message(err)})
 		return
 	}
 
 	authUser, exists := ctx.Get("authUser")
 	if !exists {
-		ctx.JSON(http.StatusForbidden, dto.ErrorResponse{Code: "FORBIDDEN", Error: "Invalid jwt token"})
+		ctx.JSON(apperror.StatusFromError(apperror.ErrForbidden), dto.ErrorResponse{ErrorCode: apperror.ErrForbidden.Code, Message: apperror.ErrForbidden.Message})
 		return
 	}
 
 	err := c.communityService.AddModerator(req, authUser.(auth.AuthUser).ID)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, dto.ErrorResponse{Code: apperror.Code(err), Error: err.Error()})
+		ctx.JSON(apperror.StatusFromError(err), dto.ErrorResponse{ErrorCode: apperror.Code(err), Message: apperror.Message(err)})
 		return
 	}
 
@@ -203,19 +203,19 @@ func (c *CommunityController) AddModerator(ctx *gin.Context) {
 func (c *CommunityController) RemoveModerator(ctx *gin.Context) {
 	var req *dto.RemoveModeratorRequest
 	if err := ctx.ShouldBind(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, dto.ErrorResponse{Code: "INVALID_REQUEST", Error: err.Error()})
+		ctx.JSON(apperror.StatusFromError(apperror.ErrBadRequest), dto.ErrorResponse{ErrorCode: apperror.ErrBadRequest.Code, Message: apperror.Message(err)})
 		return
 	}
 
 	authUser, exists := ctx.Get("authUser")
 	if !exists {
-		ctx.JSON(http.StatusForbidden, dto.ErrorResponse{Code: "FORBIDDEN", Error: "Invalid jwt token"})
+		ctx.JSON(apperror.StatusFromError(apperror.ErrForbidden), dto.ErrorResponse{ErrorCode: apperror.ErrForbidden.Code, Message: apperror.ErrForbidden.Message})
 		return
 	}
 
 	err := c.communityService.RemoveModerator(req, authUser.(auth.AuthUser).ID)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, dto.ErrorResponse{Code: apperror.Code(err), Error: err.Error()})
+		ctx.JSON(apperror.StatusFromError(err), dto.ErrorResponse{ErrorCode: apperror.Code(err), Message: apperror.Message(err)})
 		return
 	}
 
@@ -228,19 +228,19 @@ func (c *CommunityController) RemoveModerator(ctx *gin.Context) {
 func (c *CommunityController) DeleteCommunityByID(ctx *gin.Context) {
 	communityID := ctx.Param("community_id")
 	if communityID == "" {
-		ctx.JSON(http.StatusBadRequest, dto.ErrorResponse{Code: "INVALID_REQUEST", Error: communityID})
+		ctx.JSON(apperror.StatusFromError(apperror.ErrBadRequest), dto.ErrorResponse{ErrorCode: apperror.ErrBadRequest.Code, Message: apperror.ErrBadRequest.Message})
 		return
 	}
 
 	authUser, exists := ctx.Get("authUser")
 	if !exists {
-		ctx.JSON(http.StatusForbidden, dto.ErrorResponse{Code: "FORBIDDEN", Error: "Invalid jwt token"})
+		ctx.JSON(apperror.StatusFromError(apperror.ErrForbidden), dto.ErrorResponse{ErrorCode: apperror.ErrForbidden.Code, Message: apperror.ErrForbidden.Message})
 		return
 	}
 
 	err := c.communityService.DeleteCommunityByID(communityID, authUser.(auth.AuthUser).ID)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, dto.ErrorResponse{Code: apperror.Code(err), Error: err.Error()})
+		ctx.JSON(apperror.StatusFromError(err), dto.ErrorResponse{ErrorCode: apperror.Code(err), Message: apperror.Message(err)})
 		return
 	}
 

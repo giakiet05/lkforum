@@ -20,8 +20,8 @@ type Community struct {
 	CreateByID     primitive.ObjectID `bson:"create_by_id,omitempty" json:"create_by_id,omitempty"`
 	CreateByName   string             `bson:"create_by_name,omitempty" json:"create_by_name,omitempty"`
 	CreateByAvatar string             `bson:"create_by_avatar,omitempty" json:"create_by_avatar,omitempty"`
-	IsDeleted      bool               `bson:"is_deleted,omitempty" json:"is_deleted,omitempty"`
-	IsBanned       bool               `bson:"is_banned,omitempty" json:"is_banned,omitempty"`
+	IsDeleted      bool               `bson:"is_deleted" json:"is_deleted"`
+	IsBanned       bool               `bson:"is_banned" json:"is_banned"`
 }
 
 type CommunitySetting struct {

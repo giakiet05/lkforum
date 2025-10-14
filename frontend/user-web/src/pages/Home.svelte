@@ -3,7 +3,7 @@
   import { logout } from "../services/auth-service";
   import { push } from "svelte-spa-router";
   import { get } from "svelte/store";
-  import type {User} from "../models/user";
+  import type { User } from "../models/user";
 
   let user: User | null = null;
   $: {

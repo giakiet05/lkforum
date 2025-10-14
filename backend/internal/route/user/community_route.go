@@ -13,9 +13,9 @@ func RegisterCommunityRoutes(rg *gin.RouterGroup, c *controller.CommunityControl
 	communities.Use(middleware.AuthMiddleware())
 	{
 		communities.POST("", c.CreateCommunity)
-		communities.GET("/:community_id", c.GetCommunityByID)
-		communities.GET("/filter", c.GetCommunitiesFilter)
-		communities.GET("/moderator/:moderator_id", c.GetCommunityByModeratorID)
+		communities.GET(":community_id", c.GetCommunityByID)
+		communities.GET("filter", c.GetCommunitiesFilter)
+		communities.GET("moderator/:moderator_id", c.GetCommunityByModeratorID)
 		communities.GET("", c.GetAllCommunities)
 		communities.PUT("", c.UpdateCommunity)
 		communities.PUT("/add_moderator", c.AddModerator)

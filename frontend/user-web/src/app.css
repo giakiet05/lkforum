@@ -1,5 +1,31 @@
+html {
+  font-size: 13px; /* Mặc định là 16px, giảm xuống 14px để thu nhỏ khoảng 12.5% */
+}
+
 :root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+
+  --font-primary: 'Nunito Sans', sans-serif;
+  --font-secondary: 'Roboto', sans-serif;
+   /* ==================================== */
+  /* ===== THÊM BIẾN MÀU SẮC VÀO ĐÂY ===== */
+  /* ==================================== */
+  --primary-color: #646cff;      /* Màu chính cho nút bấm, link */
+  --primary-color-hover: #535bf2;/* Màu chính khi hover */
+
+  --text-color: black; /* Màu chữ chính */
+  --text-color-secondary: #a0a0a0;       /* Màu chữ phụ */
+
+  --background-color: #242424;   /* Màu nền chính */
+  --surface-color: #1a1a1a;      /* Màu nền cho các thẻ card, button */
+
+  --border-color: #444444;       /* Màu viền */
+   --darkblue--color:#154D71;
+
+  --success-color: #2ecc71;      /* Màu cho thông báo thành công */
+  --error-color: #e74c3c;        /* Màu cho thông báo lỗi */
+
+  font-family: var(--font-primary);
+
   line-height: 1.5;
   font-weight: 400;
 
@@ -12,6 +38,14 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+/* ================================================== */
+/* 3. THÊM KHỐI NÀY ĐỂ ÁP DỤNG FONT CHO TIÊU ĐỀ */
+/* ================================================== */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-secondary);
+}
+
 
 a {
   font-weight: 500;
@@ -30,11 +64,6 @@ body {
   min-height: 100vh;
 }
 
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
-}
-
 .card {
   padding: 2em;
 }
@@ -46,24 +75,6 @@ h1 {
   text-align: center;
 }
 
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
-  cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
-}
 
 @media (prefers-color-scheme: light) {
   :root {

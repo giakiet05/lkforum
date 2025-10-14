@@ -3,6 +3,8 @@ package service
 import (
 	"errors"
 	"fmt"
+	"regexp"
+
 	"github.com/giakiet05/lkforum/internal/apperror"
 	"github.com/giakiet05/lkforum/internal/auth"
 	"github.com/giakiet05/lkforum/internal/dto"
@@ -11,7 +13,6 @@ import (
 	"github.com/giakiet05/lkforum/internal/util"
 	"go.mongodb.org/mongo-driver/mongo"
 	"golang.org/x/crypto/bcrypt"
-	"regexp"
 )
 
 type UserService interface {

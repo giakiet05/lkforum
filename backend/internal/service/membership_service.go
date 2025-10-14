@@ -1,23 +1,26 @@
 package service
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"strings"
 	"time"
 
+	"github.com/giakiet05/lkforum/internal/apperror"
 	"github.com/giakiet05/lkforum/internal/dto"
 	"github.com/giakiet05/lkforum/internal/model"
 	"github.com/giakiet05/lkforum/internal/repo"
 	"github.com/giakiet05/lkforum/internal/util"
 	"github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type MembershipService interface {
 	CreateMembership(req *dto.CreateMembershipRequest, userID string) (*model.Membership, error)
 	GetMembershipByID(membershipID string) (*model.Membership, error)
-	GetMembershipByUserID(userID string) ([]model.Membership, error)
+	GetMembershipsByUserID(userID string) ([]model.Membership, error)
 	GetAllMemberships(page int, pageSize int) (*dto.PaginatedMembershipsResponse, error)
 	GetMembershipByCommunityID(communityID string, page int, pageSize int) (*dto.PaginatedMembershipsResponse, error)
 	DeleteMembership(req *dto.DeleteMembershipRequest, userID string) error
@@ -47,7 +50,7 @@ func (m *membershipService) CreateMembership(req *dto.CreateMembershipRequest, u
 	defer cancel()
 
 	if userID != req.UserID {
-		return nil, fmt.Errorf("unathorize to create membership for this user id")
+		return nil, apperror.ErrForbidden
 	}
 
 	userObjectID, err := primitive.ObjectIDFromHex(req.UserID)
@@ -58,6 +61,14 @@ func (m *membershipService) CreateMembership(req *dto.CreateMembershipRequest, u
 	communityObjectID, err := primitive.ObjectIDFromHex(req.CommunityID)
 	if err != nil {
 		return nil, err
+	}
+
+	exited, err := m.membershipRepo.IsCommunityExist(ctx, req.CommunityID)
+	if err != nil {
+		return nil, err
+	}
+	if !exited {
+		return nil, apperror.ErrCommunityNotFound
 	}
 
 	membership := &model.Membership{
@@ -82,10 +93,18 @@ func (m *membershipService) GetMembershipByID(membershipID string) (*model.Membe
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
 
-	return m.membershipRepo.GetByID(ctx, membershipID)
+	membership, err := m.membershipRepo.GetByID(ctx, membershipID)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return nil, apperror.ErrMembershipNotFound
+		}
+		return nil, err
+	}
+
+	return membership, nil
 }
 
-func (m *membershipService) GetMembershipByUserID(userID string) ([]model.Membership, error) {
+func (m *membershipService) GetMembershipsByUserID(userID string) ([]model.Membership, error) {
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
 
@@ -137,7 +156,7 @@ func (m *membershipService) DeleteMembership(req *dto.DeleteMembershipRequest, u
 	defer cancel()
 
 	if userID != req.UserID {
-		return fmt.Errorf("unathorize user id")
+		return apperror.ErrForbidden
 	}
 
 	err := m.membershipRepo.Delete(ctx, req.CommunityID)
@@ -228,7 +247,7 @@ func (m *membershipService) ensureMembersCountExists(communityID string) (string
 
 func (m *membershipService) StartRedisToMongoMembershipSync() {
 	// Tạm thời set cứng 1 min
-	ticker := time.NewTicker(1 * time.Minute)
+	ticker := time.NewTicker(5 * time.Minute)
 
 	go func() {
 		for range ticker.C {

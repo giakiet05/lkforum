@@ -1,14 +1,17 @@
 package service
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
+	"github.com/giakiet05/lkforum/internal/apperror"
 	"github.com/giakiet05/lkforum/internal/dto"
 	"github.com/giakiet05/lkforum/internal/model"
 	"github.com/giakiet05/lkforum/internal/repo"
 	"github.com/giakiet05/lkforum/internal/util"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type CommunityService interface {
@@ -41,6 +44,14 @@ func (c *communityService) CreateCommunity(req *dto.CreateCommunityRequest, user
 		return nil, err
 	}
 
+	existed, err := c.communityRepo.IsUserExist(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	if !existed {
+		return nil, apperror.ErrUserNotFound
+	}
+
 	community := &model.Community{
 		Name:           req.Name,
 		Description:    req.Description,
@@ -55,14 +66,30 @@ func (c *communityService) CreateCommunity(req *dto.CreateCommunityRequest, user
 		IsDeleted:      false,
 		IsBanned:       false,
 	}
-	return c.communityRepo.Create(ctx, community)
+	community, err = c.communityRepo.Create(ctx, community)
+	if err != nil {
+		if mongo.IsDuplicateKeyError(err) {
+			return nil, apperror.ErrCommunityNameExists
+		}
+		return nil, err
+	}
+
+	return community, nil
 }
 
 func (c *communityService) GetCommunityByID(id string) (*model.Community, error) {
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
 
-	return c.communityRepo.GetByID(ctx, id)
+	community, err := c.communityRepo.GetByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return nil, apperror.ErrCommunityNotFound
+		}
+		return nil, err
+	}
+
+	return community, nil
 }
 
 func (c *communityService) GetCommunitiesFilter(
@@ -148,14 +175,10 @@ func (c *communityService) UpdateCommunity(req *dto.UpdateCommunityRequest, user
 		return nil, err
 	}
 	if !ok {
-		return nil, fmt.Errorf("user is not a moderator of the community")
+		return nil, apperror.ErrForbidden
 	}
 
 	var updateCount = 0
-	if req.Name != nil {
-		community.Name = *req.Name
-		updateCount++
-	}
 	if req.Description != nil {
 		community.Description = req.Description
 		updateCount++
@@ -174,7 +197,7 @@ func (c *communityService) UpdateCommunity(req *dto.UpdateCommunityRequest, user
 	}
 
 	if updateCount == 0 {
-		return nil, fmt.Errorf("no fields to update")
+		return nil, apperror.ErrNoFieldsToUpdate
 	}
 
 	return community, c.communityRepo.Replace(ctx, community)
@@ -194,7 +217,7 @@ func (c *communityService) AddModerator(req *dto.AddModeratorRequest, userID str
 		return err
 	}
 	if !ok {
-		return fmt.Errorf("user is not a moderator of the community")
+		return apperror.ErrForbidden
 	}
 
 	var newModerators []model.Moderator
@@ -209,8 +232,17 @@ func (c *communityService) AddModerator(req *dto.AddModeratorRequest, userID str
 
 		objectID, err := primitive.ObjectIDFromHex(modDTO.ModeratorID)
 		if err != nil {
-			return fmt.Errorf("invalid new moderator id: %s", modDTO.ModeratorID)
+			return apperror.ErrInvalidID
 		}
+
+		existed, err := c.communityRepo.IsUserExist(ctx, modDTO.ModeratorID)
+		if err != nil {
+			return err
+		}
+		if !existed {
+			return fmt.Errorf("new moderator id not found: %s", modDTO.ModeratorID)
+		}
+
 		newModerators = append(
 			newModerators,
 			model.Moderator{
@@ -242,16 +274,16 @@ func (c *communityService) RemoveModerator(req *dto.RemoveModeratorRequest, user
 		return err
 	}
 	if !ok {
-		return fmt.Errorf("user is not a moderator of the community")
+		return apperror.ErrForbidden
 	}
 
-	for _, modDTO := range req.RemovedModerator {
-		if userID == modDTO.ModeratorID {
+	for _, modID := range req.RemovedModerator {
+		if userID == modID {
 			return fmt.Errorf("cannot remove yourself as a moderator")
 		}
 
 		for i, mod := range community.Moderators {
-			if mod.UserID.Hex() == modDTO.ModeratorID {
+			if mod.UserID.Hex() == modID {
 				community.Moderators = append(community.Moderators[:i], community.Moderators[i+1:]...)
 				break
 			}
