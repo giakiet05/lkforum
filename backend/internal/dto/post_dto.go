@@ -109,14 +109,15 @@ type VideoResponse struct {
 	URL       string `json:"url"`
 }
 
+// dto/post_dto.go
 type GetPostsQuery struct {
-	CommunityID string `query:"community_id"`
-	AuthorID    string `query:"author_id"`
-	Type        string `query:"type" validate:"omitempty,oneof=text image video poll"`
-	Sort        string `query:"sort" validate:"omitempty,oneof=hot new top controversial"`
-	TimeFrame   string `query:"time" validate:"omitempty,oneof=hour day week month year all"`
+	CommunityID string `form:"community_id"` // Nên dùng 'form' thay vì 'query' cho nhất quán với Gin
+	AuthorID    string `form:"author_id"`
+	Type        string `form:"type" validate:"omitempty,oneof=text image video poll"`
+	Sort        string `form:"sort" validate:"omitempty,oneof=hot new top controversial"`
+	TimeFrame   string `form:"time" validate:"omitempty,oneof=hour day week month year all"`
 
-	// Đảm bảo 2 dòng này chính xác 100%
-	Page  int `query:"page" validate:"omitempty,min=1"`
-	Limit int `query:"limit" validate:"omitempty,min=1,max=100"`
+	// Page và Limit đã được tối ưu
+	Page  int `form:"page" validate:"omitempty,min=1"`
+	Limit int `form:"limit" validate:"omitempty,min=1"` // Bỏ max=100 để tự xử lý trong controller
 }
