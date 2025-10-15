@@ -24,6 +24,7 @@ const (
 	ConversationColName    = "conversations"
 	MessageColName         = "messages"
 	VoteColName            = "votes"
+	PollVoteColName        = "poll_votes"
 	NotificationColName    = "notifications"
 	ReportColName          = "reports"
 	MembershipColName      = "memberships"
@@ -84,6 +85,7 @@ func verifyCollections(ctx context.Context, db *mongo.Database) error {
 		ConversationColName,
 		MessageColName,
 		VoteColName,
+		PollVoteColName,
 		NotificationColName,
 		ReportColName,
 		MembershipColName,

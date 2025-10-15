@@ -22,19 +22,19 @@ func NewMembershipController(membershipService service.MembershipService) *Membe
 func (m *MembershipController) CreateMembership(ctx *gin.Context) {
 	var req *dto.CreateMembershipRequest
 	if err := ctx.ShouldBind(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, dto.ErrorResponse{Code: "INVALID_REQUEST", Error: err.Error()})
+		ctx.JSON(apperror.StatusFromError(apperror.ErrBadRequest), dto.ErrorResponse{ErrorCode: apperror.ErrBadRequest.Code, Message: apperror.Message(err)})
 		return
 	}
 
 	authUser, exists := ctx.Get("authUser")
 	if !exists {
-		ctx.JSON(http.StatusForbidden, dto.ErrorResponse{Code: "FORBIDDEN", Error: "Invalid jwt token"})
+		ctx.JSON(apperror.StatusFromError(apperror.ErrForbidden), dto.ErrorResponse{ErrorCode: apperror.ErrForbidden.Code, Message: apperror.ErrForbidden.Message})
 		return
 	}
 
 	membership, err := m.membershipService.CreateMembership(req, authUser.(auth.AuthUser).ID)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, dto.ErrorResponse{Code: apperror.Code(err), Error: ""})
+		ctx.JSON(apperror.StatusFromError(err), dto.ErrorResponse{ErrorCode: apperror.Code(err), Message: apperror.Message(err)})
 		return
 	}
 
@@ -47,13 +47,13 @@ func (m *MembershipController) CreateMembership(ctx *gin.Context) {
 func (m *MembershipController) GetMembershipByID(ctx *gin.Context) {
 	membershipID := ctx.Param("membership_id")
 	if membershipID == "" {
-		ctx.JSON(http.StatusBadRequest, dto.ErrorResponse{Code: "INVALID_REQUEST", Error: membershipID})
+		ctx.JSON(apperror.StatusFromError(apperror.ErrBadRequest), dto.ErrorResponse{ErrorCode: apperror.ErrBadRequest.Code, Message: apperror.ErrBadRequest.Message})
 		return
 	}
 
 	membership, err := m.membershipService.GetMembershipByID(membershipID)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, dto.ErrorResponse{Code: apperror.Code(err), Error: ""})
+		ctx.JSON(apperror.StatusFromError(err), dto.ErrorResponse{ErrorCode: apperror.Code(err), Message: apperror.Message(err)})
 		return
 	}
 
@@ -63,13 +63,13 @@ func (m *MembershipController) GetMembershipByID(ctx *gin.Context) {
 func (m *MembershipController) GetMembershipByUserID(ctx *gin.Context) {
 	userID := ctx.Param("user_id")
 	if userID == "" {
-		ctx.JSON(http.StatusBadRequest, dto.ErrorResponse{Code: "INVALID_REQUEST", Error: userID})
+		ctx.JSON(apperror.StatusFromError(apperror.ErrBadRequest), dto.ErrorResponse{ErrorCode: apperror.ErrBadRequest.Code, Message: apperror.ErrBadRequest.Message})
 		return
 	}
 
 	memberships, err := m.membershipService.GetMembershipsByUserID(userID)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, dto.ErrorResponse{Code: apperror.Code(err), Error: ""})
+		ctx.JSON(apperror.StatusFromError(err), dto.ErrorResponse{ErrorCode: apperror.Code(err), Message: apperror.Message(err)})
 		return
 	}
 
@@ -92,7 +92,7 @@ func (m *MembershipController) GetAllMemberships(ctx *gin.Context) {
 
 	memberships, err := m.membershipService.GetAllMemberships(page, pageSize)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, dto.ErrorResponse{Code: apperror.Code(err), Error: ""})
+		ctx.JSON(apperror.StatusFromError(err), dto.ErrorResponse{ErrorCode: apperror.Code(err), Message: apperror.Message(err)})
 		return
 	}
 
@@ -102,7 +102,7 @@ func (m *MembershipController) GetAllMemberships(ctx *gin.Context) {
 func (m *MembershipController) GetMembershipByCommunityID(ctx *gin.Context) {
 	communityID := ctx.Param("community_id")
 	if communityID == "" {
-		ctx.JSON(http.StatusBadRequest, dto.ErrorResponse{Code: "INVALID_REQUEST", Error: communityID})
+		ctx.JSON(apperror.StatusFromError(apperror.ErrBadRequest), dto.ErrorResponse{ErrorCode: apperror.ErrBadRequest.Code, Message: apperror.ErrBadRequest.Message})
 		return
 	}
 
@@ -121,7 +121,7 @@ func (m *MembershipController) GetMembershipByCommunityID(ctx *gin.Context) {
 
 	response, err := m.membershipService.GetMembershipByCommunityID(communityID, page, pageSize)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, dto.ErrorResponse{Code: apperror.Code(err), Error: ""})
+		ctx.JSON(apperror.StatusFromError(err), dto.ErrorResponse{ErrorCode: apperror.Code(err), Message: apperror.Message(err)})
 		return
 	}
 
@@ -131,19 +131,19 @@ func (m *MembershipController) GetMembershipByCommunityID(ctx *gin.Context) {
 func (m *MembershipController) DeleteMembership(ctx *gin.Context) {
 	var req *dto.DeleteMembershipRequest
 	if err := ctx.ShouldBind(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, dto.ErrorResponse{Code: "INVALID_REQUEST", Error: err.Error()})
+		ctx.JSON(apperror.StatusFromError(apperror.ErrBadRequest), dto.ErrorResponse{ErrorCode: apperror.ErrBadRequest.Code, Message: apperror.Message(err)})
 		return
 	}
 
 	authUser, exists := ctx.Get("authUser")
 	if !exists {
-		ctx.JSON(http.StatusForbidden, dto.ErrorResponse{Code: "FORBIDDEN", Error: "Invalid jwt token"})
+		ctx.JSON(apperror.StatusFromError(apperror.ErrForbidden), dto.ErrorResponse{ErrorCode: apperror.ErrForbidden.Code, Message: apperror.ErrForbidden.Message})
 		return
 	}
 
 	err := m.membershipService.DeleteMembership(req, authUser.(auth.AuthUser).ID)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, dto.ErrorResponse{Code: apperror.Code(err), Error: ""})
+		ctx.JSON(apperror.StatusFromError(err), dto.ErrorResponse{ErrorCode: apperror.Code(err), Message: apperror.Message(err)})
 		return
 	}
 

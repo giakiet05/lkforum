@@ -1,10 +1,11 @@
 package main
 
 import (
-	"github.com/giakiet05/lkforum/internal/bootstrap"
-	"github.com/giakiet05/lkforum/internal/config"
 	"log"
 	"os"
+
+	"github.com/giakiet05/lkforum/internal/bootstrap"
+	"github.com/giakiet05/lkforum/internal/config"
 )
 
 func main() {
@@ -27,4 +28,8 @@ func main() {
 		log.Fatalf("failed to run server: %v", err)
 	}
 
+	for _, ri := range r.Routes() {
+		println(ri.Method, ri.Path)
+	}
+	
 }
