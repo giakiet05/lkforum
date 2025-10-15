@@ -1,90 +1,133 @@
-html {
-  font-size: 13px; /* Mặc định là 16px, giảm xuống 14px để thu nhỏ khoảng 12.5% */
-}
+/* =========================
+   app.css (global) - replace the old global block with this
+   ========================= */
 
+/* ===== Global variables & reset ===== */
 :root {
+  /* layout sizes */
+  --topbar-height: 56px;
+  --sidebar-width: 256px;
+  --sidebar-compact-width: 64px;
 
+  /* fonts */
   --font-primary: 'Nunito Sans', sans-serif;
   --font-secondary: 'Roboto', sans-serif;
-   /* ==================================== */
-  /* ===== THÊM BIẾN MÀU SẮC VÀO ĐÂY ===== */
-  /* ==================================== */
-  --primary-color: #646cff;      /* Màu chính cho nút bấm, link */
-  --primary-color-hover: #535bf2;/* Màu chính khi hover */
 
-  --text-color: black; /* Màu chữ chính */
-  --text-color-secondary: #a0a0a0;       /* Màu chữ phụ */
+  /* colors (valid syntax) */
+  --primary-color: #646cff;
+  --primary-color-hover: #535bf2;
 
-  --background-color: #242424;   /* Màu nền chính */
-  --surface-color: #1a1a1a;      /* Màu nền cho các thẻ card, button */
+  --text-color: #121213;
+  --text-color-secondary: #6b7280;
 
-  --border-color: #444444;       /* Màu viền */
-   --darkblue--color:#154D71;
+  /* global background (use this name consistently) */
+  --background: #f0f2f5;
+  --surface-color: #ffffff;
+  --border-color: #e6e9ee;
 
-  --success-color: #2ecc71;      /* Màu cho thông báo thành công */
-  --error-color: #e74c3c;        /* Màu cho thông báo lỗi */
+  /* Sidebar theme */
+  --sidebar-background: #ffffff;
+  --sidebar-foreground: #0b1f2b;
+  --sidebar-border: #e6e9ee;
+  --sidebar-accent: #f5f7fb;
 
-  font-family: var(--font-primary);
+  /* Topbar theme */
+  --topbar-background: #ffffff;                 /* white topbar */
+  --topbar-foreground: #213547;
+  --topbar-border: #e6e9ee;
+  --topbar-hover: #f6f7f9;
+  --topbar-accent: #ff8a00;
+  --topbar-accent-hover: #ff7a00;
 
-  line-height: 1.5;
-  font-weight: 400;
+  /* search input */
+  --topbar-search-background: rgba(33,37,41,0.04); /* subtle grey - valid */
+  --topbar-search-border: rgba(33,37,41,0.08);
 
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  /* small helpers */
+  --muted-foreground: #9aa4b2;
 }
 
-/* ================================================== */
-/* 3. THÊM KHỐI NÀY ĐỂ ÁP DỤNG FONT CHO TIÊU ĐỀ */
-/* ================================================== */
-h1, h2, h3, h4, h5, h6 {
-  font-family: var(--font-secondary);
-}
-
-
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
-}
-
-body {
+/* Basic reset */
+html, body {
   margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
+  padding: 0;
+  height: 100%;
+  background: var(--background);
+  color: var(--text-color);
+  font-family: var(--font-primary);
+  box-sizing: border-box;
 }
+*, *::before, *::after { box-sizing: inherit; }
 
-.card {
-  padding: 2em;
-}
+/* typography */
+h1,h2,h3,h4,h5,h6 { font-family: var(--font-secondary); }
 
+/* app wrapper example */
 #app {
   max-width: 1280px;
   margin: 0 auto;
   padding: 2rem;
-  text-align: center;
 }
 
-
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
-  }
+/* =========================
+   Topbar / Search styles
+   ========================= */
+.topbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--topbar-height);
+  background: var(--topbar-background);
+  border-bottom: 1px solid var(--topbar-border);
+  z-index: 200;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
 }
+
+.topbar-container {
+  max-width: 100%;
+  height: 100%;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.topbar-search { flex: 1; max-width: 600px; }
+.search-wrapper { position: relative; width: 100%; }
+
+.search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted-foreground);
+  pointer-events: none;
+}
+
+/* IMPORTANT: use var(...) directly */
+.search-input {
+  width: 100%;
+  padding: 8px 16px 8px 40px;
+  background: var(--topbar-search-background);
+  border: 1px solid var(--topbar-search-border);
+  border-radius: 20px;
+  height: 40px;
+  font-size: 14px;
+  color: var(--topbar-foreground);
+  outline: none;
+  transition: all 0.15s ease;
+  -webkit-appearance: none; /* remove default browser decoration */
+}
+.search-input:focus {
+  background: var(--surface-color); /* white */
+  border-color: var(--topbar-accent);
+}
+.search-input::placeholder { color: var(--muted-foreground); }
+
+/* small responsiveness */
+@media (min-width: 640px) {
+  .topbar-container { padding: 0 24px; gap: 24px; }
+}
+
+/* (Optional) sidebar and other global styles follow... */

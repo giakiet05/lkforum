@@ -158,7 +158,7 @@
       />
 
       <div class="signup-link">
-        Chưa có tài khoản? <a href="/register">Đăng ký ngay</a>
+        Chưa có tài khoản? <a href="/#/register">Đăng ký ngay</a>
       </div>
     </div>
   </div>

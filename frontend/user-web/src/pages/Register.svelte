@@ -195,7 +195,7 @@
       </form>
 
       <div class="signin-link">
-        Đã có tài khoản? <a href="/">Đăng nhập</a>
+        Đã có tài khoản? <a href="/#/login">Đăng nhập</a>
       </div>
     </div>
   </div>
