@@ -45,6 +45,8 @@
 
   /* small helpers */
   --muted-foreground: #9aa4b2;
+  --button-secondary-background: #D6D8DE;
+  --button-secondary-background-hover: #B5B7BD;
 }
 
 /* Basic reset */

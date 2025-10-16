@@ -212,7 +212,7 @@
                 <button
                   type="button"
                   class="dropdown-item"
-                  on:click={handleProfileClick}
+                  on:click|stopPropagation={handleProfileClick}
                   role="menuitem"
                 >
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none"
@@ -235,7 +235,7 @@
                 <button
                   type="button"
                   class="dropdown-item"
-                  on:click={handleSettingsClick}
+                  on:click|stopPropagation={handleSettingsClick}
                   role="menuitem"
                 >
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none"
@@ -260,7 +260,7 @@
                 <button
                   type="button"
                   class="dropdown-item"
-                  on:click={handleLogoutClick}
+                  on:click|stopPropagation={handleLogoutClick}
                   role="menuitem"
                 >
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none"
@@ -417,13 +417,17 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    background: var(--topbar-accent);
-    color: white;
+    background: rgba(214, 216, 222, 0.4); /* --button-secondary-background at 40% */
+    color: #000000;
     border: none;
     border-radius: 20px;
     padding: 0 12px;
     height: 36px;
     cursor: pointer;
+    transition: background-color 0.2s;
+  }
+  .create-button:hover {
+    background-color: rgba(214, 216, 222, 0.6);
   }
   .button-text {
     display: none;
@@ -467,6 +471,8 @@
     border: 1px solid var(--topbar-border);
     border-radius: 8px;
     cursor: pointer;
+    position: relative; /* Thêm dòng này */
+    z-index: 301; /* Thêm dòng này để nó nằm dưới dropdown */
     background: transparent;
   }
   .user-button:hover {
@@ -527,7 +533,7 @@
     border-radius: 8px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
     padding: 4px;
-    z-index: 300;
+    z-index: 302; /* Tăng z-index để đảm bảo nó nằm trên cùng */
   }
 
   .dropdown-item {

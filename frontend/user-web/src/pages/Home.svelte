@@ -10,6 +10,72 @@
   import { get } from "svelte/store";
   import type { User } from "../models/user";
 
+  import Post from "../components/Post.svelte";
+  import type { PostData } from "../types/post.ts";
+
+  const posts: PostData[] = [
+    {
+      id: "1",
+      type: "text",
+      community: "sveltejs",
+      author: "user123",
+      time: "4 hours ago",
+      title: "Svelte 5 is amazing!",
+      upvotes: 123,
+      downvotes: 5,
+      commentsCount: 42,
+      content:
+        "I just tried out the new Svelte 5 features and they are mind-blowing. The new runes system is so intuitive!",
+    },
+    {
+      id: "2",
+      type: "image",
+      community: "pics",
+      author: "photographer",
+      time: "8 hours ago",
+      title: "Girl on wayhome, who is she?",
+      upvotes: 456,
+      downvotes: 12,
+      commentsCount: 89,
+      images: ["/GirlFromNowhere.jpg"],
+    },
+    {
+      id: "3",
+      type: "poll",
+      community: "polls",
+      author: "pollmaster",
+      time: "1 day ago",
+      title: "What is your favorite frontend framework?",
+      upvotes: 789,
+      downvotes: 50,
+      commentsCount: 231,
+      poll: {
+        question: "What is your favorite frontend framework?",
+        options: [
+          { id: 1, text: "Svelte", votes: 450 },
+          { id: 2, text: "React", votes: 200 },
+          { id: 3, text: "Vue", votes: 139 },
+        ],
+        multipleChoice: false,
+        totalVotes: 789,
+      },
+    },
+    {
+      id: "4",
+      type: "video",
+      community: "videos",
+      author: "videographer",
+      time: "3 hours ago",
+      title: "Flashback AMV",
+      upvotes: 250,
+      downvotes: 15,
+      commentsCount: 60,
+      videoUrl: "./video.mp4",
+      thumbnailUrl:
+        "https://i1.sndcdn.com/artworks-000307576689-fkq1mv-t500x500.jpg",
+    },
+  ];
+
   const sidebarItems = [
     {
       id: "home",
@@ -19,7 +85,12 @@
       <path d="M3 11.5L12 4l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-8.5z" fill="currentColor"/>
     </svg>`,
     },
-    { id: "popular", label: "Popular", to: "/popular", icon: "🔥" },
+    {
+      id: "popular",
+      label: "Popular",
+      to: "/popular",
+      icon: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_20_157)"><path d="M23.2499 12.751L12.7769 23.25" stroke="currentColor" stroke-opacity="0.7" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M17.25 12.751H23.25V18.75" stroke="currentColor" stroke-opacity="0.7" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M18.75 0.75V5.25H12.75V11.25H6.75V17.25H0.75V23.25" stroke="currentColor" stroke-opacity="0.7" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></g><defs><clipPath id="clip0_20_157"><rect width="24" height="24" fill="white"/></clipPath></defs></svg>`,
+    },
     {
       id: "community",
       label: "Community",
@@ -27,15 +98,22 @@
       <path d="M12 2a5 5 0 100 10 5 5 0 000-10zm0 12c-4 0-8 2-8 4v2h16v-2c0-2-4-4-8-4z" fill="currentColor"/>
     </svg>`,
       children: [
-        { id: "r-all", label: "r/all", to: "/r/all", icon: "🌐" },
-        { id: "r-news", label: "r/news", to: "/r/news", icon: "📰" },
-        { id: "r-dev", label: "r/dev", to: "/r/dev", icon: "💻" },
+        { id: "lk-all", label: "lk/all", to: "/lk/all", icon: "🌐" },
+        { id: "lk-news", label: "lk/news", to: "/lk/news", icon: "📰" },
+        { id: "lk-dev", label: "lk/dev", to: "/lk/dev", icon: "💻" },
         // thêm sau: { id: 'r-your', label: 'r/your', to: '/r/your', icon: '...' }
       ],
     },
     { id: "explore", label: "Explore", to: "/explore", icon: "🧭" },
-    { id: "all", label: "All", to: "/all", icon: "📋" },
+    {
+      id: "all",
+      label: "All",
+      to: "/all",
+      icon: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_20_165)"><path d="M23.25 21.25C23.25 22.35 22.35 23.25 21.25 23.25H2.75C1.65 23.25 0.75 22.35 0.75 21.25V2.75C0.75 1.65 1.65 0.75 2.75 0.75H21.25C22.35 0.75 23.25 1.65 23.25 2.75V21.25Z" stroke="currentColor" stroke-opacity="0.7" stroke-width="1.5" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"/><path d="M7.44971 18.4499C7.44971 19.0499 7.04971 19.4499 6.44971 19.4499H5.44971C4.84971 19.4499 4.44971 19.0499 4.44971 18.4499V15.6499C4.44971 15.0499 4.84971 14.6499 5.44971 14.6499H6.44971C7.04971 14.6499 7.44971 15.0499 7.44971 15.6499V18.4499Z" stroke="currentColor" stroke-opacity="0.7" stroke-width="1.5" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"/><path d="M13.4502 18.4499C13.4502 19.0499 13.0502 19.4499 12.4502 19.4499H11.4502C10.8502 19.4499 10.4502 19.0499 10.4502 18.4499V6.6499C10.4502 6.0499 10.8502 5.6499 11.4502 5.6499H12.4502C13.0502 5.6499 13.4502 6.0499 13.4502 6.6499V18.4499Z" stroke="currentColor" stroke-opacity="0.7" stroke-width="1.5" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"/><path d="M19.4502 18.4499C19.4502 19.0499 19.0502 19.4499 18.4502 19.4499H17.4502C16.8502 19.4499 16.4502 19.0499 16.4502 18.4499V11.6499C16.4502 11.0499 16.8502 10.6499 17.4502 10.6499H18.4502C19.0502 10.6499 19.4502 11.0499 19.4502 11.6499V18.4499Z" stroke="currentColor" stroke-opacity="0.7" stroke-width="1.5" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"/></g><defs><clipPath id="clip0_20_165"><rect width="24" height="24" fill="white"/></clipPath></defs></svg>`,
+    },
   ];
+
+  let activeSort = "hot";
 
   // Logic của trang Home giữ nguyên
   let user: User | null = null;
@@ -64,8 +142,9 @@
   });
 
   function handleLogout() {
-    // logout(); // Tạm thời comment lại
     alert("Đăng xuất!");
+    logout();
+
     // push("/login");
   }
 
@@ -85,19 +164,34 @@
   />
 
   <main class="main-content" data-compact={isSidebarCompact}>
-    <h1>Home Page</h1>
-    {#if user}
-      <p>Chào mừng trở lại!</p>
-      <div class="user-info">
-        <p><strong>Username:</strong> {user.username}</p>
-        <p><strong>Email:</strong> {user.email}</p>
-      </div>
-
-      <button onclick={handleLogout}>Logout</button>
-    {:else}
-      <p>You are not logged in.</p>
-      <a href="/#/login">Go to Login</a>
-    {/if}
+    <div class="sorting-bar">
+      <button
+        class="sort-btn"
+        class:active={activeSort === "hot"}
+        on:click={() => (activeSort = "hot")}
+      >
+        🔥 Hot
+      </button>
+      <button
+        class="sort-btn"
+        class:active={activeSort === "new"}
+        on:click={() => (activeSort = "new")}
+      >
+        ✨ New
+      </button>
+      <button
+        class="sort-btn"
+        class:active={activeSort === "top"}
+        on:click={() => (activeSort = "top")}
+      >
+        🏆 Top
+      </button>
+    </div>
+    <div class="post-list">
+      {#each posts as post}
+        <Post {post} />
+      {/each}
+    </div>
   </main>
 </div>
 
@@ -110,7 +204,7 @@
   .app-layout {
     position: relative;
     min-height: 100vh;
-    background-color: #f0f2f5;
+    background-color: white;
   }
 
   /* main-content reserves space equal to the sidebar width to avoid overlap */
@@ -136,6 +230,43 @@
     .main-content {
       margin-left: 0;
     }
+  }
+
+  .sorting-bar {
+    background-color: #f6f7f8;
+    border-radius: 4px;
+    padding: 4px;
+    margin-bottom: 16px;
+    display: flex;
+    gap: 4px;
+  }
+
+  .sort-btn {
+    flex: 1;
+    padding: 8px 12px;
+    border: none;
+    background-color: transparent;
+    color: #878a8c;
+    font-weight: bold;
+    border-radius: 4px;
+    cursor: pointer;
+    transition:
+      background-color 0.2s,
+      color 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .sort-btn.active {
+    background-color: white;
+    color: #0079d3;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+
+  .sort-btn:not(.active):hover {
+    background-color: #e9ebee;
   }
 
   .user-info {
