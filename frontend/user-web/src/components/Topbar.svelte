@@ -1,12 +1,11 @@
 <script lang="ts">
+  import { link, push } from "svelte-spa-router";
   export type Props = {
     user?: { name: string; avatar?: string; karma?: number };
     notificationCount?: number;
     onSearch?: (q: string) => void;
     onCreatePost?: () => void;
     onNotificationClick?: () => void;
-    onProfileClick?: () => void;
-    onSettingsClick?: () => void;
     onLogout?: () => void;
   };
 
@@ -16,17 +15,17 @@
     onSearch,
     onCreatePost,
     onNotificationClick,
-    onProfileClick,
-    onSettingsClick,
     onLogout,
   }: Props = $props();
 
   let searchQuery = $state("");
   let showUserMenu = $state(false);
+  let dropdownElement: HTMLDivElement | null = null;
 
   function handleSearch() {
     if (searchQuery.trim()) onSearch?.(searchQuery);
   }
+
   function handleSearchKeydown(e: KeyboardEvent) {
     if (e.key === "Enter") {
       e.preventDefault();
@@ -37,52 +36,67 @@
   function toggleUserMenu() {
     showUserMenu = !showUserMenu;
   }
+
   function closeUserMenu() {
     showUserMenu = false;
   }
+
   function handleOverlayKeydown(e: KeyboardEvent) {
     if (e.key === "Escape") closeUserMenu();
   }
 
-  function handleProfileClick() {
-    onProfileClick?.();
+  function handleOverlayClick(e: MouseEvent) {
+    if (dropdownElement && dropdownElement.contains(e.target as Node)) {
+      return;
+    }
     closeUserMenu();
   }
-  function handleSettingsClick() {
-    onSettingsClick?.();
-    closeUserMenu();
-  }
+
   function handleLogoutClick() {
+    console.log("Logout clicked!");
     onLogout?.();
     closeUserMenu();
   }
 
+  function handleNavigation() {
+    console.log("Navigation clicked!");
+    closeUserMenu();
+  }
+
   $effect(() => {
-    if (showUserMenu)
+    if (showUserMenu) {
       document.addEventListener("keydown", handleOverlayKeydown);
-    else document.removeEventListener("keydown", handleOverlayKeydown);
+      // Thêm click outside handler
+      const handleClickOutside = (e: MouseEvent) => {
+        const target = e.target as Node;
+        if (dropdownElement && !dropdownElement.contains(target)) {
+          const userButton = document.querySelector(".user-button");
+          if (userButton && !userButton.contains(target)) {
+            closeUserMenu();
+          }
+        }
+      };
+      setTimeout(() => {
+        document.addEventListener("click", handleClickOutside);
+      }, 0);
+
+      return () => {
+        document.removeEventListener("keydown", handleOverlayKeydown);
+        document.removeEventListener("click", handleClickOutside);
+      };
+    }
   });
 </script>
 
 <header class="topbar">
   <div class="topbar-container">
-    <!-- left: logo -->
     <div class="topbar-left">
-      <div
-        class="brand"
-        role="button"
-        tabindex="0"
-        on:click={() => {
-          /* navigate home */
-        }}
-      >
-        <!-- use image from public; if you want color control, inline SVG instead -->
+      <div class="brand" role="button" tabindex="0" on:click={() => {}}>
         <img src="/LKlogo.svg" alt="LKForum" class="brand-icon" />
         <span class="brand-name">LKForum</span>
       </div>
     </div>
 
-    <!-- center: search -->
     <div class="topbar-center">
       <div class="topbar-search" role="search">
         <div class="search-wrapper">
@@ -119,18 +133,17 @@
       </div>
     </div>
 
-    <!-- right: actions -->
     <div class="topbar-right">
       <div class="topbar-actions">
         <button type="button" class="create-button" on:click={onCreatePost}>
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"
-            ><path
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path
               d="M8 3V13M3 8H13"
               stroke="currentColor"
               stroke-width="2"
               stroke-linecap="round"
-            /></svg
-          >
+            />
+          </svg>
           <span class="button-text">Create</span>
         </button>
 
@@ -162,17 +175,14 @@
         </button>
 
         {#if user}
-          <!-- user menu trigger -->
-          <div
-            class="user-menu-wrapper"
-            role="button"
-            tabindex="0"
-            on:click={toggleUserMenu}
-            on:keydown={(e) =>
-              (e.key === "Enter" || e.key === " ") && toggleUserMenu()}
-          >
+          <div class="user-menu-wrapper">
             <div
               class="user-button"
+              role="button"
+              tabindex="0"
+              on:click={toggleUserMenu}
+              on:keydown={(e) =>
+                (e.key === "Enter" || e.key === " ") && toggleUserMenu()}
               aria-haspopup="true"
               aria-expanded={showUserMenu}
             >
@@ -197,113 +207,112 @@
                 height="16"
                 viewBox="0 0 16 16"
                 fill="none"
-                ><path
+              >
+                <path
                   d="M4 6L8 10L12 6"
                   stroke="currentColor"
                   stroke-width="2"
                   stroke-linecap="round"
                   stroke-linejoin="round"
-                /></svg
-              >
+                />
+              </svg>
             </div>
 
             {#if showUserMenu}
-              <div class="user-dropdown" role="menu" aria-label="User menu">
-                <button
-                  type="button"
+              <div
+                class="user-dropdown"
+                role="menu"
+                aria-label="User menu"
+                bind:this={dropdownElement}
+              >
+                <div
                   class="dropdown-item"
-                  on:click|stopPropagation={handleProfileClick}
                   role="menuitem"
+                  on:click={() => {
+                    console.log("Profile clicked!");
+                    closeUserMenu();
+                    push("/profile");
+                  }}
                 >
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none"
-                    ><circle
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <circle
                       cx="8"
                       cy="5"
                       r="2.5"
                       stroke="currentColor"
                       stroke-width="1.5"
-                    /><path
+                    />
+                    <path
                       d="M3 14C3 11.7909 4.79086 10 7 10H9C11.2091 10 13 11.7909 13 14"
                       stroke="currentColor"
                       stroke-width="1.5"
                       stroke-linecap="round"
-                    /></svg
-                  >
+                    />
+                  </svg>
                   Profile
-                </button>
+                </div>
 
-                <button
-                  type="button"
+                <div
                   class="dropdown-item"
-                  on:click|stopPropagation={handleSettingsClick}
                   role="menuitem"
+                  on:click={() => {
+                    console.log("Settings clicked!");
+                    closeUserMenu();
+                    push("/settings");
+                  }}
                 >
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none"
-                    ><circle
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <circle
                       cx="8"
                       cy="8"
                       r="2"
                       stroke="currentColor"
                       stroke-width="1.5"
-                    /><path
+                    />
+                    <path
                       d="M8 1V3M8 13V15M15 8H13M3 8H1M12.5 3.5L11 5M5 11L3.5 12.5M12.5 12.5L11 11M5 5L3.5 3.5"
                       stroke="currentColor"
                       stroke-width="1.5"
                       stroke-linecap="round"
-                    /></svg
-                  >
+                    />
+                  </svg>
                   Settings
-                </button>
+                </div>
 
                 <div class="dropdown-separator" role="separator"></div>
 
-                <button
-                  type="button"
+                <div
                   class="dropdown-item"
-                  on:click|stopPropagation={handleLogoutClick}
                   role="menuitem"
+                  on:click={() => {
+                    console.log("Logout clicked!");
+                    handleLogoutClick();
+                  }}
                 >
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none"
-                    ><path
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <path
                       d="M6 14H3C2.44772 14 2 13.5523 2 13V3C2 2.44772 2.44772 2 3 2H6M11 11L14 8M14 8L11 5M14 8H6"
                       stroke="currentColor"
                       stroke-width="1.5"
                       stroke-linecap="round"
                       stroke-linejoin="round"
-                    /></svg
-                  >
+                    />
+                  </svg>
                   Log Out
-                </button>
+                </div>
               </div>
             {/if}
           </div>
         {:else}
-          <button
-            type="button"
-            class="login-button"
-            on:click={() => {
-              /* open login */
-            }}>Log In</button
-          >
+          <a href="/login" use:link class="login-button">Log In</a>
         {/if}
       </div>
     </div>
   </div>
 </header>
 
-{#if showUserMenu}
-  <div
-    class="overlay"
-    role="button"
-    tabindex="0"
-    on:click={closeUserMenu}
-    on:keydown={handleOverlayKeydown}
-  ></div>
-{/if}
-
 <style>
   :root {
-    /* fallback values if you don't define them elsewhere */
     --topbar-height: 56px;
     --topbar-background: #ffffff;
     --topbar-border: #e6e9ee;
@@ -343,11 +352,13 @@
     align-items: center;
     gap: 12px;
   }
+
   .topbar-center {
     flex: 1;
     display: flex;
     justify-content: center;
   }
+
   .topbar-right {
     display: flex;
     align-items: center;
@@ -361,12 +372,14 @@
     cursor: pointer;
     color: var(--topbar-foreground);
   }
+
   .brand-icon {
     width: 40px;
     height: 40px;
     object-fit: contain;
     display: block;
   }
+
   .brand-name {
     font-size: 18px;
     font-weight: 700;
@@ -377,10 +390,12 @@
     width: 100%;
     max-width: 680px;
   }
+
   .search-wrapper {
     position: relative;
     width: 100%;
   }
+
   .search-icon {
     position: absolute;
     left: 12px;
@@ -389,6 +404,7 @@
     color: var(--muted-foreground);
     pointer-events: none;
   }
+
   .search-input {
     width: 100%;
     padding: 8px 16px 8px 40px;
@@ -400,10 +416,12 @@
     color: var(--topbar-foreground);
     outline: none;
   }
+
   .search-input:focus {
     background: var(--background);
     border-color: var(--topbar-accent);
   }
+
   .search-input::placeholder {
     color: var(--muted-foreground);
   }
@@ -413,11 +431,12 @@
     align-items: center;
     gap: 8px;
   }
+
   .create-button {
     display: flex;
     align-items: center;
     gap: 6px;
-    background: rgba(214, 216, 222, 0.4); /* --button-secondary-background at 40% */
+    background: rgba(214, 216, 222, 0.4);
     color: #000000;
     border: none;
     border-radius: 20px;
@@ -426,12 +445,15 @@
     cursor: pointer;
     transition: background-color 0.2s;
   }
+
   .create-button:hover {
     background-color: rgba(214, 216, 222, 0.6);
   }
+
   .button-text {
     display: none;
   }
+
   .icon-button {
     position: relative;
     width: 40px;
@@ -442,6 +464,11 @@
     border: none;
     border-radius: 8px;
     cursor: pointer;
+    background: transparent;
+  }
+
+  .icon-button:hover {
+    background: var(--topbar-search-background);
   }
 
   .notification-badge {
@@ -463,6 +490,7 @@
   .user-menu-wrapper {
     position: relative;
   }
+
   .user-button {
     display: flex;
     align-items: center;
@@ -471,10 +499,10 @@
     border: 1px solid var(--topbar-border);
     border-radius: 8px;
     cursor: pointer;
-    position: relative; /* Thêm dòng này */
-    z-index: 301; /* Thêm dòng này để nó nằm dưới dropdown */
     background: transparent;
+    transition: background-color 0.2s;
   }
+
   .user-button:hover {
     background: var(--topbar-search-background);
   }
@@ -489,11 +517,13 @@
     align-items: center;
     justify-content: center;
   }
+
   .avatar-image {
     width: 100%;
     height: 100%;
     object-fit: cover;
   }
+
   .avatar-fallback {
     color: white;
     font-weight: 600;
@@ -505,6 +535,7 @@
     flex-direction: column;
     align-items: flex-start;
   }
+
   .user-name {
     font-size: 13px;
     font-weight: 600;
@@ -513,6 +544,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
+
   .user-karma {
     font-size: 11px;
     color: var(--muted-foreground);
@@ -533,7 +565,8 @@
     border-radius: 8px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
     padding: 4px;
-    z-index: 302; /* Tăng z-index để đảm bảo nó nằm trên cùng */
+    z-index: 302;
+    pointer-events: auto;
   }
 
   .dropdown-item {
@@ -549,10 +582,14 @@
     font-size: 14px;
     color: var(--topbar-foreground);
     text-align: left;
+    text-decoration: none;
+    transition: background-color 0.2s;
   }
+
   .dropdown-item:hover {
     background: var(--topbar-search-background);
   }
+
   .dropdown-separator {
     height: 1px;
     background: var(--border);
@@ -565,13 +602,20 @@
     border-radius: 20px;
     background: transparent;
     cursor: pointer;
+    text-decoration: none;
+    color: var(--topbar-foreground);
+    transition: background-color 0.2s;
+  }
+
+  .login-button:hover {
+    background: var(--topbar-search-background);
   }
 
   .overlay {
     position: fixed;
     inset: 0;
     z-index: 250;
-    background: transparent;
+    background: rgba(0, 0, 0, 0.1);
   }
 
   @media (min-width: 640px) {
@@ -585,6 +629,7 @@
       display: block;
     }
   }
+
   @media (max-width: 640px) {
     .brand-name {
       display: none;
