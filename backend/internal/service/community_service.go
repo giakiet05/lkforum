@@ -44,14 +44,6 @@ func (c *communityService) CreateCommunity(req *dto.CreateCommunityRequest, user
 		return nil, err
 	}
 
-	existed, err := c.communityRepo.IsUserExist(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
-	if !existed {
-		return nil, apperror.ErrUserNotFound
-	}
-
 	community := &model.Community{
 		Name:           req.Name,
 		Description:    req.Description,
@@ -116,7 +108,7 @@ func (c *communityService) GetCommunitiesFilter(
 		},
 	}
 
-	return response, err
+	return response, nil
 }
 
 func (c *communityService) GetCommunitiesByModeratorIDPaginated(moderatorID string, page int, pageSize int) (*dto.PaginatedCommunitiesResponse, error) {
