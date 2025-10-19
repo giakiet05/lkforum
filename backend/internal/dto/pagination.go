@@ -22,3 +22,8 @@ type PaginatedMembershipsResponse struct {
 	Memberships []model.Membership `json:"memberships"`
 	Pagination  Pagination         `json:"pagination"`
 }
+
+type PaginatedCommentsResponse struct {
+	Comments   []CommentResponse `json:"comments"`
+	Pagination Pagination        `json:"pagination"`
+}

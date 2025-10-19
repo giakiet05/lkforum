@@ -22,6 +22,7 @@ type Repos struct {
 	repo.PostPollRepo
 	repo.PostImageRepo
 	repo.PostVoteRepo
+	repo.CommentRepo
 }
 
 type Services struct {
@@ -29,6 +30,7 @@ type Services struct {
 	service.CommunityService
 	service.MembershipService
 	service.PostService
+	service.CommentService
 }
 
 type Controllers struct {
@@ -36,6 +38,7 @@ type Controllers struct {
 	controller.CommunityController
 	controller.MembershipController
 	controller.PostController
+	controller.CommentController
 }
 
 // initRepos initializes repositories with the given database
@@ -48,6 +51,7 @@ func initRepos(client *mongo.Client, db *mongo.Database) *Repos {
 		PostVoteRepo:   repo.NewPostVoteRepo(client, db),
 		PostImageRepo:  repo.NewPostImageRepo(db),
 		PostPollRepo:   repo.NewPostPollRepo(client, db),
+		CommentRepo:    repo.NewCommentRepo(db),
 	}
 }
 
@@ -58,6 +62,7 @@ func initServices(repos *Repos, redisClient *redis.Client) *Services {
 		CommunityService:  service.NewCommunityService(repos.CommunityRepo),
 		MembershipService: service.NewMembershipService(repos.MembershipRepo, redisClient),
 		PostService:       service.NewPostService(repos.PostRepo, repos.PostVoteRepo, repos.PostPollRepo, repos.PostImageRepo),
+		CommentService:    service.NewCommentService(repos.CommentRepo),
 	}
 }
 
@@ -68,6 +73,7 @@ func initControllers(services *Services) *Controllers {
 		CommunityController:  *controller.NewCommunityController(services.CommunityService),
 		MembershipController: *controller.NewMembershipController(services.MembershipService),
 		PostController:       *controller.NewPostController(services.PostService),
+		CommentController:    *controller.NewCommentController(services.CommentService),
 	}
 }
 
@@ -90,6 +96,7 @@ func initRoutes(controllers *Controllers, r *gin.Engine) {
 	route.RegisterCommunityRoutes(api, &controllers.CommunityController)
 	route.RegisterMembershipRoutes(api, &controllers.MembershipController)
 	route.RegisterPostRoutes(api, &controllers.PostController)
+	route.RegisterCommentRoutes(api, &controllers.CommentController)
 }
 
 // Init initializes all application components
@@ -107,7 +114,7 @@ func Init() (*gin.Engine, error) {
 	client := config.NewMongoClient()
 	db := client.Database(os.Getenv("DB_NAME"))
 	router := gin.Default()
-	
+
 	// Register CORS middleware before any routes or other middleware
 	allowOrigin := os.Getenv("FRONTEND_URL")
 	if allowOrigin == "" {

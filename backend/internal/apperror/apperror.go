@@ -92,9 +92,10 @@ var (
 	ErrBadRequest         = AppError{Code: "BAD_REQUEST", Message: "Bad request"}
 
 	// Generic
-	ErrInternal         = AppError{Code: "INTERNAL_ERROR", Message: "Internal server error"}
-	ErrNoFieldsToUpdate = AppError{Code: "NO_FIELDS_TO_UPDATE", Message: "No fields provided to update"}
-	ErrInvalidID        = AppError{Code: "INVALID_ID", Message: "Invalid ID format"}
+	ErrInternal          = AppError{Code: "INTERNAL_ERROR", Message: "Internal server error"}
+	ErrNoFieldsToUpdate  = AppError{Code: "NO_FIELDS_TO_UPDATE", Message: "No fields provided to update"}
+	ErrInvalidID         = AppError{Code: "INVALID_ID", Message: "Invalid ID format"}
+	ErrPaginationInvalid = AppError{Code: "PAGINATION_INVALID", Message: "Page number or page size is invalid. Page size must be smaller than 500."}
 
 	// User-related
 	ErrUserNotFound   = AppError{Code: "USER_NOT_FOUND", Message: "User not found"}
@@ -113,4 +114,8 @@ var (
 	ErrMembershipCreateFailed = AppError{Code: "MEMBERSHIP_CREATE_FAILED", Message: "Failed to create membership"}
 	ErrMembershipDeleteFailed = AppError{Code: "MEMBERSHIP_DELETE_FAILED", Message: "Failed to delete membership"}
 	ErrInvalidMembershipData  = AppError{Code: "INVALID_MEMBERSHIP_DATA", Message: "Invalid membership data"}
+
+	// Comment-related
+	ErrCommentNotFound = AppError{Code: "COMMENT_NOT_FOUND", Message: "Comment not found"}
+	ErrDepthInvalid    = AppError{Code: "DEPTH_TOO_HIGH", Message: "Depth can not be smaller than 0 or larger than 2"}
 )
