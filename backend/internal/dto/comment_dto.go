@@ -15,6 +15,7 @@ type GetCommentsFilterQuery struct {
 	PostID   *string `form:"post_id,omitempty"`
 	ParentID *string `form:"parent_id,omitempty"`
 	UserID   *string `form:"user_id,omitempty"`
+	Content  *string `form:"content,omitempty"`
 	Page     int     `form:"page"`
 	PageSize int     `form:"page_size"`
 }
@@ -32,7 +33,7 @@ type CommentResponse struct {
 	Author    model.CommentAuthor `json:"author"`
 	PostID    string              `json:"post_id"`
 	ParentID  *string             `json:"parent_id,omitempty"`
-	Children  *[]CommentResponse  `json:"children,omitempty"`
+	Children  []CommentResponse   `json:"children"`
 	Content   string              `json:"content"`
 	CreatedAt string              `json:"created_at"`
 	IsDeleted bool                `json:"is_deleted"`
@@ -45,23 +46,34 @@ func FromComments(comments []model.Comment) []CommentResponse {
 		commentMap[resp.ID] = resp
 	}
 
-	var roots []CommentResponse
+	var roots []*CommentResponse
+	addedToParent := make(map[string]bool) // Track which comments were added as children
+
 	for _, c := range comments {
 		resp := commentMap[c.ID.Hex()]
 		if c.ParentID != nil {
 			parentResp, ok := commentMap[c.ParentID.Hex()]
 			if ok {
 				if parentResp.Children == nil {
-					parentResp.Children = &[]CommentResponse{}
+					parentResp.Children = []CommentResponse{}
 				}
-				*parentResp.Children = append(*parentResp.Children, *resp)
+				parentResp.Children = append(parentResp.Children, *resp)
+				addedToParent[c.ID.Hex()] = true
+			} else {
+				// Parent not found, treat as root (orphaned comment)
+				roots = append(roots, resp)
 			}
 		} else {
-			roots = append(roots, *resp)
+			// Actual root comment (no parent)
+			roots = append(roots, resp)
 		}
 	}
 
-	return roots
+	result := make([]CommentResponse, len(roots))
+	for i, r := range roots {
+		result[i] = *r
+	}
+	return result
 }
 
 func FromComment(comment *model.Comment) *CommentResponse {
@@ -100,9 +112,9 @@ func FromCommentWithChildren(comments []model.Comment) *CommentResponse {
 			parentResp, ok := commentMap[c.ParentID.Hex()]
 			if ok {
 				if parentResp.Children == nil {
-					parentResp.Children = &[]CommentResponse{}
+					parentResp.Children = []CommentResponse{}
 				}
-				*parentResp.Children = append(*parentResp.Children, *resp)
+				parentResp.Children = append(parentResp.Children, *resp)
 			}
 		} else {
 			root = resp

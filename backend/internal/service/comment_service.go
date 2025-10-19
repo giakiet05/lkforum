@@ -86,14 +86,18 @@ func (c *commentService) GetCommentByPostIDPaginated(query *dto.GetCommentByPost
 		return nil, apperror.ErrDepthInvalid
 	}
 
-	if query.PageSize < 1 || query.PageSize > 500 || query.Page <= 0 {
+	if query.PageSize < 1 || query.PageSize > 500 || query.Page <= 0 || query.ChildrenPageSize > 100 {
 		return nil, apperror.ErrPaginationInvalid
 	}
 
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
 
-	comments, total, err := c.commentRepo.GetCommentsPaginated(ctx, &query.PostID, nil, nil, query.Page, query.PageSize)
+	if query.PostID == "" {
+		return nil, apperror.ErrInvalidID
+	}
+
+	comments, total, err := c.commentRepo.GetCommentsFilterPaginated(ctx, &query.PostID, nil, nil, nil, query.Page, query.PageSize)
 	if err != nil {
 		return nil, err
 	}
@@ -145,7 +149,7 @@ func (c *commentService) GetCommentsFilterPaginated(query *dto.GetCommentsFilter
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
 
-	comments, total, err := c.commentRepo.GetCommentsPaginated(ctx, query.PostID, query.ParentID, query.UserID, query.Page, query.PageSize)
+	comments, total, err := c.commentRepo.GetCommentsFilterPaginated(ctx, query.PostID, query.ParentID, query.UserID, query.Content, query.Page, query.PageSize)
 	if err != nil {
 		return nil, err
 	}

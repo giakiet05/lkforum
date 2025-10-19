@@ -16,9 +16,9 @@ import (
 type CommentRepo interface {
 	Create(ctx context.Context, comment *model.Comment) (*model.Comment, error)
 	GetByID(ctx context.Context, commentID string) (*model.Comment, error)
-	GetCommentsPaginated(
+	GetCommentsFilterPaginated(
 		ctx context.Context,
-		postID *string, parentID *string, userID *string,
+		postID *string, parentID *string, userID *string, content *string,
 		page int, pageSize int,
 	) ([]model.Comment, int64, error)
 	GetByParentIDsPaginated(ctx context.Context, parentIDs []string, page int, pageSize int) ([]model.Comment, error)
@@ -65,30 +65,28 @@ func (c *commentRepo) GetByID(ctx context.Context, commentID string) (*model.Com
 	return &comment, nil
 }
 
-func (c *commentRepo) GetCommentsPaginated(
+func (c *commentRepo) GetCommentsFilterPaginated(
 	ctx context.Context,
 	postID *string,
 	parentID *string,
 	userID *string,
+	content *string,
 	page int, pageSize int,
 ) ([]model.Comment, int64, error) {
 
 	filter := bson.M{}
 
 	// Build filter dynamically
-	if postID != nil {
+	if postID != nil && *postID != "" {
 		postObjectID, err := primitive.ObjectIDFromHex(*postID)
 		if err != nil {
 			return nil, 0, apperror.ErrInvalidID
 		}
 		filter["post_id"] = postObjectID
-		// If querying root-level comments only (no parent)
-		if parentID == nil {
-			filter["parent_id"] = nil
-		}
+		filter["parent_id"] = nil
 	}
 
-	if parentID != nil {
+	if parentID != nil && *parentID != "" {
 		parentObjectID, err := primitive.ObjectIDFromHex(*parentID)
 		if err != nil {
 			return nil, 0, apperror.ErrInvalidID
@@ -96,12 +94,17 @@ func (c *commentRepo) GetCommentsPaginated(
 		filter["parent_id"] = parentObjectID
 	}
 
-	if userID != nil {
+	if userID != nil && *userID != "" {
 		userObjectID, err := primitive.ObjectIDFromHex(*userID)
 		if err != nil {
 			return nil, 0, apperror.ErrInvalidID
 		}
-		filter["author_id"] = userObjectID
+		filter["author.id"] = userObjectID
+	}
+
+	if content != nil && *content != "" {
+		// Case-insensitive partial match
+		filter["content"] = bson.M{"$regex": primitive.Regex{Pattern: *content, Options: "i"}}
 	}
 
 	// Pagination and sorting
@@ -211,9 +214,9 @@ func (c *commentRepo) Delete(ctx context.Context, commentID string) error {
 		"$set": bson.M{
 			"is_deleted":      true,
 			"content":         "[deleted]",
-			"author_id":       nil,
-			"author_username": "[deleted]",
-			"author_avatar":   "[deleted]",
+			"author.id":       nil,
+			"author.username": "[deleted]",
+			"author.avatar":   "[deleted]",
 			"deleted_at":      time.Now(),
 		},
 	}
