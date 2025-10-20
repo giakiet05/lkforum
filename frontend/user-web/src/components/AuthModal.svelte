@@ -58,7 +58,7 @@
   {#if activeTab === "login"}
     <Login
       mode="login"
-      onSubmit={handleLogin}
+      onSubmit={(data) => handleLogin(data as LoginRequest)}
       {isLoading}
       {error}
       on:switchMode={handleSwitchToRegister}
@@ -66,7 +66,7 @@
   {:else}
     <Login
       mode="register"
-      onSubmit={handleRegister}
+      onSubmit={(data) => handleRegister(data as RegisterDto)}
       {isLoading}
       {error}
       on:switchMode={handleSwitchToLogin}

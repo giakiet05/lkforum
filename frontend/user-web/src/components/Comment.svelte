@@ -2,12 +2,12 @@
   import type { Comment } from "../mocks/comments.mock";
   import CommentComponent from "./Comment.svelte";
 
-  interface Props {
+  type CommentProps = {
     comment: Comment;
     depth?: number;
-  }
+  };
 
-  let { comment, depth = 0 }: Props = $props();
+  let { comment, depth = 0 }: CommentProps = $props();
 
   let isCollapsed = $state(false);
   let isEditing = $state(false);

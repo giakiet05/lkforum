@@ -1,7 +1,8 @@
 <script lang="ts">
   import AuthModal from "./AuthModal.svelte";
   import { push } from "svelte-spa-router";
-  export type Props = {
+
+  type TopbarProps = {
     user?: { name: string; avatar?: string; karma?: number };
     notificationCount?: number;
     onSearch?: (q: string) => void;
@@ -17,7 +18,7 @@
     onCreatePost,
     onNotificationClick,
     onLogout,
-  }: Props = $props();
+  }: TopbarProps = $props();
 
   let searchQuery = $state("");
   let showUserMenu = $state(false);

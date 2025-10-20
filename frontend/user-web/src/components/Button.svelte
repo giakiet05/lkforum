@@ -1,15 +1,22 @@
 <script lang="ts">
-  import { createEventDispatcher } from "svelte";
+  type ButtonProps = {
+    label: string;
+    variant?: "primary" | "google";
+    disabled?: boolean;
+    type?: "button" | "submit";
+    onclick?: () => void;
+  };
 
-  export let label: string;
-  export let variant: "primary" | "google" = "primary";
-  export let disabled: boolean = false;
-  export let type: "button" | "submit" = "button";
-
-  const dispatch = createEventDispatcher();
+  let {
+    label,
+    variant = "primary",
+    disabled = false,
+    type = "button",
+    onclick,
+  }: ButtonProps = $props();
 
   function handleClick() {
-    dispatch("click");
+    onclick?.();
   }
 </script>
 
@@ -19,7 +26,7 @@
   class="btn"
   class:primary={variant === "primary"}
   class:google={variant === "google"}
-  on:click={handleClick}
+  onclick={handleClick}
 >
   {label}
 

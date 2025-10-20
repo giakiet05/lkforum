@@ -2,11 +2,11 @@
   import { mockComments, type Comment } from "../mocks/comments.mock";
   import CommentComponent from "./Comment.svelte";
 
-  interface Props {
+  type CommentSectionProps = {
     postId: string;
-  }
+  };
 
-  let { postId }: Props = $props();
+  let { postId }: CommentSectionProps = $props();
 
   type SortType = "top" | "newest" | "oldest" | "controversial";
 

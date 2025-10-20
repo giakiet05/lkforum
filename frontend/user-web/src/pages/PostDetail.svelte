@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import { push } from "svelte-spa-router";
   import { mockPosts } from "../mocks/posts.mock";
+  import type { Post } from "../mocks/posts.mock";
   import CommentSection from "../components/CommentSection.svelte";
   import type { PostData } from "../types/post";
 
@@ -15,13 +16,46 @@
   let selectedOptions = $state<number[]>([]);
   let hasVoted = $state(false);
 
+  // Convert Post to PostData
+  function convertPostToPostData(p: Post): PostData {
+    return {
+      id: p.id,
+      type: p.type,
+      community: p.communityName,
+      author: p.authorUsername,
+      time: new Date(p.createdAt).toLocaleString(),
+      title: p.title,
+      upvotes: p.votesCount?.up || 0,
+      downvotes: p.votesCount?.down || 0,
+      commentsCount: p.commentsCount || 0,
+      content: p.content?.text,
+      images: p.content?.images?.map((img) => img.url),
+      videoUrl: p.content?.video?.url,
+      thumbnailUrl: p.content?.video?.thumbnail,
+      poll: p.content?.poll
+        ? {
+            question: p.content.poll.question,
+            options: p.content.poll.options.map((opt, idx) => ({
+              id: idx + 1,
+              text: opt.text,
+              votes: opt.votes,
+            })),
+            multipleChoice: p.content.poll.allowMultiple,
+            totalVotes: p.content.poll.totalVotes,
+          }
+        : undefined,
+    };
+  }
+
   onMount(() => {
     // Scroll to top when component mounts
     window.scrollTo(0, 0);
 
     // Find the post by ID
-    post = mockPosts.find((p) => p.id === params.id);
-    if (!post) {
+    const foundPost = mockPosts.find((p) => p.id === params.id);
+    if (foundPost) {
+      post = convertPostToPostData(foundPost);
+    } else {
       // Redirect to home if post not found
       push("/");
     }

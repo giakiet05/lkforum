@@ -1,7 +1,13 @@
 <script lang="ts">
-  export let show = false;
-  export let title: string;
-  export let onClose: () => void;
+  import { onDestroy } from "svelte";
+
+  type ModalProps = {
+    show?: boolean;
+    title: string;
+    onClose: () => void;
+  };
+
+  let { show = false, title, onClose }: ModalProps = $props();
 
   function handleOverlayClick(e: MouseEvent) {
     if (e.target === e.currentTarget) {
@@ -15,21 +21,29 @@
     }
   }
 
-  $: if (show) {
-    document.addEventListener("keydown", handleEscape);
-    document.body.style.overflow = "hidden";
-  } else {
-    document.removeEventListener("keydown", handleEscape);
-    document.body.style.overflow = "unset";
-  }
+  $effect(() => {
+    if (show) {
+      document.addEventListener("keydown", handleEscape);
+      document.body.style.overflow = "hidden";
+    } else {
+      document.removeEventListener("keydown", handleEscape);
+      document.body.style.overflow = "unset";
+    }
+
+    // Cleanup
+    return () => {
+      document.removeEventListener("keydown", handleEscape);
+      document.body.style.overflow = "unset";
+    };
+  });
 </script>
 
 {#if show}
-  <div class="modal-overlay" on:click={handleOverlayClick}>
+  <div class="modal-overlay" role="dialog" onclick={handleOverlayClick}>
     <div class="modal-container">
       <div class="modal-header">
         <h2>{title}</h2>
-        <button class="close-button" on:click={onClose}>×</button>
+        <button class="close-button" onclick={onClose}>×</button>
       </div>
       <div class="modal-content">
         <slot />

@@ -3,7 +3,11 @@
   import { push } from "svelte-spa-router";
   import type { PostData } from "../types/post";
 
-  let { post }: { post: PostData } = $props();
+  type PostProps = {
+    post: PostData;
+  };
+
+  let { post }: PostProps = $props();
 
   let selectedOptions = $state<number[]>([]);
   let hasVoted = $state(false);

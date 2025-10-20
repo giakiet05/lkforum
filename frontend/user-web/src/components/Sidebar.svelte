@@ -9,7 +9,7 @@
     children?: SidebarItem[];
   };
 
-  type Props = {
+  type SidebarProps = {
     items: SidebarItem[];
     compact?: boolean;
     activeRoute?: string;
@@ -23,7 +23,7 @@
     activeRoute = "",
     onNavigate,
     onToggleCompact,
-  }: Props = $props();
+  }: SidebarProps = $props();
 
   let expandedGroups = $state(new Set<string>());
   function handleNavigate(item: SidebarItem) {
