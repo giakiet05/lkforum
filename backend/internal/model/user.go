@@ -7,14 +7,17 @@ import (
 )
 
 type User struct {
-	ID          primitive.ObjectID `bson:"_id,omitempty" json:"id"`
-	Username    string             `bson:"username" json:"username"`
-	Email       string             `bson:"email,omitempty" json:"email,omitempty"`
-	Password    string             `bson:"password" json:"password"`
-	Role        Role               `bson:"role" json:"role"`
-	RoleContent RoleContent        `bson:"role_content,omitempty" json:"role_content,omitempty"`
-	CreateAt    time.Time          `bson:"create_at,omitempty" json:"create_at,omitempty"`
-	DeletedAt   *time.Time         `bson:"deleted_at,omitempty" json:"deleted_at,omitempty"`
+	ID                        primitive.ObjectID `bson:"_id,omitempty" json:"id"`
+	Username                  string             `bson:"username" json:"username"`
+	Email                     string             `bson:"email,omitempty" json:"email,omitempty"`
+	Password                  string             `bson:"password" json:"-"`
+	Role                      Role               `bson:"role" json:"role"`
+	RoleContent               RoleContent        `bson:"role_content,omitempty" json:"role_content,omitempty"`
+	IsVerified                bool               `bson:"is_verified" json:"is_verified"`
+	VerificationCode          string             `bson:"verification_code,omitempty" json:"-"`
+	VerificationCodeExpiresAt *time.Time         `bson:"verification_code_expires_at,omitempty" json:"-"`
+	CreateAt                  time.Time          `bson:"create_at,omitempty" json:"create_at,omitempty"`
+	DeletedAt                 *time.Time         `bson:"deleted_at,omitempty" json:"deleted_at,omitempty"`
 }
 
 type Role string

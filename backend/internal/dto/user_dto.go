@@ -15,6 +15,15 @@ type UserLoginRequest struct {
 	Password   string `json:"password" binding:"required"`
 }
 
+type VerifyEmailRequest struct {
+	Email string `json:"email" binding:"required,email"`
+	OTP   string `json:"otp" binding:"required,len=6"`
+}
+
+type ResendVerificationEmailRequest struct {
+	Email string `json:"email" binding:"required,email"`
+}
+
 type UserUpdateRequest struct {
 	Username string `json:"username"`
 	Email    string `json:"email"`
@@ -28,10 +37,11 @@ type ChangePasswordRequest struct {
 // Response DTOs
 
 type UserResponse struct {
-	ID       string     `json:"id"`
-	Username string     `json:"username"`
-	Email    string     `json:"email,omitempty"`
-	Role     model.Role `json:"role"`
+	ID         string     `json:"id"`
+	Username   string     `json:"username"`
+	Email      string     `json:"email,omitempty"`
+	Role       model.Role `json:"role"`
+	IsVerified bool       `json:"is_verified"`
 }
 
 type AuthResponse struct {
@@ -42,10 +52,11 @@ type AuthResponse struct {
 
 func FromUser(u *model.User) UserResponse {
 	return UserResponse{
-		ID:       u.ID.Hex(),
-		Username: u.Username,
-		Email:    u.Email,
-		Role:     u.Role,
+		ID:         u.ID.Hex(),
+		Username:   u.Username,
+		Email:      u.Email,
+		Role:       u.Role,
+		IsVerified: u.IsVerified,
 	}
 }
 

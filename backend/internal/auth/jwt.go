@@ -3,16 +3,16 @@ package auth
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/giakiet05/lkforum/internal/apperror"
 	"github.com/giakiet05/lkforum/internal/config"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
-	"os"
-	"time"
 )
 
-// AuthUser đại diện cho user sau khi parse token
+// AuthUser represents the user parsed from a token.
 type AuthUser struct {
 	ID   string
 	Role string
@@ -21,37 +21,29 @@ type AuthUser struct {
 // Global token service instance
 var TokenSvc *TokenService
 
-// SetTokenService sets the token service for JWT operations
+// SetTokenService sets the token service for JWT operations.
 func SetTokenService(service *TokenService) {
 	TokenSvc = service
 }
 
-var (
-	accessSecret  = []byte(os.Getenv("ACCESS_TOKEN_SECRET"))
-	refreshSecret = []byte(os.Getenv("REFRESH_TOKEN_SECRET"))
-	issuer        = os.Getenv("JWT_ISS")
-	audience      = os.Getenv("JWT_AUD")
-)
-
 // ====== CREATE ======
 
-// Tạo access token ngắn hạn
+// createAccessToken creates a short-lived access token.
 func createAccessToken(userID, role string) (string, error) {
-	expMinutes := config.GetEnvIntWithDefault("ACCESS_TOKEN_EXP_MIN", 15)
 	jti := uuid.New().String()
 
 	claims := jwt.MapClaims{
 		"sub":  userID,
 		"role": role,
-		"iss":  issuer,
-		"aud":  audience,
+		"iss":  config.Cfg.JWTIssuer,
+		"aud":  config.Cfg.JWTAudience,
 		"iat":  time.Now().UTC().Unix(),
-		"exp":  time.Now().Add(time.Minute * time.Duration(expMinutes)).Unix(),
+		"exp":  time.Now().Add(time.Minute * time.Duration(config.Cfg.TokenTTL)).Unix(),
 		"jti":  jti,
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenString, err := token.SignedString(accessSecret)
+	tokenString, err := token.SignedString([]byte(config.Cfg.JWTSecret))
 	if err != nil {
 		return "", err
 	}
@@ -59,23 +51,22 @@ func createAccessToken(userID, role string) (string, error) {
 	return tokenString, nil
 }
 
-// Tạo refresh token dài hạn
+// createRefreshToken creates a long-lived refresh token.
 func createRefreshToken(userID string) (string, error) {
-	expDays := config.GetEnvIntWithDefault("REFRESH_TOKEN_EXP_DAYS", 7)
 	jti := uuid.New().String()
 
 	claims := jwt.MapClaims{
 		"sub":  userID,
 		"type": "refresh",
-		"iss":  issuer,
-		"aud":  audience,
+		"iss":  config.Cfg.JWTIssuer,
+		"aud":  config.Cfg.JWTAudience,
 		"iat":  time.Now().UTC().Unix(),
-		"exp":  time.Now().Add(24 * time.Hour * time.Duration(expDays)).Unix(),
+		"exp":  time.Now().Add(time.Hour * time.Duration(config.Cfg.RefreshTokenTTL)).Unix(),
 		"jti":  jti,
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenString, err := token.SignedString(refreshSecret)
+	tokenString, err := token.SignedString([]byte(config.Cfg.JWTSecret)) // Using the same secret for simplicity
 	if err != nil {
 		return "", err
 	}
@@ -83,6 +74,7 @@ func createRefreshToken(userID string) (string, error) {
 	return tokenString, nil
 }
 
+// GenerateToken creates a new pair of access and refresh tokens.
 func GenerateToken(id string, role string) (accessToken string, refreshToken string, err error) {
 	accessToken, err = createAccessToken(id, role)
 	if err != nil {
@@ -99,13 +91,13 @@ func GenerateToken(id string, role string) (accessToken string, refreshToken str
 
 // ====== PARSE ======
 
-// Parse + validate access token
+// ParseAccessToken parses and validates an access token string.
 func ParseAccessToken(tokenStr string) (AuthUser, error) {
 	token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
 		}
-		return accessSecret, nil
+		return []byte(config.Cfg.JWTSecret), nil
 	})
 
 	if err != nil {
@@ -120,19 +112,17 @@ func ParseAccessToken(tokenStr string) (AuthUser, error) {
 		return AuthUser{}, apperror.ErrInvalidClaims
 	}
 
-	// Verify issuer and audience explicitly
-	if iss, ok := claims["iss"].(string); !ok || iss != issuer {
+	if iss, ok := claims["iss"].(string); !ok || iss != config.Cfg.JWTIssuer {
 		return AuthUser{}, apperror.ErrInvalidIssuer
 	}
 
-	if aud, ok := claims["aud"].(string); !ok || aud != audience {
+	if aud, ok := claims["aud"].(string); !ok || aud != config.Cfg.JWTAudience {
 		return AuthUser{}, apperror.ErrInvalidAudience
 	}
 
 	userID, _ := claims["sub"].(string)
 	role, _ := claims["role"].(string)
 
-	// Check if token has been invalidated (if token service is available)
 	if TokenSvc != nil {
 		ctx := context.Background()
 		if !TokenSvc.IsUserValid(ctx, userID) {
@@ -143,13 +133,13 @@ func ParseAccessToken(tokenStr string) (AuthUser, error) {
 	return AuthUser{ID: userID, Role: role}, nil
 }
 
-// Parse + validate refresh token
+// ParseRefreshToken parses and validates a refresh token string.
 func ParseRefreshToken(tokenStr string) (string, error) {
 	token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
 		}
-		return refreshSecret, nil
+		return []byte(config.Cfg.JWTSecret), nil
 	})
 
 	if err != nil {
@@ -164,18 +154,16 @@ func ParseRefreshToken(tokenStr string) (string, error) {
 		return "", apperror.ErrInvalidClaims
 	}
 
-	// Verify issuer and audience explicitly
-	if iss, ok := claims["iss"].(string); !ok || iss != issuer {
+	if iss, ok := claims["iss"].(string); !ok || iss != config.Cfg.JWTIssuer {
 		return "", apperror.ErrInvalidIssuer
 	}
 
-	if aud, ok := claims["aud"].(string); !ok || aud != audience {
+	if aud, ok := claims["aud"].(string); !ok || aud != config.Cfg.JWTAudience {
 		return "", apperror.ErrInvalidAudience
 	}
 
 	userID, _ := claims["sub"].(string)
 
-	// Check if token has been invalidated (if token service is available)
 	if TokenSvc != nil {
 		ctx := context.Background()
 		if !TokenSvc.IsUserValid(ctx, userID) {
@@ -186,6 +174,7 @@ func ParseRefreshToken(tokenStr string) (string, error) {
 	return userID, nil
 }
 
+// IsOwner checks if the authenticated user is the owner of a resource.
 func IsOwner(c *gin.Context, ownerID string) bool {
 	authUser, exists := c.Get("authUser")
 	if !exists {
@@ -195,6 +184,7 @@ func IsOwner(c *gin.Context, ownerID string) bool {
 	return user.ID == ownerID
 }
 
+// IsAdmin checks if the authenticated user has the admin role.
 func IsAdmin(c *gin.Context) bool {
 	authUser, exists := c.Get("authUser")
 	if !exists {

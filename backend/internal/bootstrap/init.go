@@ -2,10 +2,10 @@ package bootstrap
 
 import (
 	"log"
-	"os"
 
 	"github.com/giakiet05/lkforum/internal/config"
 	"github.com/giakiet05/lkforum/internal/controller"
+	"github.com/giakiet05/lkforum/internal/email"
 	"github.com/giakiet05/lkforum/internal/repo"
 	route "github.com/giakiet05/lkforum/internal/route/user"
 	"github.com/giakiet05/lkforum/internal/service"
@@ -56,9 +56,9 @@ func initRepos(client *mongo.Client, db *mongo.Database) *Repos {
 }
 
 // initServices Initialize services with the given repositories
-func initServices(repos *Repos, redisClient *redis.Client) *Services {
+func initServices(repos *Repos, redisClient *redis.Client, emailSender email.Sender) *Services {
 	return &Services{
-		UserService:       service.NewUserService(repos.UserRepo),
+		UserService:       service.NewUserService(repos.UserRepo, emailSender),
 		CommunityService:  service.NewCommunityService(repos.CommunityRepo),
 		MembershipService: service.NewMembershipService(repos.MembershipRepo, redisClient),
 		PostService:       service.NewPostService(repos.PostRepo, repos.PostVoteRepo, repos.PostPollRepo, repos.PostImageRepo),
@@ -101,6 +101,9 @@ func initRoutes(controllers *Controllers, r *gin.Engine) {
 
 // Init initializes all application components
 func Init() (*gin.Engine, error) {
+	// Load configuration from .env file first
+	config.LoadConfig()
+
 	// Create Redis client once
 	redisClient := config.NewRedisClient()
 
@@ -112,16 +115,12 @@ func Init() (*gin.Engine, error) {
 
 	// Connect to MongoDB
 	client := config.NewMongoClient()
-	db := client.Database(os.Getenv("DB_NAME"))
+	db := client.Database(config.Cfg.DBName)
 	router := gin.Default()
 
 	// Register CORS middleware before any routes or other middleware
-	allowOrigin := os.Getenv("FRONTEND_URL")
-	if allowOrigin == "" {
-		allowOrigin = "http://localhost:5173"
-	}
 	router.Use(func(c *gin.Context) {
-		c.Writer.Header().Set("Access-Control-Allow-Origin", allowOrigin)
+		c.Writer.Header().Set("Access-Control-Allow-Origin", config.Cfg.FrontendURL)
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
@@ -133,8 +132,9 @@ func Init() (*gin.Engine, error) {
 	})
 
 	// Initialize other components
+	emailSender := email.NewSMTPSender()
 	repos := initRepos(client, db)
-	services := initServices(repos, redisClient)
+	services := initServices(repos, redisClient, emailSender)
 	controllers := initControllers(services)
 	initRoutes(controllers, router)
 
