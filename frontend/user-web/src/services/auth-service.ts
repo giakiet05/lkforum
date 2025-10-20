@@ -1,66 +1,23 @@
-import type { LoginRequest, LoginResponse } from "../dtos/auth-dto";
+import type { LoginRequest, LoginResponse, RegisterDto } from "../dtos/auth-dto";
 import type {
     RefreshTokenRequest,
     RefreshTokenResponse,
 } from "../dtos/auth-dto";
 import type { User } from "../models/user";
 import { setAuth, clearAuth } from "../stores/auth-store";
+import {
+    setAccessToken,
+    getAccessToken,
+    clearAccessToken,
+    setRefreshToken,
+    getRefreshToken,
+    clearRefreshToken,
+    setUser,
+    getUser,
+    clearUser
+} from "./storage-service";
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
-
-
-const TOKEN_KEY = "access_token";
-const REFRESH_KEY = "refresh_token";
-const USER_KEY = "user";
-
-// Store tokens to localStorage
-export function setAccessToken(token: string): void {
-  localStorage.setItem(TOKEN_KEY, token);
-}
-
-// Get access token from localStorage
-export function getAccessToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY);
-}
-
-// Clear access token from localStorage
-export function clearAccessToken(): void {
-  localStorage.removeItem(TOKEN_KEY);
-}
-
-// Store refresh token to localStorage
-export function setRefreshToken(refreshToken: string): void {
-  localStorage.setItem(REFRESH_KEY, refreshToken);
-}
-
-// Get refresh token from localStorage
-export function getRefreshToken(): string | null {
-  return localStorage.getItem(REFRESH_KEY);
-}
-
-// Clear refresh token from localStorage
-export function clearRefreshToken(): void {
-  localStorage.removeItem(REFRESH_KEY);
-}
-
-// Store user info to localStorage
-export function setUser(user: User): void {
-  localStorage.setItem(USER_KEY, JSON.stringify(user));
-}
-
-// Get user info from localStorage
-export function getUser(): User | null {
-  try {
-    const user = localStorage.getItem(USER_KEY);
-    return user ? (JSON.parse(user) as User) : null;
-  } catch {
-    return null;
-  }
-}
-
-// Clear user info from localStorage
-export function clearUser(): void {
-  localStorage.removeItem(USER_KEY);
-}
 
 // Check if user is logged in (has a valid access token)
 export function isLoggedIn(): boolean {
@@ -118,6 +75,36 @@ export async function getValidAccessToken(): Promise<string | null> {
     console.error("Refresh token error:", err);
     return null;
   }
+}
+
+export async function register(data: RegisterDto): Promise<LoginResponse> {
+  const res = await fetch(`${API_BASE_URL}/api/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+
+  if (!res.ok) {
+    let errObj: any = {};
+    try {
+      errObj = await res.json();
+    } catch (e) {
+      try {
+        const text = await res.text();
+        errObj = { error: text || `HTTP ${res.status}` };
+      } catch {
+        errObj = { error: `HTTP ${res.status}` };
+      }
+    }
+    throw errObj.error || "Unknown error";
+  }
+
+  const response: LoginResponse = await res.json();
+  setAccessToken(response.access_token);
+  setRefreshToken(response.refresh_token);
+  setUser(response.user);
+  setAuth(response.user, response.access_token);
+  return response;
 }
 
 export async function login(credentials: LoginRequest): Promise<LoginResponse> {

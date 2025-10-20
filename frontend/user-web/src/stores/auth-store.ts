@@ -1,6 +1,7 @@
 import { writable } from "svelte/store";
 import type { User } from "../models/user";
-import { getAccessToken, getUser, isTokenExpired } from "../services/auth-service";
+import { getAccessToken, getUser } from "../services/storage-service";
+import { isTokenExpired } from "../services/auth-service";
 
 interface AuthState {
   user: User | null;
