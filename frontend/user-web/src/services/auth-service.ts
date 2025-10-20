@@ -1,4 +1,4 @@
-import type { LoginRequest, LoginResponse } from "../dtos/auth-dto";
+import type { LoginRequest, LoginResponse, RegisterDto } from "../dtos/auth-dto";
 import type {
     RefreshTokenRequest,
     RefreshTokenResponse,
@@ -75,6 +75,36 @@ export async function getValidAccessToken(): Promise<string | null> {
     console.error("Refresh token error:", err);
     return null;
   }
+}
+
+export async function register(data: RegisterDto): Promise<LoginResponse> {
+  const res = await fetch(`${API_BASE_URL}/api/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+
+  if (!res.ok) {
+    let errObj: any = {};
+    try {
+      errObj = await res.json();
+    } catch (e) {
+      try {
+        const text = await res.text();
+        errObj = { error: text || `HTTP ${res.status}` };
+      } catch {
+        errObj = { error: `HTTP ${res.status}` };
+      }
+    }
+    throw errObj.error || "Unknown error";
+  }
+
+  const response: LoginResponse = await res.json();
+  setAccessToken(response.access_token);
+  setRefreshToken(response.refresh_token);
+  setUser(response.user);
+  setAuth(response.user, response.access_token);
+  return response;
 }
 
 export async function login(credentials: LoginRequest): Promise<LoginResponse> {

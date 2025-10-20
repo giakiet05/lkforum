@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { link, push } from "svelte-spa-router";
+  import AuthModal from "./AuthModal.svelte";
+  import { push } from "svelte-spa-router";
   export type Props = {
     user?: { name: string; avatar?: string; karma?: number };
     notificationCount?: number;
@@ -20,6 +21,7 @@
 
   let searchQuery = $state("");
   let showUserMenu = $state(false);
+  let showAuthModal = $state(false);
   let dropdownElement: HTMLDivElement | null = null;
 
   function handleSearch() {
@@ -304,7 +306,13 @@
             {/if}
           </div>
         {:else}
-          <a href="/login" use:link class="login-button">Log In</a>
+          <button class="login-button" on:click={() => (showAuthModal = true)}
+            >Log In</button
+          >
+          <AuthModal
+            show={showAuthModal}
+            onClose={() => (showAuthModal = false)}
+          />
         {/if}
       </div>
     </div>
