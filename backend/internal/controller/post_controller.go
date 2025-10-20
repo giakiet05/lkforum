@@ -1,8 +1,6 @@
 package controller
 
 import (
-	"errors"
-	"log"
 	"net/http"
 
 	"github.com/giakiet05/lkforum/internal/apperror"
@@ -21,60 +19,60 @@ func NewPostController(service service.PostService) *PostController {
 	return &PostController{service: service}
 }
 
-// === CRUD Cơ bản ===
+// === CRUD Operations ===
 
 func (c *PostController) CreatePost(ctx *gin.Context) {
 	var req dto.CreatePostRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		handlePostServiceError(ctx, apperror.NewError(err, "INVALID_REQUEST", "Invalid request payload"))
+		dto.SendError(ctx, http.StatusBadRequest, "Invalid request payload", apperror.ErrBadRequest.Code)
 		return
 	}
 
-	authUser := c.getAuthUser(ctx)
-	if authUser == nil {
+	userID, err := c.getAuthUserID(ctx)
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
 	}
-	userID, ok := c.getAuthUserID(ctx)
-	if !ok {
-		return
-	}
+
 	post, err := c.service.CreatePost(ctx.Request.Context(), userID, &req)
 	if err != nil {
-		handlePostServiceError(ctx, err)
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
 	}
 
-	ctx.JSON(http.StatusCreated, post)
+	dto.SendSuccess(ctx, http.StatusCreated, "Post created successfully", post)
 }
 
 func (c *PostController) GetPostByID(ctx *gin.Context) {
-	postID, ok := c.parseObjectID(ctx, ctx.Param("id"))
-	if !ok {
+	postID, err := c.parseObjectID(ctx.Param("id"))
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
 	}
 
-	userID, ok := c.getAuthUserID(ctx)
-	if !ok {
-		return
+	// For GET requests, a missing auth user is not a hard error.
+	// We pass a NilObjectID to the service to indicate an anonymous user.
+	userID, err := c.getAuthUserID(ctx)
+	if err != nil {
+		userID = primitive.NilObjectID
 	}
 
 	post, err := c.service.GetPostByID(ctx.Request.Context(), postID, userID)
 	if err != nil {
-		handlePostServiceError(ctx, err)
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
 	}
 
-	ctx.JSON(http.StatusOK, post)
+	dto.SendSuccess(ctx, http.StatusOK, "Post retrieved successfully", post)
 }
 
 func (c *PostController) GetPosts(ctx *gin.Context) {
 	var query dto.GetPostsQuery
 	if err := ctx.ShouldBindQuery(&query); err != nil {
-		handlePostServiceError(ctx, apperror.NewError(err, "INVALID_QUERY", "Invalid query parameters"))
+		dto.SendError(ctx, http.StatusBadRequest, "Invalid query parameters", apperror.ErrBadRequest.Code)
 		return
 	}
-	log.Printf("DEBUG: Received query parameters: %+v\n", query)
-	// Set defaults
+
 	if query.Page == 0 {
 		query.Page = 1
 	}
@@ -84,113 +82,112 @@ func (c *PostController) GetPosts(ctx *gin.Context) {
 		query.Limit = 100
 	}
 
-	userID, ok := c.getAuthUserID(ctx)
-	if !ok {
-		return
+	userID, err := c.getAuthUserID(ctx)
+	if err != nil {
+		userID = primitive.NilObjectID
 	}
 
 	posts, err := c.service.GetPosts(ctx.Request.Context(), userID, &query)
 	if err != nil {
-		handlePostServiceError(ctx, err)
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
 	}
 
-	ctx.JSON(http.StatusOK, posts)
+	dto.SendSuccess(ctx, http.StatusOK, "Posts retrieved successfully", posts)
 }
 
 func (c *PostController) UpdatePost(ctx *gin.Context) {
-	postID, ok := c.parseObjectID(ctx, ctx.Param("id"))
-	if !ok {
+	postID, err := c.parseObjectID(ctx.Param("id"))
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
 	}
-	authUser := c.getAuthUser(ctx)
-	if authUser == nil {
+
+	userID, err := c.getAuthUserID(ctx)
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
 	}
 
 	var req dto.UpdatePostRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		handlePostServiceError(ctx, apperror.NewError(err, "INVALID_REQUEST", "Invalid request payload"))
-		return
-	}
-	if req.Title == "" && req.Text == "" {
-		handlePostServiceError(ctx, apperror.NewError(nil, "INVALID_REQUEST", "Invalid request payload"))
-		return
-	}
-	userID, ok := c.getAuthUserID(ctx)
-	if !ok {
-		return
-	}
-	updatedPost, err := c.service.UpdatePost(ctx.Request.Context(), postID, userID, &req)
-	if err != nil {
-		handlePostServiceError(ctx, err)
+		dto.SendError(ctx, http.StatusBadRequest, "Invalid request payload", apperror.ErrBadRequest.Code)
 		return
 	}
 
-	ctx.JSON(http.StatusOK, updatedPost)
+	updatedPost, err := c.service.UpdatePost(ctx.Request.Context(), postID, userID, &req)
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
+		return
+	}
+
+	dto.SendSuccess(ctx, http.StatusOK, "Post updated successfully", updatedPost)
 }
 
 func (c *PostController) DeletePost(ctx *gin.Context) {
-	postID, ok := c.parseObjectID(ctx, ctx.Param("id"))
-	if !ok {
-		return
-	}
-	authUser := c.getAuthUser(ctx)
-	if authUser == nil {
-		return
-	}
-	userID, ok := c.getAuthUserID(ctx)
-	if !ok {
-		return
-	}
-	err := c.service.DeletePost(ctx.Request.Context(), postID, userID)
+	postID, err := c.parseObjectID(ctx.Param("id"))
 	if err != nil {
-		handlePostServiceError(ctx, err)
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
 	}
 
-	ctx.JSON(http.StatusOK, dto.SuccessResponse{Message: "Post deleted successfully"})
+	userID, err := c.getAuthUserID(ctx)
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
+		return
+	}
+
+	err = c.service.DeletePost(ctx.Request.Context(), postID, userID)
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
+		return
+	}
+
+	dto.SendSuccess(ctx, http.StatusOK, "Post deleted successfully", gin.H{"id": postID.Hex()})
 }
 
-// === Tương tác ===
+// === Interactions ===
 
 func (c *PostController) VoteOnPost(ctx *gin.Context) {
-	postID, ok := c.parseObjectID(ctx, ctx.Param("id"))
-	if !ok {
+	postID, err := c.parseObjectID(ctx.Param("id"))
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
 	}
-	authUser := c.getAuthUser(ctx)
-	if authUser == nil {
+
+	userID, err := c.getAuthUserID(ctx)
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
 	}
 
 	var req struct {
-		Value bool `json:"value"`
+		Value *bool `json:"value" binding:"required"`
 	}
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		handlePostServiceError(ctx, apperror.NewError(err, "INVALID_REQUEST", "Vote value is required"))
-		return
-	}
-	userID, ok := c.getAuthUserID(ctx)
-	if !ok {
-		return
-	}
-	votesCount, err := c.service.VoteOnPost(ctx.Request.Context(), userID, postID, req.Value)
-	if err != nil {
-		handlePostServiceError(ctx, err)
+		dto.SendError(ctx, http.StatusBadRequest, "Invalid request: 'value' field is required", apperror.ErrBadRequest.Code)
 		return
 	}
 
-	ctx.JSON(http.StatusOK, votesCount)
+	votesCount, err := c.service.VoteOnPost(ctx.Request.Context(), userID, postID, *req.Value)
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
+		return
+	}
+
+	dto.SendSuccess(ctx, http.StatusOK, "Vote cast successfully", votesCount)
 }
 
 func (c *PostController) VoteOnPoll(ctx *gin.Context) {
-	postID, ok := c.parseObjectID(ctx, ctx.Param("id"))
-	if !ok {
+	postID, err := c.parseObjectID(ctx.Param("id"))
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
 	}
-	authUser := c.getAuthUser(ctx)
-	if authUser == nil {
+
+	userID, err := c.getAuthUserID(ctx)
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
 	}
 
@@ -198,276 +195,230 @@ func (c *PostController) VoteOnPoll(ctx *gin.Context) {
 		OptionID string `json:"option_id" binding:"required"`
 	}
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		handlePostServiceError(ctx, apperror.NewError(err, "INVALID_REQUEST", "Option ID is required"))
+		dto.SendError(ctx, http.StatusBadRequest, "Invalid request: 'option_id' is required", apperror.ErrBadRequest.Code)
 		return
 	}
 
-	optionID, ok := c.parseObjectID(ctx, req.OptionID)
-	if !ok {
+	optionID, err := c.parseObjectID(req.OptionID)
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
 	}
-	userID, ok := c.getAuthUserID(ctx)
-	if !ok {
-		return
-	}
+
 	poll, err := c.service.VoteOnPoll(ctx.Request.Context(), userID, postID, optionID)
 	if err != nil {
-		handlePostServiceError(ctx, err)
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
 	}
 
-	ctx.JSON(http.StatusOK, poll)
+	dto.SendSuccess(ctx, http.StatusOK, "Poll vote cast successfully", poll)
 }
 
-// === Quản lý Image ===
+// === Image Management ===
 
 func (c *PostController) AddImagesToPost(ctx *gin.Context) {
-	postID, ok := c.parseObjectID(ctx, ctx.Param("id"))
-	if !ok {
+	postID, err := c.parseObjectID(ctx.Param("id"))
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
 	}
-	authUser := c.getAuthUser(ctx)
-	if authUser == nil {
+
+	userID, err := c.getAuthUserID(ctx)
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
 	}
 
 	var req dto.AddImageRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		handlePostServiceError(ctx, apperror.NewError(err, "INVALID_REQUEST", "Invalid image data"))
-		return
-	}
-	userID, ok := c.getAuthUserID(ctx)
-	if !ok {
-		return
-	}
-	images, err := c.service.AddImagesToPost(ctx.Request.Context(), userID, postID, &req)
-	if err != nil {
-		handlePostServiceError(ctx, err)
+		dto.SendError(ctx, http.StatusBadRequest, "Invalid image data", apperror.ErrBadRequest.Code)
 		return
 	}
 
-	ctx.JSON(http.StatusOK, images)
+	images, err := c.service.AddImagesToPost(ctx.Request.Context(), userID, postID, &req)
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
+		return
+	}
+
+	dto.SendSuccess(ctx, http.StatusOK, "Images added successfully", images)
 }
 
 func (c *PostController) RemoveImagesFromPost(ctx *gin.Context) {
-	postID, ok := c.parseObjectID(ctx, ctx.Param("id"))
-	if !ok {
+	postID, err := c.parseObjectID(ctx.Param("id"))
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
 	}
-	authUser := c.getAuthUser(ctx)
-	if authUser == nil {
+
+	userID, err := c.getAuthUserID(ctx)
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
 	}
 
 	var req dto.RemoveImageRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		handlePostServiceError(ctx, apperror.NewError(err, "INVALID_REQUEST", "Image IDs are required"))
-		return
-	}
-	userID, ok := c.getAuthUserID(ctx)
-	if !ok {
-		return
-	}
-	if err := c.service.RemoveImagesFromPost(ctx.Request.Context(), userID, postID, &req); err != nil {
-		handlePostServiceError(ctx, err)
+		dto.SendError(ctx, http.StatusBadRequest, "Image IDs are required", apperror.ErrBadRequest.Code)
 		return
 	}
 
-	ctx.JSON(http.StatusOK, dto.SuccessResponse{Message: "Images removed successfully"})
+	if err := c.service.RemoveImagesFromPost(ctx.Request.Context(), userID, postID, &req); err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
+		return
+	}
+
+	dto.SendSuccess(ctx, http.StatusOK, "Images removed successfully", nil)
 }
 
-// === Quản lý Poll ===
+// === Poll Management ===
 
 func (c *PostController) UpdatePollDetails(ctx *gin.Context) {
-	postID, ok := c.parseObjectID(ctx, ctx.Param("id"))
-	if !ok {
+	postID, err := c.parseObjectID(ctx.Param("id"))
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
 	}
-	authUser := c.getAuthUser(ctx)
-	if authUser == nil {
+
+	userID, err := c.getAuthUserID(ctx)
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
 	}
 
 	var req dto.UpdatePollRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		handlePostServiceError(ctx, apperror.NewError(err, "INVALID_REQUEST", "Invalid poll data"))
-		return
-	}
-	userID, ok := c.getAuthUserID(ctx)
-	if !ok {
-		return
-	}
-	poll, err := c.service.UpdatePollDetails(ctx.Request.Context(), postID, userID, &req)
-	if err != nil {
-		handlePostServiceError(ctx, err)
+		dto.SendError(ctx, http.StatusBadRequest, "Invalid poll data", apperror.ErrBadRequest.Code)
 		return
 	}
 
-	ctx.JSON(http.StatusOK, poll)
+	poll, err := c.service.UpdatePollDetails(ctx.Request.Context(), postID, userID, &req)
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
+		return
+	}
+
+	dto.SendSuccess(ctx, http.StatusOK, "Poll details updated successfully", poll)
 }
 
 func (c *PostController) AddPollOptions(ctx *gin.Context) {
-	postID, ok := c.parseObjectID(ctx, ctx.Param("id"))
-	if !ok {
+	postID, err := c.parseObjectID(ctx.Param("id"))
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
 	}
-	authUser := c.getAuthUser(ctx)
-	if authUser == nil {
+
+	userID, err := c.getAuthUserID(ctx)
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
 	}
 
 	var req dto.AddPollOptionRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		handlePostServiceError(ctx, apperror.NewError(err, "INVALID_REQUEST", "Invalid poll options"))
-		return
-	}
-	userID, ok := c.getAuthUserID(ctx)
-	if !ok {
-		return
-	}
-	poll, err := c.service.AddPollOptions(ctx.Request.Context(), userID, postID, &req)
-	if err != nil {
-		handlePostServiceError(ctx, err)
+		dto.SendError(ctx, http.StatusBadRequest, "Invalid poll options", apperror.ErrBadRequest.Code)
 		return
 	}
 
-	ctx.JSON(http.StatusOK, poll)
+	poll, err := c.service.AddPollOptions(ctx.Request.Context(), userID, postID, &req)
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
+		return
+	}
+
+	dto.SendSuccess(ctx, http.StatusOK, "Poll options added successfully", poll)
 }
 
 func (c *PostController) UpdatePollOption(ctx *gin.Context) {
-	// 1. Lấy userID từ context
-	authUser := c.getAuthUser(ctx)
-	if authUser == nil {
+	userID, err := c.getAuthUserID(ctx)
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
 	}
 
-	// 2. Lấy postID và optionID từ URL
-	postID, ok := c.parseObjectID(ctx, ctx.Param("id"))
-	if !ok {
-		return
-	}
-	optionID, ok := c.parseObjectID(ctx, ctx.Param("optionID"))
-	if !ok {
+	postID, err := c.parseObjectID(ctx.Param("id"))
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
 	}
 
-	// 3. Lấy newText từ request body (sử dụng DTO đã sửa)
+	optionID, err := c.parseObjectID(ctx.Param("optionID"))
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
+		return
+	}
+
 	var req dto.UpdatePollOptionRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		handlePostServiceError(ctx, apperror.NewError(err, "INVALID_REQUEST", "Invalid option text"))
-		return
-	}
-	userID, ok := c.getAuthUserID(ctx)
-	if !ok {
-		return
-	}
-	// 4. Gọi đến service với các tham số đã được tách biệt rõ ràng
-	pollResponse, err := c.service.UpdatePollOption(ctx.Request.Context(), userID, postID, optionID, req.Text)
-	if err != nil {
-		handlePostServiceError(ctx, err)
+		dto.SendError(ctx, http.StatusBadRequest, "Invalid option text", apperror.ErrBadRequest.Code)
 		return
 	}
 
-	// 5. Trả về kết quả thành công
-	ctx.JSON(http.StatusOK, pollResponse)
+	pollResponse, err := c.service.UpdatePollOption(ctx.Request.Context(), userID, postID, optionID, req.Text)
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
+		return
+	}
+
+	dto.SendSuccess(ctx, http.StatusOK, "Poll option updated successfully", pollResponse)
 }
 
 func (c *PostController) RemovePollOptions(ctx *gin.Context) {
-	postID, ok := c.parseObjectID(ctx, ctx.Param("id"))
-	if !ok {
+	postID, err := c.parseObjectID(ctx.Param("id"))
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
 	}
-	authUser := c.getAuthUser(ctx)
-	if authUser == nil {
+
+	userID, err := c.getAuthUserID(ctx)
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
 	}
 
 	var req dto.RemovePollOptionRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		handlePostServiceError(ctx, apperror.NewError(err, "INVALID_REQUEST", "Option IDs are required"))
-		return
-	}
-	userID, ok := c.getAuthUserID(ctx)
-	if !ok {
-		return
-	}
-	poll, err := c.service.RemovePollOptions(ctx.Request.Context(), userID, postID, &req)
-	if err != nil {
-		handlePostServiceError(ctx, err)
+		dto.SendError(ctx, http.StatusBadRequest, "Option IDs are required", apperror.ErrBadRequest.Code)
 		return
 	}
 
-	ctx.JSON(http.StatusOK, poll)
+	poll, err := c.service.RemovePollOptions(ctx.Request.Context(), userID, postID, &req)
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
+		return
+	}
+
+	dto.SendSuccess(ctx, http.StatusOK, "Poll options removed successfully", poll)
 }
 
 // === Helpers ===
 
-// getAuthUser là một helper để lấy thông tin user đã xác thực.
-func (c *PostController) getAuthUser(ctx *gin.Context) *auth.AuthUser {
+// getAuthUserID is a helper to get the authenticated user's ObjectID.
+// It returns an error if the user is not authenticated or the ID is invalid.
+func (c *PostController) getAuthUserID(ctx *gin.Context) (primitive.ObjectID, error) {
 	authUser, exists := ctx.Get("authUser")
 	if !exists {
-		handlePostServiceError(ctx, apperror.NewError(nil, "UNAUTHORIZED", "Authentication required"))
-		return nil
+		return primitive.NilObjectID, apperror.ErrForbidden // Or a more specific "UNAUTHORIZED" error
 	}
+
 	user, ok := authUser.(auth.AuthUser)
 	if !ok {
-		handlePostServiceError(ctx, apperror.NewError(nil, "INTERNAL_ERROR", "Invalid auth user type in context"))
-		return nil
-	}
-	return &user
-}
-
-// parseObjectID là một helper để parse ObjectID từ string.
-func (c *PostController) parseObjectID(ctx *gin.Context, idStr string) (primitive.ObjectID, bool) {
-	id, err := primitive.ObjectIDFromHex(idStr)
-	if err != nil {
-		handlePostServiceError(ctx, apperror.NewError(err, "INVALID_ID", "Invalid ID format: "+idStr))
-		return primitive.NilObjectID, false
-	}
-	return id, true
-}
-
-// handlePostServiceError là hàm helper cục bộ để xử lý lỗi từ PostService.
-func handlePostServiceError(ctx *gin.Context, err error) {
-	code := apperror.Code(err)
-	status := http.StatusInternalServerError
-
-	switch {
-	case errors.Is(err, service.ErrPostNotFound):
-		status = http.StatusNotFound
-	case errors.Is(err, service.ErrPermissionDenied):
-		status = http.StatusForbidden
-	case errors.Is(err, service.ErrInvalidInput):
-		status = http.StatusBadRequest
-	case errors.Is(err, service.ErrPollCannotEdit):
-		status = http.StatusConflict
-	case code == "UNAUTHORIZED":
-		status = http.StatusUnauthorized
+		return primitive.NilObjectID, apperror.ErrInternal
 	}
 
-	ctx.JSON(status, dto.ErrorResponse{ErrorCode: code, Message: err.Error()})
-}
-func (c *PostController) getAuthUserID(ctx *gin.Context) (primitive.ObjectID, bool) {
-	// Bước 1: Lấy thông tin user từ context
-	authUser, exists := ctx.Get("authUser")
-	if !exists {
-		handlePostServiceError(ctx, apperror.NewError(nil, "UNAUTHORIZED", "Authentication required"))
-		return primitive.NilObjectID, false
-	}
-
-	// Bước 2: Kiểm tra kiểu dữ liệu
-	user, ok := authUser.(auth.AuthUser)
-	if !ok {
-		handlePostServiceError(ctx, apperror.NewError(nil, "INTERNAL_ERROR", "Invalid auth user type in context"))
-		return primitive.NilObjectID, false
-	}
-
-	// Bước 3: Chuyển đổi ID từ string sang ObjectID
 	userID, err := primitive.ObjectIDFromHex(user.ID)
 	if err != nil {
-		handlePostServiceError(ctx, apperror.NewError(err, "INVALID_TOKEN", "Invalid user ID in token"))
-		return primitive.NilObjectID, false
+		return primitive.NilObjectID, apperror.ErrInvalidToken // Invalid ID in token
 	}
 
-	return userID, true
+	return userID, nil
+}
+
+// parseObjectID is a helper to parse an ObjectID from a string.
+func (c *PostController) parseObjectID(idStr string) (primitive.ObjectID, error) {
+	id, err := primitive.ObjectIDFromHex(idStr)
+	if err != nil {
+		return primitive.NilObjectID, apperror.ErrInvalidID
+	}
+	return id, nil
 }
