@@ -13,6 +13,8 @@
   let sortBy = $state<SortType>("top");
   let showSortDropdown = $state(false);
   let newCommentContent = $state("");
+  let selectedImage = $state<File | null>(null);
+  let imagePreview = $state<string | null>(null);
 
   // Filter comments for this post
   const postComments = $derived(
@@ -63,8 +65,33 @@
     if (newCommentContent.trim()) {
       // Mock submit - in real app, would send to backend
       console.log("Submitting comment:", newCommentContent);
+      if (selectedImage) {
+        console.log("With image:", selectedImage.name);
+      }
       newCommentContent = "";
+      selectedImage = null;
+      imagePreview = null;
     }
+  };
+
+  const handleImageSelect = (event: Event) => {
+    const input = event.target as HTMLInputElement;
+    if (input.files && input.files[0]) {
+      const file = input.files[0];
+      selectedImage = file;
+
+      // Create preview
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        imagePreview = e.target?.result as string;
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeImage = () => {
+    selectedImage = null;
+    imagePreview = null;
   };
 
   const getTotalComments = () => {
@@ -89,7 +116,53 @@
       class="comment-textarea"
       rows="4"
     ></textarea>
-    <div class="comment-submit">
+
+    {#if imagePreview}
+      <div class="image-preview">
+        <img src={imagePreview} alt="Preview" />
+        <button class="remove-image" onclick={removeImage} title="Remove image">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+            <path
+              d="M4 4l8 8M12 4l-8 8"
+              stroke="currentColor"
+              stroke-width="2"
+            />
+          </svg>
+        </button>
+      </div>
+    {/if}
+
+    <div class="comment-actions">
+      <div class="attachment-buttons">
+        <input
+          type="file"
+          id="comment-image-upload"
+          accept="image/*"
+          onchange={handleImageSelect}
+          style="display: none;"
+        />
+        <button
+          class="attachment-btn"
+          onclick={() =>
+            document.getElementById("comment-image-upload")?.click()}
+          title="Add image"
+        >
+          <img
+            src="/icon_comment.png"
+            alt="Add comment icon"
+            width="20"
+            height="20"
+          />
+        </button>
+        <button
+          class="attachment-btn"
+          onclick={() =>
+            document.getElementById("comment-image-upload")?.click()}
+          title="Add picture"
+        >
+          <img src="/comment_picture.png" alt="" width="20" height="20" />
+        </button>
+      </div>
       <button class="submit-btn" onclick={submitComment}>Comment</button>
     </div>
   </div>
@@ -205,6 +278,75 @@
 
   .comment-textarea:focus {
     outline: none;
+  }
+
+  .image-preview {
+    position: relative;
+    margin-top: 8px;
+    margin-bottom: 8px;
+  }
+
+  .image-preview img {
+    max-width: 200px;
+    max-height: 200px;
+    border-radius: 4px;
+    display: block;
+  }
+
+  .remove-image {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    border: none;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .remove-image:hover {
+    background: rgba(0, 0, 0, 0.9);
+  }
+
+  .comment-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 8px;
+    border-top: 1px solid #edeff1;
+    margin-top: 8px;
+  }
+
+  .attachment-buttons {
+    display: flex;
+    gap: 8px;
+  }
+
+  .attachment-btn {
+    background: transparent;
+    border: none;
+    padding: 6px;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+    color: #7c7c7c;
+  }
+
+  .attachment-btn:hover {
+    background: #f6f7f8;
+  }
+
+  .attachment-btn img {
+    display: block;
   }
 
   .comment-submit {

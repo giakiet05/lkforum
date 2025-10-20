@@ -75,21 +75,21 @@
       class:active={activeSort === "hot"}
       on:click={() => (activeSort = "hot")}
     >
-      🔥 Hot
+      Hot
     </button>
     <button
       class="sort-btn"
       class:active={activeSort === "new"}
       on:click={() => (activeSort = "new")}
     >
-      ✨ New
+      New
     </button>
     <button
       class="sort-btn"
       class:active={activeSort === "top"}
       on:click={() => (activeSort = "top")}
     >
-      🏆 Top
+      Top
     </button>
   </div>
   <div class="post-list">
@@ -130,7 +130,7 @@
 
   .sort-btn.active {
     background-color: white;
-    color: #0079d3;
+    color: var(--blue--);
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   }
 
