@@ -1,11 +1,21 @@
 <script lang="ts">
   import { fade } from "svelte/transition";
+  import { push } from "svelte-spa-router";
   import type { PostData } from "../types/post";
 
   let { post }: { post: PostData } = $props();
 
   let selectedOptions = $state<number[]>([]);
   let hasVoted = $state(false);
+
+  function handlePostClick() {
+    push(`/post/${post.id}`);
+  }
+
+  function handleButtonClick(e: MouseEvent) {
+    // Prevent navigation when clicking buttons
+    e.stopPropagation();
+  }
 
   function handleVote(optionId: number) {
     if (hasVoted) return;
@@ -38,13 +48,23 @@
     hasVoted = true;
   }
 
+  function handlePollOptionClick(e: MouseEvent, optionId: number) {
+    e.stopPropagation();
+    handleVote(optionId);
+  }
+
+  function handleVoteSubmit(e: MouseEvent) {
+    e.stopPropagation();
+    submitVote();
+  }
+
   const getVotePercentage = (votes: number, total: number) => {
     if (total === 0) return 0;
     return (votes / total) * 100;
   };
 </script>
 
-<article class="post-container" transition:fade>
+<article class="post-container" transition:fade onclick={handlePostClick}>
   <div class="post-main">
     <div class="post-header">
       <span class="community-name">lk/{post.community}</span>
@@ -77,7 +97,7 @@
               <button
                 class="poll-option"
                 class:selected={selectedOptions.includes(option.id)}
-                onclick={() => handleVote(option.id)}
+                onclick={(e) => handlePollOptionClick(e, option.id)}
                 disabled={hasVoted}
               >
                 {#if hasVoted}
@@ -112,7 +132,7 @@
           {#if !hasVoted}
             <button
               class="vote-submit-btn"
-              onclick={submitVote}
+              onclick={handleVoteSubmit}
               disabled={selectedOptions.length === 0}
             >
               Vote
@@ -129,15 +149,23 @@
 
     <div class="post-footer">
       <div class="vote-actions">
-        <button class="footer-btn vote-btn" aria-label="Upvote">▲</button>
+        <button
+          class="footer-btn vote-btn"
+          aria-label="Upvote"
+          onclick={handleButtonClick}>▲</button
+        >
         <span class="vote-count">{post.upvotes - post.downvotes}</span>
-        <button class="footer-btn vote-btn" aria-label="Downvote">▼</button>
+        <button
+          class="footer-btn vote-btn"
+          aria-label="Downvote"
+          onclick={handleButtonClick}>▼</button
+        >
       </div>
-      <button class="footer-btn">
+      <button class="footer-btn" onclick={handlePostClick}>
         <img src="/CommentIcon.svg" alt="Comments" width="20" height="20" />
         <span>{post.commentsCount} Comments</span>
       </button>
-      <button class="footer-btn">
+      <button class="footer-btn" onclick={handleButtonClick}>
         <svg
           width="20"
           height="20"
@@ -153,7 +181,7 @@
         >
         <span>Share</span>
       </button>
-      <button class="footer-btn">
+      <button class="footer-btn" onclick={handleButtonClick}>
         <svg
           width="20"
           height="20"
@@ -180,6 +208,8 @@
     margin-bottom: 10px;
     color: #000000;
     font-family: Arial, sans-serif;
+    cursor: pointer;
+    transition: border-color 0.2s;
   }
   .post-container:hover {
     border-color: var(--button-secondary-background);
@@ -275,12 +305,17 @@
   }
 
   .footer-btn {
-    background: rgba(214, 216, 222, 0.4); /* --button-secondary-background at 40% */
+    background: rgba(
+      214,
+      216,
+      222,
+      0.4
+    ); /* --button-secondary-background at 40% */
     border: none;
     color: #000000;
     font-weight: bold;
     font-size: 12px;
-    padding: 8px;
+    padding: 10px 14px;
     border-radius: 20px; /* Make it rounder */
     cursor: pointer;
     display: flex;
@@ -293,6 +328,7 @@
   .vote-actions .footer-btn {
     background: transparent;
     border-radius: 4px; /* Reset border-radius if needed */
+    padding: 8px 10px;
   }
 
   .footer-btn:hover {

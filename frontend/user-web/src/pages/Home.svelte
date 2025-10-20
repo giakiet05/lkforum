@@ -105,8 +105,9 @@
     border-radius: 4px;
     padding: 4px;
     margin-bottom: 16px;
+    margin-top: -16px;
     display: flex;
-    gap: 4px;
+    gap: 0px;
   }
 
   .sort-btn {

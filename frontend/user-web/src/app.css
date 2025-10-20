@@ -47,6 +47,9 @@
   --muted-foreground: #9aa4b2;
   --button-secondary-background: #D6D8DE;
   --button-secondary-background-hover: #B5B7BD;
+  /* ... add more as needed ... */
+  --blue--:#153060;
+  --darkblue--:#154D71;
 }
 
 /* Basic reset */
