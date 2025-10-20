@@ -58,19 +58,19 @@ func isErrorType(err error, targets ...error) bool {
 func StatusFromError(err error) int {
 	switch {
 	// 400 Bad Request
-	case isErrorType(err, ErrBadRequest, ErrInvalidID, ErrInvalidMembershipData):
+	case isErrorType(err, ErrBadRequest, ErrInvalidID, ErrInvalidMembershipData, ErrInvalidOTP, ErrOTPExpired):
 		return http.StatusBadRequest
 	// 401 Unauthorized
 	case isErrorType(err, ErrInvalidCredentials, ErrInvalidToken, ErrInvalidClaims, ErrInvalidIssuer, ErrInvalidAudience, ErrTokenInvalidated):
 		return http.StatusUnauthorized
 	// 403 Forbidden
-	case isErrorType(err, ErrForbidden, ErrUserInactive, ErrUserNotMember):
+	case isErrorType(err, ErrForbidden, ErrUserInactive, ErrUserNotMember, ErrEmailNotVerified):
 		return http.StatusForbidden
 	// 404 Not Found
 	case isErrorType(err, ErrUserNotFound, ErrCommunityNotFound, ErrMembershipNotFound):
 		return http.StatusNotFound
 	// 409 Conflict
-	case isErrorType(err, ErrUsernameExists, ErrEmailExists, ErrCommunityNameExists, ErrAlreadyMember):
+	case isErrorType(err, ErrUsernameExists, ErrEmailExists, ErrCommunityNameExists, ErrAlreadyMember, ErrEmailAlreadyVerified):
 		return http.StatusConflict
 	// 500 Internal Server Error
 	case isErrorType(err, ErrInternal, ErrNoFieldsToUpdate, ErrMembershipCreateFailed, ErrMembershipDeleteFailed):
@@ -82,19 +82,24 @@ func StatusFromError(err error) int {
 
 var (
 	// Auth-related
-	ErrInvalidCredentials = AppError{Code: "INVALID_CREDENTIALS", Message: "Invalid username or password"}
-	ErrInvalidToken       = AppError{Code: "INVALID_TOKEN", Message: "Invalid or expired token"}
-	ErrInvalidClaims      = AppError{Code: "INVALID_CLAIMS", Message: "Invalid token claims"}
-	ErrInvalidIssuer      = AppError{Code: "INVALID_ISSUER", Message: "Invalid token issuer"}
-	ErrInvalidAudience    = AppError{Code: "INVALID_AUDIENCE", Message: "Invalid token audience"}
-	ErrTokenInvalidated   = AppError{Code: "TOKEN_INVALIDATED", Message: "Token has been invalidated"}
-	ErrForbidden          = AppError{Code: "FORBIDDEN", Message: "You do not have permission to perform this action"}
-	ErrBadRequest         = AppError{Code: "BAD_REQUEST", Message: "Bad request"}
+	ErrInvalidCredentials   = AppError{Code: "INVALID_CREDENTIALS", Message: "Invalid username or password"}
+	ErrInvalidToken         = AppError{Code: "INVALID_TOKEN", Message: "Invalid or expired token"}
+	ErrInvalidClaims        = AppError{Code: "INVALID_CLAIMS", Message: "Invalid token claims"}
+	ErrInvalidIssuer        = AppError{Code: "INVALID_ISSUER", Message: "Invalid token issuer"}
+	ErrInvalidAudience      = AppError{Code: "INVALID_AUDIENCE", Message: "Invalid token audience"}
+	ErrTokenInvalidated     = AppError{Code: "TOKEN_INVALIDATED", Message: "Token has been invalidated"}
+	ErrForbidden            = AppError{Code: "FORBIDDEN", Message: "You do not have permission to perform this action"}
+	ErrBadRequest           = AppError{Code: "BAD_REQUEST", Message: "Bad request"}
+	ErrEmailNotVerified     = AppError{Code: "EMAIL_NOT_VERIFIED", Message: "Email has not been verified"}
+	ErrEmailAlreadyVerified = AppError{Code: "EMAIL_ALREADY_VERIFIED", Message: "Email has already been verified"}
+	ErrInvalidOTP           = AppError{Code: "INVALID_OTP", Message: "Invalid verification code"}
+	ErrOTPExpired           = AppError{Code: "OTP_EXPIRED", Message: "Verification code has expired"}
 
 	// Generic
-	ErrInternal         = AppError{Code: "INTERNAL_ERROR", Message: "Internal server error"}
-	ErrNoFieldsToUpdate = AppError{Code: "NO_FIELDS_TO_UPDATE", Message: "No fields provided to update"}
-	ErrInvalidID        = AppError{Code: "INVALID_ID", Message: "Invalid ID format"}
+	ErrInternal          = AppError{Code: "INTERNAL_ERROR", Message: "Internal server error"}
+	ErrNoFieldsToUpdate  = AppError{Code: "NO_FIELDS_TO_UPDATE", Message: "No fields provided to update"}
+	ErrInvalidID         = AppError{Code: "INVALID_ID", Message: "Invalid ID format"}
+	ErrPaginationInvalid = AppError{Code: "PAGINATION_INVALID", Message: "Page number or page size is invalid. Page size must be smaller than 500."}
 
 	// User-related
 	ErrUserNotFound   = AppError{Code: "USER_NOT_FOUND", Message: "User not found"}
@@ -113,4 +118,8 @@ var (
 	ErrMembershipCreateFailed = AppError{Code: "MEMBERSHIP_CREATE_FAILED", Message: "Failed to create membership"}
 	ErrMembershipDeleteFailed = AppError{Code: "MEMBERSHIP_DELETE_FAILED", Message: "Failed to delete membership"}
 	ErrInvalidMembershipData  = AppError{Code: "INVALID_MEMBERSHIP_DATA", Message: "Invalid membership data"}
+
+	// Comment-related
+	ErrCommentNotFound = AppError{Code: "COMMENT_NOT_FOUND", Message: "Comment not found"}
+	ErrDepthInvalid    = AppError{Code: "DEPTH_TOO_HIGH", Message: "Depth can not be smaller than 0 or larger than 2"}
 )

@@ -9,14 +9,13 @@ import (
 func RegisterCommunityRoutes(rg *gin.RouterGroup, c *controller.CommunityController) {
 	communities := rg.Group("/communities")
 
+	communities.GET("filter", c.GetCommunitiesFilter)
+	communities.GET(":community_id", c.GetCommunityByID)
+
 	// Protected routes (require authentication)
 	communities.Use(middleware.AuthMiddleware())
 	{
 		communities.POST("", c.CreateCommunity)
-		communities.GET(":community_id", c.GetCommunityByID)
-		communities.GET("filter", c.GetCommunitiesFilter)
-		communities.GET("moderator/:moderator_id", c.GetCommunityByModeratorID)
-		communities.GET("", c.GetAllCommunities)
 		communities.PUT("", c.UpdateCommunity)
 		communities.PUT("/add_moderator", c.AddModerator)
 		communities.PUT("/remove_moderator", c.RemoveModerator)

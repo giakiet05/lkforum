@@ -10,4 +10,6 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, c *controller.UserController) {
 	auth.POST("/register", c.RegisterUser)
 	auth.POST("/login", c.Login)
 	auth.POST("/refresh", c.RefreshToken)
+	auth.POST("/verify-email", c.VerifyEmail)
+	auth.POST("/resend-verification-email", c.ResendVerificationEmail)
 }
