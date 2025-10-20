@@ -16,14 +16,11 @@ type UserController struct {
 }
 
 func NewUserController(service service.UserService) *UserController {
-
 	return &UserController{service: service}
 }
 
 // GetUsers returns a paginated list of users
-// If no pagination parameters are provided, it uses sensible defaults
 func (c *UserController) GetUsers(ctx *gin.Context) {
-	// Parse pagination parameters
 	page := 1
 	pageSize := 10
 
@@ -39,7 +36,6 @@ func (c *UserController) GetUsers(ctx *gin.Context) {
 		}
 	}
 
-	// Call the service
 	response, err := c.service.GetUsers(page, pageSize)
 	if err != nil {
 		ctx.JSON(apperror.StatusFromError(err), dto.ErrorResponse{ErrorCode: apperror.Code(err), Message: apperror.Message(err)})
@@ -48,7 +44,7 @@ func (c *UserController) GetUsers(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, response)
 }
 
-// RegisterUser handles user registration
+// RegisterUser handles user registration. It creates a user and sends a verification email.
 func (c *UserController) RegisterUser(ctx *gin.Context) {
 	var req dto.UserRegisterRequest
 
@@ -57,16 +53,59 @@ func (c *UserController) RegisterUser(ctx *gin.Context) {
 		return
 	}
 
-	user, accessToken, refreshToken, err := c.service.RegisterUser(req.Username, req.Email, req.Password)
+	// The service now only creates the user and triggers the email, without returning tokens
+	user, err := c.service.RegisterUser(req.Username, req.Email, req.Password)
 	if err != nil {
 		ctx.JSON(apperror.StatusFromError(err), dto.ErrorResponse{ErrorCode: apperror.Code(err), Message: apperror.Message(err)})
 		return
 	}
 
-	ctx.JSON(http.StatusCreated, dto.AuthResponse{
+	ctx.JSON(http.StatusCreated, dto.SuccessResponse{
+		Message: "User registered successfully. A verification email has been sent.",
+		ID:      user.ID.String(),
+	})
+}
+
+// VerifyEmail handles the verification of a user's email with an OTP.
+// On success, it returns auth tokens, logging the user in automatically.
+func (c *UserController) VerifyEmail(ctx *gin.Context) {
+	var req dto.VerifyEmailRequest // This DTO will be added to user_dto.go
+
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.JSON(apperror.StatusFromError(apperror.ErrBadRequest), dto.ErrorResponse{ErrorCode: apperror.ErrBadRequest.Code, Message: apperror.Message(err)})
+		return
+	}
+
+	user, accessToken, refreshToken, err := c.service.VerifyEmail(req.Email, req.OTP)
+	if err != nil {
+		ctx.JSON(apperror.StatusFromError(err), dto.ErrorResponse{ErrorCode: apperror.Code(err), Message: apperror.Message(err)})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, dto.AuthResponse{
 		User:         dto.FromUser(user),
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
+	})
+}
+
+// ResendVerificationEmail handles requests to send a new verification email.
+func (c *UserController) ResendVerificationEmail(ctx *gin.Context) {
+	var req dto.ResendVerificationEmailRequest // This DTO will be added to user_dto.go
+
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.JSON(apperror.StatusFromError(apperror.ErrBadRequest), dto.ErrorResponse{ErrorCode: apperror.ErrBadRequest.Code, Message: apperror.Message(err)})
+		return
+	}
+
+	err := c.service.ResendVerificationEmail(req.Email)
+	if err != nil {
+		ctx.JSON(apperror.StatusFromError(err), dto.ErrorResponse{ErrorCode: apperror.Code(err), Message: apperror.Message(err)})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"message": "A new verification email has been sent.",
 	})
 }
 
