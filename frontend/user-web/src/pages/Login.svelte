@@ -26,6 +26,7 @@
 
   // form fields
   let identifier = $state(""); // username hoặc email tuỳ backend
+  let email = $state(""); // email field cho register mode
   let password = $state("");
   let showPassword = $state(false);
 
@@ -33,6 +34,10 @@
   function validate() {
     if (!identifier || !password) {
       error = "Vui lòng nhập tên đăng nhập và mật khẩu";
+      return false;
+    }
+    if (mode === "register" && !email) {
+      error = "Vui lòng nhập email";
       return false;
     }
     return true;
@@ -57,6 +62,7 @@
     if (mode === "register") {
       onSubmit({
         username: identifier,
+        email: email,
         password: password,
       });
     } else {
@@ -93,6 +99,18 @@
         : "Enter your username"}
     />
   </div>
+
+  {#if mode === "register"}
+    <div class="input-group">
+      <label for="email">Email</label>
+      <input
+        id="email"
+        type="email"
+        bind:value={email}
+        placeholder="Enter your email"
+      />
+    </div>
+  {/if}
 
   <div class="input-group password-group">
     <label for="password">Mật khẩu</label>

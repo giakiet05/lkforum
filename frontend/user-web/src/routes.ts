@@ -4,6 +4,7 @@ import Register from './pages/Register.svelte';
 import Profile from './pages/Profile.svelte';
 import Settings from './pages/Settings.svelte';
 import PostDetail from './pages/PostDetail.svelte';
+import Community from './pages/Community.svelte';
 
 const routes = {
     '/': Home,
@@ -12,6 +13,7 @@ const routes = {
     '/profile': Profile,
     '/settings': Settings,
     '/post/:id': PostDetail,
+    '/lk/:name': Community,
 };
 
 export default routes;

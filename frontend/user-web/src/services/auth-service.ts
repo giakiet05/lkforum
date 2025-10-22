@@ -108,28 +108,34 @@ export async function register(data: RegisterDto): Promise<LoginResponse> {
 }
 
 export async function login(credentials: LoginRequest): Promise<LoginResponse> {
+    console.log('Login request:', credentials);
     const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(credentials),
     });
 
+    console.log('Login response status:', res.status);
+    
     if (!res.ok) {
         let errObj: any = {};
         try {
             errObj = await res.json();
+            console.log('Login error response:', errObj);
         } catch (e) {
             try {
                 const text = await res.text();
+                console.log('Login error text:', text);
                 errObj = { error: text || `HTTP ${res.status}` };
             } catch {
                 errObj = { error: `HTTP ${res.status}` };
             }
         }
-        throw errObj.error || "Unknown error";
+        throw errObj.error || errObj.message || "Unknown error";
     }
 
     const response: LoginResponse = await res.json();
+    console.log('Login success:', response);
     setAccessToken(response.access_token);
     setRefreshToken(response.refresh_token);
     setUser(response.user);

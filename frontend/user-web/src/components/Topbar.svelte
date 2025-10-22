@@ -606,18 +606,19 @@
   }
 
   .login-button {
-    padding: 8px 12px;
-    border: 1px solid var(--topbar-border);
+    padding: 8px 16px;
+    border: none;
     border-radius: 20px;
-    background: transparent;
+    background: var(--darkblue--);
     cursor: pointer;
     text-decoration: none;
-    color: var(--topbar-foreground);
-    transition: background-color 0.2s;
+    color: white;
+    font-weight: 500;
+    transition: opacity 0.2s;
   }
 
   .login-button:hover {
-    background: var(--topbar-search-background);
+    opacity: 0.9;
   }
 
   .overlay {

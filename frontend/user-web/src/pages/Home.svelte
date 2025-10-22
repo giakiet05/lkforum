@@ -100,6 +100,10 @@
 </div>
 
 <style>
+  div {
+    padding: 16px 24px;
+  }
+
   .sorting-bar {
     background-color: #f6f7f8;
     border-radius: 4px;

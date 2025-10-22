@@ -21,6 +21,11 @@
     e.stopPropagation();
   }
 
+  function handleCommunityClick(e: MouseEvent) {
+    e.stopPropagation();
+    push(`/lk/${post.community}`);
+  }
+
   function handleVote(optionId: number) {
     if (hasVoted) return;
 
@@ -73,7 +78,9 @@
     <div class="post-header">
       <div class="post-header-left">
         <img src="/avatar.jpg" alt="User avatar" class="author-avatar" />
-        <span class="community-name">lk/{post.community}</span>
+        <span class="community-name" onclick={handleCommunityClick}
+          >lk/{post.community}</span
+        >
         <span class="meta-divider">•</span>
         <span class="author">Posted by u/{post.author}</span>
         <span class="time">{post.time}</span>
@@ -283,7 +290,13 @@
   .community-name {
     font-weight: bold;
     color: #000000;
+    cursor: pointer;
   }
+
+  .community-name:hover {
+    text-decoration: underline;
+  }
+
   .meta-divider {
     margin: 0 4px;
     color: #878a8c;

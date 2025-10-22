@@ -6,9 +6,6 @@
   import { authStore } from "./stores/auth-store";
   import { logout } from "./services/auth-service";
   import { push } from "svelte-spa-router";
-  import { get } from "svelte/store";
-  import type { User } from "./models/user";
-  import { run } from "svelte/legacy";
 
   const sidebarItems = [
     {
@@ -46,25 +43,22 @@
     },
   ];
 
-  let user: User | null = null;
-  run(() => {
-    const state = get(authStore);
-    user = state.user;
-  });
-
   let isSidebarCompact = false;
 
   let topbarUser:
     | { name: string; avatar?: string; karma?: number }
     | undefined = undefined;
-  run(() => {
-    const state = get(authStore);
+
+  // Subscribe to authStore để update realtime khi login/logout
+  authStore.subscribe((state) => {
     if (state.user) {
       topbarUser = {
         name: state.user.username || state.user.email || "User",
         avatar: "../avatar.jpg",
         karma: 20,
       };
+    } else {
+      topbarUser = undefined;
     }
   });
 
@@ -108,10 +102,10 @@
   .main-content {
     margin-left: var(--sidebar-width);
     transition: margin-left 0.2s ease;
-    padding-top: calc(var(--topbar-height) + 1rem);
-    padding-right: 2rem;
-    padding-left: 2rem;
-    padding-bottom: 2rem;
+    padding-top: var(--topbar-height);
+    padding-right: 0;
+    padding-left: 0;
+    padding-bottom: 0;
     min-height: 100vh;
     box-sizing: border-box;
     overflow-y: auto;

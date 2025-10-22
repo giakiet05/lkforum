@@ -69,9 +69,9 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-secondary); }
 
 /* app wrapper example */
 #app {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
 }
 
 /* =========================
