@@ -10,6 +10,7 @@ import (
 
 // AppConfig holds the application's configuration
 type AppConfig struct {
+	Port                 string
 	MongoURI             string
 	DBName               string
 	JWTSecret            string
@@ -47,6 +48,9 @@ func LoadConfig() {
 	if err := godotenv.Load(); err != nil {
 		log.Println(".env file not found. Using environment variables.")
 	}
+
+	//Port
+	Cfg.Port = getEnv("PORT", "8080")
 
 	// Database & App
 	Cfg.MongoURI = getEnv("MONGO_URI", "mongodb://localhost:27017")

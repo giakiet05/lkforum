@@ -23,42 +23,39 @@ func NewCommunityController(communityService service.CommunityService) *Communit
 func (c *CommunityController) CreateCommunity(ctx *gin.Context) {
 	var req dto.CreateCommunityRequest
 	if err := ctx.ShouldBind(&req); err != nil {
-		ctx.JSON(apperror.StatusFromError(apperror.ErrBadRequest), dto.ErrorResponse{ErrorCode: apperror.ErrBadRequest.Code, Message: apperror.Message(err)})
+		dto.SendError(ctx, http.StatusBadRequest, apperror.Message(apperror.ErrBadRequest), apperror.ErrBadRequest.Code)
 		return
 	}
 
 	authUser, exists := ctx.Get("authUser")
 	if !exists {
-		ctx.JSON(apperror.StatusFromError(apperror.ErrForbidden), dto.ErrorResponse{ErrorCode: apperror.ErrForbidden.Code, Message: apperror.ErrForbidden.Message})
+		dto.SendError(ctx, http.StatusForbidden, apperror.ErrForbidden.Message, apperror.ErrForbidden.Code)
 		return
 	}
 
 	community, err := c.communityService.CreateCommunity(&req, authUser.(auth.AuthUser).ID)
 	if err != nil {
-		ctx.JSON(apperror.StatusFromError(err), dto.ErrorResponse{ErrorCode: apperror.Code(err), Message: apperror.Message(err)})
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
 	}
 
-	ctx.JSON(http.StatusCreated, dto.SuccessResponse{
-		ID:      community.ID.Hex(),
-		Message: "Create community successfully",
-	})
+	dto.SendSuccess(ctx, http.StatusCreated, "Community created successfully", dto.FromCommunity(community))
 }
 
 func (c *CommunityController) GetCommunityByID(ctx *gin.Context) {
 	communityID := ctx.Param("community_id")
 	if communityID == "" {
-		ctx.JSON(apperror.StatusFromError(apperror.ErrBadRequest), dto.ErrorResponse{ErrorCode: apperror.ErrBadRequest.Code, Message: apperror.ErrBadRequest.Message})
+		dto.SendError(ctx, http.StatusBadRequest, "Community ID is required", apperror.ErrBadRequest.Code)
 		return
 	}
 
 	community, err := c.communityService.GetCommunityByID(communityID)
 	if err != nil {
-		ctx.JSON(apperror.StatusFromError(err), dto.ErrorResponse{ErrorCode: apperror.Code(err), Message: apperror.Message(err)})
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
 	}
 
-	ctx.JSON(http.StatusOK, dto.FromCommunity(community))
+	dto.SendSuccess(ctx, http.StatusOK, "Community retrieved successfully", dto.FromCommunity(community))
 }
 
 func (c *CommunityController) GetCommunitiesFilter(ctx *gin.Context) {
@@ -81,27 +78,26 @@ func (c *CommunityController) GetCommunitiesFilter(ctx *gin.Context) {
 	var createFrom time.Time
 	if createFromStr != "" {
 		t, err := time.Parse(time.RFC3339, createFromStr)
-		if err == nil {
-			createFrom = t
-		} else {
-			ctx.JSON(apperror.StatusFromError(apperror.ErrBadRequest), dto.ErrorResponse{ErrorCode: apperror.ErrBadRequest.Code, Message: apperror.ErrBadRequest.Message})
+		if err != nil {
+			dto.SendError(ctx, http.StatusBadRequest, "Invalid date format for create_from", apperror.ErrBadRequest.Code)
 			return
 		}
+		createFrom = t
 	}
 
 	response, err := c.communityService.GetCommunitiesFilter(name, description, createFrom, page, pageSize)
 	if err != nil {
-		ctx.JSON(apperror.StatusFromError(err), dto.ErrorResponse{ErrorCode: apperror.Code(err), Message: apperror.Message(err)})
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
 	}
 
-	ctx.JSON(http.StatusOK, response)
+	dto.SendSuccess(ctx, http.StatusOK, "Communities retrieved successfully", response)
 }
 
 func (c *CommunityController) GetCommunityByModeratorID(ctx *gin.Context) {
 	moderatorID := ctx.Param("moderator_id")
 	if moderatorID == "" {
-		ctx.JSON(apperror.StatusFromError(apperror.ErrBadRequest), dto.ErrorResponse{ErrorCode: apperror.ErrBadRequest.Code, Message: apperror.ErrBadRequest.Message})
+		dto.SendError(ctx, http.StatusBadRequest, "Moderator ID is required", apperror.ErrBadRequest.Code)
 		return
 	}
 
@@ -120,11 +116,11 @@ func (c *CommunityController) GetCommunityByModeratorID(ctx *gin.Context) {
 
 	response, err := c.communityService.GetCommunitiesByModeratorIDPaginated(moderatorID, page, pageSize)
 	if err != nil {
-		ctx.JSON(apperror.StatusFromError(err), dto.ErrorResponse{ErrorCode: apperror.Code(err), Message: apperror.Message(err)})
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
 	}
 
-	ctx.JSON(http.StatusOK, response)
+	dto.SendSuccess(ctx, http.StatusOK, "Communities retrieved successfully", response)
 }
 
 func (c *CommunityController) GetAllCommunities(ctx *gin.Context) {
@@ -143,109 +139,97 @@ func (c *CommunityController) GetAllCommunities(ctx *gin.Context) {
 
 	response, err := c.communityService.GetAllCommunitiesPaginated(page, pageSize)
 	if err != nil {
-		ctx.JSON(apperror.StatusFromError(err), dto.ErrorResponse{ErrorCode: apperror.Code(err), Message: apperror.Message(err)})
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
 	}
 
-	ctx.JSON(http.StatusOK, response)
+	dto.SendSuccess(ctx, http.StatusOK, "Communities retrieved successfully", response)
 }
 
 func (c *CommunityController) UpdateCommunity(ctx *gin.Context) {
 	var req dto.UpdateCommunityRequest
 	if err := ctx.ShouldBind(&req); err != nil {
-		ctx.JSON(apperror.StatusFromError(apperror.ErrBadRequest), dto.ErrorResponse{ErrorCode: apperror.ErrBadRequest.Code, Message: apperror.Message(err)})
+		dto.SendError(ctx, http.StatusBadRequest, apperror.Message(apperror.ErrBadRequest), apperror.ErrBadRequest.Code)
 		return
 	}
 
 	authUser, exists := ctx.Get("authUser")
 	if !exists {
-		ctx.JSON(apperror.StatusFromError(apperror.ErrForbidden), dto.ErrorResponse{ErrorCode: apperror.ErrForbidden.Code, Message: apperror.ErrForbidden.Message})
+		dto.SendError(ctx, http.StatusForbidden, apperror.ErrForbidden.Message, apperror.ErrForbidden.Code)
 		return
 	}
 
 	community, err := c.communityService.UpdateCommunity(&req, authUser.(auth.AuthUser).ID)
 	if err != nil {
-		ctx.JSON(apperror.StatusFromError(err), dto.ErrorResponse{ErrorCode: apperror.Code(err), Message: apperror.Message(err)})
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
 	}
 
-	ctx.JSON(http.StatusOK, dto.SuccessResponse{
-		ID:      community.ID.Hex(),
-		Message: "Update community successfully",
-	})
+	dto.SendSuccess(ctx, http.StatusOK, "Community updated successfully", dto.FromCommunity(community))
 }
 
 func (c *CommunityController) AddModerator(ctx *gin.Context) {
 	var req *dto.AddModeratorRequest
 	if err := ctx.ShouldBind(&req); err != nil {
-		ctx.JSON(apperror.StatusFromError(apperror.ErrBadRequest), dto.ErrorResponse{ErrorCode: apperror.ErrBadRequest.Code, Message: apperror.Message(err)})
+		dto.SendError(ctx, http.StatusBadRequest, apperror.Message(apperror.ErrBadRequest), apperror.ErrBadRequest.Code)
 		return
 	}
 
 	authUser, exists := ctx.Get("authUser")
 	if !exists {
-		ctx.JSON(apperror.StatusFromError(apperror.ErrForbidden), dto.ErrorResponse{ErrorCode: apperror.ErrForbidden.Code, Message: apperror.ErrForbidden.Message})
+		dto.SendError(ctx, http.StatusForbidden, apperror.ErrForbidden.Message, apperror.ErrForbidden.Code)
 		return
 	}
 
 	err := c.communityService.AddModerator(req, authUser.(auth.AuthUser).ID)
 	if err != nil {
-		ctx.JSON(apperror.StatusFromError(err), dto.ErrorResponse{ErrorCode: apperror.Code(err), Message: apperror.Message(err)})
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
 	}
 
-	ctx.JSON(http.StatusOK, dto.SuccessResponse{
-		ID:      req.CommunityID,
-		Message: "Add moderator successfully",
-	})
+	dto.SendSuccess(ctx, http.StatusOK, "Moderator added successfully", gin.H{"community_id": req.CommunityID})
 }
 
 func (c *CommunityController) RemoveModerator(ctx *gin.Context) {
 	var req *dto.RemoveModeratorRequest
 	if err := ctx.ShouldBind(&req); err != nil {
-		ctx.JSON(apperror.StatusFromError(apperror.ErrBadRequest), dto.ErrorResponse{ErrorCode: apperror.ErrBadRequest.Code, Message: apperror.Message(err)})
+		dto.SendError(ctx, http.StatusBadRequest, apperror.Message(apperror.ErrBadRequest), apperror.ErrBadRequest.Code)
 		return
 	}
 
 	authUser, exists := ctx.Get("authUser")
 	if !exists {
-		ctx.JSON(apperror.StatusFromError(apperror.ErrForbidden), dto.ErrorResponse{ErrorCode: apperror.ErrForbidden.Code, Message: apperror.ErrForbidden.Message})
+		dto.SendError(ctx, http.StatusForbidden, apperror.ErrForbidden.Message, apperror.ErrForbidden.Code)
 		return
 	}
 
 	err := c.communityService.RemoveModerator(req, authUser.(auth.AuthUser).ID)
 	if err != nil {
-		ctx.JSON(apperror.StatusFromError(err), dto.ErrorResponse{ErrorCode: apperror.Code(err), Message: apperror.Message(err)})
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
 	}
 
-	ctx.JSON(http.StatusOK, dto.SuccessResponse{
-		ID:      req.CommunityID,
-		Message: "Remove moderator successfully",
-	})
+	dto.SendSuccess(ctx, http.StatusOK, "Moderator removed successfully", gin.H{"community_id": req.CommunityID})
 }
 
 func (c *CommunityController) DeleteCommunityByID(ctx *gin.Context) {
 	communityID := ctx.Param("community_id")
 	if communityID == "" {
-		ctx.JSON(apperror.StatusFromError(apperror.ErrBadRequest), dto.ErrorResponse{ErrorCode: apperror.ErrBadRequest.Code, Message: apperror.ErrBadRequest.Message})
+		dto.SendError(ctx, http.StatusBadRequest, "Community ID is required", apperror.ErrBadRequest.Code)
 		return
 	}
 
 	authUser, exists := ctx.Get("authUser")
 	if !exists {
-		ctx.JSON(apperror.StatusFromError(apperror.ErrForbidden), dto.ErrorResponse{ErrorCode: apperror.ErrForbidden.Code, Message: apperror.ErrForbidden.Message})
+		dto.SendError(ctx, http.StatusForbidden, apperror.ErrForbidden.Message, apperror.ErrForbidden.Code)
 		return
 	}
 
 	err := c.communityService.DeleteCommunityByID(communityID, authUser.(auth.AuthUser).ID)
 	if err != nil {
-		ctx.JSON(apperror.StatusFromError(err), dto.ErrorResponse{ErrorCode: apperror.Code(err), Message: apperror.Message(err)})
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
 	}
 
-	ctx.JSON(http.StatusOK, dto.SuccessResponse{
-		ID:      communityID,
-		Message: "Delete community successfully",
-	})
+	dto.SendSuccess(ctx, http.StatusOK, "Community deleted successfully", gin.H{"id": communityID})
 }

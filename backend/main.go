@@ -2,9 +2,9 @@ package main
 
 import (
 	"log"
-	"os"
 
 	"github.com/giakiet05/lkforum/internal/bootstrap"
+	"github.com/giakiet05/lkforum/internal/config"
 )
 
 func main() {
@@ -15,10 +15,7 @@ func main() {
 	}
 
 	// Start the server
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
+	port := config.Cfg.Port
 	log.Printf("Server is running at http://localhost:%s\n", port)
 	if err := r.Run(":" + port); err != nil {
 		log.Fatalf("failed to run server: %v", err)

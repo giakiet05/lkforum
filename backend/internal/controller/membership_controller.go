@@ -22,58 +22,55 @@ func NewMembershipController(membershipService service.MembershipService) *Membe
 func (m *MembershipController) CreateMembership(ctx *gin.Context) {
 	var req *dto.CreateMembershipRequest
 	if err := ctx.ShouldBind(&req); err != nil {
-		ctx.JSON(apperror.StatusFromError(apperror.ErrBadRequest), dto.ErrorResponse{ErrorCode: apperror.ErrBadRequest.Code, Message: apperror.Message(err)})
+		dto.SendError(ctx, http.StatusBadRequest, apperror.Message(apperror.ErrBadRequest), apperror.ErrBadRequest.Code)
 		return
 	}
 
 	authUser, exists := ctx.Get("authUser")
 	if !exists {
-		ctx.JSON(apperror.StatusFromError(apperror.ErrForbidden), dto.ErrorResponse{ErrorCode: apperror.ErrForbidden.Code, Message: apperror.ErrForbidden.Message})
+		dto.SendError(ctx, http.StatusForbidden, apperror.ErrForbidden.Message, apperror.ErrForbidden.Code)
 		return
 	}
 
 	membership, err := m.membershipService.CreateMembership(req, authUser.(auth.AuthUser).ID)
 	if err != nil {
-		ctx.JSON(apperror.StatusFromError(err), dto.ErrorResponse{ErrorCode: apperror.Code(err), Message: apperror.Message(err)})
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
 	}
 
-	ctx.JSON(http.StatusCreated, dto.SuccessResponse{
-		ID:      membership.ID.Hex(),
-		Message: "Create membership successfully",
-	})
+	dto.SendSuccess(ctx, http.StatusCreated, "Membership created successfully", membership)
 }
 
 func (m *MembershipController) GetMembershipByID(ctx *gin.Context) {
 	membershipID := ctx.Param("membership_id")
 	if membershipID == "" {
-		ctx.JSON(apperror.StatusFromError(apperror.ErrBadRequest), dto.ErrorResponse{ErrorCode: apperror.ErrBadRequest.Code, Message: apperror.ErrBadRequest.Message})
+		dto.SendError(ctx, http.StatusBadRequest, "Membership ID is required", apperror.ErrBadRequest.Code)
 		return
 	}
 
 	membership, err := m.membershipService.GetMembershipByID(membershipID)
 	if err != nil {
-		ctx.JSON(apperror.StatusFromError(err), dto.ErrorResponse{ErrorCode: apperror.Code(err), Message: apperror.Message(err)})
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
 	}
 
-	ctx.JSON(http.StatusOK, membership)
+	dto.SendSuccess(ctx, http.StatusOK, "Membership retrieved successfully", membership)
 }
 
 func (m *MembershipController) GetMembershipByUserID(ctx *gin.Context) {
 	userID := ctx.Param("user_id")
 	if userID == "" {
-		ctx.JSON(apperror.StatusFromError(apperror.ErrBadRequest), dto.ErrorResponse{ErrorCode: apperror.ErrBadRequest.Code, Message: apperror.ErrBadRequest.Message})
+		dto.SendError(ctx, http.StatusBadRequest, "User ID is required", apperror.ErrBadRequest.Code)
 		return
 	}
 
 	memberships, err := m.membershipService.GetMembershipsByUserID(userID)
 	if err != nil {
-		ctx.JSON(apperror.StatusFromError(err), dto.ErrorResponse{ErrorCode: apperror.Code(err), Message: apperror.Message(err)})
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
 	}
 
-	ctx.JSON(http.StatusOK, memberships)
+	dto.SendSuccess(ctx, http.StatusOK, "Memberships retrieved successfully", memberships)
 }
 
 func (m *MembershipController) GetAllMemberships(ctx *gin.Context) {
@@ -90,19 +87,19 @@ func (m *MembershipController) GetAllMemberships(ctx *gin.Context) {
 		pageSize = 10
 	}
 
-	memberships, err := m.membershipService.GetAllMemberships(page, pageSize)
+	response, err := m.membershipService.GetAllMemberships(page, pageSize)
 	if err != nil {
-		ctx.JSON(apperror.StatusFromError(err), dto.ErrorResponse{ErrorCode: apperror.Code(err), Message: apperror.Message(err)})
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
 	}
 
-	ctx.JSON(http.StatusOK, memberships)
+	dto.SendSuccess(ctx, http.StatusOK, "Memberships retrieved successfully", response)
 }
 
 func (m *MembershipController) GetMembershipByCommunityID(ctx *gin.Context) {
 	communityID := ctx.Param("community_id")
 	if communityID == "" {
-		ctx.JSON(apperror.StatusFromError(apperror.ErrBadRequest), dto.ErrorResponse{ErrorCode: apperror.ErrBadRequest.Code, Message: apperror.ErrBadRequest.Message})
+		dto.SendError(ctx, http.StatusBadRequest, "Community ID is required", apperror.ErrBadRequest.Code)
 		return
 	}
 
@@ -121,34 +118,31 @@ func (m *MembershipController) GetMembershipByCommunityID(ctx *gin.Context) {
 
 	response, err := m.membershipService.GetMembershipByCommunityID(communityID, page, pageSize)
 	if err != nil {
-		ctx.JSON(apperror.StatusFromError(err), dto.ErrorResponse{ErrorCode: apperror.Code(err), Message: apperror.Message(err)})
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
 	}
 
-	ctx.JSON(http.StatusOK, response)
+	dto.SendSuccess(ctx, http.StatusOK, "Memberships retrieved successfully", response)
 }
 
 func (m *MembershipController) DeleteMembership(ctx *gin.Context) {
 	var req *dto.DeleteMembershipRequest
 	if err := ctx.ShouldBind(&req); err != nil {
-		ctx.JSON(apperror.StatusFromError(apperror.ErrBadRequest), dto.ErrorResponse{ErrorCode: apperror.ErrBadRequest.Code, Message: apperror.Message(err)})
+		dto.SendError(ctx, http.StatusBadRequest, apperror.Message(apperror.ErrBadRequest), apperror.ErrBadRequest.Code)
 		return
 	}
 
 	authUser, exists := ctx.Get("authUser")
 	if !exists {
-		ctx.JSON(apperror.StatusFromError(apperror.ErrForbidden), dto.ErrorResponse{ErrorCode: apperror.ErrForbidden.Code, Message: apperror.ErrForbidden.Message})
+		dto.SendError(ctx, http.StatusForbidden, apperror.ErrForbidden.Message, apperror.ErrForbidden.Code)
 		return
 	}
 
 	err := m.membershipService.DeleteMembership(req, authUser.(auth.AuthUser).ID)
 	if err != nil {
-		ctx.JSON(apperror.StatusFromError(err), dto.ErrorResponse{ErrorCode: apperror.Code(err), Message: apperror.Message(err)})
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
 	}
 
-	ctx.JSON(http.StatusNoContent, dto.SuccessResponse{
-		ID:      req.CommunityID,
-		Message: "Delete membership successfully",
-	})
+	dto.SendSuccess(ctx, http.StatusOK, "Membership deleted successfully", gin.H{"community_id": req.CommunityID, "user_id": authUser.(auth.AuthUser).ID})
 }
