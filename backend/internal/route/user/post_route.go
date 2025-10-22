@@ -19,12 +19,12 @@ func RegisterPostRoutes(rg *gin.RouterGroup, c *controller.PostController) {
 	{
 
 	}
-
+	posts.GET("", c.GetPosts)
 	// --- 🛡️ Private / Required Auth Routes ---
 	// Các route này yêu cầu phải đăng nhập.
 	posts.Use(middleware.AuthMiddleware())
 	{
-		posts.GET("", c.GetPosts)        // Xem danh sách bài đăng
+		// Xem danh sách bài đăng
 		posts.GET("/:id", c.GetPostByID) // Xem chi tiết một bài đăng
 		posts.POST("", c.CreatePost)
 		posts.PUT("/:id", c.UpdatePost)
