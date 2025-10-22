@@ -8,7 +8,7 @@ import (
 	"github.com/giakiet05/lkforum/internal/apperror"
 	"github.com/giakiet05/lkforum/internal/email"
 	"github.com/giakiet05/lkforum/internal/model"
-	"github.com/giakiet05/lkforum/internal/repo" // Mày phải import cái repo thật
+	"github.com/giakiet05/lkforum/internal/repo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -16,13 +16,11 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// --- MOCK USER REPO (NÂNG CẤP) ---
 type mockUserRepo struct {
 	repo.UserRepo     // Nhúng interface thật
 	GetByEmailFunc    func(ctx context.Context, email string) (*model.User, error)
 	GetByUsernameFunc func(ctx context.Context, username string) (*model.User, error)
-	// Thêm hàm Create
-	CreateFunc func(ctx context.Context, user *model.User) (*model.User, error)
+	CreateFunc        func(ctx context.Context, user *model.User) (*model.User, error)
 }
 
 func (m *mockUserRepo) GetByEmail(ctx context.Context, email string) (*model.User, error) {
@@ -48,7 +46,6 @@ func (m *mockUserRepo) Create(ctx context.Context, user *model.User) (*model.Use
 }
 
 // --- MOCK EMAIL SENDER ---
-// Cần cái này để NewUserService không bị lỗi
 type mockEmailSender struct {
 	email.Sender              // Nhúng interface
 	SendVerificationEmailFunc func(to, otp string) error
@@ -58,8 +55,6 @@ func (m *mockEmailSender) SendVerificationEmail(to, otp string) error {
 	if m.SendVerificationEmailFunc != nil {
 		return m.SendVerificationEmailFunc(to, otp)
 	}
-	// Mặc định là thành công, không làm gì cả
-	// để cái goroutine nó chạy mà không bị panic
 	return nil
 }
 
@@ -229,8 +224,6 @@ func TestUserService_Login(t *testing.T) {
 
 // --- TEST REGISTER (Code mới) ---
 func TestUserService_RegisterUser(t *testing.T) {
-	// --- SETUP CHUNG ---
-	// Giả lập user đã tồn tại (dựa trên precondition của mày)
 	preconditionUser := &model.User{
 		ID:       primitive.NewObjectID(),
 		Username: "kiet",
@@ -280,7 +273,6 @@ func TestUserService_RegisterUser(t *testing.T) {
 				m.GetByUsernameFunc = func(ctx context.Context, s string) (*model.User, error) {
 					return preconditionUser, nil
 				}
-				// (Hàm sẽ return ngay, không cần mock GetByEmail hay Create)
 			},
 			expectUser: false,
 			expectErr:  apperror.ErrUsernameExists,
