@@ -65,32 +65,19 @@
     },
   ];
 
-  let activeSort = "hot";
+  let sortBy: "best" | "hot" | "new" | "top" | "rising" | "" = "";
 </script>
 
 <div>
-  <div class="sorting-bar">
-    <button
-      class="sort-btn"
-      class:active={activeSort === "hot"}
-      on:click={() => (activeSort = "hot")}
-    >
-      Hot
-    </button>
-    <button
-      class="sort-btn"
-      class:active={activeSort === "new"}
-      on:click={() => (activeSort = "new")}
-    >
-      New
-    </button>
-    <button
-      class="sort-btn"
-      class:active={activeSort === "top"}
-      on:click={() => (activeSort = "top")}
-    >
-      Top
-    </button>
+  <div class="sort-options">
+    <select bind:value={sortBy}>
+      <option value="" disabled selected hidden>Sort by</option>
+      <option value="best">Best</option>
+      <option value="hot">Hot</option>
+      <option value="new">New</option>
+      <option value="top">Top</option>
+      <option value="rising">Rising</option>
+    </select>
   </div>
   <div class="post-list">
     {#each posts as post}
@@ -104,41 +91,72 @@
     padding: 16px 24px;
   }
 
-  .sorting-bar {
-    background-color: #f6f7f8;
-    border-radius: 4px;
-    padding: 4px;
+  .sort-options {
     margin-bottom: 16px;
-    margin-top: -16px;
-    display: flex;
-    gap: 0px;
+    display: inline-block;
   }
 
-  .sort-btn {
-    flex: 1;
-    padding: 8px 12px;
+  .sort-options select {
+    padding: 8px 32px 8px 12px;
     border: none;
-    background-color: transparent;
-    color: #878a8c;
-    font-weight: bold;
     border-radius: 4px;
-    cursor: pointer;
-    transition:
-      background-color 0.2s,
-      color 0.2s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-  }
-
-  .sort-btn.active {
-    background-color: white;
+    background-color: transparent;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23153060' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    background-size: 16px;
     color: var(--blue--);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    transition: all 0.2s ease;
   }
 
-  .sort-btn:not(.active):hover {
-    background-color: #e9ebee;
+  .sort-options select:hover {
+    background-color: rgba(21, 48, 96, 0.08);
+  }
+
+  .sort-options select:focus {
+    outline: none;
+    background-color: rgba(21, 48, 96, 0.12);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    border-radius: 8px;
+  }
+
+  .sort-options select option {
+    padding: 12px 16px;
+    background-color: white;
+    color: #1a1a1b;
+    font-size: 14px;
+    font-weight: 400;
+    border: none;
+  }
+
+  .sort-options select option:first-child {
+    color: #878a8c;
+    font-weight: 500;
+  }
+
+  .sort-options select option:hover {
+    background-color: #f8f9fa;
+  }
+
+  .sort-options select option:checked {
+    background-color: #f0f1f2;
+    font-weight: 500;
+  }
+
+  /* Custom dropdown appearance */
+  @media screen and (-webkit-min-device-pixel-ratio: 0) {
+    .sort-options select option {
+      padding: 12px 16px;
+    }
+
+    .sort-options select option:checked {
+      background: #f0f1f2;
+    }
   }
 </style>

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { push, location } from "svelte-spa-router";
+  import CommunitiesList from "./CommunitiesList.svelte";
 
   type SidebarItem = {
     id: string;
@@ -132,6 +133,9 @@
         </li>
       {/each}
     </ul>
+
+    <!-- Communities Section -->
+    <CommunitiesList {compact} />
   </nav>
 
   <div class="sidebar-footer">
