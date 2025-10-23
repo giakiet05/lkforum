@@ -1,5 +1,6 @@
 <script lang="ts">
   import AuthModal from "./AuthModal.svelte";
+  import CreatePostModal from "./CreatePostModal.svelte";
   import { push } from "svelte-spa-router";
 
   type TopbarProps = {
@@ -23,6 +24,7 @@
   let searchQuery = $state("");
   let showUserMenu = $state(false);
   let showAuthModal = $state(false);
+  let showCreatePostModal = $state(false);
   let dropdownElement: HTMLDivElement | null = null;
 
   function handleSearch() {
@@ -59,6 +61,11 @@
     console.log("Logout clicked!");
     onLogout?.();
     closeUserMenu();
+  }
+
+  function handleCreatePostClick() {
+    showCreatePostModal = true;
+    onCreatePost?.();
   }
 
   function handleNavigation() {
@@ -138,7 +145,11 @@
 
     <div class="topbar-right">
       <div class="topbar-actions">
-        <button type="button" class="create-button" on:click={onCreatePost}>
+        <button
+          type="button"
+          class="create-button"
+          on:click={handleCreatePostClick}
+        >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <path
               d="M8 3V13M3 8H13"
@@ -319,6 +330,11 @@
     </div>
   </div>
 </header>
+
+<CreatePostModal
+  show={showCreatePostModal}
+  onClose={() => (showCreatePostModal = false)}
+/>
 
 <style>
   :root {

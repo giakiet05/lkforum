@@ -87,14 +87,104 @@
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   }
 
+  // Helper function to resend OTP
+  async function resendOTP(emailAddress: string) {
+    const res = await fetch(
+      `${API_BASE_URL}/api/auth/resend-verification-email`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: emailAddress }),
+      }
+    );
+
+    if (!res.ok) {
+      throw new Error("Không thể gửi lại mã OTP");
+    }
+  }
+
   const handleLogin = async (data: LoginRequest) => {
     try {
       isLoading = true;
       error = "";
-      await login(data);
+      const response = await login(data);
+
+      // Kiểm tra nếu user chưa verify email (nếu backend cho phép login)
+      if (!response.user.is_verified) {
+        // Lưu email để hiển thị trong màn OTP
+        email = response.user.email;
+        localStorage.setItem("pending_verification_email", response.user.email);
+
+        // Gửi lại OTP
+        await resendOTP(response.user.email);
+
+        // Chuyển sang tab register để hiển thị màn OTP
+        activeTab = "register";
+        step = "verify";
+        error =
+          "Tài khoản chưa được xác thực. Vui lòng nhập mã OTP đã gửi đến email của bạn.";
+
+        // Bắt đầu countdown
+        startCountdown();
+        return;
+      }
+
       handleClose();
-    } catch (err) {
-      error = err instanceof Error ? err.message : "Login failed";
+    } catch (err: any) {
+      console.log("Login error:", err);
+      console.log("Login error type:", typeof err);
+      console.log("Login error.error_code:", err?.error_code);
+
+      // Xử lý lỗi 403 - Email chưa verify
+      if (
+        err &&
+        typeof err === "object" &&
+        err.error_code === "EMAIL_NOT_VERIFIED"
+      ) {
+        console.log("Detected EMAIL_NOT_VERIFIED, switching to verify screen");
+
+        // Lấy email từ data.identifier (có thể là email hoặc username)
+        if (data.identifier.includes("@")) {
+          email = data.identifier;
+        } else {
+          // Nếu là username, thử lấy email từ localStorage
+          const savedEmail = localStorage.getItem(
+            `user_email_${data.identifier}`
+          );
+          if (savedEmail) {
+            email = savedEmail;
+          } else {
+            error =
+              "Tài khoản chưa được xác thực. Vui lòng đăng nhập bằng email để tiếp tục verify.";
+            return;
+          }
+        }
+
+        localStorage.setItem("pending_verification_email", email);
+
+        // Gửi lại OTP
+        try {
+          await resendOTP(email);
+        } catch (resendErr) {
+          error = "Không thể gửi mã OTP. Vui lòng thử lại.";
+          return;
+        }
+
+        // Chuyển sang tab register để hiển thị màn OTP
+        activeTab = "register";
+        step = "verify";
+        error =
+          "Tài khoản chưa được xác thực. Vui lòng nhập mã OTP đã gửi đến email của bạn.";
+
+        // Bắt đầu countdown
+        startCountdown();
+        return;
+      }
+
+      error =
+        err instanceof Error
+          ? err.message
+          : err.message || err.error || "Login failed";
     } finally {
       isLoading = false;
     }
@@ -138,6 +228,24 @@
       });
 
       if (!res.ok) {
+        // Xử lý 409 Conflict - tài khoản đã tồn tại nhưng chưa verify
+        if (res.status === 409) {
+          console.log("409 Conflict - Tài khoản chưa verify, gửi lại OTP");
+
+          // Gửi lại OTP cho email này
+          await resendOTP(email);
+
+          // Chuyển sang màn verify OTP
+          step = "verify";
+          error = "";
+
+          // Lưu email để tracking
+          localStorage.setItem("pending_verification_email", email);
+
+          startCountdown();
+          return;
+        }
+
         const errObj = await res
           .json()
           .catch(() => ({ error: `HTTP ${res.status}` }));
@@ -149,6 +257,9 @@
 
       // Lưu email để tracking pending verification
       localStorage.setItem("pending_verification_email", email);
+
+      // Lưu mapping username -> email để dùng cho đăng nhập
+      localStorage.setItem(`user_email_${username}`, email);
 
       startCountdown(); // Bắt đầu đếm ngược
     } catch (err: any) {

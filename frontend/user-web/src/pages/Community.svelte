@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import Post from "../components/Post.svelte";
+  import CreatePostModal from "../components/CreatePostModal.svelte";
   import type { PostData } from "../types/post";
 
   type CommunityProps = {
@@ -11,6 +12,8 @@
 
   let activeSort = $state("hot");
   let isJoined = $state(false);
+  let expandedRules = $state(new Set<number>());
+  let showCreatePostModal = $state(false);
 
   // Mock community data
   const community = {
@@ -57,6 +60,44 @@
     isJoined = !isJoined;
   }
 
+  function toggleRule(ruleIndex: number) {
+    if (expandedRules.has(ruleIndex)) {
+      expandedRules.delete(ruleIndex);
+    } else {
+      expandedRules.add(ruleIndex);
+    }
+    expandedRules = new Set(expandedRules);
+  }
+
+  // Mock rules data
+  const rules = [
+    {
+      title: "Be respectful and civil",
+      content:
+        "Treat others with respect. No harassment, hate speech, or personal attacks. Keep discussions constructive and friendly.",
+    },
+    {
+      title: "No spam or self-promotion",
+      content:
+        "Do not post spam, excessive self-promotion, or advertisements. Share content that adds value to the community.",
+    },
+    {
+      title: "Stay on topic",
+      content:
+        "Posts should be relevant to the community's theme. Off-topic content may be removed to keep discussions focused.",
+    },
+    {
+      title: "No personal attacks",
+      content:
+        "Disagree with ideas, not people. Personal attacks, name-calling, and hostile behavior will not be tolerated.",
+    },
+    {
+      title: "Follow Reddit's content policy",
+      content:
+        "All posts must comply with Reddit's site-wide content policy and guidelines. Violations may result in removal or ban.",
+    },
+  ];
+
   onMount(() => {
     window.scrollTo(0, 0);
   });
@@ -78,9 +119,52 @@
           <p class="community-name">lk/{community.name}</p>
         </div>
       </div>
-      <button class="join-btn" class:joined={isJoined} onclick={toggleJoin}>
-        {isJoined ? "Joined" : "Join"}
-      </button>
+
+      <div class="community-actions">
+        <!-- Create Post Button -->
+        <button
+          class="create-post-action-btn"
+          title="Create post"
+          onclick={() => (showCreatePostModal = true)}
+        >
+          <svg viewBox="0 0 20 20" fill="currentColor">
+            <path
+              d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
+            />
+          </svg>
+          Create post
+        </button>
+
+        <!-- Notification Bell Button -->
+        <button class="action-btn" title="Notifications">
+          <svg viewBox="0 0 20 20" fill="currentColor">
+            <path
+              d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"
+            />
+          </svg>
+        </button>
+
+        <!-- Mod Tools Button -->
+        <button class="mod-tools-btn" title="Moderator tools">
+          <svg viewBox="0 0 20 20" fill="currentColor">
+            <path
+              fill-rule="evenodd"
+              d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z"
+              clip-rule="evenodd"
+            />
+          </svg>
+          Mod tools
+        </button>
+
+        <!-- More Options Button -->
+        <button class="action-btn" title="More options">
+          <svg viewBox="0 0 20 20" fill="currentColor">
+            <path
+              d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"
+            />
+          </svg>
+        </button>
+      </div>
     </div>
   </div>
 
@@ -138,46 +222,83 @@
         </div>
 
         <div class="community-created">
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-            <path
-              d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z"
-            />
-          </svg>
+          <img src="/Calendar_duotone.svg" alt="Calendar" />
           <span>Created {community.createdAt}</span>
         </div>
-
-        <button class="create-post-btn">Create Post</button>
       </div>
 
       <!-- Rules Card -->
       <div class="rules-card">
         <h3>Community Rules</h3>
-        <ol class="rules-list">
-          <li>Be respectful and civil</li>
-          <li>No spam or self-promotion</li>
-          <li>Stay on topic</li>
-          <li>No personal attacks</li>
-          <li>Follow Reddit's content policy</li>
-        </ol>
+        {#if rules.length > 0}
+          <div class="rules-accordion">
+            {#each rules as rule, index}
+              <div class="rule-item">
+                <button
+                  class="rule-header"
+                  onclick={() => toggleRule(index)}
+                  aria-expanded={expandedRules.has(index)}
+                >
+                  <span class="rule-number">{index + 1}.</span>
+                  <span class="rule-title">{rule.title}</span>
+                  <span
+                    class="rule-toggle"
+                    class:expanded={expandedRules.has(index)}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                      <path
+                        d="M4 6L8 10L12 6"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      />
+                    </svg>
+                  </span>
+                </button>
+                {#if expandedRules.has(index)}
+                  <div class="rule-content">
+                    <p>{rule.content}</p>
+                  </div>
+                {/if}
+              </div>
+            {/each}
+          </div>
+        {:else}
+          <p class="no-rules">No rules available</p>
+        {/if}
       </div>
 
       <!-- Moderators Card -->
       <div class="moderators-card">
-        <h3>Moderators</h3>
+        <div class="moderators-header">
+          <h3>Moderators</h3>
+          <button class="invite-mod-btn" title="Invite moderator">
+            <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
+              <path
+                d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 016 6H2a6 6 0 016-6zm10-5a1 1 0 10-2 0v1h-1a1 1 0 100 2h1v1a1 1 0 102 0v-1h1a1 1 0 100-2h-1V6z"
+              />
+            </svg>
+            Invite Mod
+          </button>
+        </div>
         <div class="moderator-list">
           <div class="moderator">
             <img src="/avatar.jpg" alt="Moderator" class="mod-avatar" />
-            <span class="mod-name">u/moderator1</span>
-          </div>
-          <div class="moderator">
-            <img src="/avatar.jpg" alt="Moderator" class="mod-avatar" />
-            <span class="mod-name">u/moderator2</span>
+            <span class="mod-name">u/BlueItsSelf</span>
           </div>
         </div>
+        <button class="view-all-mods-btn">View all moderators</button>
       </div>
     </div>
   </div>
 </div>
+
+<CreatePostModal
+  show={showCreatePostModal}
+  onClose={() => (showCreatePostModal = false)}
+  communityName={community.name}
+/>
 
 <style>
   .community-page {
@@ -215,12 +336,90 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 16px;
   }
 
   .community-info {
     display: flex;
     align-items: center;
     gap: 16px;
+    flex: 1;
+  }
+
+  .community-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .action-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 1.5px solid #ccc;
+    background: white;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .action-btn:hover {
+    background: #f6f7f8;
+    border-color: #999;
+  }
+
+  .action-btn svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .create-post-action-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    background: white;
+    color: #1c1c1c;
+    border: 1.5px solid #ccc;
+    border-radius: 9999px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: "Roboto", sans-serif;
+    transition: all 0.2s;
+  }
+
+  .create-post-action-btn:hover {
+    background: #f6f7f8;
+    border-color: #999;
+  }
+
+  .create-post-action-btn svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .mod-tools-btn {
+    background: var(--blue--);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 9999px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: "Roboto", sans-serif;
+    transition: background 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+  }
+
+  .mod-tools-btn:hover {
+    background: var(--darkblue--);
   }
 
   .community-icon {
@@ -341,10 +540,11 @@
   .about-card,
   .rules-card,
   .moderators-card {
-    background: white;
-    border: 1px solid #ccc;
+    background: var(--table-bg);
+    border: none;
     border-radius: 4px;
     padding: 12px;
+    color: var(--grayfont);
   }
 
   .about-card h3,
@@ -363,7 +563,7 @@
   .about-description {
     font-size: 14px;
     line-height: 21px;
-    color: #1c1c1c;
+    color: var(--grayfont);
     margin: 12px 0;
   }
 
@@ -389,55 +589,158 @@
 
   .stat-label {
     font-size: 12px;
-    color: #7c7c7c;
+    color: var(--grayfont);
   }
 
   .community-created {
     display: flex;
     align-items: center;
     gap: 8px;
-    color: #7c7c7c;
+    color: var(--grayfont);
     font-size: 14px;
     margin: 12px 0;
   }
 
-  .create-post-btn {
-    width: 100%;
-    background: var(--blue--);
-    color: white;
-    border: none;
-    padding: 8px;
-    border-radius: 9999px;
-    font-size: 14px;
-    font-weight: 700;
-    cursor: pointer;
-    font-family: "Roboto", sans-serif;
-    transition: background 0.2s;
-    margin-top: 12px;
-  }
-
-  .create-post-btn:hover {
-    background: var(--darkblue--);
+  .community-created img {
+    width: 20px;
+    height: 20px;
   }
 
   /* Rules */
-  .rules-list {
-    margin: 0;
-    padding-left: 20px;
+  .rules-accordion {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
   }
 
-  .rules-list li {
+  .rule-item {
+    border-bottom: 1px solid #edeff1;
+  }
+
+  .rule-item:last-child {
+    border-bottom: none;
+  }
+
+  .rule-header {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 0;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.2s;
+  }
+
+  .rule-header:hover {
+    background: #f6f7f8;
+  }
+
+  .rule-number {
     font-size: 14px;
+    font-weight: 700;
     color: #1c1c1c;
-    margin: 8px 0;
-    line-height: 18px;
+    min-width: 24px;
+  }
+
+  .rule-title {
+    flex: 1;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--grayfont);
+  }
+
+  .rule-toggle {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    transition: transform 0.2s ease;
+    color: var(--grayfont);
+    transform: rotate(-90deg);
+  }
+
+  .rule-toggle.expanded {
+    transform: rotate(0deg);
+  }
+
+  .rule-content {
+    padding: 0 0 12px 32px;
+    animation: slideDown 0.2s ease;
+  }
+
+  .rule-content p {
+    margin: 0;
+    font-size: 13px;
+    line-height: 20px;
+    color: var(--grayfont);
+  }
+
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .no-rules {
+    font-size: 14px;
+    color: var(--grayfont);
+    text-align: center;
+    padding: 16px 0;
+    margin: 0;
   }
 
   /* Moderators */
+  .moderators-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+
+  .moderators-header h3 {
+    margin: 0;
+    padding: 0;
+    border: none;
+  }
+
+  .invite-mod-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 12px;
+    background: transparent;
+    border: 1px solid #edeff1;
+    border-radius: 9999px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #1c1c1c;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: "Roboto", sans-serif;
+  }
+
+  .invite-mod-btn:hover {
+    background: #f6f7f8;
+    border-color: #d7dadc;
+  }
+
+  .invite-mod-btn svg {
+    width: 16px;
+    height: 16px;
+  }
+
   .moderator-list {
     display: flex;
     flex-direction: column;
     gap: 12px;
+    margin-bottom: 12px;
   }
 
   .moderator {
@@ -447,21 +750,39 @@
   }
 
   .mod-avatar {
-    width: 24px;
-    height: 24px;
+    width: 32px;
+    height: 32px;
     border-radius: 50%;
     object-fit: cover;
   }
 
   .mod-name {
-    font-size: 12px;
-    color: #1c1c1c;
+    font-size: 14px;
+    color: var(--grayfont);
     font-weight: 500;
   }
 
   .mod-name:hover {
     text-decoration: underline;
     cursor: pointer;
+  }
+
+  .view-all-mods-btn {
+    width: 100%;
+    padding: 8px 16px;
+    background: var(--button-secondary-bg);
+    border: none;
+    border-radius: 9999px;
+    font-size: 14px;
+    font-weight: 700;
+    color: #1c1c1c;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: "Roboto", sans-serif;
+  }
+
+  .view-all-mods-btn:hover {
+    background: rgba(214, 216, 222, 0.6);
   }
 
   /* Responsive */

@@ -131,7 +131,8 @@ export async function login(credentials: LoginRequest): Promise<LoginResponse> {
                 errObj = { error: `HTTP ${res.status}` };
             }
         }
-        throw errObj.error || errObj.message || "Unknown error";
+        // Throw the entire error object to preserve error_code
+        throw errObj;
     }
 
     const response: LoginResponse = await res.json();

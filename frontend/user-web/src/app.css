@@ -52,6 +52,11 @@
   --darkblue--:#154D71;
   --lightblue--:#1C6EA4;
   --error--:#F2451C;
+  --table-bg: rgba(214, 216, 222, 0.2);
+  --grayfont: #8A8A8A;
+  --button-secondary-bg: rgba(214, 216, 222, 0.4);
+  --lightgray--: #D1D5DB;
+  --select-bg: #999999;
 }
 
 /* Basic reset */

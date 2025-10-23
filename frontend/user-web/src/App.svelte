@@ -22,18 +22,6 @@
       to: "/popular",
       icon: `<svg width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><g clip-path=\"url(#clip0_20_157)\"><path d=\"M23.2499 12.751L12.7769 23.25\" stroke=\"currentColor\" stroke-opacity=\"0.7\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M17.25 12.751H23.25V18.75\" stroke=\"currentColor\" stroke-opacity=\"0.7\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M18.75 0.75V5.25H12.75V11.25H6.75V17.25H0.75V23.25\" stroke=\"currentColor\" stroke-opacity=\"0.7\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></g><defs><clipPath id=\"clip0_20_157\"><rect width=\"24\" height=\"24\" fill=\"white\"/></clipPath></defs></svg>`,
     },
-    {
-      id: "community",
-      label: "Community",
-      icon: `<svg viewBox=\"0 0 24 24\" width=\"20\" height=\"20\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">
-      <path d=\"M12 2a5 5 0 100 10 5 5 0 000-10zm0 12c-4 0-8 2-8 4v2h16v-2c0-2-4-4-8-4z\" fill=\"currentColor\"/>
-    </svg>`,
-      children: [
-        { id: "lk-all", label: "lk/all", to: "/lk/all", icon: "🌐" },
-        { id: "lk-news", label: "lk/news", to: "/lk/news", icon: "📰" },
-        { id: "lk-dev", label: "lk/dev", to: "/lk/dev", icon: "💻" },
-      ],
-    },
     { id: "explore", label: "Explore", to: "/explore", icon: "🧭" },
     {
       id: "all",
