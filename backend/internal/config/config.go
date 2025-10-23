@@ -22,6 +22,7 @@ type AppConfig struct {
 	OTPExpirationMinutes int
 	SMTP                 SMTPConfig
 	Redis                RedisConfig
+	Google               GoogleConfig
 }
 
 // SMTPConfig holds the email server configuration
@@ -38,6 +39,13 @@ type RedisConfig struct {
 	Addr     string
 	Password string
 	DB       int
+}
+
+// GoogleConfig holds the Google OAuth2 configuration
+type GoogleConfig struct {
+	ClientID     string
+	ClientSecret string
+	RedirectURL  string
 }
 
 // Cfg is a global variable holding the application's configuration
@@ -77,6 +85,10 @@ func LoadConfig() {
 	Cfg.Redis.Addr = getEnv("REDIS_ADDR", "localhost:6379")
 	Cfg.Redis.Password = getEnv("REDIS_PASSWORD", "")
 	Cfg.Redis.DB = getEnvInt("REDIS_DB", 0)
+
+	Cfg.Google.ClientID = getEnv("GOOGLE_CLIENT_ID", "")
+	Cfg.Google.ClientSecret = getEnv("GOOGLE_CLIENT_SECRET", "")
+	Cfg.Google.RedirectURL = getEnv("GOOGLE_REDIRECT_URL", "")
 
 	log.Println("Configuration loaded successfully")
 }

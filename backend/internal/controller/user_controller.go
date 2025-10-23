@@ -11,10 +11,12 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// UserController handles requests related to user management.
 type UserController struct {
 	service service.UserService
 }
 
+// NewUserController creates a new UserController.
 func NewUserController(service service.UserService) *UserController {
 	return &UserController{service: service}
 }
@@ -43,80 +45,6 @@ func (c *UserController) GetUsers(ctx *gin.Context) {
 	dto.SendSuccess(ctx, http.StatusOK, "Users retrieved successfully", response)
 }
 
-func (c *UserController) RegisterUser(ctx *gin.Context) {
-	var req dto.UserRegisterRequest
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		dto.SendError(ctx, http.StatusBadRequest, apperror.Message(apperror.ErrBadRequest), apperror.ErrBadRequest.Code)
-		return
-	}
-
-	user, err := c.service.RegisterUser(req.Username, req.Email, req.Password)
-	if err != nil {
-		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
-		return
-	}
-
-	dto.SendSuccess(ctx, http.StatusCreated, "Registration successful. Please check your email for a verification code.", gin.H{"user_id": user.ID.Hex()})
-}
-
-func (c *UserController) VerifyEmail(ctx *gin.Context) {
-	var req dto.VerifyEmailRequest
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		dto.SendError(ctx, http.StatusBadRequest, apperror.Message(apperror.ErrBadRequest), apperror.ErrBadRequest.Code)
-		return
-	}
-
-	user, accessToken, refreshToken, err := c.service.VerifyEmail(req.Email, req.OTP)
-	if err != nil {
-		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
-		return
-	}
-
-	data := dto.AuthResponse{
-		User:         dto.FromUser(user),
-		AccessToken:  accessToken,
-		RefreshToken: refreshToken,
-	}
-	dto.SendSuccess(ctx, http.StatusOK, "Email verified successfully. You are now logged in.", data)
-}
-
-func (c *UserController) ResendVerificationEmail(ctx *gin.Context) {
-	var req dto.ResendVerificationEmailRequest
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		dto.SendError(ctx, http.StatusBadRequest, apperror.Message(apperror.ErrBadRequest), apperror.ErrBadRequest.Code)
-		return
-	}
-
-	err := c.service.ResendVerificationEmail(req.Email)
-	if err != nil {
-		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
-		return
-	}
-
-	dto.SendSuccess(ctx, http.StatusOK, "A new verification email has been sent.", nil)
-}
-
-func (c *UserController) Login(ctx *gin.Context) {
-	var req dto.UserLoginRequest
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		dto.SendError(ctx, http.StatusBadRequest, apperror.Message(apperror.ErrBadRequest), apperror.ErrBadRequest.Code)
-		return
-	}
-
-	user, accessToken, refreshToken, err := c.service.Login(req.Identifier, req.Password)
-	if err != nil {
-		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
-		return
-	}
-
-	data := dto.AuthResponse{
-		User:         dto.FromUser(user),
-		AccessToken:  accessToken,
-		RefreshToken: refreshToken,
-	}
-	dto.SendSuccess(ctx, http.StatusOK, "Login successful", data)
-}
-
 func (c *UserController) UpdateUser(ctx *gin.Context) {
 	userID := ctx.Param("id")
 	if !auth.IsOwner(ctx, userID) && !auth.IsAdmin(ctx) {
@@ -140,6 +68,7 @@ func (c *UserController) UpdateUser(ctx *gin.Context) {
 		currentUser.Username = req.Username
 	}
 	if req.Email != "" {
+		// In a real app, changing email should trigger a re-verification process.
 		currentUser.Email = req.Email
 	}
 
@@ -213,27 +142,4 @@ func (c *UserController) ChangePassword(ctx *gin.Context) {
 	}
 
 	dto.SendSuccess(ctx, http.StatusOK, "Password changed successfully", nil)
-}
-
-func (c *UserController) RefreshToken(ctx *gin.Context) {
-	type RefreshRequest struct {
-		RefreshToken string `json:"refresh_token" binding:"required"`
-	}
-	var req RefreshRequest
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		dto.SendError(ctx, http.StatusBadRequest, apperror.Message(apperror.ErrBadRequest), apperror.ErrBadRequest.Code)
-		return
-	}
-
-	accessToken, refreshToken, err := c.service.RefreshToken(req.RefreshToken)
-	if err != nil {
-		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
-		return
-	}
-
-	data := gin.H{
-		"access_token":  accessToken,
-		"refresh_token": refreshToken,
-	}
-	dto.SendSuccess(ctx, http.StatusOK, "Tokens refreshed successfully", data)
 }

@@ -70,7 +70,7 @@ func StatusFromError(err error) int {
 	case isErrorType(err, ErrUserNotFound, ErrCommunityNotFound, ErrMembershipNotFound):
 		return http.StatusNotFound
 	// 409 Conflict
-	case isErrorType(err, ErrUsernameExists, ErrEmailExists, ErrCommunityNameExists, ErrAlreadyMember, ErrEmailAlreadyVerified):
+	case isErrorType(err, ErrUsernameExists, ErrEmailExists, ErrCommunityNameExists, ErrAlreadyMember, ErrEmailAlreadyVerified, ErrLoginMethodMismatch):
 		return http.StatusConflict
 	// 500 Internal Server Error
 	case isErrorType(err, ErrInternal, ErrNoFieldsToUpdate, ErrMembershipCreateFailed, ErrMembershipDeleteFailed):
@@ -94,6 +94,7 @@ var (
 	ErrEmailAlreadyVerified = AppError{Code: "EMAIL_ALREADY_VERIFIED", Message: "Email has already been verified"}
 	ErrInvalidOTP           = AppError{Code: "INVALID_OTP", Message: "Invalid verification code"}
 	ErrOTPExpired           = AppError{Code: "OTP_EXPIRED", Message: "Verification code has expired"}
+	ErrLoginMethodMismatch  = AppError{Code: "LOGIN_METHOD_MISMATCH", Message: "This email is registered with a different login method. Please use the original method."}
 
 	// Generic
 	ErrInternal          = AppError{Code: "INTERNAL_ERROR", Message: "Internal server error"}

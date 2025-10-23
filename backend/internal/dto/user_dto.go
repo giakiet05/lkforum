@@ -24,6 +24,11 @@ type ResendVerificationEmailRequest struct {
 	Email string `json:"email" binding:"required,email"`
 }
 
+type CompleteGoogleSetupRequest struct {
+	SetupToken string `json:"setup_token" binding:"required"`
+	Username   string `json:"username" binding:"required,min=3,max=20"`
+}
+
 type UserUpdateRequest struct {
 	Username string `json:"username"`
 	Email    string `json:"email"`
@@ -34,14 +39,19 @@ type ChangePasswordRequest struct {
 	NewPassword string `json:"new_password" binding:"required,min=6"`
 }
 
+type RefreshRequest struct {
+	RefreshToken string `json:"refresh_token" binding:"required"`
+}
+
 // Response DTOs
 
 type UserResponse struct {
-	ID         string     `json:"id"`
-	Username   string     `json:"username"`
-	Email      string     `json:"email,omitempty"`
-	Role       model.Role `json:"role"`
-	IsVerified bool       `json:"is_verified"`
+	ID         string           `json:"id"`
+	Username   string           `json:"username"`
+	Email      string           `json:"email,omitempty"`
+	Role       model.Role       `json:"role"`
+	Provider   model.AuthProvider `json:"provider"`
+	IsVerified bool             `json:"is_verified"`
 }
 
 type AuthResponse struct {
@@ -56,6 +66,7 @@ func FromUser(u *model.User) UserResponse {
 		Username:   u.Username,
 		Email:      u.Email,
 		Role:       u.Role,
+		Provider:   u.Provider,
 		IsVerified: u.IsVerified,
 	}
 }
