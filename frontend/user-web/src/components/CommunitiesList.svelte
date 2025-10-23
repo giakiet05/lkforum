@@ -1,14 +1,8 @@
 <script lang="ts">
   import { push } from "svelte-spa-router";
   import CreateCommunityModal from "./CreateCommunityModal.svelte";
-
-  type Community = {
-    id: string;
-    name: string;
-    icon?: string;
-    isFavorite: boolean;
-    memberCount?: number;
-  };
+  import type { SidebarCommunity } from "../mocks/sidebar-communities.mock";
+  import { mockSidebarCommunities } from "../mocks/sidebar-communities.mock";
 
   type Props = {
     compact?: boolean;
@@ -16,44 +10,7 @@
 
   let { compact = false }: Props = $props();
 
-  // Mock data - sau này sẽ fetch từ API
-  let communities = $state<Community[]>([
-    {
-      id: "1",
-      name: "3amjokes",
-      icon: "🌙",
-      isFavorite: true,
-      memberCount: 125000,
-    },
-    {
-      id: "2",
-      name: "anime",
-      icon: "👧",
-      isFavorite: true,
-      memberCount: 850000,
-    },
-    {
-      id: "3",
-      name: "Animesuggest",
-      icon: "💭",
-      isFavorite: true,
-      memberCount: 45000,
-    },
-    {
-      id: "4",
-      name: "30PlusSkinCare",
-      icon: "🧴",
-      isFavorite: false,
-      memberCount: 23000,
-    },
-    {
-      id: "5",
-      name: "acne",
-      icon: "🩺",
-      isFavorite: false,
-      memberCount: 18000,
-    },
-  ]);
+  let communities = $state<SidebarCommunity[]>(mockSidebarCommunities);
 
   let isExpanded = $state(true);
   let showCreateModal = $state(false);

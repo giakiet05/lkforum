@@ -6,6 +6,7 @@ import Settings from './pages/Settings.svelte';
 import PostDetail from './pages/PostDetail.svelte';
 import Community from './pages/Community.svelte';
 import ManageCommunities from './pages/ManageCommunities.svelte';
+import ModTools from './pages/ModTools.svelte';
 
 const routes = {
     '/': Home,
@@ -15,6 +16,7 @@ const routes = {
     '/settings': Settings,
     '/post/:id': PostDetail,
     '/lk/:name': Community,
+    '/lk/:name/mod': ModTools,
     '/communities/manage': ManageCommunities,
 };
 

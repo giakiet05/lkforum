@@ -1,4 +1,8 @@
 <script lang="ts">
+  import DraftsModal from "./DraftsModal.svelte";
+  import { mockDraftsDetails } from "../mocks/drafts.mock";
+  import { mockJoinedCommunities } from "../mocks/joined-communities.mock";
+
   interface Props {
     show: boolean;
     onClose: () => void;
@@ -17,52 +21,7 @@
   let isDragging = $state(false);
   let showCommunitySearch = $state(false);
   let communitySearchQuery = $state("");
-
-  // Mock data cho các community đã join
-  const joinedCommunities = [
-    {
-      name: "3amjokes",
-      members: "2,349,727 members",
-      status: "Favorited",
-      icon: "/LKlogo.jpg",
-    },
-    {
-      name: "anime",
-      members: "14,043,102 members",
-      status: "Favorited",
-      icon: "/LKlogo.jpg",
-    },
-    {
-      name: "Animesuggiest",
-      members: "1,064,940 members",
-      status: "Favorited",
-      icon: "/LKlogo.jpg",
-    },
-    {
-      name: "30PlusSkinCare",
-      members: "2,323,937 members",
-      status: "Subscribed",
-      icon: "/LKlogo.jpg",
-    },
-    {
-      name: "acne",
-      members: "1,731,543 members",
-      status: "Subscribed",
-      icon: "/LKlogo.jpg",
-    },
-    {
-      name: "AdviceAnimals",
-      members: "9,904,334 members",
-      status: "Subscribed",
-      icon: "/LKlogo.jpg",
-    },
-    {
-      name: "AmItheAsshole",
-      members: "15,234,567 members",
-      status: "Subscribed",
-      icon: "/LKlogo.jpg",
-    },
-  ];
+  let showDraftsModal = $state(false);
 
   $effect(() => {
     if (communityName) {
@@ -71,7 +30,7 @@
   });
 
   const filteredCommunities = $derived(
-    joinedCommunities.filter((c) =>
+    mockJoinedCommunities.filter((c) =>
       c.name.toLowerCase().includes(communitySearchQuery.toLowerCase())
     )
   );
@@ -104,6 +63,37 @@
         document.getElementById("community-search-input")?.focus();
       }, 100);
     }
+  }
+
+  function handleOpenDrafts() {
+    showDraftsModal = true;
+  }
+
+  function handleCloseDrafts() {
+    showDraftsModal = false;
+  }
+
+  function handleEditDraft(draftId: number) {
+    console.log("Edit draft:", draftId);
+
+    // Load draft data from mockDraftsDetails
+    const draft = mockDraftsDetails[draftId];
+    if (draft) {
+      title = draft.title;
+      selectedCommunity = draft.community;
+      activeTab = draft.tab;
+      tags = draft.tags || [];
+
+      if (draft.tab === "text") {
+        bodyText = draft.bodyText || "";
+      } else if (draft.tab === "link") {
+        linkUrl = draft.linkUrl || "";
+      }
+
+      console.log("Loaded draft:", draft);
+    }
+
+    showDraftsModal = false;
   }
 
   function handleSaveDraft() {
@@ -168,7 +158,9 @@
     <div class="modal-content" onclick={(e) => e.stopPropagation()}>
       <div class="modal-header">
         <h2>Create post</h2>
-        <span class="drafts-indicator">Drafts 1</span>
+        <span class="drafts-indicator" onclick={handleOpenDrafts}>
+          Drafts <span class="draft-count">1</span>
+        </span>
       </div>
 
       <!-- Community Selector -->
@@ -332,9 +324,12 @@
             style="display: none;"
           />
           <label for="media-upload" class="upload-label">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
-            </svg>
+            <img
+              src="/uploadmedia_icon.svg"
+              alt="Upload"
+              width="48"
+              height="48"
+            />
             <p>Drag or upload media</p>
           </label>
           {#if mediaFiles.length > 0}
@@ -369,6 +364,13 @@
     </div>
   </div>
 {/if}
+
+<!-- Drafts Modal -->
+<DraftsModal
+  show={showDraftsModal}
+  onClose={handleCloseDrafts}
+  onEditDraft={handleEditDraft}
+/>
 
 <style>
   .modal-overlay {
@@ -410,6 +412,11 @@
     font-size: 14px;
     font-weight: 600;
     color: #1c1c1c;
+    cursor: pointer;
+  }
+
+  .draft-count {
+    opacity: 0.6;
   }
 
   /* Community Selector */
@@ -719,10 +726,6 @@
     flex-direction: column;
     align-items: center;
     gap: 8px;
-  }
-
-  .upload-label svg {
-    color: #7c7c7c;
   }
 
   .upload-label p {

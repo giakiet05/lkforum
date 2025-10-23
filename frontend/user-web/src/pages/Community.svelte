@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { push } from "svelte-spa-router";
   import Post from "../components/Post.svelte";
   import CreatePostModal from "../components/CreatePostModal.svelte";
   import type { PostData } from "../types/post";
@@ -98,6 +99,10 @@
     },
   ];
 
+  function handleModTools() {
+    push(`/lk/${params.name}/mod`);
+  }
+
   onMount(() => {
     window.scrollTo(0, 0);
   });
@@ -145,7 +150,11 @@
         </button>
 
         <!-- Mod Tools Button -->
-        <button class="mod-tools-btn" title="Moderator tools">
+        <button
+          class="mod-tools-btn"
+          title="Moderator tools"
+          onclick={handleModTools}
+        >
           <svg viewBox="0 0 20 20" fill="currentColor">
             <path
               fill-rule="evenodd"
