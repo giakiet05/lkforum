@@ -7,6 +7,7 @@ import (
 	"github.com/giakiet05/lkforum/internal/config"
 	"github.com/giakiet05/lkforum/internal/controller"
 	"github.com/giakiet05/lkforum/internal/email"
+	"github.com/giakiet05/lkforum/internal/platform/bus"
 	"github.com/giakiet05/lkforum/internal/repo"
 	"github.com/giakiet05/lkforum/internal/route/user"
 	"github.com/giakiet05/lkforum/internal/service"
@@ -33,6 +34,7 @@ type Services struct {
 	service.MembershipService
 	service.PostService
 	service.CommentService
+	service.ReputationService
 }
 
 type Controllers struct {
@@ -44,7 +46,6 @@ type Controllers struct {
 	controller.CommentController
 }
 
-// initRepos initializes repositories with the given database
 func initRepos(client *mongo.Client, db *mongo.Database) *Repos {
 	return &Repos{
 		UserRepo:       repo.NewUserRepo(db),
@@ -58,19 +59,18 @@ func initRepos(client *mongo.Client, db *mongo.Database) *Repos {
 	}
 }
 
-// initServices Initialize services with the given repositories
 func initServices(repos *Repos, redisClient *redis.Client, emailSender email.Sender) *Services {
 	return &Services{
 		AuthService:       service.NewAuthService(repos.UserRepo, emailSender),
 		UserService:       service.NewUserService(repos.UserRepo),
 		CommunityService:  service.NewCommunityService(repos.CommunityRepo),
 		MembershipService: service.NewMembershipService(repos.MembershipRepo, redisClient),
-		PostService:       service.NewPostService(repos.PostRepo, repos.PostVoteRepo, repos.PostPollRepo, repos.PostImageRepo),
-		CommentService:    service.NewCommentService(repos.CommentRepo),
+		PostService:       service.NewPostService(repos.PostRepo, repos.PostVoteRepo, repos.PostPollRepo, repos.PostImageRepo, bus.Bus),
+		CommentService:    service.NewCommentService(repos.CommentRepo, bus.Bus),
+		ReputationService: service.NewReputationService(repos.UserRepo),
 	}
 }
 
-// initControllers Initialize controllers with the given services
 func initControllers(services *Services) *Controllers {
 	return &Controllers{
 		AuthController:       *controller.NewAuthController(services.AuthService),
@@ -82,7 +82,6 @@ func initControllers(services *Services) *Controllers {
 	}
 }
 
-// initRoutes sets up the routes for the Gin engine
 func initRoutes(controllers *Controllers, r *gin.Engine) {
 	r.GET("/ping", func(c *gin.Context) {
 		c.JSON(200, gin.H{"message": "pong"})
@@ -93,7 +92,6 @@ func initRoutes(controllers *Controllers, r *gin.Engine) {
 		c.JSON(200, gin.H{"message": "Welcome to LKForum API!"})
 	})
 
-	// Register routes
 	userroute.RegisterAuthRoutes(api, &controllers.AuthController)
 	userroute.RegisterUserRoutes(api, &controllers.UserController)
 	userroute.RegisterCommunityRoutes(api, &controllers.CommunityController)
@@ -102,7 +100,6 @@ func initRoutes(controllers *Controllers, r *gin.Engine) {
 	userroute.RegisterCommentRoutes(api, &controllers.CommentController)
 }
 
-// Init initializes all application components
 func Init() (*gin.Engine, error) {
 	config.LoadConfig()
 	auth.InitGoogleOAuthConfig()
@@ -134,6 +131,9 @@ func Init() (*gin.Engine, error) {
 	services := initServices(repos, redisClient, emailSender)
 	controllers := initControllers(services)
 	initRoutes(controllers, router)
+
+	// Start background services
+	services.ReputationService.Start()
 
 	return router, nil
 }

@@ -46,12 +46,14 @@ type RefreshRequest struct {
 // Response DTOs
 
 type UserResponse struct {
-	ID         string           `json:"id"`
-	Username   string           `json:"username"`
-	Email      string           `json:"email,omitempty"`
-	Role       model.Role       `json:"role"`
+	ID         string             `json:"id"`
+	Username   string             `json:"username"`
+	Email      string             `json:"email,omitempty"`
+	Reputation int                `json:"reputation"`
+	Title      string             `json:"title"`
+	Role       model.Role         `json:"role"`
 	Provider   model.AuthProvider `json:"provider"`
-	IsVerified bool             `json:"is_verified"`
+	IsVerified bool               `json:"is_verified"`
 }
 
 type AuthResponse struct {
@@ -65,6 +67,8 @@ func FromUser(u *model.User) UserResponse {
 		ID:         u.ID.Hex(),
 		Username:   u.Username,
 		Email:      u.Email,
+		Reputation: u.Reputation,
+		Title:      calculateTitle(u.Reputation),
 		Role:       u.Role,
 		Provider:   u.Provider,
 		IsVerified: u.IsVerified,
@@ -77,4 +81,22 @@ func FromUsers(users []*model.User) []UserResponse {
 		responses = append(responses, FromUser(u))
 	}
 	return responses
+}
+
+// calculateTitle determines the user's title based on their reputation score.
+func calculateTitle(reputation int) string {
+	switch {
+	case reputation >= 10000:
+		return "Huyền thoại"
+	case reputation >= 2000:
+		return "Lão làng"
+	case reputation >= 500:
+		return "Cây bút trẻ"
+	case reputation >= 100:
+		return "Thành viên tích cực"
+	case reputation >= 0:
+		return "Lính mới"
+	default:
+		return "Người qua đường"
+	}
 }

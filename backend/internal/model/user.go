@@ -18,6 +18,7 @@ type User struct {
 	ID                        primitive.ObjectID `bson:"_id,omitempty" json:"id"`
 	Username                  string             `bson:"username" json:"username"`
 	Email                     string             `bson:"email" json:"email"` // Should be unique across all providers
+	Reputation                int                `bson:"reputation" json:"reputation"`
 	Password                  string             `bson:"password,omitempty" json:"-"` // Can be empty for OAuth users
 	Provider                  AuthProvider       `bson:"provider" json:"provider"`
 	ProviderID                string             `bson:"provider_id,omitempty" json:"-"` // The user's unique ID from the provider (e.g., Google's `sub` claim)

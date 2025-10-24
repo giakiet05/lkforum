@@ -2,7 +2,6 @@ package util
 
 import (
 	"context"
-	"regexp"
 	"time"
 )
 
@@ -27,11 +26,4 @@ func NewDefaultRedisContext() (context.Context, context.CancelFunc) {
 // NewRedisContextWith creates a new context with a custom timeout duration
 func NewRedisContextWith(timeout time.Duration) (context.Context, context.CancelFunc) {
 	return context.WithTimeout(context.Background(), timeout)
-}
-
-// IsEmail checks if the given string is a valid email address format
-func IsEmail(s string) bool {
-	// Simple regex for email validation
-	var emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
-	return emailRegex.MatchString(s)
 }
