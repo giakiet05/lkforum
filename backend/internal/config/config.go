@@ -10,6 +10,7 @@ import (
 
 // AppConfig holds the application's configuration
 type AppConfig struct {
+	Port                 string
 	MongoURI             string
 	DBName               string
 	JWTSecret            string
@@ -21,6 +22,7 @@ type AppConfig struct {
 	OTPExpirationMinutes int
 	SMTP                 SMTPConfig
 	Redis                RedisConfig
+	Google               GoogleConfig
 }
 
 // SMTPConfig holds the email server configuration
@@ -39,6 +41,13 @@ type RedisConfig struct {
 	DB       int
 }
 
+// GoogleConfig holds the Google OAuth2 configuration
+type GoogleConfig struct {
+	ClientID     string
+	ClientSecret string
+	RedirectURL  string
+}
+
 // Cfg is a global variable holding the application's configuration
 var Cfg AppConfig
 
@@ -47,6 +56,9 @@ func LoadConfig() {
 	if err := godotenv.Load(); err != nil {
 		log.Println(".env file not found. Using environment variables.")
 	}
+
+	//Port
+	Cfg.Port = getEnv("PORT", "8080")
 
 	// Database & App
 	Cfg.MongoURI = getEnv("MONGO_URI", "mongodb://localhost:27017")
@@ -73,6 +85,10 @@ func LoadConfig() {
 	Cfg.Redis.Addr = getEnv("REDIS_ADDR", "localhost:6379")
 	Cfg.Redis.Password = getEnv("REDIS_PASSWORD", "")
 	Cfg.Redis.DB = getEnvInt("REDIS_DB", 0)
+
+	Cfg.Google.ClientID = getEnv("GOOGLE_CLIENT_ID", "")
+	Cfg.Google.ClientSecret = getEnv("GOOGLE_CLIENT_SECRET", "")
+	Cfg.Google.RedirectURL = getEnv("GOOGLE_REDIRECT_URL", "")
 
 	log.Println("Configuration loaded successfully")
 }

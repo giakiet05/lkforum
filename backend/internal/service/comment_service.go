@@ -6,6 +6,7 @@ import (
 	"github.com/giakiet05/lkforum/internal/apperror"
 	"github.com/giakiet05/lkforum/internal/dto"
 	"github.com/giakiet05/lkforum/internal/model"
+	"github.com/giakiet05/lkforum/internal/platform/bus"
 	"github.com/giakiet05/lkforum/internal/repo"
 	"github.com/giakiet05/lkforum/internal/util"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -22,10 +23,11 @@ type CommentService interface {
 
 type commentService struct {
 	commentRepo repo.CommentRepo
+	bus         *bus.EventBus
 }
 
-func NewCommentService(commentRepo repo.CommentRepo) CommentService {
-	return &commentService{commentRepo: commentRepo}
+func NewCommentService(commentRepo repo.CommentRepo, bus *bus.EventBus) CommentService {
+	return &commentService{commentRepo: commentRepo, bus: bus}
 }
 
 func (c *commentService) CreateComment(request *dto.CreateCommentRequest, userID string) (*model.Comment, error) {
@@ -70,6 +72,9 @@ func (c *commentService) CreateComment(request *dto.CreateCommentRequest, userID
 	if err != nil {
 		return nil, err
 	}
+
+	// Publish event for reputation system
+	c.bus.Publish(bus.CommentCreatedEvent{AuthorID: userID})
 
 	return comment, nil
 }

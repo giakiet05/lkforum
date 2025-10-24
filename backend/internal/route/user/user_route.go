@@ -1,4 +1,4 @@
-package route
+package userroute
 
 import (
 	"github.com/giakiet05/lkforum/internal/controller"

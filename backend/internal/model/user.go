@@ -6,11 +6,22 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
+// AuthProvider defines the source of user authentication.
+type AuthProvider string
+
+const (
+	ProviderLocal  AuthProvider = "local"  // Registered with email and password
+	ProviderGoogle AuthProvider = "google" // Registered via Google OAuth
+)
+
 type User struct {
 	ID                        primitive.ObjectID `bson:"_id,omitempty" json:"id"`
 	Username                  string             `bson:"username" json:"username"`
-	Email                     string             `bson:"email,omitempty" json:"email,omitempty"`
-	Password                  string             `bson:"password" json:"-"`
+	Email                     string             `bson:"email" json:"email"` // Should be unique across all providers
+	Reputation                int                `bson:"reputation" json:"reputation"`
+	Password                  string             `bson:"password,omitempty" json:"-"` // Can be empty for OAuth users
+	Provider                  AuthProvider       `bson:"provider" json:"provider"`
+	ProviderID                string             `bson:"provider_id,omitempty" json:"-"` // The user's unique ID from the provider (e.g., Google's `sub` claim)
 	Role                      Role               `bson:"role" json:"role"`
 	RoleContent               RoleContent        `bson:"role_content,omitempty" json:"role_content,omitempty"`
 	IsVerified                bool               `bson:"is_verified" json:"is_verified"`

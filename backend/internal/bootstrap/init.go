@@ -3,11 +3,13 @@ package bootstrap
 import (
 	"log"
 
+	"github.com/giakiet05/lkforum/internal/auth"
 	"github.com/giakiet05/lkforum/internal/config"
 	"github.com/giakiet05/lkforum/internal/controller"
 	"github.com/giakiet05/lkforum/internal/email"
+	"github.com/giakiet05/lkforum/internal/platform/bus"
 	"github.com/giakiet05/lkforum/internal/repo"
-	route "github.com/giakiet05/lkforum/internal/route/user"
+	"github.com/giakiet05/lkforum/internal/route/user"
 	"github.com/giakiet05/lkforum/internal/service"
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
@@ -26,14 +28,17 @@ type Repos struct {
 }
 
 type Services struct {
+	service.AuthService
 	service.UserService
 	service.CommunityService
 	service.MembershipService
 	service.PostService
 	service.CommentService
+	service.ReputationService
 }
 
 type Controllers struct {
+	controller.AuthController
 	controller.UserController
 	controller.CommunityController
 	controller.MembershipController
@@ -41,7 +46,6 @@ type Controllers struct {
 	controller.CommentController
 }
 
-// initRepos initializes repositories with the given database
 func initRepos(client *mongo.Client, db *mongo.Database) *Repos {
 	return &Repos{
 		UserRepo:       repo.NewUserRepo(db),
@@ -55,20 +59,21 @@ func initRepos(client *mongo.Client, db *mongo.Database) *Repos {
 	}
 }
 
-// initServices Initialize services with the given repositories
 func initServices(repos *Repos, redisClient *redis.Client, emailSender email.Sender) *Services {
 	return &Services{
-		UserService:       service.NewUserService(repos.UserRepo, emailSender),
+		AuthService:       service.NewAuthService(repos.UserRepo, emailSender),
+		UserService:       service.NewUserService(repos.UserRepo),
 		CommunityService:  service.NewCommunityService(repos.CommunityRepo),
 		MembershipService: service.NewMembershipService(repos.MembershipRepo, redisClient),
-		PostService:       service.NewPostService(repos.PostRepo, repos.PostVoteRepo, repos.PostPollRepo, repos.PostImageRepo),
-		CommentService:    service.NewCommentService(repos.CommentRepo),
+		PostService:       service.NewPostService(repos.PostRepo, repos.PostVoteRepo, repos.PostPollRepo, repos.PostImageRepo, bus.Bus),
+		CommentService:    service.NewCommentService(repos.CommentRepo, bus.Bus),
+		ReputationService: service.NewReputationService(repos.UserRepo),
 	}
 }
 
-// initControllers Initialize controllers with the given services
 func initControllers(services *Services) *Controllers {
 	return &Controllers{
+		AuthController:       *controller.NewAuthController(services.AuthService),
 		UserController:       *controller.NewUserController(services.UserService),
 		CommunityController:  *controller.NewCommunityController(services.CommunityService),
 		MembershipController: *controller.NewMembershipController(services.MembershipService),
@@ -77,48 +82,38 @@ func initControllers(services *Services) *Controllers {
 	}
 }
 
-// initRoutes sets up the routes for the Gin engine
 func initRoutes(controllers *Controllers, r *gin.Engine) {
-	//Test route
 	r.GET("/ping", func(c *gin.Context) {
 		c.JSON(200, gin.H{"message": "pong"})
 	})
 
-	//Test API group
 	api := r.Group("/api")
 	api.GET("/", func(c *gin.Context) {
 		c.JSON(200, gin.H{"message": "Welcome to LKForum API!"})
 	})
 
-	//Register more routes here
-	route.RegisterAuthRoutes(api, &controllers.UserController)
-	route.RegisterUserRoutes(api, &controllers.UserController)
-	route.RegisterCommunityRoutes(api, &controllers.CommunityController)
-	route.RegisterMembershipRoutes(api, &controllers.MembershipController)
-	route.RegisterPostRoutes(api, &controllers.PostController)
-	route.RegisterCommentRoutes(api, &controllers.CommentController)
+	userroute.RegisterAuthRoutes(api, &controllers.AuthController)
+	userroute.RegisterUserRoutes(api, &controllers.UserController)
+	userroute.RegisterCommunityRoutes(api, &controllers.CommunityController)
+	userroute.RegisterMembershipRoutes(api, &controllers.MembershipController)
+	userroute.RegisterPostRoutes(api, &controllers.PostController)
+	userroute.RegisterCommentRoutes(api, &controllers.CommentController)
 }
 
-// Init initializes all application components
 func Init() (*gin.Engine, error) {
-	// Load configuration from .env file first
 	config.LoadConfig()
+	auth.InitGoogleOAuthConfig()
 
-	// Create Redis client once
 	redisClient := config.NewRedisClient()
 
-	// Initialize token service first for JWT blacklisting
 	if err := InitializeTokenService(redisClient); err != nil {
-		// Log error but continue - the system will work without Redis, just without token invalidation
 		log.Printf("Warning: Token invalidation service not available: %v\n", err)
 	}
 
-	// Connect to MongoDB
 	client := config.NewMongoClient()
 	db := client.Database(config.Cfg.DBName)
 	router := gin.Default()
 
-	// Register CORS middleware before any routes or other middleware
 	router.Use(func(c *gin.Context) {
 		c.Writer.Header().Set("Access-Control-Allow-Origin", config.Cfg.FrontendURL)
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
@@ -131,14 +126,14 @@ func Init() (*gin.Engine, error) {
 		c.Next()
 	})
 
-	// Initialize other components
 	emailSender := email.NewSMTPSender()
 	repos := initRepos(client, db)
 	services := initServices(repos, redisClient, emailSender)
 	controllers := initControllers(services)
 	initRoutes(controllers, router)
 
-	// Setup router
+	// Start background services
+	services.ReputationService.Start()
 
 	return router, nil
 }

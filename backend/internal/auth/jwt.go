@@ -18,6 +18,15 @@ type AuthUser struct {
 	Role string
 }
 
+// SetupTokenClaims holds the claims for the short-lived token used for completing Google user setup.
+type SetupTokenClaims struct {
+	GoogleID string `json:"google_id"`
+	Email    string `json:"email"`
+	Name     string `json:"name"`
+	Picture  string `json:"picture"`
+	jwt.RegisteredClaims
+}
+
 // Global token service instance
 var TokenSvc *TokenService
 
@@ -26,53 +35,7 @@ func SetTokenService(service *TokenService) {
 	TokenSvc = service
 }
 
-// ====== CREATE ======
-
-// createAccessToken creates a short-lived access token.
-func createAccessToken(userID, role string) (string, error) {
-	jti := uuid.New().String()
-
-	claims := jwt.MapClaims{
-		"sub":  userID,
-		"role": role,
-		"iss":  config.Cfg.JWTIssuer,
-		"aud":  config.Cfg.JWTAudience,
-		"iat":  time.Now().UTC().Unix(),
-		"exp":  time.Now().Add(time.Minute * time.Duration(config.Cfg.TokenTTL)).Unix(),
-		"jti":  jti,
-	}
-
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenString, err := token.SignedString([]byte(config.Cfg.JWTSecret))
-	if err != nil {
-		return "", err
-	}
-
-	return tokenString, nil
-}
-
-// createRefreshToken creates a long-lived refresh token.
-func createRefreshToken(userID string) (string, error) {
-	jti := uuid.New().String()
-
-	claims := jwt.MapClaims{
-		"sub":  userID,
-		"type": "refresh",
-		"iss":  config.Cfg.JWTIssuer,
-		"aud":  config.Cfg.JWTAudience,
-		"iat":  time.Now().UTC().Unix(),
-		"exp":  time.Now().Add(time.Hour * time.Duration(config.Cfg.RefreshTokenTTL)).Unix(),
-		"jti":  jti,
-	}
-
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenString, err := token.SignedString([]byte(config.Cfg.JWTSecret)) // Using the same secret for simplicity
-	if err != nil {
-		return "", err
-	}
-
-	return tokenString, nil
-}
+// ====== Login/Refresh Tokens ======
 
 // GenerateToken creates a new pair of access and refresh tokens.
 func GenerateToken(id string, role string) (accessToken string, refreshToken string, err error) {
@@ -89,9 +52,75 @@ func GenerateToken(id string, role string) (accessToken string, refreshToken str
 	return accessToken, refreshToken, nil
 }
 
+func createAccessToken(userID, role string) (string, error) {
+	jti := uuid.New().String()
+	claims := jwt.MapClaims{
+		"sub":  userID,
+		"role": role,
+		"iss":  config.Cfg.JWTIssuer,
+		"aud":  config.Cfg.JWTAudience,
+		"iat":  time.Now().UTC().Unix(),
+		"exp":  time.Now().Add(time.Minute * time.Duration(config.Cfg.TokenTTL)).Unix(),
+		"jti":  jti,
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString([]byte(config.Cfg.JWTSecret))
+}
+
+func createRefreshToken(userID string) (string, error) {
+	jti := uuid.New().String()
+	claims := jwt.MapClaims{
+		"sub":  userID,
+		"type": "refresh",
+		"iss":  config.Cfg.JWTIssuer,
+		"aud":  config.Cfg.JWTAudience,
+		"iat":  time.Now().UTC().Unix(),
+		"exp":  time.Now().Add(time.Hour * time.Duration(config.Cfg.RefreshTokenTTL)).Unix(),
+		"jti":  jti,
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString([]byte(config.Cfg.JWTSecret))
+}
+
+// ====== Setup Token (for Google OAuth) ======
+
+// CreateSetupToken creates a short-lived token to complete user registration.
+func CreateSetupToken(userInfo *GoogleUserInfo) (string, error) {
+	claims := SetupTokenClaims{
+		GoogleID: userInfo.ID,
+		Email:    userInfo.Email,
+		Name:     userInfo.Name,
+		Picture:  userInfo.Picture,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(15 * time.Minute)), // Token is valid for 15 minutes
+			Issuer:    config.Cfg.JWTIssuer,
+		},
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	// Use a slightly different secret for setup tokens for security.
+	return token.SignedString([]byte(config.Cfg.JWTSecret + "-setup"))
+}
+
+// ParseSetupToken validates the setup token and returns the claims.
+func ParseSetupToken(tokenStr string) (*SetupTokenClaims, error) {
+	var claims SetupTokenClaims
+	token, err := jwt.ParseWithClaims(tokenStr, &claims, func(t *jwt.Token) (interface{}, error) {
+		return []byte(config.Cfg.JWTSecret + "-setup"), nil
+	})
+
+	if err != nil {
+		return nil, apperror.ErrInvalidToken
+	}
+
+	if !token.Valid {
+		return nil, apperror.ErrInvalidToken
+	}
+
+	return &claims, nil
+}
+
 // ====== PARSE ======
 
-// ParseAccessToken parses and validates an access token string.
 func ParseAccessToken(tokenStr string) (AuthUser, error) {
 	token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
@@ -133,7 +162,6 @@ func ParseAccessToken(tokenStr string) (AuthUser, error) {
 	return AuthUser{ID: userID, Role: role}, nil
 }
 
-// ParseRefreshToken parses and validates a refresh token string.
 func ParseRefreshToken(tokenStr string) (string, error) {
 	token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
@@ -174,7 +202,8 @@ func ParseRefreshToken(tokenStr string) (string, error) {
 	return userID, nil
 }
 
-// IsOwner checks if the authenticated user is the owner of a resource.
+// ====== HELPERS ======
+
 func IsOwner(c *gin.Context, ownerID string) bool {
 	authUser, exists := c.Get("authUser")
 	if !exists {
@@ -184,7 +213,6 @@ func IsOwner(c *gin.Context, ownerID string) bool {
 	return user.ID == ownerID
 }
 
-// IsAdmin checks if the authenticated user has the admin role.
 func IsAdmin(c *gin.Context) bool {
 	authUser, exists := c.Get("authUser")
 	if !exists {

@@ -21,97 +21,91 @@ func NewCommentController(commentService service.CommentService) *CommentControl
 func (c *CommentController) CreateComment(ctx *gin.Context) {
 	var req *dto.CreateCommentRequest
 	if err := ctx.ShouldBind(&req); err != nil {
-		ctx.JSON(apperror.StatusFromError(apperror.ErrBadRequest), dto.ErrorResponse{ErrorCode: apperror.ErrBadRequest.Code, Message: apperror.Message(err)})
+		dto.SendError(ctx, http.StatusBadRequest, apperror.Message(apperror.ErrBadRequest), apperror.ErrBadRequest.Code)
 		return
 	}
 
 	authUser, exists := ctx.Get("authUser")
 	if !exists {
-		ctx.JSON(apperror.StatusFromError(apperror.ErrForbidden), dto.ErrorResponse{ErrorCode: apperror.ErrForbidden.Code, Message: apperror.ErrForbidden.Message})
+		dto.SendError(ctx, http.StatusForbidden, apperror.ErrForbidden.Message, apperror.ErrForbidden.Code)
 		return
 	}
 
 	comment, err := c.commentService.CreateComment(req, authUser.(auth.AuthUser).ID)
 	if err != nil {
-		ctx.JSON(apperror.StatusFromError(err), dto.ErrorResponse{ErrorCode: apperror.Code(err), Message: apperror.Message(err)})
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
 	}
 
-	ctx.JSON(http.StatusCreated, dto.SuccessResponse{
-		ID:      comment.ID.Hex(),
-		Message: "Create comment successfully",
-	})
+	dto.SendSuccess(ctx, http.StatusCreated, "Comment created successfully", dto.FromComment(comment))
 }
 
 func (c *CommentController) GetCommentByID(ctx *gin.Context) {
 	commentID := ctx.Param("comment_id")
 	if commentID == "" {
-		ctx.JSON(apperror.StatusFromError(apperror.ErrBadRequest), dto.ErrorResponse{ErrorCode: apperror.ErrBadRequest.Code, Message: apperror.ErrBadRequest.Message})
+		dto.SendError(ctx, http.StatusBadRequest, "Comment ID is required", apperror.ErrBadRequest.Code)
 		return
 	}
 
 	comment, err := c.commentService.GetCommentByID(commentID)
 	if err != nil {
-		ctx.JSON(apperror.StatusFromError(err), dto.ErrorResponse{ErrorCode: apperror.Code(err), Message: apperror.Message(err)})
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
 	}
 
-	ctx.JSON(http.StatusOK, dto.FromComment(comment))
+	dto.SendSuccess(ctx, http.StatusOK, "Comment retrieved successfully", dto.FromComment(comment))
 }
 
 func (c *CommentController) GetCommentByPostID(ctx *gin.Context) {
 	var query *dto.GetCommentByPostIDQuery
 	if err := ctx.ShouldBindQuery(&query); err != nil {
-		ctx.JSON(apperror.StatusFromError(apperror.ErrBadRequest), dto.ErrorResponse{ErrorCode: apperror.ErrBadRequest.Code, Message: apperror.Message(err)})
+		dto.SendError(ctx, http.StatusBadRequest, apperror.Message(apperror.ErrBadRequest), apperror.ErrBadRequest.Code)
 		return
 	}
 
 	response, err := c.commentService.GetCommentByPostIDPaginated(query)
 	if err != nil {
-		ctx.JSON(apperror.StatusFromError(err), dto.ErrorResponse{ErrorCode: apperror.Code(err), Message: apperror.Message(err)})
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
 	}
 
-	ctx.JSON(http.StatusOK, response)
+	dto.SendSuccess(ctx, http.StatusOK, "Comments retrieved successfully", response)
 }
 
 func (c *CommentController) GetCommentsFilter(ctx *gin.Context) {
 	var query *dto.GetCommentsFilterQuery
 	if err := ctx.ShouldBindQuery(&query); err != nil {
-		ctx.JSON(apperror.StatusFromError(apperror.ErrBadRequest), dto.ErrorResponse{ErrorCode: apperror.ErrBadRequest.Code, Message: apperror.Message(err)})
+		dto.SendError(ctx, http.StatusBadRequest, apperror.Message(apperror.ErrBadRequest), apperror.ErrBadRequest.Code)
 		return
 	}
 
 	response, err := c.commentService.GetCommentsFilterPaginated(query)
 	if err != nil {
-		ctx.JSON(apperror.StatusFromError(err), dto.ErrorResponse{ErrorCode: apperror.Code(err), Message: apperror.Message(err)})
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
 	}
 
-	ctx.JSON(http.StatusOK, response)
+	dto.SendSuccess(ctx, http.StatusOK, "Comments retrieved successfully", response)
 }
 
 func (c *CommentController) DeleteCommentByID(ctx *gin.Context) {
 	commentID := ctx.Param("comment_id")
 	if commentID == "" {
-		ctx.JSON(apperror.StatusFromError(apperror.ErrBadRequest), dto.ErrorResponse{ErrorCode: apperror.ErrBadRequest.Code, Message: apperror.ErrBadRequest.Message})
+		dto.SendError(ctx, http.StatusBadRequest, "Comment ID is required", apperror.ErrBadRequest.Code)
 		return
 	}
 
 	authUser, exists := ctx.Get("authUser")
 	if !exists {
-		ctx.JSON(apperror.StatusFromError(apperror.ErrForbidden), dto.ErrorResponse{ErrorCode: apperror.ErrForbidden.Code, Message: apperror.ErrForbidden.Message})
+		dto.SendError(ctx, http.StatusForbidden, apperror.ErrForbidden.Message, apperror.ErrForbidden.Code)
 		return
 	}
 
 	err := c.commentService.DeleteCommentByID(commentID, authUser.(auth.AuthUser).ID)
 	if err != nil {
-		ctx.JSON(apperror.StatusFromError(err), dto.ErrorResponse{ErrorCode: apperror.Code(err), Message: apperror.Message(err)})
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
 	}
 
-	ctx.JSON(http.StatusOK, dto.SuccessResponse{
-		ID:      commentID,
-		Message: "Delete comment successfully",
-	})
+	dto.SendSuccess(ctx, http.StatusOK, "Comment deleted successfully", gin.H{"id": commentID})
 }
