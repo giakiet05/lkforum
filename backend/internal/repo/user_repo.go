@@ -16,6 +16,7 @@ type UserRepo interface {
 	Create(ctx context.Context, user *model.User) (*model.User, error)
 	Update(ctx context.Context, user *model.User) (*model.User, error)
 	Delete(ctx context.Context, id string) error
+	UpdateReputation(ctx context.Context, userID string, points int) error
 
 	GetByID(ctx context.Context, id string) (*model.User, error)
 	GetByUsername(ctx context.Context, username string) (*model.User, error)
@@ -90,6 +91,29 @@ func (r *userRepo) Delete(ctx context.Context, id string) error {
 	if result.MatchedCount == 0 {
 		return mongo.ErrNoDocuments
 	}
+	return nil
+}
+
+func (r *userRepo) UpdateReputation(ctx context.Context, userID string, points int) error {
+	objectID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return err // Invalid ID format
+	}
+
+	filter := bson.M{"_id": objectID}
+	update := bson.M{
+		"$inc": bson.M{"reputation": points},
+	}
+
+	result, err := r.userCollection.UpdateOne(ctx, filter, update)
+	if err != nil {
+		return err
+	}
+
+	if result.MatchedCount == 0 {
+		return mongo.ErrNoDocuments // User not found
+	}
+
 	return nil
 }
 

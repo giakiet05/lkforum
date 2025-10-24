@@ -1,5 +1,3 @@
-// internal/service/post_service.go
-
 package service
 
 import (
@@ -10,13 +8,13 @@ import (
 
 	"github.com/giakiet05/lkforum/internal/dto"
 	"github.com/giakiet05/lkforum/internal/model"
+	"github.com/giakiet05/lkforum/internal/platform/bus"
 	"github.com/giakiet05/lkforum/internal/repo"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-// --- Định nghĩa Lỗi ---
 var (
 	ErrPermissionDenied = errors.New("user does not have permission to perform this action")
 	ErrInvalidInput     = errors.New("invalid input provided")
@@ -24,56 +22,32 @@ var (
 	ErrPollCannotEdit   = repo.ErrPollCannotEdit
 )
 
-// --- PostService Interface (Đầy Đủ) ---
 type PostService interface {
-	// CRUD cơ bản
 	CreatePost(ctx context.Context, userID primitive.ObjectID, req *dto.CreatePostRequest) (*dto.PostResponse, error)
 	GetPostByID(ctx context.Context, postID, userID primitive.ObjectID) (*dto.PostResponse, error)
 	UpdatePost(ctx context.Context, postID, userID primitive.ObjectID, req *dto.UpdatePostRequest) (*dto.PostResponse, error)
 	DeletePost(ctx context.Context, postID, userID primitive.ObjectID) error
-
-	// Lấy danh sách (Feed)
 	GetPosts(ctx context.Context, userID primitive.ObjectID, query *dto.GetPostsQuery) (*PaginatedPostsResponse, error)
-
-	// Tương tác (Vote)
 	VoteOnPost(ctx context.Context, userID, postID primitive.ObjectID, voteValue bool) (*dto.VotesCountResponse, error)
 	RemovePostVote(ctx context.Context, userID, postID primitive.ObjectID) (*dto.VotesCountResponse, error)
 	VoteOnPoll(ctx context.Context, userID, postID, optionID primitive.ObjectID) (*dto.PollResponse, error)
 	RemovePollVote(ctx context.Context, userID, postID primitive.ObjectID) (*dto.PollResponse, error)
-
-	// Quản lý Image (chi tiết)
 	AddImagesToPost(ctx context.Context, userID, postID primitive.ObjectID, req *dto.AddImageRequest) ([]dto.ImageResponse, error)
 	RemoveImagesFromPost(ctx context.Context, userID, postID primitive.ObjectID, req *dto.RemoveImageRequest) error
-
-	// Quản lý Poll (chi tiết)
 	UpdatePollDetails(ctx context.Context, postID, userID primitive.ObjectID, req *dto.UpdatePollRequest) (*dto.PollResponse, error)
 	AddPollOptions(ctx context.Context, userID, postID primitive.ObjectID, req *dto.AddPollOptionRequest) (*dto.PollResponse, error)
 	UpdatePollOption(ctx context.Context, userID, postID, optionID primitive.ObjectID, newText string) (*dto.PollResponse, error)
 	RemovePollOptions(ctx context.Context, userID, postID primitive.ObjectID, req *dto.RemovePollOptionRequest) (*dto.PollResponse, error)
-
-	// Tính năng cho người dùng
 	BookmarkPost(ctx context.Context, userID, postID primitive.ObjectID) error
 	RemoveBookmark(ctx context.Context, userID, postID primitive.ObjectID) error
-
-	//GetMembersCount(communityID string) (int64, error)
-	//increaseMembersCount(communityID string) error
-	//decreaseMembersCount(communityID string) error
-	//ensureMembersCountExists(communityID string) (string, error)
-	//
-	//StartRedisToMongoMembershipSync()
-	//syncMemberCounts() error
 }
 
-// --- postService Implementation ---
 type postService struct {
 	postRepo      repo.PostRepo
 	postVoteRepo  repo.PostVoteRepo
 	postPollRepo  repo.PostPollRepo
 	postImageRepo repo.PostImageRepo
-	communityRepo repo.CommunityRepo
-	// --- Placeholder Repositories ---
-	// communityRepo repo.CommunityRepo
-	// bookmarkRepo  repo.BookmarkRepo
+	bus           *bus.EventBus
 }
 
 func NewPostService(
@@ -81,12 +55,14 @@ func NewPostService(
 	postVoteRepo repo.PostVoteRepo,
 	postPollRepo repo.PostPollRepo,
 	postImageRepo repo.PostImageRepo,
+	bus *bus.EventBus,
 ) PostService {
 	return &postService{
 		postRepo:      postRepo,
 		postVoteRepo:  postVoteRepo,
 		postPollRepo:  postPollRepo,
 		postImageRepo: postImageRepo,
+		bus:           bus,
 	}
 }
 
@@ -98,7 +74,6 @@ type PaginatedPostsResponse struct {
 	Posts       []*dto.PostResponse `json:"posts"`
 }
 
-// CreatePost tạo bài đăng mới
 func (s *postService) CreatePost(ctx context.Context, userID primitive.ObjectID, req *dto.CreatePostRequest) (*dto.PostResponse, error) {
 	postModel, err := mapCreateRequestToPostModel(req, userID)
 	if err != nil {
@@ -110,18 +85,54 @@ func (s *postService) CreatePost(ctx context.Context, userID primitive.ObjectID,
 		return nil, err
 	}
 
-	// Khi mới tạo, không có thông tin vote của user
+	// Publish event for reputation system
+	s.bus.Publish(bus.PostCreatedEvent{AuthorID: userID.Hex()})
+
 	return mapPostModelToResponse(createdPost, "", nil), nil
 }
 
-// GetPostByID lấy chi tiết một bài đăng
+func (s *postService) VoteOnPost(ctx context.Context, userID, postID primitive.ObjectID, voteValue bool) (*dto.VotesCountResponse, error) {
+	post, err := s.postRepo.GetByID(ctx, postID)
+	if err != nil {
+		return nil, err
+	}
+
+	vote := &model.Vote{
+		UserID:     userID,
+		TargetID:   postID,
+		TargetType: model.VoteTargetPost,
+		Value:      voteValue,
+	}
+	if err := s.postVoteRepo.Vote(ctx, vote); err != nil {
+		return nil, err
+	}
+
+	// Publish event for reputation system
+	if voteValue {
+		s.bus.Publish(bus.PostUpvotedEvent{AuthorID: post.AuthorID.Hex()})
+	} else {
+		s.bus.Publish(bus.PostDownvotedEvent{
+			AuthorID: post.AuthorID.Hex(),
+			VoterID:  userID.Hex(),
+		})
+	}
+
+	updatedPost, err := s.postRepo.GetByID(ctx, postID)
+	if err != nil {
+		return nil, err
+	}
+
+	return mapVotesToResponse(updatedPost.VotesCount), nil
+}
+
+// ... other methods remain the same for now ...
+
 func (s *postService) GetPostByID(ctx context.Context, postID, userID primitive.ObjectID) (*dto.PostResponse, error) {
 	post, err := s.postRepo.GetByID(ctx, postID)
 	if err != nil {
 		return nil, err
 	}
 
-	// Lấy thông tin phụ để làm giàu DTO
 	userVote, _ := s.postVoteRepo.GetUserVote(ctx, postID, userID)
 	userPollVotes, _ := s.postPollRepo.GetUserPollVotes(ctx, postID, userID)
 	var userVoteStr string
@@ -136,16 +147,12 @@ func (s *postService) GetPostByID(ctx context.Context, postID, userID primitive.
 }
 
 func (s *postService) GetPosts(ctx context.Context, userID primitive.ObjectID, query *dto.GetPostsQuery) (*PaginatedPostsResponse, error) {
-	// 1. Service xây dựng bộ lọc động dựa trên query DTO.
 	filter := s.buildFilter(query)
-
-	// 2. Lấy tổng số bài đăng khớp với bộ lọc để tính toán phân trang.
 	totalPosts, err := s.postRepo.Count(ctx, filter)
 	if err != nil {
-		return nil, err // Nếu không đếm được thì trả về lỗi
+		return nil, err
 	}
 
-	// Nếu không có bài đăng nào, trả về kết quả rỗng ngay lập tức để tiết kiệm chi phí.
 	if totalPosts == 0 {
 		return &PaginatedPostsResponse{
 			CurrentPage: query.Page,
@@ -156,16 +163,12 @@ func (s *postService) GetPosts(ctx context.Context, userID primitive.ObjectID, q
 		}, nil
 	}
 
-	// 3. Service xây dựng các tùy chọn truy vấn (sắp xếp, phân trang).
 	findOptions := s.buildFindOptions(query)
-
-	// 4. Gọi hàm Find của Repository để lấy dữ liệu.
 	posts, err := s.postRepo.Find(ctx, filter, findOptions)
 	if err != nil {
 		return nil, err
 	}
 
-	// Chuẩn bị các slice ID để truy vấn thông tin vote
 	postIDs := make([]primitive.ObjectID, len(posts))
 	var pollPostIDs []primitive.ObjectID
 	for i, p := range posts {
@@ -175,7 +178,6 @@ func (s *postService) GetPosts(ctx context.Context, userID primitive.ObjectID, q
 		}
 	}
 
-	// 5. Lấy thông tin upvote/downvote của người dùng.
 	userVotes := make(map[primitive.ObjectID]string)
 	if !userID.IsZero() {
 		userVotes, err = s.postVoteRepo.FindUserVotesOnPosts(ctx, userID, postIDs)
@@ -184,9 +186,7 @@ func (s *postService) GetPosts(ctx context.Context, userID primitive.ObjectID, q
 		}
 	}
 
-	// 6. Lấy thông tin poll vote của người dùng.
 	userPollVotesMap := make(map[primitive.ObjectID][]*model.PollVote)
-	// Chỉ gọi DB nếu có bài poll và user đã đăng nhập
 	if len(pollPostIDs) > 0 && !userID.IsZero() {
 		userPollVotesMap, err = s.postPollRepo.FindUserVotesOnPolls(ctx, userID, pollPostIDs)
 		if err != nil {
@@ -194,7 +194,6 @@ func (s *postService) GetPosts(ctx context.Context, userID primitive.ObjectID, q
 		}
 	}
 
-	// 7. Chuyển đổi (map) model sang DTO.
 	responses := make([]*dto.PostResponse, len(posts))
 	for i, post := range posts {
 		userVoteStr := userVotes[post.ID]
@@ -202,7 +201,6 @@ func (s *postService) GetPosts(ctx context.Context, userID primitive.ObjectID, q
 		responses[i] = mapPostModelToResponse(post, userVoteStr, userPollVotes)
 	}
 
-	// 8. Tính toán các thông tin phân trang cuối cùng và trả về.
 	totalPages := int64(math.Ceil(float64(totalPosts) / float64(query.Limit)))
 
 	return &PaginatedPostsResponse{
@@ -214,7 +212,6 @@ func (s *postService) GetPosts(ctx context.Context, userID primitive.ObjectID, q
 	}, nil
 }
 
-// buildFilter là hàm helper để tạo bộ lọc động.
 func (s *postService) buildFilter(query *dto.GetPostsQuery) bson.M {
 	filter := bson.M{"is_deleted": bson.M{"$ne": true}}
 
@@ -234,7 +231,6 @@ func (s *postService) buildFilter(query *dto.GetPostsQuery) bson.M {
 		filter["type"] = query.Type
 	}
 
-	// Logic nghiệp vụ: Chỉ áp dụng bộ lọc thời gian cho các kiểu sort "top" hoặc "controversial".
 	if query.Sort == "top" || query.Sort == "controversial" {
 		if timeFilter := createTimeFilter(query.TimeFrame); timeFilter != nil {
 			for key, value := range timeFilter {
@@ -246,23 +242,18 @@ func (s *postService) buildFilter(query *dto.GetPostsQuery) bson.M {
 	return filter
 }
 
-// buildFindOptions là hàm helper để tạo các tùy chọn truy vấn (sắp xếp, phân trang).
 func (s *postService) buildFindOptions(query *dto.GetPostsQuery) *options.FindOptions {
 	opts := options.Find()
 
-	// Phân trang
 	limit := query.Limit
 	offset := (query.Page - 1) * limit
 	opts.SetLimit(int64(limit))
 	opts.SetSkip(int64(offset))
 
-	// Sắp xếp
 	var sortDoc bson.D
 	switch query.Sort {
 	case "top":
 		sortDoc = bson.D{{Key: "votes_count.up", Value: -1}, {Key: "created_at", Value: -1}}
-	// Thêm các case "hot", "controversial" ở đây nếu cần.
-	// Để có sort "hot" chính xác, bạn cần dùng Aggregation Pipeline.
 	case "new":
 		fallthrough
 	default:
@@ -273,9 +264,6 @@ func (s *postService) buildFindOptions(query *dto.GetPostsQuery) *options.FindOp
 	return opts
 }
 
-// --- HÀM TIỆN ÍCH (UTILITY) ---
-
-// createTimeFilter là một hàm tiện ích tạo ra bộ lọc thời gian.
 func createTimeFilter(timeFrame string) bson.M {
 	if timeFrame == "" || timeFrame == "all" {
 		return nil
@@ -302,7 +290,6 @@ func createTimeFilter(timeFrame string) bson.M {
 	return bson.M{"created_at": bson.M{"$gte": startTime}}
 }
 
-// UpdatePost cập nhật bài đăng
 func (s *postService) UpdatePost(ctx context.Context, postID, userID primitive.ObjectID, req *dto.UpdatePostRequest) (*dto.PostResponse, error) {
 	post, err := s.postRepo.GetByID(ctx, postID)
 	if err != nil {
@@ -313,7 +300,6 @@ func (s *postService) UpdatePost(ctx context.Context, postID, userID primitive.O
 		return nil, ErrPermissionDenied
 	}
 
-	// Cập nhật các trường
 	if req.Title != "" {
 		post.Title = req.Title
 	}
@@ -331,7 +317,6 @@ func (s *postService) UpdatePost(ctx context.Context, postID, userID primitive.O
 	return mapPostModelToResponse(post, "", nil), nil
 }
 
-// DeletePost xóa một bài đăng
 func (s *postService) DeletePost(ctx context.Context, postID, userID primitive.ObjectID) error {
 	post, err := s.postRepo.GetByID(ctx, postID)
 	if err != nil {
@@ -343,34 +328,11 @@ func (s *postService) DeletePost(ctx context.Context, postID, userID primitive.O
 	return s.postRepo.SoftDelete(ctx, postID)
 }
 
-// VoteOnPost xử lý vote up/down
-func (s *postService) VoteOnPost(ctx context.Context, userID, postID primitive.ObjectID, voteValue bool) (*dto.VotesCountResponse, error) {
-	vote := &model.Vote{
-		UserID:     userID,
-		TargetID:   postID,
-		TargetType: model.VoteTargetPost,
-		Value:      voteValue,
-	}
-	if err := s.postVoteRepo.Vote(ctx, vote); err != nil {
-		return nil, err
-	}
-
-	// Lấy lại thông tin post để có số vote mới nhất
-	updatedPost, err := s.postRepo.GetByID(ctx, postID)
-	if err != nil {
-		return nil, err
-	}
-
-	return mapVotesToResponse(updatedPost.VotesCount), nil
-}
 func (s *postService) RemovePostVote(ctx context.Context, userID, postID primitive.ObjectID) (*dto.VotesCountResponse, error) {
-
-	// 1. Gọi PostVoteRepo để xóa vote. Logic transaction được xử lý ở tầng Repo.
 	if err := s.postVoteRepo.RemoveVote(ctx, postID, userID); err != nil {
 		return nil, err
 	}
 
-	// 2. Lấy lại thông tin post để có số vote đã cập nhật
 	post, err := s.postRepo.GetByID(ctx, postID)
 	if err != nil {
 		return nil, err
@@ -380,7 +342,6 @@ func (s *postService) RemovePostVote(ctx context.Context, userID, postID primiti
 		return &dto.VotesCountResponse{Up: 0, Down: 0, Score: 0}, nil
 	}
 
-	// 3. Tạo và trả về DTO response
 	response := &dto.VotesCountResponse{
 		Up:    post.VotesCount.Up,
 		Down:  post.VotesCount.Down,
@@ -390,7 +351,6 @@ func (s *postService) RemovePostVote(ctx context.Context, userID, postID primiti
 	return response, nil
 }
 
-// VoteOnPoll xử lý vote cho poll
 func (s *postService) VoteOnPoll(ctx context.Context, userID, postID, optionID primitive.ObjectID) (*dto.PollResponse, error) {
 	pollVote := &model.PollVote{
 		PostID:   postID,
@@ -401,7 +361,6 @@ func (s *postService) VoteOnPoll(ctx context.Context, userID, postID, optionID p
 		return nil, err
 	}
 
-	// Lấy lại thông tin post và vote của user để trả về poll response mới nhất
 	updatedPost, err := s.postRepo.GetByID(ctx, postID)
 	if err != nil {
 		return nil, err
@@ -412,29 +371,24 @@ func (s *postService) VoteOnPoll(ctx context.Context, userID, postID, optionID p
 }
 
 func (s *postService) RemovePollVote(ctx context.Context, userID, postID primitive.ObjectID) (*dto.PollResponse, error) {
-	// 1. Gọi PostPollRepo để xóa tất cả các vote của user cho poll này.
 	if err := s.postPollRepo.RemovePollVote(ctx, postID, userID); err != nil {
 		return nil, err
 	}
 
-	// 2. Lấy lại thông tin post để có trạng thái poll đã cập nhật
 	post, err := s.postRepo.GetByID(ctx, postID)
 	if err != nil {
 		return nil, err
 	}
 
-	// 3. Kiểm tra xem đây có thực sự là một poll hợp lệ không
 	if post.Type != model.PostTypePoll || post.Content == nil || post.Content.Poll == nil {
 		return nil, errors.New("post is not a valid poll")
 	}
 
-	// 4. Tạo và trả về DTO response (sử dụng lại hàm helper `mapPollModelToResponse`)
 	response := mapPollToResponse(post.Content.Poll, []*model.PollVote{})
 
 	return response, nil
 }
 
-// === Quản lý Image ===
 func (s *postService) AddImagesToPost(ctx context.Context, userID, postID primitive.ObjectID, req *dto.AddImageRequest) ([]dto.ImageResponse, error) {
 	post, err := s.postRepo.GetByID(ctx, postID)
 	if err != nil {
@@ -457,7 +411,6 @@ func (s *postService) AddImagesToPost(ctx context.Context, userID, postID primit
 		return nil, err
 	}
 
-	// Chuyển đổi kết quả trả về
 	res := make([]dto.ImageResponse, len(newImages))
 	for i, img := range newImages {
 		res[i] = dto.ImageResponse{ID: img.ID.Hex(), URL: img.URL}
@@ -486,7 +439,6 @@ func (s *postService) RemoveImagesFromPost(ctx context.Context, userID, postID p
 	return s.postImageRepo.RemoveImages(ctx, postID, imageObjectIDs)
 }
 
-// === Quản lý Poll ===
 func (s *postService) UpdatePollDetails(ctx context.Context, postID, userID primitive.ObjectID, req *dto.UpdatePollRequest) (*dto.PollResponse, error) {
 	post, err := s.postRepo.GetByID(ctx, postID)
 	if err != nil {
@@ -524,7 +476,6 @@ func (s *postService) AddPollOptions(ctx context.Context, userID, postID primiti
 }
 
 func (s *postService) UpdatePollOption(ctx context.Context, userID, postID, optionID primitive.ObjectID, newText string) (*dto.PollResponse, error) {
-	// 1. Kiểm tra quyền hạn của người dùng
 	post, err := s.postRepo.GetByID(ctx, postID)
 	if err != nil {
 		return nil, err
@@ -533,12 +484,10 @@ func (s *postService) UpdatePollOption(ctx context.Context, userID, postID, opti
 		return nil, ErrPermissionDenied
 	}
 
-	// 2. Gọi đến repository để cập nhật
 	if err := s.postPollRepo.UpdatePollOption(ctx, postID, optionID, newText); err != nil {
 		return nil, err
 	}
 
-	// 3. Lấy lại thông tin poll mới nhất và trả về
 	return s.getUpdatedPollResponse(ctx, postID, userID)
 }
 func (s *postService) RemovePollOptions(ctx context.Context, userID, postID primitive.ObjectID, req *dto.RemovePollOptionRequest) (*dto.PollResponse, error) {
@@ -565,41 +514,14 @@ func (s *postService) RemovePollOptions(ctx context.Context, userID, postID prim
 	return s.getUpdatedPollResponse(ctx, postID, userID)
 }
 
-// === Tính năng người dùng ===
 func (s *postService) BookmarkPost(ctx context.Context, userID, postID primitive.ObjectID) error {
-	// TODO: Implement logic với bookmarkRepo
-	// _, err := s.postRepo.GetByID(ctx, postID) // Kiểm tra post có tồn tại
-	// if err != nil { return err }
-	// return s.bookmarkRepo.Create(ctx, userID, postID)
 	return errors.New("bookmark not implemented")
 }
 
 func (s *postService) RemoveBookmark(ctx context.Context, userID, postID primitive.ObjectID) error {
-	// TODO: Implement logic với bookmarkRepo
-	// return s.bookmarkRepo.Delete(ctx, userID, postID)
 	return errors.New("bookmark not implemented")
 }
 
-// === Tính năng Admin/Mod ===
-func (s *postService) PinPost(ctx context.Context, moderatorID, postID primitive.ObjectID) error {
-	// TODO: Dùng communityRepo để kiểm tra quyền moderator
-	// post, err := s.postRepo.GetByID(ctx, postID)
-	// if err != nil { return err }
-	// isMod, err := s.communityRepo.IsModerator(ctx, moderatorID, post.CommunityID)
-	// if err != nil { return err }
-	// if !isMod { return ErrPermissionDenied }
-	// return s.postRepo.SetPinned(ctx, postID, true)
-	return errors.New("pin not implemented")
-}
-
-func (s *postService) UnpinPost(ctx context.Context, moderatorID, postID primitive.ObjectID) error {
-	// TODO: Tương tự PinPost
-	// return s.postRepo.SetPinned(ctx, postID, false)
-	return errors.New("unpin not implemented")
-}
-
-// --- Hàm helper ---
-// getUpdatedPollResponse là hàm helper để lấy lại thông tin poll mới nhất và map sang DTO.
 func (s *postService) getUpdatedPollResponse(ctx context.Context, postID, userID primitive.ObjectID) (*dto.PollResponse, error) {
 	post, err := s.postRepo.GetByID(ctx, postID)
 	if err != nil {
