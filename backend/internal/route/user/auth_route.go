@@ -9,12 +9,16 @@ import (
 func RegisterAuthRoutes(rg *gin.RouterGroup, c *controller.AuthController) {
 	auth := rg.Group("/auth")
 
-	// Local Authentication
-	auth.POST("/register", c.RegisterUser)
-	auth.POST("/login", c.Login)
 	auth.POST("/refresh", c.RefreshToken)
-	auth.POST("/verify-email", c.VerifyEmail)
-	auth.POST("/resend-verification-email", c.ResendVerificationEmail)
+
+	// Local Authentication
+	local := auth.Group("/local")
+	{
+		local.POST("/register", c.RegisterUser)
+		local.POST("/login", c.Login)
+		local.POST("/verify-email", c.VerifyEmail)
+		local.POST("/resend-verification-email", c.ResendVerificationEmail)
+	}
 
 	// Google OAuth2
 	google := auth.Group("/google")
