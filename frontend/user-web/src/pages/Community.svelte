@@ -4,6 +4,7 @@
   import Post from "../components/Post.svelte";
   import CreatePostModal from "../components/CreatePostModal.svelte";
   import type { PostData } from "../types/post";
+  import { mockCommunityRules } from "../mocks/community-rules.mock";
 
   type CommunityProps = {
     params?: { name: string };
@@ -15,6 +16,10 @@
   let isJoined = $state(false);
   let expandedRules = $state(new Set<number>());
   let showCreatePostModal = $state(false);
+  let showInviteModModal = $state(false);
+  let inviteUsername = $state("");
+  let invitePermission = $state("Everything");
+  let inviteCanEdit = $state(true);
 
   // Mock community data
   const community = {
@@ -25,7 +30,7 @@
     online: 3200,
     createdAt: "Jan 1, 2020",
     banner: "/banner_sample1.jpg",
-    icon: "/LKlogo.jpg",
+    icon: "/community_logo.jpg",
   };
 
   // Mock posts for this community
@@ -70,37 +75,36 @@
     expandedRules = new Set(expandedRules);
   }
 
-  // Mock rules data
-  const rules = [
-    {
-      title: "Be respectful and civil",
-      content:
-        "Treat others with respect. No harassment, hate speech, or personal attacks. Keep discussions constructive and friendly.",
-    },
-    {
-      title: "No spam or self-promotion",
-      content:
-        "Do not post spam, excessive self-promotion, or advertisements. Share content that adds value to the community.",
-    },
-    {
-      title: "Stay on topic",
-      content:
-        "Posts should be relevant to the community's theme. Off-topic content may be removed to keep discussions focused.",
-    },
-    {
-      title: "No personal attacks",
-      content:
-        "Disagree with ideas, not people. Personal attacks, name-calling, and hostile behavior will not be tolerated.",
-    },
-    {
-      title: "Follow Reddit's content policy",
-      content:
-        "All posts must comply with Reddit's site-wide content policy and guidelines. Violations may result in removal or ban.",
-    },
-  ];
-
   function handleModTools() {
     push(`/lk/${params.name}/mod`);
+  }
+
+  function handleOpenInviteModModal() {
+    showInviteModModal = true;
+    inviteUsername = "";
+    invitePermission = "Everything";
+    inviteCanEdit = true;
+  }
+
+  function handleCloseInviteModModal() {
+    showInviteModModal = false;
+    inviteUsername = "";
+    invitePermission = "Everything";
+    inviteCanEdit = true;
+  }
+
+  function handleInviteMod() {
+    if (!inviteUsername.trim()) {
+      alert("Please enter a username!");
+      return;
+    }
+    console.log("Invite mod:", {
+      username: inviteUsername,
+      permission: invitePermission,
+      canEdit: inviteCanEdit,
+    });
+    alert(`Invitation sent to ${inviteUsername} to become moderator!`);
+    handleCloseInviteModModal();
   }
 
   onMount(() => {
@@ -239,9 +243,9 @@
       <!-- Rules Card -->
       <div class="rules-card">
         <h3>Community Rules</h3>
-        {#if rules.length > 0}
+        {#if mockCommunityRules.length > 0}
           <div class="rules-accordion">
-            {#each rules as rule, index}
+            {#each mockCommunityRules as rule, index}
               <div class="rule-item">
                 <button
                   class="rule-header"
@@ -249,7 +253,7 @@
                   aria-expanded={expandedRules.has(index)}
                 >
                   <span class="rule-number">{index + 1}.</span>
-                  <span class="rule-title">{rule.title}</span>
+                  <span class="rule-title">{rule.name}</span>
                   <span
                     class="rule-toggle"
                     class:expanded={expandedRules.has(index)}
@@ -267,7 +271,7 @@
                 </button>
                 {#if expandedRules.has(index)}
                   <div class="rule-content">
-                    <p>{rule.content}</p>
+                    <p>{rule.description}</p>
                   </div>
                 {/if}
               </div>
@@ -282,7 +286,11 @@
       <div class="moderators-card">
         <div class="moderators-header">
           <h3>Moderators</h3>
-          <button class="invite-mod-btn" title="Invite moderator">
+          <button
+            class="invite-mod-btn"
+            title="Invite moderator"
+            onclick={handleOpenInviteModModal}
+          >
             <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
               <path
                 d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 016 6H2a6 6 0 016-6zm10-5a1 1 0 10-2 0v1h-1a1 1 0 100 2h1v1a1 1 0 102 0v-1h1a1 1 0 100-2h-1V6z"
@@ -308,6 +316,61 @@
   onClose={() => (showCreatePostModal = false)}
   communityName={community.name}
 />
+
+{#if showInviteModModal}
+  <div class="modal-overlay" onclick={handleCloseInviteModModal}>
+    <div class="modal-content" onclick={(e) => e.stopPropagation()}>
+      <h2>Invite Moderator</h2>
+
+      <div class="form-group">
+        <div class="search-input-wrapper">
+          <img
+            src="/searchuser_icon.svg"
+            alt="Search"
+            class="search-icon"
+            width="20"
+            height="20"
+          />
+          <input
+            type="text"
+            placeholder="Search for user"
+            bind:value={inviteUsername}
+            class="search-input"
+          />
+        </div>
+        <p class="hint">Enter username to search</p>
+      </div>
+
+      <div class="form-group">
+        <label>Permissions</label>
+        <select bind:value={invitePermission} class="permission-select">
+          <option value="Everything">Everything</option>
+          <option value="Manage Posts & Comments"
+            >Manage Posts & Comments</option
+          >
+          <option value="Manage Users">Manage Users</option>
+          <option value="Manage Settings">Manage Settings</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="checkbox-label">
+          <input type="checkbox" bind:checked={inviteCanEdit} />
+          <span>You can edit this moderator</span>
+        </label>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-cancel" onclick={handleCloseInviteModModal}>
+          Cancel
+        </button>
+        <button class="action-btn-primary" onclick={handleInviteMod}>
+          Invite
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
 
 <style>
   .community-page {
@@ -432,12 +495,12 @@
   }
 
   .community-icon {
-    width: 72px;
-    height: 72px;
+    width: 120px;
+    height: 120px;
     border-radius: 50%;
     border: 4px solid white;
     background: white;
-    margin-top: -36px;
+    margin-top: -60px;
     object-fit: cover;
   }
 
@@ -792,6 +855,160 @@
 
   .view-all-mods-btn:hover {
     background: rgba(214, 216, 222, 0.6);
+  }
+
+  /* Modal Styles */
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+  }
+
+  .modal-content {
+    background: white;
+    padding: 32px;
+    border-radius: 12px;
+    max-width: 500px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+
+  .modal-content h2 {
+    margin: 0 0 24px 0;
+    font-size: 20px;
+    font-weight: 700;
+    color: #1c1c1c;
+  }
+
+  .form-group {
+    margin-bottom: 16px;
+  }
+
+  .form-group label {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    color: #1c1c1c;
+    margin-bottom: 8px;
+  }
+
+  .search-input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+
+  .search-input-wrapper .search-icon {
+    position: absolute;
+    left: 16px;
+    pointer-events: none;
+    opacity: 0.6;
+  }
+
+  .search-input {
+    width: 100%;
+    padding: 12px 16px 12px 48px;
+    border: 1px solid #edeff1;
+    border-radius: 8px;
+    font-size: 14px;
+    background: #f6f7f8;
+    color: #1c1c1c;
+  }
+
+  .search-input:focus {
+    outline: none;
+    border-color: var(--blue--);
+    background: white;
+  }
+
+  .permission-select {
+    width: 100%;
+    padding: 12px 16px;
+    border: 1px solid #edeff1;
+    border-radius: 8px;
+    font-size: 14px;
+    background: #f6f7f8;
+    color: #1c1c1c;
+    cursor: pointer;
+  }
+
+  .permission-select:focus {
+    outline: none;
+    border-color: var(--blue--);
+    background: white;
+  }
+
+  .checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .checkbox-label input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: var(--blue--);
+  }
+
+  .checkbox-label span {
+    font-size: 14px;
+    color: #1c1c1c;
+  }
+
+  .hint {
+    font-size: 12px;
+    color: var(--grayfont);
+    margin: 6px 0 0 0;
+  }
+
+  .modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 24px;
+  }
+
+  .btn-cancel {
+    padding: 10px 20px;
+    background: var(--button-secondary-bg);
+    color: var(--blue--);
+    border: none;
+    border-radius: 16px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn-cancel:hover {
+    background: rgba(214, 216, 222, 0.6);
+  }
+
+  .action-btn-primary {
+    padding: 10px 20px;
+    background: var(--blue--);
+    color: white;
+    border: none;
+    border-radius: 16px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .action-btn-primary:hover {
+    filter: brightness(0.85);
   }
 
   /* Responsive */
