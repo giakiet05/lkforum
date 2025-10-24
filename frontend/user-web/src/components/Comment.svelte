@@ -15,6 +15,8 @@
   let showReplyBox = $state(false);
   let replyContent = $state("");
   let userVote = $state<"up" | "down" | null>(null); // Track user's vote
+  let replyImage = $state<File | null>(null);
+  let replyImagePreview = $state<string | null>(null);
 
   const toggleCollapse = () => {
     isCollapsed = !isCollapsed;
@@ -72,9 +74,33 @@
     if (replyContent.trim()) {
       // Mock reply - in real app, would add to parent state
       console.log("Replying to comment:", comment.id, replyContent);
+      if (replyImage) {
+        console.log("With image:", replyImage.name);
+      }
       replyContent = "";
+      replyImage = null;
+      replyImagePreview = null;
       showReplyBox = false;
     }
+  };
+
+  const handleReplyImageSelect = (event: Event) => {
+    const input = event.target as HTMLInputElement;
+    if (input.files && input.files[0]) {
+      const file = input.files[0];
+      replyImage = file;
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        replyImagePreview = e.target?.result as string;
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeReplyImage = () => {
+    replyImage = null;
+    replyImagePreview = null;
   };
 
   const formatTime = (dateString: string) => {
@@ -188,17 +214,82 @@
               class="reply-textarea"
               rows="3"
             ></textarea>
+
+            {#if replyImagePreview}
+              <div class="reply-image-preview">
+                <img src={replyImagePreview} alt="Preview" />
+                <button class="remove-reply-image" onclick={removeReplyImage}>
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 16 16"
+                    fill="currentColor"
+                  >
+                    <path
+                      d="M4 4l8 8M12 4l-8 8"
+                      stroke="currentColor"
+                      stroke-width="2"
+                    />
+                  </svg>
+                </button>
+              </div>
+            {/if}
+
             <div class="reply-actions">
-              <button class="submit-btn" onclick={submitReply}>Comment</button>
-              <button
-                class="cancel-btn"
-                onclick={() => {
-                  showReplyBox = false;
-                  replyContent = "";
-                }}
-              >
-                Cancel
-              </button>
+              <div class="reply-attachment-buttons">
+                <input
+                  type="file"
+                  id="reply-image-upload-{comment.id}"
+                  accept="image/*"
+                  onchange={handleReplyImageSelect}
+                  style="display: none;"
+                />
+                <button
+                  class="attachment-btn"
+                  onclick={() =>
+                    document
+                      .getElementById(`reply-image-upload-{comment.id}`)
+                      ?.click()}
+                  title="Add image"
+                >
+                  <img
+                    src="/icon_comment.png"
+                    alt="Add comment icon"
+                    width="20"
+                    height="20"
+                  />
+                </button>
+                <button
+                  class="attachment-btn"
+                  onclick={() =>
+                    document
+                      .getElementById(`reply-image-upload-{comment.id}`)
+                      ?.click()}
+                  title="Add picture"
+                >
+                  <img
+                    src="/comment_picture.png"
+                    alt="Add picture"
+                    width="20"
+                    height="20"
+                  />
+                </button>
+              </div>
+              <div class="reply-action-buttons">
+                <button class="submit-btn" onclick={submitReply}>Comment</button
+                >
+                <button
+                  class="cancel-btn"
+                  onclick={() => {
+                    showReplyBox = false;
+                    replyContent = "";
+                    replyImage = null;
+                    replyImagePreview = null;
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           </div>
         {/if}
@@ -253,23 +344,23 @@
   }
 
   .vote-btn.voted {
-    color: #ff4500;
+    color: var(--darkblue--);
   }
 
   .vote-count {
     font-size: 12px;
     font-weight: 700;
-    color: #1c1c1c;
+    color: var(--darkblue--);
     min-width: 24px;
     text-align: center;
   }
 
   .vote-count.positive {
-    color: #ff4500;
+    color: var(--darkblue--);
   }
 
   .vote-count.negative {
-    color: #7193ff;
+    color: var(--darkblue--);
   }
 
   /* Comment Content */
@@ -443,9 +534,74 @@
     border-color: var(--blue--);
   }
 
+  .reply-image-preview {
+    position: relative;
+    margin-bottom: 8px;
+  }
+
+  .reply-image-preview img {
+    max-width: 200px;
+    max-height: 200px;
+    border-radius: 4px;
+    display: block;
+  }
+
+  .remove-reply-image {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    border: none;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .remove-reply-image:hover {
+    background: rgba(0, 0, 0, 0.9);
+  }
+
   .reply-actions {
     display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .reply-attachment-buttons {
+    display: flex;
     gap: 8px;
+  }
+
+  .reply-action-buttons {
+    display: flex;
+    gap: 8px;
+  }
+
+  .attachment-btn {
+    background: transparent;
+    border: none;
+    padding: 6px;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+    color: #7c7c7c;
+  }
+
+  .attachment-btn:hover {
+    background: #f6f7f8;
+  }
+
+  .attachment-btn img {
+    display: block;
   }
 
   .submit-btn {

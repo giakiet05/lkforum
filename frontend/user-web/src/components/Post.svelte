@@ -21,6 +21,11 @@
     e.stopPropagation();
   }
 
+  function handleCommunityClick(e: MouseEvent) {
+    e.stopPropagation();
+    push(`/lk/${post.community}`);
+  }
+
   function handleVote(optionId: number) {
     if (hasVoted) return;
 
@@ -71,10 +76,25 @@
 <article class="post-container" transition:fade onclick={handlePostClick}>
   <div class="post-main">
     <div class="post-header">
-      <span class="community-name">lk/{post.community}</span>
-      <span class="meta-divider">•</span>
-      <span class="author">Posted by u/{post.author}</span>
-      <span class="time">{post.time}</span>
+      <div class="post-header-left">
+        <img src="/avatar.jpg" alt="User avatar" class="author-avatar" />
+        <span class="community-name" onclick={handleCommunityClick}
+          >lk/{post.community}</span
+        >
+        <span class="meta-divider">•</span>
+        <span class="author">Posted by u/{post.author}</span>
+        <span class="time">{post.time}</span>
+      </div>
+      <div class="post-header-right">
+        <button class="join-btn" onclick={handleButtonClick}>Join</button>
+        <button
+          class="more-btn"
+          onclick={handleButtonClick}
+          title="More options"
+        >
+          <img src="/dot.png" alt="" width="20" height="20" />
+        </button>
+      </div>
     </div>
 
     <h2 class="post-title">{post.title}</h2>
@@ -224,13 +244,13 @@
   }
 
   .vote-btn:hover {
-    color: #000000;
+    color: var(--darkblue--);
   }
   .vote-count {
     font-weight: bold;
     font-size: 12px;
     margin: 0 4px;
-    color: #000000;
+    color: var(--darkblue--);
   }
 
   .post-main {
@@ -242,13 +262,41 @@
   .post-header {
     display: flex;
     align-items: center;
+    justify-content: space-between;
     font-size: 12px;
     margin-bottom: 8px;
   }
+
+  .post-header-left {
+    display: flex;
+    align-items: center;
+    flex: 1;
+  }
+
+  .post-header-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .author-avatar {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-right: 8px;
+  }
+
   .community-name {
     font-weight: bold;
     color: #000000;
+    cursor: pointer;
   }
+
+  .community-name:hover {
+    text-decoration: underline;
+  }
+
   .meta-divider {
     margin: 0 4px;
     color: #878a8c;
@@ -259,6 +307,43 @@
   }
   .author {
     margin-right: 4px;
+  }
+
+  .join-btn {
+    background: var(--blue--);
+    color: white;
+    border: none;
+    padding: 4px 12px;
+    border-radius: 9999px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: "Roboto", sans-serif;
+    transition: background 0.2s;
+  }
+
+  .join-btn:hover {
+    background: var(--darkblue--);
+  }
+
+  .more-btn {
+    background: transparent;
+    border: none;
+    padding: 4px;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+  }
+
+  .more-btn:hover {
+    background: rgba(0, 0, 0, 0.05);
+  }
+
+  .more-btn img {
+    display: block;
   }
 
   .post-title {

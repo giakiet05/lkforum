@@ -6,9 +6,6 @@
   import { authStore } from "./stores/auth-store";
   import { logout } from "./services/auth-service";
   import { push } from "svelte-spa-router";
-  import { get } from "svelte/store";
-  import type { User } from "./models/user";
-  import { run } from "svelte/legacy";
 
   const sidebarItems = [
     {
@@ -25,18 +22,6 @@
       to: "/popular",
       icon: `<svg width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><g clip-path=\"url(#clip0_20_157)\"><path d=\"M23.2499 12.751L12.7769 23.25\" stroke=\"currentColor\" stroke-opacity=\"0.7\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M17.25 12.751H23.25V18.75\" stroke=\"currentColor\" stroke-opacity=\"0.7\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M18.75 0.75V5.25H12.75V11.25H6.75V17.25H0.75V23.25\" stroke=\"currentColor\" stroke-opacity=\"0.7\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></g><defs><clipPath id=\"clip0_20_157\"><rect width=\"24\" height=\"24\" fill=\"white\"/></clipPath></defs></svg>`,
     },
-    {
-      id: "community",
-      label: "Community",
-      icon: `<svg viewBox=\"0 0 24 24\" width=\"20\" height=\"20\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">
-      <path d=\"M12 2a5 5 0 100 10 5 5 0 000-10zm0 12c-4 0-8 2-8 4v2h16v-2c0-2-4-4-8-4z\" fill=\"currentColor\"/>
-    </svg>`,
-      children: [
-        { id: "lk-all", label: "lk/all", to: "/lk/all", icon: "🌐" },
-        { id: "lk-news", label: "lk/news", to: "/lk/news", icon: "📰" },
-        { id: "lk-dev", label: "lk/dev", to: "/lk/dev", icon: "💻" },
-      ],
-    },
     { id: "explore", label: "Explore", to: "/explore", icon: "🧭" },
     {
       id: "all",
@@ -46,25 +31,22 @@
     },
   ];
 
-  let user: User | null = null;
-  run(() => {
-    const state = get(authStore);
-    user = state.user;
-  });
-
   let isSidebarCompact = false;
 
   let topbarUser:
     | { name: string; avatar?: string; karma?: number }
     | undefined = undefined;
-  run(() => {
-    const state = get(authStore);
+
+  // Subscribe to authStore để update realtime khi login/logout
+  authStore.subscribe((state) => {
     if (state.user) {
       topbarUser = {
         name: state.user.username || state.user.email || "User",
         avatar: "../avatar.jpg",
         karma: 20,
       };
+    } else {
+      topbarUser = undefined;
     }
   });
 
@@ -108,10 +90,10 @@
   .main-content {
     margin-left: var(--sidebar-width);
     transition: margin-left 0.2s ease;
-    padding-top: calc(var(--topbar-height) + 1rem);
-    padding-right: 2rem;
-    padding-left: 2rem;
-    padding-bottom: 2rem;
+    padding-top: var(--topbar-height);
+    padding-right: 0;
+    padding-left: 0;
+    padding-bottom: 0;
     min-height: 100vh;
     box-sizing: border-box;
     overflow-y: auto;

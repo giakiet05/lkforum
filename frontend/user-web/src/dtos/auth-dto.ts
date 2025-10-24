@@ -2,6 +2,7 @@ import type { User } from "../models/user";
 
 export interface RegisterDto {
   username: string;
+  email: string;
   password: string;
 }
 

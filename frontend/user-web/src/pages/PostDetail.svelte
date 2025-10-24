@@ -272,7 +272,7 @@
     border: none;
     color: #1c1c1c;
     font-size: 14px;
-    font-weight: 600;
+    font-weight: 400;
     cursor: pointer;
     padding: 8px 12px;
     margin-bottom: 16px;
@@ -298,14 +298,14 @@
   }
 
   .vote-btn:hover {
-    color: #000000;
+    color: var(--darkblue--);
   }
 
   .vote-count {
     font-weight: bold;
     font-size: 12px;
     margin: 0 4px;
-    color: #000000;
+    color: var(--darkblue--);
   }
 
   .post-main {

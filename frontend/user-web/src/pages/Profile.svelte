@@ -186,6 +186,9 @@
     overflow: hidden;
     background-color: #f6f7f8;
     position: relative;
+    width: calc(100% - 48px);
+    border-radius: 8px;
+    margin: 8px 24px;
   }
 
   .cover-image {
@@ -226,8 +229,8 @@
     display: flex;
     justify-content: space-between;
     align-items: flex-end;
-    padding: 0 2rem;
-    max-width: 1000px;
+    padding: 0 24px;
+    max-width: 100%;
     margin: 0 auto;
     padding-bottom: 1rem;
   }
@@ -347,8 +350,8 @@
   .profile-content {
     display: flex;
     gap: 1.5rem;
-    padding: 0 2rem;
-    max-width: 1000px;
+    padding: 0 24px;
+    max-width: 100%;
     margin: 0 auto;
   }
 
