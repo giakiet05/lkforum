@@ -8,8 +8,9 @@ import (
 	"github.com/giakiet05/lkforum/internal/controller"
 	"github.com/giakiet05/lkforum/internal/email"
 	"github.com/giakiet05/lkforum/internal/platform/bus"
+	"github.com/giakiet05/lkforum/internal/platform/ws"
 	"github.com/giakiet05/lkforum/internal/repo"
-	"github.com/giakiet05/lkforum/internal/route/user"
+	userroute "github.com/giakiet05/lkforum/internal/route/user"
 	"github.com/giakiet05/lkforum/internal/service"
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
@@ -25,6 +26,7 @@ type Repos struct {
 	repo.PostImageRepo
 	repo.PostVoteRepo
 	repo.CommentRepo
+	repo.NotificationRepo
 }
 
 type Services struct {
@@ -35,6 +37,7 @@ type Services struct {
 	service.PostService
 	service.CommentService
 	service.ReputationService
+	service.NotificationService
 }
 
 type Controllers struct {
@@ -44,41 +47,47 @@ type Controllers struct {
 	controller.MembershipController
 	controller.PostController
 	controller.CommentController
+	controller.NotificationController
+	controller.WebSocketController
 }
 
 func initRepos(client *mongo.Client, db *mongo.Database) *Repos {
 	return &Repos{
-		UserRepo:       repo.NewUserRepo(db),
-		CommunityRepo:  repo.NewCommunityRepo(db),
-		MembershipRepo: repo.NewMembershipRepo(db),
-		PostRepo:       repo.NewPostRepo(db),
-		PostVoteRepo:   repo.NewPostVoteRepo(client, db),
-		PostImageRepo:  repo.NewPostImageRepo(db),
-		PostPollRepo:   repo.NewPostPollRepo(client, db),
-		CommentRepo:    repo.NewCommentRepo(db),
+		UserRepo:         repo.NewUserRepo(db),
+		CommunityRepo:    repo.NewCommunityRepo(db),
+		MembershipRepo:   repo.NewMembershipRepo(db),
+		PostRepo:         repo.NewPostRepo(db),
+		PostVoteRepo:     repo.NewPostVoteRepo(client, db),
+		PostImageRepo:    repo.NewPostImageRepo(db),
+		PostPollRepo:     repo.NewPostPollRepo(client, db),
+		CommentRepo:      repo.NewCommentRepo(db),
+		NotificationRepo: repo.NewNotificationRepo(db),
 	}
 }
 
 func initServices(repos *Repos, redisClient *redis.Client, emailSender email.Sender) *Services {
 	return &Services{
-		AuthService:       service.NewAuthService(repos.UserRepo, emailSender),
-		UserService:       service.NewUserService(repos.UserRepo),
-		CommunityService:  service.NewCommunityService(repos.CommunityRepo),
-		MembershipService: service.NewMembershipService(repos.MembershipRepo, redisClient),
-		PostService:       service.NewPostService(repos.PostRepo, repos.PostVoteRepo, repos.PostPollRepo, repos.PostImageRepo, bus.Bus),
-		CommentService:    service.NewCommentService(repos.CommentRepo, bus.Bus),
-		ReputationService: service.NewReputationService(repos.UserRepo),
+		AuthService:         service.NewAuthService(repos.UserRepo, emailSender),
+		UserService:         service.NewUserService(repos.UserRepo),
+		CommunityService:    service.NewCommunityService(repos.CommunityRepo),
+		MembershipService:   service.NewMembershipService(repos.MembershipRepo, redisClient),
+		PostService:         service.NewPostService(repos.PostRepo, repos.PostVoteRepo, repos.PostPollRepo, repos.PostImageRepo, bus.Bus),
+		CommentService:      service.NewCommentService(repos.CommentRepo, bus.Bus),
+		ReputationService:   service.NewReputationService(repos.UserRepo),
+		NotificationService: service.NewNotificationService(repos.NotificationRepo, repos.UserRepo, repos.PostRepo, repos.CommentRepo, bus.Bus),
 	}
 }
 
 func initControllers(services *Services) *Controllers {
 	return &Controllers{
-		AuthController:       *controller.NewAuthController(services.AuthService),
-		UserController:       *controller.NewUserController(services.UserService),
-		CommunityController:  *controller.NewCommunityController(services.CommunityService),
-		MembershipController: *controller.NewMembershipController(services.MembershipService),
-		PostController:       *controller.NewPostController(services.PostService),
-		CommentController:    *controller.NewCommentController(services.CommentService),
+		AuthController:         *controller.NewAuthController(services.AuthService),
+		UserController:         *controller.NewUserController(services.UserService),
+		CommunityController:    *controller.NewCommunityController(services.CommunityService),
+		MembershipController:   *controller.NewMembershipController(services.MembershipService),
+		PostController:         *controller.NewPostController(services.PostService),
+		CommentController:      *controller.NewCommentController(services.CommentService),
+		NotificationController: *controller.NewNotificationController(services.NotificationService),
+		WebSocketController:    *controller.NewWebSocketController(),
 	}
 }
 
@@ -98,6 +107,8 @@ func initRoutes(controllers *Controllers, r *gin.Engine) {
 	userroute.RegisterMembershipRoutes(api, &controllers.MembershipController)
 	userroute.RegisterPostRoutes(api, &controllers.PostController)
 	userroute.RegisterCommentRoutes(api, &controllers.CommentController)
+	userroute.RegisterNotificationRoutes(api, &controllers.NotificationController)
+	userroute.RegisterWebSocketRoutes(api, &controllers.WebSocketController)
 }
 
 func Init() (*gin.Engine, error) {
@@ -133,7 +144,9 @@ func Init() (*gin.Engine, error) {
 	initRoutes(controllers, router)
 
 	// Start background services
+	go ws.WSHub.Start()
 	services.ReputationService.Start()
+	services.NotificationService.Start()
 
 	return router, nil
 }

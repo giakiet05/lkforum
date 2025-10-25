@@ -69,7 +69,7 @@ func LoadConfig() {
 	Cfg.JWTSecret = getEnv("JWT_SECRET", "your-secret-key")
 	Cfg.JWTIssuer = getEnv("JWT_ISSUER", "lkforum")
 	Cfg.JWTAudience = getEnv("JWT_AUDIENCE", "lkforum-users")
-	Cfg.TokenTTL = getEnvInt("TOKEN_TTL_MINUTES", 15)
+	Cfg.TokenTTL = getEnvInt("TOKEN_TTL_MINUTES", 60)
 	Cfg.RefreshTokenTTL = getEnvInt("REFRESH_TOKEN_TTL_HOURS", 72)
 
 	// Features
