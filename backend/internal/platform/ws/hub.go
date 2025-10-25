@@ -49,9 +49,8 @@ func (h *Hub) run(eventChannel bus.EventListener) {
 
 		case client := <-h.unregister:
 			if _, ok := h.userClients[client.UserID]; ok {
-				// Important: only delete from the map. The closing of the send channel
-				// and the connection is handled by the client's pumps.
 				delete(h.userClients, client.UserID)
+				close(client.send)
 				log.Printf("WebSocket client unregistered: %s", client.UserID)
 			}
 
@@ -84,14 +83,11 @@ func (h *Hub) sendToUser(userID string, messageType string, payload interface{})
 		if err != nil {
 			log.Printf("Error marshalling websocket message: %v", err)
 			return
-	}
+		}
 
 		select {
 		case client.send <- jsonMsg:
 		default:
-			// If the client's send buffer is full, we assume the client is lagging
-			// and drop the message. The client's own read/write pumps are responsible
-			// for detecting a dead connection and unregistering.
 			log.Printf("Warning: Client %s channel is full. Message dropped.", userID)
 		}
 	}

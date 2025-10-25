@@ -48,13 +48,12 @@ func (c *Client) readPump() {
 	c.conn.SetReadDeadline(time.Now().Add(pongWait))
 	c.conn.SetPongHandler(func(string) error { c.conn.SetReadDeadline(time.Now().Add(pongWait)); return nil })
 	for {
-		// The client application is not expected to send any messages.
-		// This ReadMessage is primarily to detect a closed connection.
-		if _, _, err := c.conn.ReadMessage(); err != nil {
+		_, _, err := c.conn.ReadMessage()
+		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("WebSocket client %s read error: %v", c.UserID, err)
+				log.Printf("error: %v", err)
 			}
-			break // Exit loop on any error
+			break
 		}
 	}
 }
@@ -71,7 +70,6 @@ func (c *Client) writePump() {
 		case message, ok := <-c.send:
 			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if !ok {
-				// The hub closed the channel.
 				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
 				return
 			}
@@ -81,13 +79,6 @@ func (c *Client) writePump() {
 				return
 			}
 			w.Write(message)
-
-			// Add queued chat messages to the current websocket message.
-			n := len(c.send)
-			for i := 0; i < n; i++ {
-				w.Write([]byte{ '\n' })
-				w.Write(<-c.send)
-			}
 
 			if err := w.Close(); err != nil {
 				return
