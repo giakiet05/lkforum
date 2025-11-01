@@ -122,8 +122,9 @@ func (c *communityRepo) GetByModeratorIDPaginated(
 
 	skip := (page - 1) * pageSize
 	filter := bson.M{"moderators.user_id": modObjectID}
+	opt := options.Find().SetSkip(int64(skip)).SetLimit(int64(pageSize))
 
-	cursor, err := c.communityCollection.Find(ctx, filter, options.Find().SetSkip(int64(skip)), options.Find().SetLimit(int64(pageSize)))
+	cursor, err := c.communityCollection.Find(ctx, filter, opt)
 	if err != nil {
 		return nil, -1, err
 	}
