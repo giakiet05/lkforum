@@ -7,7 +7,7 @@ import (
 )
 
 type Channel struct {
-	ID        primitive.ObjectID `bson:"_id" json:"id"`
+	ID        primitive.ObjectID `bson:"_id,omitempty" json:"id,omitempty"`
 	Members   []ChannelMember    `bson:"members" json:"members"`
 	Settings  []ChannelSetting   `bson:"settings" json:"settings"`
 	Status    ChannelStatus      `bson:"status" json:"status"`

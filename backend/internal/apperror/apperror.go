@@ -125,4 +125,6 @@ var (
 	ErrDepthInvalid    = AppError{Code: "DEPTH_TOO_HIGH", Message: "Depth can not be smaller than 0 or larger than 2"}
 
 	// Messaging-related
+	ErrChannelNotFound = AppError{Code: "CHANNEL_NOT_FOUND", Message: "Channel not found"}
+	ErrNoMessageFound  = AppError{Code: "NO_MESSAGE_FOUND", Message: "No message found"}
 )

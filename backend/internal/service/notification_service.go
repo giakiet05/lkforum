@@ -24,7 +24,7 @@ type notificationService struct {
 	userRepo         repo.UserRepo
 	postRepo         repo.PostRepo
 	commentRepo      repo.CommentRepo
-	bus              *bus.EventBus
+	eventBus         *bus.EventBus
 }
 
 func NewNotificationService(notificationRepo repo.NotificationRepo, userRepo repo.UserRepo, postRepo repo.PostRepo, commentRepo repo.CommentRepo, bus *bus.EventBus) NotificationService {
@@ -33,15 +33,15 @@ func NewNotificationService(notificationRepo repo.NotificationRepo, userRepo rep
 		userRepo:         userRepo,
 		postRepo:         postRepo,
 		commentRepo:      commentRepo,
-		bus:              bus,
+		eventBus:         bus,
 	}
 }
 
 func (s *notificationService) Start() {
 	eventChannel := make(bus.EventListener, 100)
 
-	bus.Bus.Subscribe(bus.TopicPostUpvoted, eventChannel)
-	bus.Bus.Subscribe(bus.TopicCommentCreated, eventChannel)
+	s.eventBus.Subscribe(bus.TopicPostUpvoted, eventChannel)
+	s.eventBus.Subscribe(bus.TopicCommentCreated, eventChannel)
 
 	log.Println("NotificationService started and subscribed to events.")
 
@@ -109,7 +109,7 @@ func (s *notificationService) handlePostUpvoted(event bus.Event) {
 		return
 	}
 
-	s.bus.Publish(bus.NotificationCreatedEvent{
+	s.eventBus.Publish(bus.NotificationCreatedEvent{
 		RecipientID:  authorID,
 		Notification: dto.FromNotification(createdNotification),
 	})
@@ -153,7 +153,7 @@ func (s *notificationService) handleCommentCreated(event bus.Event) {
 		return
 	}
 
-	s.bus.Publish(bus.NotificationCreatedEvent{
+	s.eventBus.Publish(bus.NotificationCreatedEvent{
 		RecipientID:  parentAuthorID,
 		Notification: dto.FromNotification(createdNotification),
 	})

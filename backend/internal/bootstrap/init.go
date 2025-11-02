@@ -73,22 +73,22 @@ func initRepos(client *mongo.Client, db *mongo.Database) *Repos {
 	}
 }
 
-func initServices(repos *Repos, redisClient *redis.Client, emailSender email.Sender) *Services {
+func initServices(repos *Repos, redisClient *redis.Client, emailSender email.Sender, eventBus *bus.EventBus) *Services {
 	return &Services{
 		AuthService:         service.NewAuthService(repos.UserRepo, emailSender),
 		UserService:         service.NewUserService(repos.UserRepo),
 		CommunityService:    service.NewCommunityService(repos.CommunityRepo),
 		MembershipService:   service.NewMembershipService(repos.MembershipRepo, redisClient),
-		PostService:         service.NewPostService(repos.PostRepo, repos.PostVoteRepo, repos.PostPollRepo, repos.PostImageRepo, bus.Bus),
-		CommentService:      service.NewCommentService(repos.CommentRepo, bus.Bus),
-		ReputationService:   service.NewReputationService(repos.UserRepo),
-		NotificationService: service.NewNotificationService(repos.NotificationRepo, repos.UserRepo, repos.PostRepo, repos.CommentRepo, bus.Bus),
+		PostService:         service.NewPostService(repos.PostRepo, repos.PostVoteRepo, repos.PostPollRepo, repos.PostImageRepo, eventBus),
+		CommentService:      service.NewCommentService(repos.CommentRepo, eventBus),
+		ReputationService:   service.NewReputationService(repos.UserRepo, eventBus),
+		NotificationService: service.NewNotificationService(repos.NotificationRepo, repos.UserRepo, repos.PostRepo, repos.CommentRepo, eventBus),
 		ChannelService:      service.NewChannelService(repos.ChannelRepo),
-		MessageService:      service.NewMessageService(repos.MessageRepo, repos.ChannelRepo),
+		MessageService:      service.NewMessageService(repos.MessageRepo, repos.ChannelRepo, eventBus),
 	}
 }
 
-func initControllers(services *Services) *Controllers {
+func initControllers(services *Services, wsHub *ws.Hub) *Controllers {
 	return &Controllers{
 		AuthController:         *controller.NewAuthController(services.AuthService),
 		UserController:         *controller.NewUserController(services.UserService),
@@ -97,7 +97,7 @@ func initControllers(services *Services) *Controllers {
 		PostController:         *controller.NewPostController(services.PostService),
 		CommentController:      *controller.NewCommentController(services.CommentService),
 		NotificationController: *controller.NewNotificationController(services.NotificationService),
-		WebSocketController:    *controller.NewWebSocketController(),
+		WebSocketController:    *controller.NewWebSocketController(wsHub),
 		ChannelController:      *controller.NewChannelController(services.ChannelService),
 		MessageController:      *controller.NewMessageController(services.MessageService),
 	}
@@ -151,16 +151,20 @@ func Init() (*gin.Engine, error) {
 		c.Next()
 	})
 
+	eventBus := bus.NewEventBus()
+	wsHub := ws.NewHub(eventBus)
 	emailSender := email.NewSMTPSender()
+
 	repos := initRepos(client, db)
-	services := initServices(repos, redisClient, emailSender)
-	controllers := initControllers(services)
+	services := initServices(repos, redisClient, emailSender, eventBus)
+	controllers := initControllers(services, wsHub)
 	initRoutes(controllers, router)
 
 	// Start background services
-	go ws.WSHub.Start()
+	go wsHub.Start()
 	services.ReputationService.Start()
 	services.NotificationService.Start()
+	services.MessageService.Start()
 
 	return router, nil
 }

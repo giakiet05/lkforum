@@ -7,7 +7,7 @@ import (
 )
 
 type Message struct {
-	ID        primitive.ObjectID  `bson:"_id" json:"id"`
+	ID        primitive.ObjectID  `bson:"_id,omitempty" json:"id,omitempty"`
 	ChannelID primitive.ObjectID  `bson:"channel_id" json:"channel_id"`
 	SenderID  *primitive.ObjectID `bson:"sender_id,omitempty" json:"sender_id,omitempty"` // nil for system messages
 	Type      MessageType         `bson:"type" json:"type"`

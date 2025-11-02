@@ -19,11 +19,8 @@ type EventBus struct {
 	lock      sync.RWMutex
 }
 
-// Bus is the global instance of the EventBus.
-var Bus = New()
-
-// New creates a new EventBus.
-func New() *EventBus {
+// NewEventBus creates a new EventBus.
+func NewEventBus() *EventBus {
 	return &EventBus{
 		listeners: make(map[string][]EventListener),
 	}
