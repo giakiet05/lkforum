@@ -5,21 +5,21 @@ import (
 	"github.com/giakiet05/lkforum/internal/model"
 )
 
-type SocketMessageType string
+type WebSocketMessageType string
 
 const (
-	NewNotification SocketMessageType = "new_notification"
-	ACKMessage      SocketMessageType = "ack_message"
-	NewMessage      SocketMessageType = "new_message"
-	SendMessage     SocketMessageType = "send_message"
-	TypingIndicator SocketMessageType = "typing"
-	InChatIndicator SocketMessageType = "in_chat"
-	ErrorMessage    SocketMessageType = "error"
+	NewNotification WebSocketMessageType = "new_notification"
+	ACKMessage      WebSocketMessageType = "ack_message"
+	NewMessage      WebSocketMessageType = "new_message"
+	SendMessage     WebSocketMessageType = "send_message"
+	TypingIndicator WebSocketMessageType = "typing"
+	InChatIndicator WebSocketMessageType = "in_chat"
+	ErrorMessage    WebSocketMessageType = "error"
 )
 
 type WebSocketMessage struct {
-	Type    SocketMessageType `json:"type"`
-	Payload interface{}       `json:"payload"`
+	Type    WebSocketMessageType `json:"type"`
+	Payload interface{}          `json:"payload"`
 }
 
 type NewMessagePayload struct {
@@ -39,9 +39,9 @@ type ACKMessagePayload struct {
 }
 
 type TypingIndicatorPayload struct {
-	ConversationId string `json:"conversation_id"`
-	UserID         string `json:"user_id"`
-	IsTyping       bool   `json:"is_typing"`
+	ChannelID string `json:"channel_id"`
+	SenderID  string `json:"sender_id"`
+	IsTyping  bool   `json:"is_typing"`
 }
 
 type InChatIndicatorPayload struct {

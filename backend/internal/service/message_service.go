@@ -42,6 +42,7 @@ func (m *messageService) Start() {
 	eventChannel := make(bus.EventListener, 100)
 
 	m.eventBus.Subscribe(bus.TopicNewMessage, eventChannel)
+	m.eventBus.Subscribe(bus.TopicTypingMessage, eventChannel)
 
 	log.Println("MessageService started and subscribed to events.")
 
@@ -53,6 +54,10 @@ func (m *messageService) processEvents(ch bus.EventListener) {
 		switch event.Topic() {
 		case bus.TopicNewMessage:
 			m.handleNewMessage(event)
+		case bus.TopicTypingMessage:
+			m.handleTypingEvent(event)
+		default:
+			log.Println("Unhandled event topic:", event.Topic())
 		}
 	}
 }
@@ -127,10 +132,61 @@ func (m *messageService) handleNewMessage(event bus.Event) {
 		return
 	}
 
-	m.eventBus.Publish(bus.MessageCreatedEvent{
+	broadcastEvent := bus.BroadcastEvent{
 		RecipientIDs:  recipientIDs,
+		EventType:     bus.EventMessageCreated,
 		TempMessageID: tempMessageID,
-		Message:       *dto.FromMessage(message),
+		Data:          *dto.FromMessage(message),
+	}
+
+	m.eventBus.Publish(broadcastEvent)
+}
+
+func (m *messageService) handleTypingEvent(event bus.Event) {
+	payload := event.Payload()
+
+	channelID, _ := payload["channel_id"].(string)
+	senderID, _ := payload["sender_id"].(string)
+	isTyping, _ := payload["is_typing"].(bool)
+
+	if channelID == "" || senderID == "" {
+		m.publishMessageError(senderID, channelID, "", apperror.ErrBadRequest)
+		return
+	}
+
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
+
+	channel, err := m.channelRepository.GetByID(ctx, channelID)
+	if err != nil {
+		m.publishMessageError(senderID, channelID, "", apperror.ErrChannelNotFound)
+		return
+	}
+
+	// Gather recipients except the sender
+	var recipientIDs []string
+	for _, member := range channel.Members {
+		if member.UserID.Hex() != senderID {
+			recipientIDs = append(recipientIDs, member.UserID.Hex())
+		}
+	}
+
+	eventType := bus.EventTypingStop
+	if isTyping {
+		eventType = bus.EventTypingStart
+	}
+
+	data := map[string]interface{}{
+		"channel_id": channelID,
+		"sender_id":  senderID,
+		"is_typing":  isTyping,
+	}
+
+	// Publish a broadcast event so the WS Hub can send it to clients
+	m.eventBus.Publish(bus.BroadcastEvent{
+		RecipientIDs: recipientIDs,
+		EventType:    eventType,
+		Data:         data,
 	})
 }
 

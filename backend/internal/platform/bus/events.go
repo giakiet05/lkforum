@@ -7,6 +7,8 @@ import (
 
 // Event Topics
 const (
+	TopicBroadcast = "broadcast"
+
 	TopicPostCreated         = "post.created"
 	TopicPostUpvoted         = "post.upvoted"
 	TopicPostDownvoted       = "post.downvoted"
@@ -15,11 +17,45 @@ const (
 	TopicCommentDownvoted    = "comment.downvoted"
 	TopicNotificationCreated = "notification.created"
 
-	TopicNewMessage     = "message.new"
-	TopicMessageCreated = "message.created"
-	TopicMessageSend    = "message.send"
-	TopicMessageError   = "message.error"
+	TopicNewMessage    = "message.new"
+	TopicMessageError  = "message.error"
+	TopicTypingMessage = "message.typing"
 )
+
+type BroadcastEventType string
+
+const (
+	// ---- Message-related ----
+	EventMessageCreated BroadcastEventType = "message_created"
+	EventMessageDeleted BroadcastEventType = "message_deleted"
+
+	// ---- Typing indicators ----
+	EventTypingStart BroadcastEventType = "typing_start"
+	EventTypingStop  BroadcastEventType = "typing_stop"
+
+	// ---- Read receipts ----
+	EventMessageRead BroadcastEventType = "message_read"
+)
+
+type BroadcastEvent struct {
+	RecipientIDs  []string           `json:"recipient_ids"`
+	EventType     BroadcastEventType `json:"event_type"`
+	TempMessageID string             `json:"temp_id"`
+	Data          interface{}        `json:"data"`
+}
+
+func (e BroadcastEvent) Topic() string {
+	return TopicBroadcast
+}
+
+func (e BroadcastEvent) Payload() map[string]interface{} {
+	return map[string]interface{}{
+		"recipient_ids":   e.RecipientIDs,
+		"event_type":      e.EventType,
+		"temp_message_id": e.TempMessageID,
+		"data":            e.Data,
+	}
+}
 
 // --- Post Events ---
 
@@ -130,44 +166,6 @@ func (e NewMessageEvent) Payload() map[string]interface{} {
 	}
 }
 
-type MessageCreatedEvent struct {
-	RecipientIDs  []string
-	TempMessageID string
-	Message       dto.MessageResponse
-}
-
-func (e MessageCreatedEvent) Topic() string {
-	return TopicMessageCreated
-}
-
-func (e MessageCreatedEvent) Payload() map[string]interface{} {
-	return map[string]interface{}{
-		"recipient_ids":   e.RecipientIDs,
-		"temp_message_id": e.TempMessageID,
-		"message":         e.Message,
-	}
-}
-
-type MessageSendEvent struct {
-	MessageID  string   `json:"message_id"`
-	ChannelID  string   `json:"channel_id"`
-	SenderID   string   `json:"sender_id"`
-	ReceivedID []string `json:"received_id"`
-}
-
-func (e MessageSendEvent) Topic() string {
-	return TopicMessageSend
-}
-
-func (e MessageSendEvent) Payload() map[string]interface{} {
-	return map[string]interface{}{
-		"message_id":  e.MessageID,
-		"channel_id":  e.ChannelID,
-		"sender_id":   e.SenderID,
-		"received_id": e.ReceivedID,
-	}
-}
-
 type MessageErrorEvent struct {
 	SenderID      string `json:"sender_id"`
 	ChannelID     string `json:"channel_id"`
@@ -187,5 +185,23 @@ func (e MessageErrorEvent) Payload() map[string]interface{} {
 		"temp_message_id": e.TempMessageID,
 		"error_code":      e.ErrorCode,
 		"error_msg":       e.ErrorMsg,
+	}
+}
+
+type TypingMessageEvent struct {
+	ChannelID string `json:"channel_id"`
+	SenderID  string `json:"sender_id"`
+	IsTyping  bool   `json:"is_typing"`
+}
+
+func (e TypingMessageEvent) Topic() string {
+	return TopicTypingMessage
+}
+
+func (e TypingMessageEvent) Payload() map[string]interface{} {
+	return map[string]interface{}{
+		"channel_id": e.ChannelID,
+		"sender_id":  e.SenderID,
+		"is_typing":  e.IsTyping,
 	}
 }
