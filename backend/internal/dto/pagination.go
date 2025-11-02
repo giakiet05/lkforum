@@ -32,3 +32,8 @@ type PaginatedChannelsResponse struct {
 	Channels   []ChannelResponse `json:"channels"`
 	Pagination Pagination        `json:"pagination"`
 }
+
+type PaginatedMessagesResponse struct {
+	Messages   []MessageResponse `json:"messages"`
+	Pagination Pagination        `json:"pagination"`
+}

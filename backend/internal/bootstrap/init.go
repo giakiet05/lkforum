@@ -28,6 +28,7 @@ type Repos struct {
 	repo.CommentRepo
 	repo.NotificationRepo
 	repo.ChannelRepo
+	repo.MessageRepo
 }
 
 type Services struct {
@@ -40,6 +41,7 @@ type Services struct {
 	service.ReputationService
 	service.NotificationService
 	service.ChannelService
+	service.MessageService
 }
 
 type Controllers struct {
@@ -52,6 +54,7 @@ type Controllers struct {
 	controller.NotificationController
 	controller.WebSocketController
 	controller.ChannelController
+	controller.MessageController
 }
 
 func initRepos(client *mongo.Client, db *mongo.Database) *Repos {
@@ -66,6 +69,7 @@ func initRepos(client *mongo.Client, db *mongo.Database) *Repos {
 		CommentRepo:      repo.NewCommentRepo(db),
 		NotificationRepo: repo.NewNotificationRepo(db),
 		ChannelRepo:      repo.NewChannelRepo(db),
+		MessageRepo:      repo.NewMessageRepo(db),
 	}
 }
 
@@ -80,6 +84,7 @@ func initServices(repos *Repos, redisClient *redis.Client, emailSender email.Sen
 		ReputationService:   service.NewReputationService(repos.UserRepo),
 		NotificationService: service.NewNotificationService(repos.NotificationRepo, repos.UserRepo, repos.PostRepo, repos.CommentRepo, bus.Bus),
 		ChannelService:      service.NewChannelService(repos.ChannelRepo),
+		MessageService:      service.NewMessageService(repos.MessageRepo, repos.ChannelRepo),
 	}
 }
 
@@ -94,6 +99,7 @@ func initControllers(services *Services) *Controllers {
 		NotificationController: *controller.NewNotificationController(services.NotificationService),
 		WebSocketController:    *controller.NewWebSocketController(),
 		ChannelController:      *controller.NewChannelController(services.ChannelService),
+		MessageController:      *controller.NewMessageController(services.MessageService),
 	}
 }
 
@@ -116,6 +122,7 @@ func initRoutes(controllers *Controllers, r *gin.Engine) {
 	userroute.RegisterNotificationRoutes(api, &controllers.NotificationController)
 	userroute.RegisterWebSocketRoutes(api, &controllers.WebSocketController)
 	userroute.RegisterChannelRoutes(api, &controllers.ChannelController)
+	userroute.RegisterMessageRoutes(api, &controllers.MessageController)
 }
 
 func Init() (*gin.Engine, error) {
