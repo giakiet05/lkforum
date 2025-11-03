@@ -20,28 +20,28 @@ const (
 	TopicNewMessage    = "message.new"
 	TopicMessageError  = "message.error"
 	TopicTypingMessage = "message.typing"
+	TopicInChatMessage = "message.in_chat"
 )
 
 type BroadcastEventType string
 
 const (
 	// ---- Message-related ----
-	EventMessageCreated BroadcastEventType = "message_created"
-	EventMessageDeleted BroadcastEventType = "message_deleted"
+	BroadcastEventMessageCreated BroadcastEventType = "message_created"
+	BroadcastEventMessageDeleted BroadcastEventType = "message_deleted"
+	BroadcastEventTypingStart    BroadcastEventType = "typing_start"
+	BroadcastEventTypingStop     BroadcastEventType = "typing_stop"
+	BroadcastEventMessageRead    BroadcastEventType = "message_read"
 
-	// ---- Typing indicators ----
-	EventTypingStart BroadcastEventType = "typing_start"
-	EventTypingStop  BroadcastEventType = "typing_stop"
-
-	// ---- Read receipts ----
-	EventMessageRead BroadcastEventType = "message_read"
+	// ---- Notification-related ----
+	BroadcastEventMessageNotification BroadcastEventType = "message_notification"
 )
 
 type BroadcastEvent struct {
-	RecipientIDs  []string           `json:"recipient_ids"`
-	EventType     BroadcastEventType `json:"event_type"`
-	TempMessageID string             `json:"temp_id"`
-	Data          interface{}        `json:"data"`
+	RecipientIDs []string           `json:"recipient_ids"`
+	EventType    BroadcastEventType `json:"event_type"`
+	TempID       string             `json:"temp_id"`
+	Data         interface{}        `json:"data"`
 }
 
 func (e BroadcastEvent) Topic() string {
@@ -50,10 +50,10 @@ func (e BroadcastEvent) Topic() string {
 
 func (e BroadcastEvent) Payload() map[string]interface{} {
 	return map[string]interface{}{
-		"recipient_ids":   e.RecipientIDs,
-		"event_type":      e.EventType,
-		"temp_message_id": e.TempMessageID,
-		"data":            e.Data,
+		"recipient_ids": e.RecipientIDs,
+		"event_type":    e.EventType,
+		"temp_id":       e.TempID,
+		"data":          e.Data,
 	}
 }
 
@@ -145,11 +145,12 @@ func (e NotificationCreatedEvent) Payload() map[string]interface{} {
 // --- Message Events ---
 
 type NewMessageEvent struct {
-	TempMessageID string            `json:"temp_message_id"`
-	ChannelID     string            `json:"channel_id"`
-	SenderID      string            `json:"sender_id"`
-	Type          model.MessageType `json:"type"`
-	Content       string            `json:"content"`
+	TempMessageID  string            `json:"temp_message_id"`
+	ChannelID      string            `json:"channel_id"`
+	SenderID       string            `json:"sender_id"`
+	SenderUsername string            `json:"sender_username"`
+	Type           model.MessageType `json:"type"`
+	Content        string            `json:"content"`
 }
 
 func (e NewMessageEvent) Topic() string {
@@ -161,6 +162,7 @@ func (e NewMessageEvent) Payload() map[string]interface{} {
 		"temp_message_id": e.TempMessageID,
 		"channel_id":      e.ChannelID,
 		"sender_id":       e.SenderID,
+		"sender_username": e.SenderUsername,
 		"type":            e.Type,
 		"content":         e.Content,
 	}
@@ -203,5 +205,23 @@ func (e TypingMessageEvent) Payload() map[string]interface{} {
 		"channel_id": e.ChannelID,
 		"sender_id":  e.SenderID,
 		"is_typing":  e.IsTyping,
+	}
+}
+
+type InChatMessageEvent struct {
+	ChannelID string `json:"channel_id"`
+	UserID    string `json:"user_id"`
+	IsInChat  bool   `json:"is_in_chat"`
+}
+
+func (e InChatMessageEvent) Topic() string {
+	return TopicInChatMessage
+}
+
+func (e InChatMessageEvent) Payload() map[string]interface{} {
+	return map[string]interface{}{
+		"channel_id": e.ChannelID,
+		"user_id":    e.UserID,
+		"is_in_chat": e.IsInChat,
 	}
 }

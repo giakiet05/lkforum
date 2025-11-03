@@ -5,11 +5,13 @@ import (
 	"log"
 	"time"
 
+	"github.com/giakiet05/lkforum/internal/config"
 	"github.com/giakiet05/lkforum/internal/dto"
 	"github.com/giakiet05/lkforum/internal/model"
 	"github.com/giakiet05/lkforum/internal/platform/bus"
 	"github.com/giakiet05/lkforum/internal/repo"
 	"github.com/giakiet05/lkforum/internal/util"
+	"github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -25,15 +27,17 @@ type notificationService struct {
 	postRepo         repo.PostRepo
 	commentRepo      repo.CommentRepo
 	eventBus         *bus.EventBus
+	redisClient      *redis.Client
 }
 
-func NewNotificationService(notificationRepo repo.NotificationRepo, userRepo repo.UserRepo, postRepo repo.PostRepo, commentRepo repo.CommentRepo, bus *bus.EventBus) NotificationService {
+func NewNotificationService(notificationRepo repo.NotificationRepo, userRepo repo.UserRepo, postRepo repo.PostRepo, commentRepo repo.CommentRepo, bus *bus.EventBus, redis *redis.Client) NotificationService {
 	return &notificationService{
 		notificationRepo: notificationRepo,
 		userRepo:         userRepo,
 		postRepo:         postRepo,
 		commentRepo:      commentRepo,
 		eventBus:         bus,
+		redisClient:      redis,
 	}
 }
 
@@ -42,6 +46,7 @@ func (s *notificationService) Start() {
 
 	s.eventBus.Subscribe(bus.TopicPostUpvoted, eventChannel)
 	s.eventBus.Subscribe(bus.TopicCommentCreated, eventChannel)
+	s.eventBus.Subscribe(bus.TopicBroadcast, eventChannel)
 
 	log.Println("NotificationService started and subscribed to events.")
 
@@ -55,6 +60,8 @@ func (s *notificationService) processEvents(ch bus.EventListener) {
 			s.handlePostUpvoted(event)
 		case bus.TopicCommentCreated:
 			s.handleCommentCreated(event)
+		case bus.TopicBroadcast:
+			s.handleBroadcast(event)
 		}
 	}
 }
@@ -157,6 +164,69 @@ func (s *notificationService) handleCommentCreated(event bus.Event) {
 		RecipientID:  parentAuthorID,
 		Notification: dto.FromNotification(createdNotification),
 	})
+}
+
+func (s *notificationService) handleBroadcast(event bus.Event) {
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
+
+	payload := event.Payload()
+	recipientIDs, _ := payload["recipient_ids"].([]string)
+	eventType, _ := payload["event_type"].(bus.BroadcastEventType)
+	data := payload["data"]
+
+	switch eventType {
+	case bus.BroadcastEventMessageCreated:
+		// Send notification to user not in chat
+		var messageData dto.MessageResponse
+		if err := util.DecodeJson(data, &messageData); err != nil {
+			log.Printf("Failed to decode message: %v", err)
+			return
+		}
+
+		key := fmt.Sprintf(config.RedisActiveUsersKey, messageData.ChannelID)
+		isInChat, err := s.redisClient.SIsMember(ctx, key, recipientIDs[0]).Result()
+		if err != nil {
+			log.Printf("Failed to check active users: %v", err)
+			return
+		}
+
+		if isInChat {
+			// Recipient is in chat, skip notification
+			return
+		}
+
+		recipientObjectID, err := primitive.ObjectIDFromHex(recipientIDs[0])
+		if err != nil {
+			return
+		}
+
+		actorObjectID, err := primitive.ObjectIDFromHex(messageData.SenderID)
+		if err != nil {
+			return
+		}
+
+		notification := &model.Notification{
+			RecipientID: recipientObjectID,
+			ActorID:     actorObjectID,
+			Type:        model.NotificationTypeNewMessage,
+			Message:     fmt.Sprintf("Tin nhắn mới từ %s", messageData.SenderUsername),
+			Link:        fmt.Sprintf("/channels/%s", messageData.ChannelID),
+			IsRead:      false,
+			CreatedAt:   time.Now(),
+		}
+
+		createdNotification, err := s.notificationRepo.Create(ctx, notification)
+		if err != nil {
+			log.Printf("ERROR: NotificationService: failed to create notification: %v", err)
+			return
+		}
+
+		s.eventBus.Publish(bus.NotificationCreatedEvent{
+			RecipientID:  recipientIDs[0],
+			Notification: dto.FromNotification(createdNotification),
+		})
+	}
 }
 
 func (s *notificationService) GetNotifications(recipientID string, page, pageSize int) (*dto.PaginatedNotificationsResponse, error) {

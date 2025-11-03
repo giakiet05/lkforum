@@ -2,15 +2,18 @@ package service
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"time"
 
 	"github.com/giakiet05/lkforum/internal/apperror"
+	"github.com/giakiet05/lkforum/internal/config"
 	"github.com/giakiet05/lkforum/internal/dto"
 	"github.com/giakiet05/lkforum/internal/model"
 	"github.com/giakiet05/lkforum/internal/platform/bus"
 	"github.com/giakiet05/lkforum/internal/repo"
 	"github.com/giakiet05/lkforum/internal/util"
+	"github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -28,13 +31,15 @@ type messageService struct {
 	messageRepository repo.MessageRepo
 	channelRepository repo.ChannelRepo
 	eventBus          *bus.EventBus
+	redisClient       *redis.Client
 }
 
-func NewMessageService(messageRepo repo.MessageRepo, channelRepo repo.ChannelRepo, bus *bus.EventBus) MessageService {
+func NewMessageService(messageRepo repo.MessageRepo, channelRepo repo.ChannelRepo, bus *bus.EventBus, redis *redis.Client) MessageService {
 	return &messageService{
 		messageRepository: messageRepo,
 		channelRepository: channelRepo,
 		eventBus:          bus,
+		redisClient:       redis,
 	}
 }
 
@@ -43,6 +48,7 @@ func (m *messageService) Start() {
 
 	m.eventBus.Subscribe(bus.TopicNewMessage, eventChannel)
 	m.eventBus.Subscribe(bus.TopicTypingMessage, eventChannel)
+	m.eventBus.Subscribe(bus.TopicInChatMessage, eventChannel)
 
 	log.Println("MessageService started and subscribed to events.")
 
@@ -56,6 +62,8 @@ func (m *messageService) processEvents(ch bus.EventListener) {
 			m.handleNewMessage(event)
 		case bus.TopicTypingMessage:
 			m.handleTypingEvent(event)
+		case bus.TopicInChatMessage:
+			m.handleInChatEvent(event)
 		default:
 			log.Println("Unhandled event topic:", event.Topic())
 		}
@@ -68,6 +76,7 @@ func (m *messageService) handleNewMessage(event bus.Event) {
 	tempMessageID, _ := payload["temp_message_id"].(string)
 	channelID, _ := payload["channel_id"].(string)
 	senderID, _ := payload["sender_id"].(string)
+	senderUsername, _ := payload["sender_username"].(string)
 	content, _ := payload["content"].(string)
 
 	var msgType model.MessageType
@@ -75,7 +84,7 @@ func (m *messageService) handleNewMessage(event bus.Event) {
 		msgType = model.MessageType(t)
 	}
 
-	if tempMessageID == "" || channelID == "" || senderID == "" || content == "" {
+	if tempMessageID == "" || channelID == "" || senderID == "" || senderUsername == "" || content == "" {
 		m.publishMessageError(senderID, channelID, tempMessageID, apperror.ErrBadRequest)
 		return
 	}
@@ -116,14 +125,15 @@ func (m *messageService) handleNewMessage(event bus.Event) {
 	}
 
 	message := &model.Message{
-		ChannelID: channelObjectID,
-		SenderID:  &senderObjectID,
-		Type:      msgType,
-		Content:   content,
-		IsSend:    false,
-		IsRead:    false,
-		IsDeleted: false,
-		CreatedAt: time.Now(),
+		ChannelID:      channelObjectID,
+		SenderID:       &senderObjectID,
+		SenderUsername: senderUsername,
+		Type:           msgType,
+		Content:        content,
+		IsSend:         false,
+		IsRead:         false,
+		IsDeleted:      false,
+		CreatedAt:      time.Now(),
 	}
 
 	message, err = m.messageRepository.Create(ctx, message)
@@ -133,10 +143,10 @@ func (m *messageService) handleNewMessage(event bus.Event) {
 	}
 
 	broadcastEvent := bus.BroadcastEvent{
-		RecipientIDs:  recipientIDs,
-		EventType:     bus.EventMessageCreated,
-		TempMessageID: tempMessageID,
-		Data:          *dto.FromMessage(message),
+		RecipientIDs: recipientIDs,
+		EventType:    bus.BroadcastEventMessageCreated,
+		TempID:       tempMessageID,
+		Data:         *dto.FromMessage(message),
 	}
 
 	m.eventBus.Publish(broadcastEvent)
@@ -171,9 +181,9 @@ func (m *messageService) handleTypingEvent(event bus.Event) {
 		}
 	}
 
-	eventType := bus.EventTypingStop
+	eventType := bus.BroadcastEventTypingStop
 	if isTyping {
-		eventType = bus.EventTypingStart
+		eventType = bus.BroadcastEventTypingStart
 	}
 
 	data := map[string]interface{}{
@@ -188,6 +198,43 @@ func (m *messageService) handleTypingEvent(event bus.Event) {
 		EventType:    eventType,
 		Data:         data,
 	})
+}
+
+func (m *messageService) handleInChatEvent(event bus.Event) {
+	payload := event.Payload()
+
+	channelID, _ := payload["channel_id"].(string)
+	userID, _ := payload["user_id"].(string)
+	isInChat, _ := payload["is_in_chat"].(bool)
+
+	if channelID == "" || userID == "" {
+		m.publishMessageError(userID, channelID, "", apperror.ErrBadRequest)
+		return
+	}
+
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
+
+	_, err := m.channelRepository.GetByID(ctx, channelID)
+	if err != nil {
+		m.publishMessageError(userID, channelID, "", apperror.ErrChannelNotFound)
+		return
+	}
+
+	key := fmt.Sprintf(config.RedisActiveUsersKey, channelID)
+	if isInChat {
+		// User joins chat
+		if err := m.redisClient.SAdd(ctx, key, userID).Err(); err != nil {
+			m.publishMessageError(userID, channelID, "", apperror.ErrInternal)
+			return
+		}
+	} else {
+		// User leaves chat
+		if err := m.redisClient.SRem(ctx, key, userID).Err(); err != nil {
+			m.publishMessageError(userID, channelID, "", apperror.ErrInternal)
+			return
+		}
+	}
 }
 
 func (m *messageService) publishMessageError(senderID string, channelID string, tempMessageID string, err apperror.AppError) {

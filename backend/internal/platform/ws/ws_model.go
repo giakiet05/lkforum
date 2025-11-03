@@ -23,10 +23,11 @@ type WebSocketMessage struct {
 }
 
 type NewMessagePayload struct {
-	TempMessageID string            `json:"temp_message_id"`
-	ChannelID     string            `json:"channel_id"`
-	Type          model.MessageType `json:"type"`
-	Content       string            `json:"content"`
+	TempMessageID  string            `json:"temp_message_id"`
+	ChannelID      string            `json:"channel_id"`
+	SenderUsername string            `json:"sender_username"`
+	Type           model.MessageType `json:"type"`
+	Content        string            `json:"content"`
 }
 
 type SendMessagePayload struct {
@@ -45,13 +46,17 @@ type TypingIndicatorPayload struct {
 }
 
 type InChatIndicatorPayload struct {
-	TempMessageID  string `json:"temp_message_id"`
-	ConversationId string `json:"conversation_id"`
-	IsInChat       bool   `json:"is_in_chat"`
+	ChannelID string `json:"channel_id"`
+	IsInChat  bool   `json:"is_in_chat"`
 }
 
 type ErrorPayload struct {
 	TempMessageID *string `json:"temp_message_id,omitempty"`
 	ErrorCode     *string `json:"error_code,omitempty"`
 	ErrorMsg      string  `json:"error_msg"`
+}
+
+type ChatPresenceKey struct {
+	UserID    string
+	ChannelID string
 }

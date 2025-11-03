@@ -7,6 +7,7 @@ import (
 
 	"github.com/giakiet05/lkforum/internal/dto"
 	"github.com/giakiet05/lkforum/internal/platform/bus"
+	"github.com/giakiet05/lkforum/internal/util"
 )
 
 // Hub maintains the set of active clients and broadcasts messages to them.
@@ -51,14 +52,12 @@ func (h *Hub) run(eventChannel bus.EventListener) {
 		case client := <-h.register:
 			h.userClients[client.UserID] = client
 			log.Printf("WebSocket client registered: %s", client.UserID)
-
 		case client := <-h.unregister:
 			if _, ok := h.userClients[client.UserID]; ok {
 				delete(h.userClients, client.UserID)
 				close(client.send)
 				log.Printf("WebSocket client unregistered: %s", client.UserID)
 			}
-
 		case data := <-h.incoming:
 			//Handle message receive from client
 			parts := bytes.SplitN(data, []byte("|"), 2)
@@ -70,7 +69,6 @@ func (h *Hub) run(eventChannel bus.EventListener) {
 			userID := string(parts[0])
 			message := parts[1]
 			h.handleIncoming(message, userID)
-
 		case event := <-eventChannel:
 			//Handle event
 			switch event.Topic() {
@@ -81,15 +79,14 @@ func (h *Hub) run(eventChannel bus.EventListener) {
 						h.sendToUser(recipientID, NewNotification, notification)
 					}
 				}
-
 			case bus.TopicBroadcast:
 				payload := event.Payload()
 				recipientIDs, _ := payload["recipient_ids"].([]string)
 				eventType, _ := payload["event_type"].(bus.BroadcastEventType)
-				tempMessageID, _ := payload["temp_message_id"].(string)
+				tempID, _ := payload["temp_id"].(string)
 				data := payload["data"]
 
-				h.handleBroadcast(recipientIDs, string(eventType), tempMessageID, data)
+				h.handleBroadcast(recipientIDs, string(eventType), tempID, data)
 			case bus.TopicMessageError:
 				payload := event.Payload()
 				senderID, _ := payload["sender_id"].(string)
@@ -103,7 +100,6 @@ func (h *Hub) run(eventChannel bus.EventListener) {
 					ErrorMsg:      errorMsg,
 				}
 				h.sendToUser(senderID, ErrorMessage, errPayload)
-
 			default:
 				log.Printf("WebSocket client received unknown event: %s", event.Topic())
 			}
@@ -121,22 +117,23 @@ func (h *Hub) handleIncoming(raw []byte, userID string) {
 	switch incomingMsg.Type {
 	case NewMessage:
 		var payload NewMessagePayload
-		if err := decodePayload(incomingMsg.Payload, &payload); err != nil {
+		if err := util.DecodeJson(incomingMsg.Payload, &payload); err != nil {
 			log.Printf("WebSocket invalid new message payload from user %s: %v", userID, err)
 			h.sendToUser(userID, ErrorMessage, ErrorPayload{ErrorMsg: err.Error(), TempMessageID: nil})
 			return
 		}
 
 		h.eventBus.Publish(bus.NewMessageEvent{
-			TempMessageID: payload.TempMessageID,
-			ChannelID:     payload.ChannelID,
-			SenderID:      userID,
-			Type:          payload.Type,
-			Content:       payload.Content,
+			TempMessageID:  payload.TempMessageID,
+			ChannelID:      payload.ChannelID,
+			SenderID:       userID,
+			SenderUsername: payload.SenderUsername,
+			Type:           payload.Type,
+			Content:        payload.Content,
 		})
 	case TypingIndicator:
 		var payload TypingIndicatorPayload
-		if err := decodePayload(incomingMsg.Payload, &payload); err != nil {
+		if err := util.DecodeJson(incomingMsg.Payload, &payload); err != nil {
 			log.Printf("WebSocket invalid typing indicator payload from user %s: %v", userID, err)
 			h.sendToUser(userID, ErrorMessage, ErrorPayload{ErrorMsg: err.Error()})
 			return
@@ -147,6 +144,19 @@ func (h *Hub) handleIncoming(raw []byte, userID string) {
 			SenderID:  userID,
 			IsTyping:  payload.IsTyping,
 		})
+	case InChatIndicator:
+		var payload InChatIndicatorPayload
+		if err := util.DecodeJson(incomingMsg.Payload, &payload); err != nil {
+			log.Printf("WebSocket invalid in-chat indicator payload from user %s: %v", userID, err)
+			h.sendToUser(userID, ErrorMessage, ErrorPayload{ErrorMsg: err.Error()})
+			return
+		}
+
+		h.eventBus.Publish(bus.InChatMessageEvent{
+			ChannelID: payload.ChannelID,
+			UserID:    userID,
+			IsInChat:  payload.IsInChat,
+		})
 	default:
 		log.Printf("Unknown incoming type: %s", incomingMsg.Type)
 	}
@@ -154,10 +164,10 @@ func (h *Hub) handleIncoming(raw []byte, userID string) {
 
 func (h *Hub) handleBroadcast(recipientIDs []string, eventType string, tempMessageID string, data interface{}) {
 	switch eventType {
-	// Handle new message
-	case string(bus.EventMessageCreated):
+	case string(bus.BroadcastEventMessageCreated):
+		// Handle new message
 		var messageData dto.MessageResponse
-		if err := decodePayload(data, &messageData); err != nil {
+		if err := util.DecodeJson(data, &messageData); err != nil {
 			log.Printf("Failed to decode message payload: %v", err)
 			return
 		}
@@ -174,22 +184,12 @@ func (h *Hub) handleBroadcast(recipientIDs []string, eventType string, tempMessa
 			Message: messageData,
 		}
 		h.broadcastToUsers(recipientIDs, SendMessage, response)
-
-	// Handle typing indicator
-	case string(bus.EventTypingStart), string(bus.EventTypingStop):
+	case string(bus.BroadcastEventTypingStart), string(bus.BroadcastEventTypingStop):
+		// Handle typing message
 		h.broadcastToUsers(recipientIDs, TypingIndicator, data)
-
 	default:
 		log.Printf("Unhandled broadcast event type: %s", eventType)
 	}
-}
-
-func decodePayload[T any](data interface{}, out *T) error {
-	marshal, err := json.Marshal(data)
-	if err != nil {
-		return err
-	}
-	return json.Unmarshal(marshal, out)
 }
 
 // sendToUser is a private method to send a message to a specific user.
