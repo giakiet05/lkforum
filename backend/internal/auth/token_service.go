@@ -3,8 +3,10 @@ package auth
 import (
 	"context"
 	"fmt"
-	"github.com/redis/go-redis/v9"
 	"time"
+
+	"github.com/giakiet05/lkforum/internal/config"
+	"github.com/redis/go-redis/v9"
 )
 
 // TokenService handles token operations including invalidation
@@ -21,13 +23,13 @@ func NewTokenService(redisClient *redis.Client) *TokenService {
 
 // InvalidateAllUserTokens marks a user as deleted in Redis
 func (s *TokenService) InvalidateAllUserTokens(ctx context.Context, userID string) error {
-	key := fmt.Sprintf("invalidated:user:%s", userID)
+	key := fmt.Sprintf(config.RedisInvalidatedUserKey, userID)
 	return s.redisClient.Set(ctx, key, time.Now().Unix(), 90*24*time.Hour).Err()
 }
 
 // IsUserValid checks if a user is still valid (not invalidated)
 func (s *TokenService) IsUserValid(ctx context.Context, userID string) bool {
-	key := fmt.Sprintf("invalidated:user:%s", userID)
+	key := fmt.Sprintf(config.RedisInvalidatedUserKey, userID)
 	exists, err := s.redisClient.Exists(ctx, key).Result()
 	return exists == 0 && err == nil
 }

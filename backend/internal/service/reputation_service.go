@@ -25,20 +25,21 @@ type ReputationService interface {
 
 type reputationService struct {
 	userRepo repo.UserRepo
+	eventBus *bus.EventBus
 }
 
-func NewReputationService(userRepo repo.UserRepo) ReputationService {
-	return &reputationService{userRepo: userRepo}
+func NewReputationService(userRepo repo.UserRepo, bus *bus.EventBus) ReputationService {
+	return &reputationService{userRepo: userRepo, eventBus: bus}
 }
 
 // Start subscribes to relevant events and starts the reputation processing goroutine.
 func (s *reputationService) Start() {
 	eventChannel := make(bus.EventListener, 100)
 
-	bus.Bus.Subscribe(bus.TopicPostCreated, eventChannel)
-	bus.Bus.Subscribe(bus.TopicPostUpvoted, eventChannel)
-	bus.Bus.Subscribe(bus.TopicPostDownvoted, eventChannel)
-	bus.Bus.Subscribe(bus.TopicCommentCreated, eventChannel)
+	s.eventBus.Subscribe(bus.TopicPostCreated, eventChannel)
+	s.eventBus.Subscribe(bus.TopicPostUpvoted, eventChannel)
+	s.eventBus.Subscribe(bus.TopicPostDownvoted, eventChannel)
+	s.eventBus.Subscribe(bus.TopicCommentCreated, eventChannel)
 
 	log.Println("ReputationService started and subscribed to events.")
 

@@ -7,7 +7,7 @@ import (
 )
 
 type Community struct {
-	ID             primitive.ObjectID `bson:"_id,omitempty" json:"id"`
+	ID             primitive.ObjectID `bson:"_id,omitempty" json:"id,omitempty"`
 	Name           string             `bson:"name,omitempty" json:"name,omitempty"`
 	Description    *string            `bson:"description,omitempty" json:"description,omitempty"`
 	Avatar         *string            `bson:"avatar,omitempty" json:"avatar,omitempty"`

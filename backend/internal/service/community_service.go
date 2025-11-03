@@ -103,8 +103,9 @@ func (c *communityService) GetCommunitiesFilter(
 	var response = &dto.PaginatedCommunitiesResponse{
 		Communities: communitiesResponses,
 		Pagination: dto.Pagination{
-			Total: total,
-			Page:  page,
+			Total:    total,
+			Page:     page,
+			PageSize: pageSize,
 		},
 	}
 

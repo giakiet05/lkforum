@@ -20,10 +20,12 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-type WebSocketController struct{}
+type WebSocketController struct {
+	wsHub *ws.Hub
+}
 
-func NewWebSocketController() *WebSocketController {
-	return &WebSocketController{}
+func NewWebSocketController(hub *ws.Hub) *WebSocketController {
+	return &WebSocketController{wsHub: hub}
 }
 
 // HandleConnections handles the WebSocket connection requests.
@@ -42,10 +44,10 @@ func (c *WebSocketController) HandleConnections(ctx *gin.Context) {
 	}
 
 	// Create a new client instance.
-	client := ws.NewClient(ws.WSHub, conn, userID)
+	client := ws.NewClient(c.wsHub, conn, userID)
 
 	// Register the client with the hub.
-	ws.WSHub.RegisterClient(client)
+	c.wsHub.RegisterClient(client)
 
 	// Start the client's processing goroutines.
 	client.Serve()
