@@ -76,14 +76,14 @@ func initRepos(client *mongo.Client, db *mongo.Database) *Repos {
 func initServices(repos *Repos, redisClient *redis.Client, emailSender email.Sender, eventBus *bus.EventBus) *Services {
 	return &Services{
 		AuthService:         service.NewAuthService(repos.UserRepo, emailSender),
-		UserService:         service.NewUserService(repos.UserRepo),
-		CommunityService:    service.NewCommunityService(repos.CommunityRepo),
+		UserService:         service.NewUserService(repos.UserRepo, eventBus),
+		CommunityService:    service.NewCommunityService(repos.CommunityRepo, eventBus),
 		MembershipService:   service.NewMembershipService(repos.MembershipRepo, redisClient),
 		PostService:         service.NewPostService(repos.PostRepo, repos.PostVoteRepo, repos.PostPollRepo, repos.PostImageRepo, eventBus),
 		CommentService:      service.NewCommentService(repos.CommentRepo, eventBus),
 		ReputationService:   service.NewReputationService(repos.UserRepo, eventBus),
 		NotificationService: service.NewNotificationService(repos.NotificationRepo, repos.UserRepo, repos.PostRepo, repos.CommentRepo, eventBus, redisClient),
-		ChannelService:      service.NewChannelService(repos.ChannelRepo),
+		ChannelService:      service.NewChannelService(repos.ChannelRepo, eventBus),
 		MessageService:      service.NewMessageService(repos.MessageRepo, repos.ChannelRepo, eventBus, redisClient),
 	}
 }
@@ -165,6 +165,8 @@ func Init() (*gin.Engine, error) {
 	services.ReputationService.Start()
 	services.NotificationService.Start()
 	services.MessageService.Start()
+	services.ChannelService.Start()
+	services.CommunityService.Start()
 
 	return router, nil
 }

@@ -18,6 +18,7 @@ type ChannelRepo interface {
 	GetByUserID(ctx context.Context, userID string, page int, pageSize int) ([]model.Channel, int64, error)
 	GetByBothUserID(ctx context.Context, user1ID string, user2ID string) (*model.Channel, error)
 	Update(ctx context.Context, channel *model.Channel) (*model.Channel, error)
+	UpdateUserAvatar(ctx context.Context, userID string, newAvatar string) error
 	Delete(ctx context.Context, channelID string, userID string) error
 	IsMember(ctx context.Context, channelID string, userID string) (bool, error)
 }
@@ -148,6 +149,35 @@ func (c *channelRepo) Update(ctx context.Context, channel *model.Channel) (*mode
 	}
 
 	return &updated, nil
+}
+
+func (c *channelRepo) UpdateUserAvatar(ctx context.Context, userID string, newAvatar string) error {
+	userObjectID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return err
+	}
+
+	filter := bson.M{
+		"members.user_id": userObjectID,
+	}
+
+	update := bson.M{
+		"$set": bson.M{
+			"members.$[elem].avatar": newAvatar,
+			"updated_at":             time.Now(),
+		},
+	}
+
+	arrayFilters := options.ArrayFilters{
+		Filters: []interface{}{
+			bson.M{"elem.user_id": userObjectID},
+		},
+	}
+
+	opts := options.Update().SetArrayFilters(arrayFilters).SetUpsert(false)
+
+	_, err = c.channelCollection.UpdateMany(ctx, filter, update, opts)
+	return err
 }
 
 func (c *channelRepo) Delete(ctx context.Context, channelID string, userID string) error {

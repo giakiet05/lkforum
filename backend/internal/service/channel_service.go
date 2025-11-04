@@ -1,17 +1,20 @@
 package service
 
 import (
+	"log"
 	"time"
 
 	"github.com/giakiet05/lkforum/internal/apperror"
 	"github.com/giakiet05/lkforum/internal/dto"
 	"github.com/giakiet05/lkforum/internal/model"
+	"github.com/giakiet05/lkforum/internal/platform/bus"
 	"github.com/giakiet05/lkforum/internal/repo"
 	"github.com/giakiet05/lkforum/internal/util"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type ChannelService interface {
+	Start()
 	CreateChannel(req *dto.CreateChannelRequest, userID string) (*model.Channel, error)
 	GetChannelByID(channelID string) (*model.Channel, error)
 	GetChannelsByUserID(userID string, requesterID string, page int, pageSize int) (*dto.PaginatedChannelsResponse, error)
@@ -22,11 +25,52 @@ type ChannelService interface {
 
 type channelService struct {
 	channelRepository repo.ChannelRepo
+	eventBus          *bus.EventBus
 }
 
-func NewChannelService(channelRepo repo.ChannelRepo) ChannelService {
+func NewChannelService(channelRepo repo.ChannelRepo, bus *bus.EventBus) ChannelService {
 	return &channelService{
 		channelRepository: channelRepo,
+		eventBus:          bus,
+	}
+}
+
+func (s *channelService) Start() {
+	eventChannel := make(bus.EventListener, 100)
+
+	s.eventBus.Subscribe(bus.TopicUserChangeAvatar, eventChannel)
+
+	log.Println("ChannelService started and subscribed to events.")
+
+	go s.processEvents(eventChannel)
+}
+
+func (s *channelService) processEvents(ch bus.EventListener) {
+	for event := range ch {
+		switch event.Topic() {
+		case bus.TopicUserChangeAvatar:
+			s.handleNewAvatar(event)
+		default:
+			log.Println("Unhandled event topic:", event.Topic())
+		}
+	}
+}
+
+func (s *channelService) handleNewAvatar(event bus.Event) {
+	payload := event.Payload()
+	userID, _ := payload["user_id"].(string)
+	newAvatar, _ := payload["new_avatar"].(string)
+
+	if userID == "" || newAvatar == "" {
+		return
+	}
+
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
+
+	err := s.channelRepository.UpdateUserAvatar(ctx, userID, newAvatar)
+	if err != nil {
+		log.Printf("Failed to update avatar: %v", err)
 	}
 }
 

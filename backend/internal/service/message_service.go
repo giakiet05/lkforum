@@ -20,8 +20,6 @@ import (
 
 type MessageService interface {
 	Start()
-
-	//CreateMessage(req *dto.CreateMessageRequest, requesterID string) (*model.Message, error)
 	GetMessageByID(channelID string, messageID string, requesterID string) (*model.Message, error)
 	GetMessageFilter(query *dto.GetMessageFilterQuery, requesterID string) (*dto.PaginatedMessagesResponse, error)
 	DeleteMessage(channelID string, messageID string, requesterID string) error

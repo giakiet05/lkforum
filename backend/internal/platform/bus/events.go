@@ -9,6 +9,8 @@ import (
 const (
 	TopicBroadcast = "broadcast"
 
+	TopicUserChangeAvatar = "user.avatar"
+
 	TopicPostCreated         = "post.created"
 	TopicPostUpvoted         = "post.upvoted"
 	TopicPostDownvoted       = "post.downvoted"
@@ -54,6 +56,22 @@ func (e BroadcastEvent) Payload() map[string]interface{} {
 		"event_type":    e.EventType,
 		"temp_id":       e.TempID,
 		"data":          e.Data,
+	}
+}
+
+type UserChangeAvatarEventType struct {
+	UserID    string
+	NewAvatar string
+}
+
+func (e UserChangeAvatarEventType) Topic() string {
+	return TopicUserChangeAvatar
+}
+
+func (e UserChangeAvatarEventType) Payload() map[string]interface{} {
+	return map[string]interface{}{
+		"user_id":    e.UserID,
+		"new_avatar": e.NewAvatar,
 	}
 }
 

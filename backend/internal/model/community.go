@@ -37,5 +37,6 @@ type CommunitySetting struct {
 type Moderator struct {
 	UserID     primitive.ObjectID `bson:"user_id,omitempty" json:"user_id,omitempty"`
 	Username   string             `bson:"username,omitempty" json:"username,omitempty"`
+	Avatar     string             `bson:"avatar,omitempty" json:"avatar,omitempty"`
 	AssignedAt time.Time          `bson:"assigned_at,omitempty" json:"assigned_at,omitempty"`
 }
