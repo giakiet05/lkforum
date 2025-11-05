@@ -37,3 +37,8 @@ type PaginatedMessagesResponse struct {
 	Messages   []MessageResponse `json:"messages"`
 	Pagination Pagination        `json:"pagination"`
 }
+
+type PaginatedPostHistoryResponse struct {
+	PostHistories []PostHistoryResponse `json:"post_histories"`
+	Pagination    Pagination            `json:"pagination"`
+}

@@ -29,6 +29,7 @@ type Repos struct {
 	repo.NotificationRepo
 	repo.ChannelRepo
 	repo.MessageRepo
+	repo.PostHistoryRepo
 }
 
 type Services struct {
@@ -42,6 +43,7 @@ type Services struct {
 	service.NotificationService
 	service.ChannelService
 	service.MessageService
+	service.PostHistoryService
 }
 
 type Controllers struct {
@@ -55,6 +57,7 @@ type Controllers struct {
 	controller.WebSocketController
 	controller.ChannelController
 	controller.MessageController
+	controller.PostHistoryController
 }
 
 func initRepos(client *mongo.Client, db *mongo.Database) *Repos {
@@ -70,6 +73,7 @@ func initRepos(client *mongo.Client, db *mongo.Database) *Repos {
 		NotificationRepo: repo.NewNotificationRepo(db),
 		ChannelRepo:      repo.NewChannelRepo(db),
 		MessageRepo:      repo.NewMessageRepo(db),
+		PostHistoryRepo:  repo.NewPostHistoryRepo(db),
 	}
 }
 
@@ -85,6 +89,7 @@ func initServices(repos *Repos, redisClient *redis.Client, emailSender email.Sen
 		NotificationService: service.NewNotificationService(repos.NotificationRepo, repos.UserRepo, repos.PostRepo, repos.CommentRepo, eventBus, redisClient),
 		ChannelService:      service.NewChannelService(repos.ChannelRepo, eventBus),
 		MessageService:      service.NewMessageService(repos.MessageRepo, repos.ChannelRepo, eventBus, redisClient),
+		PostHistoryService:  service.NewPostHistoryService(repos.PostHistoryRepo),
 	}
 }
 
@@ -100,6 +105,7 @@ func initControllers(services *Services, wsHub *ws.Hub) *Controllers {
 		WebSocketController:    *controller.NewWebSocketController(wsHub),
 		ChannelController:      *controller.NewChannelController(services.ChannelService),
 		MessageController:      *controller.NewMessageController(services.MessageService),
+		PostHistoryController:  *controller.NewPostHistoryController(services.PostHistoryService),
 	}
 }
 
@@ -123,6 +129,7 @@ func initRoutes(controllers *Controllers, r *gin.Engine) {
 	userroute.RegisterWebSocketRoutes(api, &controllers.WebSocketController)
 	userroute.RegisterChannelRoutes(api, &controllers.ChannelController)
 	userroute.RegisterMessageRoutes(api, &controllers.MessageController)
+	userroute.RegisterPostHistoryRoutes(api, &controllers.PostHistoryController)
 }
 
 func Init() (*gin.Engine, error) {

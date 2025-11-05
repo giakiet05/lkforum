@@ -25,13 +25,10 @@ type Community struct {
 }
 
 type CommunitySetting struct {
-	IsPrivate           bool `bson:"isPrivate" json:"isPrivate"` // visible only to members
-	AllowPosts          bool `bson:"allowPosts" json:"allowPosts"`
-	AllowComments       bool `bson:"allowComments" json:"allowComments"`
-	AllowMedia          bool `bson:"allowMedia" json:"allowMedia"`
-	PostRequireApproval bool `bson:"requireApproval" json:"requireApproval"`         // new posts need moderator approval
-	JoinRequireApproval bool `bson:"joinRequireApproval" json:"joinRequireApproval"` // new member need moderator approval
-	MaxPostLength       int  `bson:"maxPostLength,omitempty" json:"maxPostLength,omitempty"`
+	IsPrivate           bool `bson:"is_private" json:"is_private"`                       //post visible only to members
+	PostRequireApproval bool `bson:"post_require_approval" json:"post_require_approval"` // new posts need moderator approval
+	JoinRequireApproval bool `bson:"join_require_approval" json:"join_require_approval"` // new member need moderator approval
+	MaxPostLength       int  `bson:"max_post_length" json:"max_post_length"`
 }
 
 type Moderator struct {
