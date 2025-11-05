@@ -7,6 +7,8 @@ import PostDetail from './pages/PostDetail.svelte';
 import Community from './pages/Community.svelte';
 import ManageCommunities from './pages/ManageCommunities.svelte';
 import ModTools from './pages/ModTools.svelte';
+import Messages from './pages/Messages.svelte';
+import GoogleCallback from './pages/GoogleCallback.svelte';
 
 const routes = {
     '/': Home,
@@ -18,6 +20,8 @@ const routes = {
     '/lk/:name': Community,
     '/lk/:name/mod': ModTools,
     '/communities/manage': ManageCommunities,
+    '/messages': Messages,
+    '/auth/google/callback': GoogleCallback,
 };
 
 export default routes;

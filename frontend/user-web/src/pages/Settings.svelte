@@ -227,7 +227,7 @@
   .settings-page {
     background-color: white;
     min-height: 100vh;
-    padding-top: 0px;
+    padding-top: 72px;
   }
 
   .settings-container {
@@ -238,7 +238,6 @@
 
   .settings-header {
     margin-bottom: 2rem;
-    margin-top: -48px;
   }
 
   .settings-header h1 {

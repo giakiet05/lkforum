@@ -78,7 +78,7 @@ export async function getValidAccessToken(): Promise<string | null> {
 }
 
 export async function register(data: RegisterDto): Promise<LoginResponse> {
-  const res = await fetch(`${API_BASE_URL}/api/auth/register`, {
+  const res = await fetch(`${API_BASE_URL}/api/auth/local/register`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -109,7 +109,7 @@ export async function register(data: RegisterDto): Promise<LoginResponse> {
 
 export async function login(credentials: LoginRequest): Promise<LoginResponse> {
     console.log('Login request:', credentials);
-    const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
+    const res = await fetch(`${API_BASE_URL}/api/auth/local/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(credentials),

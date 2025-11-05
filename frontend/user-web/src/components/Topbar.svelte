@@ -1,6 +1,7 @@
 <script lang="ts">
   import AuthModal from "./AuthModal.svelte";
   import CreatePostModal from "./CreatePostModal.svelte";
+  import ChatPopup from "./ChatPopup.svelte";
   import { push } from "svelte-spa-router";
 
   type TopbarProps = {
@@ -25,6 +26,7 @@
   let showUserMenu = $state(false);
   let showAuthModal = $state(false);
   let showCreatePostModal = $state(false);
+  let showChatPopup = $state(false);
   let dropdownElement: HTMLDivElement | null = null;
 
   function handleSearch() {
@@ -188,6 +190,15 @@
           {/if}
         </button>
 
+        <!-- Messages Button -->
+        <button
+          class="icon-button"
+          on:click={() => (showChatPopup = true)}
+          title="Messages"
+        >
+          <img src="/message_icon.svg" alt="Messages" width="24" height="24" />
+        </button>
+
         {#if user}
           <div class="user-menu-wrapper">
             <div
@@ -335,6 +346,8 @@
   show={showCreatePostModal}
   onClose={() => (showCreatePostModal = false)}
 />
+
+<ChatPopup show={showChatPopup} onClose={() => (showChatPopup = false)} />
 
 <style>
   :root {
@@ -625,7 +638,7 @@
     padding: 8px 16px;
     border: none;
     border-radius: 20px;
-    background: var(--darkblue--);
+    background: var(--blue--);
     cursor: pointer;
     text-decoration: none;
     color: white;
