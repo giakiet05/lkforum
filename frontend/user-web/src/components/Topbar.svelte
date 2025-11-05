@@ -638,7 +638,7 @@
     padding: 8px 16px;
     border: none;
     border-radius: 20px;
-    background: var(--darkblue--);
+    background: var(--blue--);
     cursor: pointer;
     text-decoration: none;
     color: white;

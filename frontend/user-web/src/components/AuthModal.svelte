@@ -502,6 +502,20 @@
           Đăng nhập
         </button>
       </div>
+
+      <!-- Google Login -->
+      <div class="social-divider">
+        <span>hoặc</span>
+      </div>
+
+      <Button
+        label="Đăng nhập với Google"
+        variant="google"
+        disabled={isLoading}
+        onclick={() => {
+          window.location.href = `${API_BASE_URL}/api/auth/google/login`;
+        }}
+      />
     </form>
   {:else}
     <!-- Verify OTP Form -->
@@ -790,5 +804,37 @@
 
   .login-link-btn:hover {
     text-decoration: underline;
+  }
+
+  /* Social Login */
+  .social-divider {
+    position: relative;
+    text-align: center;
+    margin: 20px 0;
+  }
+
+  .social-divider::before,
+  .social-divider::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    width: 45%;
+    height: 1px;
+    background-color: #e0e0e0;
+  }
+
+  .social-divider::before {
+    left: 0;
+  }
+
+  .social-divider::after {
+    right: 0;
+  }
+
+  .social-divider span {
+    background-color: white;
+    padding: 0 12px;
+    color: #7c7c7c;
+    font-size: 14px;
   }
 </style>
