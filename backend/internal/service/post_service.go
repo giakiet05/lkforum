@@ -97,6 +97,11 @@ func (s *postService) VoteOnPost(ctx context.Context, userID, postID primitive.O
 		return nil, err
 	}
 
+	// Prevent users from voting on their own posts
+	if post.AuthorID == userID {
+		return mapVotesToResponse(post.VotesCount), nil
+	}
+
 	vote := &model.Vote{
 		UserID:     userID,
 		TargetID:   postID,
@@ -107,13 +112,18 @@ func (s *postService) VoteOnPost(ctx context.Context, userID, postID primitive.O
 		return nil, err
 	}
 
-	// Publish event for reputation system
+	// Publish event for reputation and notification systems
 	if voteValue {
-		s.bus.Publish(bus.PostUpvotedEvent{AuthorID: post.AuthorID.Hex()})
+		s.bus.Publish(bus.PostUpvotedEvent{
+			AuthorID: post.AuthorID.Hex(),
+			VoterID:  userID.Hex(),
+			PostID:   postID.Hex(),
+		})
 	} else {
 		s.bus.Publish(bus.PostDownvotedEvent{
 			AuthorID: post.AuthorID.Hex(),
 			VoterID:  userID.Hex(),
+			PostID:   postID.Hex(),
 		})
 	}
 
@@ -125,7 +135,7 @@ func (s *postService) VoteOnPost(ctx context.Context, userID, postID primitive.O
 	return mapVotesToResponse(updatedPost.VotesCount), nil
 }
 
-// ... other methods remain the same for now ...
+// ... other methods ...
 
 func (s *postService) GetPostByID(ctx context.Context, postID, userID primitive.ObjectID) (*dto.PostResponse, error) {
 	post, err := s.postRepo.GetByID(ctx, postID)

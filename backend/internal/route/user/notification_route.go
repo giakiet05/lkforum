@@ -1,0 +1,16 @@
+package userroute
+
+import (
+	"github.com/giakiet05/lkforum/internal/controller"
+	"github.com/giakiet05/lkforum/internal/middleware"
+	"github.com/gin-gonic/gin"
+)
+
+func RegisterNotificationRoutes(rg *gin.RouterGroup, c *controller.NotificationController) {
+	notifications := rg.Group("/notifications")
+	notifications.Use(middleware.AuthMiddleware()) // All notification routes require authentication
+	{
+		notifications.GET("", c.GetNotifications)
+		notifications.PUT("/read-all", c.MarkAllAsRead)
+	}
+}

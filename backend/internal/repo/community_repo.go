@@ -20,9 +20,9 @@ type CommunityRepo interface {
 	GetByModeratorIDPaginated(ctx context.Context, moderatorID string, page int, pageSize int) ([]model.Community, int64, error)
 	GetAllPaginated(ctx context.Context, page int, pageSize int) ([]model.Community, int64, error)
 	Update(ctx context.Context, communityID string, updates bson.M) (*model.Community, error)
+	UpdateUserAvatar(ctx context.Context, userID string, newAvatar string) error
 	Replace(ctx context.Context, community *model.Community) error
 	Delete(ctx context.Context, communityID string) error
-
 	IsUserExist(ctx context.Context, userID string) (bool, error)
 }
 
@@ -122,8 +122,9 @@ func (c *communityRepo) GetByModeratorIDPaginated(
 
 	skip := (page - 1) * pageSize
 	filter := bson.M{"moderators.user_id": modObjectID}
+	opt := options.Find().SetSkip(int64(skip)).SetLimit(int64(pageSize))
 
-	cursor, err := c.communityCollection.Find(ctx, filter, options.Find().SetSkip(int64(skip)), options.Find().SetLimit(int64(pageSize)))
+	cursor, err := c.communityCollection.Find(ctx, filter, opt)
 	if err != nil {
 		return nil, -1, err
 	}
@@ -190,6 +191,55 @@ func (c *communityRepo) Update(ctx context.Context, communityID string, updates 
 	}
 
 	return &updated, nil
+}
+
+func (c *communityRepo) UpdateUserAvatar(ctx context.Context, userID string, newAvatar string) error {
+	userObjectID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return err
+	}
+
+	// Update moderator avatars
+	filterModerators := bson.M{
+		"moderators.user_id": userObjectID,
+	}
+
+	updateModerators := bson.M{
+		"$set": bson.M{
+			"moderators.$[elem].avatar": newAvatar,
+			"updated_at":                time.Now(),
+		},
+	}
+
+	arrayFilters := options.ArrayFilters{
+		Filters: []interface{}{
+			bson.M{"elem.user_id": userObjectID},
+		},
+	}
+
+	opts := options.Update().SetArrayFilters(arrayFilters)
+
+	if _, err := c.communityCollection.UpdateMany(ctx, filterModerators, updateModerators, opts); err != nil {
+		return err
+	}
+
+	// Update communities creator avatar
+	filterCreator := bson.M{
+		"create_by_id": userObjectID,
+	}
+
+	updateCreator := bson.M{
+		"$set": bson.M{
+			"create_by_avatar": newAvatar,
+			"updated_at":       time.Now(),
+		},
+	}
+
+	if _, err := c.communityCollection.UpdateMany(ctx, filterCreator, updateCreator); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (c *communityRepo) Replace(ctx context.Context, community *model.Community) error {

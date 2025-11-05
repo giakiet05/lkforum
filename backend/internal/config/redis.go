@@ -8,6 +8,13 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+const (
+	// Redis key patterns
+	RedisInvalidatedUserKey = "invalidated:user:%s"
+	RedisActiveUsersKey     = "channel:%s:active_users"
+	RedisMembersCountKey    = "community:%s:member_count"
+)
+
 // NewRedisClient creates and returns a new Redis client using the global AppConfig.
 func NewRedisClient() *redis.Client {
 	// Create the client with configuration from the global Cfg variable.

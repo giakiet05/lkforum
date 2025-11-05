@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/giakiet05/lkforum/internal/apperror"
+	"github.com/giakiet05/lkforum/internal/config"
 	"github.com/giakiet05/lkforum/internal/dto"
 	"github.com/giakiet05/lkforum/internal/model"
 	"github.com/giakiet05/lkforum/internal/repo"
@@ -224,7 +225,7 @@ func (m *membershipService) ensureMembersCountExists(communityID string) (string
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
 
-	key := fmt.Sprintf("community:%s:member_count", communityID)
+	key := fmt.Sprintf(config.RedisMembersCountKey, communityID)
 
 	exists, err := m.redisClient.Exists(ctx, key).Result()
 	if err != nil {
@@ -246,15 +247,15 @@ func (m *membershipService) ensureMembersCountExists(communityID string) (string
 }
 
 func (m *membershipService) StartRedisToMongoMembershipSync() {
-	// Tạm thời set cứng 1 min
+	// Tạm thời set cứng 5 min
 	ticker := time.NewTicker(5 * time.Minute)
 
 	go func() {
 		for range ticker.C {
 			if err := m.syncMemberCounts(); err != nil {
-				log.Printf("⚠️ Redis→Mongo membership sync failed: %v", err)
+				log.Printf("Redis→Mongo membership sync failed: %v", err)
 			} else {
-				log.Println("✅ Redis→Mongo membership sync completed successfully")
+				log.Println("Redis→Mongo membership sync completed successfully")
 			}
 		}
 	}()
@@ -264,7 +265,7 @@ func (m *membershipService) syncMemberCounts() error {
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
 
-	iter := m.redisClient.Scan(ctx, 0, "community:*:member_count", 0).Iterator()
+	iter := m.redisClient.Scan(ctx, 0, fmt.Sprintf(config.RedisMembersCountKey, "*"), 0).Iterator()
 	for iter.Next(ctx) {
 		key := iter.Val()
 

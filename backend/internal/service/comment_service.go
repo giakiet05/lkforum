@@ -30,7 +30,7 @@ func NewCommentService(commentRepo repo.CommentRepo, bus *bus.EventBus) CommentS
 	return &commentService{commentRepo: commentRepo, bus: bus}
 }
 
-func (c *commentService) CreateComment(request *dto.CreateCommentRequest, userID string) (*model.Comment, error) {
+func (s *commentService) CreateComment(request *dto.CreateCommentRequest, userID string) (*model.Comment, error) {
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
 
@@ -44,6 +44,7 @@ func (c *commentService) CreateComment(request *dto.CreateCommentRequest, userID
 		return nil, err
 	}
 
+	var parentAuthorID string
 	var parentObjectID *primitive.ObjectID
 	if request.ParentID != nil {
 		oid, err := primitive.ObjectIDFromHex(*request.ParentID)
@@ -51,6 +52,12 @@ func (c *commentService) CreateComment(request *dto.CreateCommentRequest, userID
 			return nil, err
 		}
 		parentObjectID = &oid
+
+		// Fetch the parent comment to get its author's ID for the notification
+		parentComment, err := s.commentRepo.GetByID(ctx, *request.ParentID)
+		if err == nil { // If parent comment exists
+			parentAuthorID = parentComment.Author.ID.Hex()
+		}
 	}
 
 	author := model.CommentAuthor{
@@ -68,25 +75,32 @@ func (c *commentService) CreateComment(request *dto.CreateCommentRequest, userID
 		IsDeleted: false,
 	}
 
-	comment, err = c.commentRepo.Create(ctx, comment)
+	createdComment, err := s.commentRepo.Create(ctx, comment)
 	if err != nil {
 		return nil, err
 	}
 
-	// Publish event for reputation system
-	c.bus.Publish(bus.CommentCreatedEvent{AuthorID: userID})
+	// Publish event for reputation and notification systems
+	s.bus.Publish(bus.CommentCreatedEvent{
+		AuthorID:       userID,
+		PostID:         request.PostID,
+		CommentID:      createdComment.ID.Hex(),
+		ParentAuthorID: parentAuthorID,
+	})
 
-	return comment, nil
+	return createdComment, nil
 }
 
-func (c *commentService) GetCommentByID(commentID string) (*model.Comment, error) {
+// ... other methods remain the same
+
+func (s *commentService) GetCommentByID(commentID string) (*model.Comment, error) {
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
 
-	return c.commentRepo.GetByID(ctx, commentID)
+	return s.commentRepo.GetByID(ctx, commentID)
 }
 
-func (c *commentService) GetCommentByPostIDPaginated(query *dto.GetCommentByPostIDQuery) (*dto.PaginatedCommentsResponse, error) {
+func (s *commentService) GetCommentByPostIDPaginated(query *dto.GetCommentByPostIDQuery) (*dto.PaginatedCommentsResponse, error) {
 	if query.Depth < 0 || query.Depth > 2 {
 		return nil, apperror.ErrDepthInvalid
 	}
@@ -102,7 +116,7 @@ func (c *commentService) GetCommentByPostIDPaginated(query *dto.GetCommentByPost
 		return nil, apperror.ErrInvalidID
 	}
 
-	comments, total, err := c.commentRepo.GetCommentsFilterPaginated(ctx, &query.PostID, nil, nil, nil, query.Page, query.PageSize)
+	comments, total, err := s.commentRepo.GetCommentsFilterPaginated(ctx, &query.PostID, nil, nil, nil, query.Page, query.PageSize)
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +134,7 @@ func (c *commentService) GetCommentByPostIDPaginated(query *dto.GetCommentByPost
 				parentIDs = append(parentIDs, cmt.ID.Hex())
 			}
 
-			children, err := c.commentRepo.GetByParentIDsPaginated(ctx, parentIDs, 1, query.ChildrenPageSize)
+			children, err := s.commentRepo.GetByParentIDsPaginated(ctx, parentIDs, 1, query.ChildrenPageSize)
 			if err != nil {
 				return nil, err
 			}
@@ -146,7 +160,7 @@ func (c *commentService) GetCommentByPostIDPaginated(query *dto.GetCommentByPost
 	return response, nil
 }
 
-func (c *commentService) GetCommentsFilterPaginated(query *dto.GetCommentsFilterQuery) (*dto.PaginatedCommentsResponse, error) {
+func (s *commentService) GetCommentsFilterPaginated(query *dto.GetCommentsFilterQuery) (*dto.PaginatedCommentsResponse, error) {
 	if query.PageSize < 1 || query.PageSize > 500 || query.Page <= 0 {
 		return nil, apperror.ErrPaginationInvalid
 	}
@@ -154,7 +168,7 @@ func (c *commentService) GetCommentsFilterPaginated(query *dto.GetCommentsFilter
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
 
-	comments, total, err := c.commentRepo.GetCommentsFilterPaginated(ctx, query.PostID, query.ParentID, query.UserID, query.Content, query.Page, query.PageSize)
+	comments, total, err := s.commentRepo.GetCommentsFilterPaginated(ctx, query.PostID, query.ParentID, query.UserID, query.Content, query.Page, query.PageSize)
 	if err != nil {
 		return nil, err
 	}
@@ -171,18 +185,18 @@ func (c *commentService) GetCommentsFilterPaginated(query *dto.GetCommentsFilter
 	return response, nil
 }
 
-func (c *commentService) GetAllChildren(commentID string) ([]model.Comment, error) {
+func (s *commentService) GetAllChildren(commentID string) ([]model.Comment, error) {
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
 
-	return c.commentRepo.GetAllChildren(ctx, commentID)
+	return s.commentRepo.GetAllChildren(ctx, commentID)
 }
 
-func (c *commentService) DeleteCommentByID(commentID string, userID string) error {
+func (s *commentService) DeleteCommentByID(commentID string, userID string) error {
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
 
-	comment, err := c.commentRepo.GetByID(ctx, commentID)
+	comment, err := s.commentRepo.GetByID(ctx, commentID)
 	if err != nil {
 		return err
 	}
@@ -191,5 +205,5 @@ func (c *commentService) DeleteCommentByID(commentID string, userID string) erro
 		return apperror.ErrForbidden
 	}
 
-	return c.commentRepo.Delete(ctx, commentID)
+	return s.commentRepo.Delete(ctx, commentID)
 }

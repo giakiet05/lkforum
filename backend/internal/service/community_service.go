@@ -3,11 +3,13 @@ package service
 import (
 	"errors"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/giakiet05/lkforum/internal/apperror"
 	"github.com/giakiet05/lkforum/internal/dto"
 	"github.com/giakiet05/lkforum/internal/model"
+	"github.com/giakiet05/lkforum/internal/platform/bus"
 	"github.com/giakiet05/lkforum/internal/repo"
 	"github.com/giakiet05/lkforum/internal/util"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -15,6 +17,7 @@ import (
 )
 
 type CommunityService interface {
+	Start()
 	CreateCommunity(req *dto.CreateCommunityRequest, userID string) (*model.Community, error)
 	GetCommunityByID(id string) (*model.Community, error)
 	GetCommunitiesFilter(name string, description string, createFrom time.Time, page int, pageSize int) (*dto.PaginatedCommunitiesResponse, error)
@@ -29,10 +32,50 @@ type CommunityService interface {
 
 type communityService struct {
 	communityRepo repo.CommunityRepo
+	eventBus      *bus.EventBus
 }
 
-func NewCommunityService(communityRepo repo.CommunityRepo) CommunityService {
-	return &communityService{communityRepo: communityRepo}
+func NewCommunityService(communityRepo repo.CommunityRepo, bus *bus.EventBus) CommunityService {
+	return &communityService{communityRepo: communityRepo, eventBus: bus}
+}
+
+func (c *communityService) Start() {
+	eventChannel := make(bus.EventListener, 100)
+
+	c.eventBus.Subscribe(bus.TopicUserChangeAvatar, eventChannel)
+
+	log.Println("ChannelService started and subscribed to events.")
+
+	go c.processEvents(eventChannel)
+}
+
+func (c *communityService) processEvents(ch bus.EventListener) {
+	for event := range ch {
+		switch event.Topic() {
+		case bus.TopicUserChangeAvatar:
+			c.handleNewAvatar(event)
+		default:
+			log.Println("Unhandled event topic:", event.Topic())
+		}
+	}
+}
+
+func (c *communityService) handleNewAvatar(event bus.Event) {
+	payload := event.Payload()
+	userID, _ := payload["user_id"].(string)
+	newAvatar, _ := payload["new_avatar"].(string)
+
+	if userID == "" || newAvatar == "" {
+		return
+	}
+
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
+
+	err := c.communityRepo.UpdateUserAvatar(ctx, userID, newAvatar)
+	if err != nil {
+		log.Printf("Failed to update avatar: %v", err)
+	}
 }
 
 func (c *communityService) CreateCommunity(req *dto.CreateCommunityRequest, userID string) (*model.Community, error) {
@@ -103,8 +146,9 @@ func (c *communityService) GetCommunitiesFilter(
 	var response = &dto.PaginatedCommunitiesResponse{
 		Communities: communitiesResponses,
 		Pagination: dto.Pagination{
-			Total: total,
-			Page:  page,
+			Total:    total,
+			Page:     page,
+			PageSize: pageSize,
 		},
 	}
 

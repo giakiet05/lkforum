@@ -39,15 +39,18 @@ type RemoveModeratorRequest struct {
 }
 
 type CommunityResponse struct {
-	ID          string                 `json:"id"`
-	Name        string                 `json:"name"`
-	Description string                 `json:"description"`
-	Avatar      string                 `json:"avatar"`
-	Banner      string                 `json:"banner"`
-	Setting     model.CommunitySetting `json:"setting"`
-	Moderators  []model.Moderator      `json:"moderators"`
-	PostCount   int64                  `json:"post_count"`
-	MemberCount int64                  `json:"member_count"`
+	ID             string                 `json:"id"`
+	Name           string                 `json:"name"`
+	Description    string                 `json:"description"`
+	Avatar         string                 `json:"avatar"`
+	Banner         string                 `json:"banner"`
+	Setting        model.CommunitySetting `json:"setting"`
+	Moderators     []model.Moderator      `json:"moderators"`
+	PostCount      int64                  `json:"post_count"`
+	MemberCount    int64                  `json:"member_count"`
+	CreateByID     string                 `json:"create_by_id,omitempty"`
+	CreateByName   string                 `json:"create_by_name,omitempty"`
+	CreateByAvatar string                 `json:"create_by_avatar,omitempty"`
 }
 
 func FromCommunities(communities []model.Community) []CommunityResponse {
@@ -60,14 +63,17 @@ func FromCommunities(communities []model.Community) []CommunityResponse {
 
 func FromCommunity(community *model.Community) *CommunityResponse {
 	return &CommunityResponse{
-		ID:          community.ID.Hex(),
-		Name:        community.Name,
-		Description: *community.Description,
-		Avatar:      *community.Avatar,
-		Banner:      *community.Banner,
-		Setting:     community.Setting,
-		Moderators:  community.Moderators,
-		PostCount:   community.PostCount,
-		MemberCount: community.MemberCount,
+		ID:             community.ID.Hex(),
+		Name:           community.Name,
+		Description:    *community.Description,
+		Avatar:         *community.Avatar,
+		Banner:         *community.Banner,
+		Setting:        community.Setting,
+		Moderators:     community.Moderators,
+		PostCount:      community.PostCount,
+		MemberCount:    community.MemberCount,
+		CreateByID:     community.CreateByID.Hex(),
+		CreateByName:   community.CreateByName,
+		CreateByAvatar: community.CreateByAvatar,
 	}
 }

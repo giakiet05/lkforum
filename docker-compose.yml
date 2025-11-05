@@ -1,0 +1,26 @@
+
+services:
+  redis:
+    image: redis
+    volumes:
+      - redis_data:/data
+    networks:
+      - lkforum_net
+
+  backend:
+    build: ./backend
+    ports:
+      - "8080:8080"
+    env_file: ./backend/.env
+    environment:
+      REDIS_ADDR: redis:6379
+      TZ: Asia/Ho_Chi_Minh
+    depends_on:
+      - redis
+    networks:
+      - lkforum_net
+networks:
+  lkforum_net:
+
+volumes:
+  redis_data:

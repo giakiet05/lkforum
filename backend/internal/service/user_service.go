@@ -8,6 +8,7 @@ import (
 	"github.com/giakiet05/lkforum/internal/auth"
 	"github.com/giakiet05/lkforum/internal/dto"
 	"github.com/giakiet05/lkforum/internal/model"
+	"github.com/giakiet05/lkforum/internal/platform/bus"
 	"github.com/giakiet05/lkforum/internal/repo"
 	"github.com/giakiet05/lkforum/internal/util"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -29,11 +30,13 @@ type UserService interface {
 
 type userService struct {
 	userRepo repo.UserRepo
+	eventBus *bus.EventBus
 }
 
-func NewUserService(userRepo repo.UserRepo) UserService {
+func NewUserService(userRepo repo.UserRepo, bus *bus.EventBus) UserService {
 	return &userService{
 		userRepo: userRepo,
+		eventBus: bus,
 	}
 }
 

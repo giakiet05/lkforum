@@ -27,3 +27,13 @@ type PaginatedCommentsResponse struct {
 	Comments   []CommentResponse `json:"comments"`
 	Pagination Pagination        `json:"pagination"`
 }
+
+type PaginatedChannelsResponse struct {
+	Channels   []ChannelResponse `json:"channels"`
+	Pagination Pagination        `json:"pagination"`
+}
+
+type PaginatedMessagesResponse struct {
+	Messages   []MessageResponse `json:"messages"`
+	Pagination Pagination        `json:"pagination"`
+}

@@ -7,18 +7,22 @@ import (
 )
 
 type Message struct {
-	ID             primitive.ObjectID   `bson:"_id,omitempty" json:"id"`
-	ConversationID primitive.ObjectID   `bson:"conversation_id" json:"conversation_id"`
-	SenderID       *primitive.ObjectID  `bson:"sender_id,omitempty" json:"sender_id,omitempty"` // nil for system messages
-	Type           MessageType          `bson:"type" json:"type"`
-	Content        string               `bson:"content" json:"content"`
-	CreatedAt      time.Time            `bson:"create_at" json:"create_at"`
-	ReadBy         []primitive.ObjectID `bson:"read_by,omitempty" json:"read_by,omitempty"`
+	ID             primitive.ObjectID  `bson:"_id,omitempty" json:"id,omitempty"`
+	ChannelID      primitive.ObjectID  `bson:"channel_id" json:"channel_id"`
+	SenderID       *primitive.ObjectID `bson:"sender_id,omitempty" json:"sender_id,omitempty"` // nil for system messages
+	SenderUsername string              `bson:"sender_username,omitempty" json:"sender_username,omitempty"`
+	Type           MessageType         `bson:"type" json:"type"`
+	Content        string              `bson:"content" json:"content"`
+	IsRead         bool                `bson:"is_read" json:"is_read"`
+	IsSend         bool                `bson:"is_send" json:"is_send"`
+	CreatedAt      time.Time           `bson:"created_at" json:"created_at"`
+	IsDeleted      bool                `bson:"is_deleted" json:"is_deleted"`
+	DeletedAt      *time.Time          `bson:"deleted_at" json:"deleted_at"`
 }
 
 type MessageType string
 
 const (
-	MessageTypeUser   MessageType = "user"
-	MessageTypeSystem MessageType = "system"
+	UserMessage   MessageType = "user"
+	SystemMessage MessageType = "system"
 )
