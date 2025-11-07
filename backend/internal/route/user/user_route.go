@@ -9,13 +9,17 @@ import (
 func RegisterUserRoutes(rg *gin.RouterGroup, c *controller.UserController) {
 	users := rg.Group("/users")
 
-	// Protected routes (require authentication)
-	users.Use(middleware.AuthMiddleware())
+	// Public routes - anyone can view a user's profile
+	users.GET("/profile/:username", c.GetUserByUsername)
+
+	// Routes for the currently authenticated user ("me")
+	me := users.Group("/me")
+	me.Use(middleware.RequireAuth())
 	{
-		users.GET("", c.GetUsers)
-		users.GET(":id", c.GetUserByID)
-		users.PUT(":id", c.UpdateUser)
-		users.PUT(":id/change-password", c.ChangePassword)
-		users.DELETE(":id", c.DeleteUser)
+		me.GET("", c.GetMyProfile)
+		me.PUT("/profile", c.UpdateProfile)
+		me.PUT("/password", c.ChangePassword)
+		me.POST("/avatar", c.UploadAvatar)
+		me.POST("/cover", c.UploadCover)
 	}
 }

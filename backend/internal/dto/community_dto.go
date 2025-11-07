@@ -53,10 +53,10 @@ type CommunityResponse struct {
 	CreateByAvatar string                 `json:"create_by_avatar,omitempty"`
 }
 
-func FromCommunities(communities []model.Community) []CommunityResponse {
-	var communityResponses []CommunityResponse
+func FromCommunities(communities []model.Community) []*CommunityResponse {
+	var communityResponses []*CommunityResponse
 	for _, community := range communities {
-		communityResponses = append(communityResponses, *FromCommunity(&community))
+		communityResponses = append(communityResponses, FromCommunity(&community))
 	}
 	return communityResponses
 }

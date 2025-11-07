@@ -6,8 +6,8 @@ import (
 	"github.com/giakiet05/lkforum/internal/auth"
 	"github.com/giakiet05/lkforum/internal/config"
 	"github.com/giakiet05/lkforum/internal/controller"
-	"github.com/giakiet05/lkforum/internal/email"
 	"github.com/giakiet05/lkforum/internal/platform/bus"
+	"github.com/giakiet05/lkforum/internal/platform/email"
 	"github.com/giakiet05/lkforum/internal/platform/ws"
 	"github.com/giakiet05/lkforum/internal/repo"
 	userroute "github.com/giakiet05/lkforum/internal/route/user"
@@ -22,8 +22,7 @@ type Repos struct {
 	repo.CommunityRepo
 	repo.MembershipRepo
 	repo.PostRepo
-	repo.PostPollRepo
-	repo.PostImageRepo
+	repo.PollVoteRepo
 	repo.PostVoteRepo
 	repo.CommentRepo
 	repo.NotificationRepo
@@ -67,8 +66,7 @@ func initRepos(client *mongo.Client, db *mongo.Database) *Repos {
 		MembershipRepo:   repo.NewMembershipRepo(db),
 		PostRepo:         repo.NewPostRepo(db),
 		PostVoteRepo:     repo.NewPostVoteRepo(client, db),
-		PostImageRepo:    repo.NewPostImageRepo(db),
-		PostPollRepo:     repo.NewPostPollRepo(client, db),
+		PollVoteRepo:     repo.NewPollVoteRepo(client, db),
 		CommentRepo:      repo.NewCommentRepo(db),
 		NotificationRepo: repo.NewNotificationRepo(db),
 		ChannelRepo:      repo.NewChannelRepo(db),
@@ -83,7 +81,7 @@ func initServices(repos *Repos, redisClient *redis.Client, emailSender email.Sen
 		UserService:         service.NewUserService(repos.UserRepo, eventBus),
 		CommunityService:    service.NewCommunityService(repos.CommunityRepo, eventBus),
 		MembershipService:   service.NewMembershipService(repos.MembershipRepo, redisClient),
-		PostService:         service.NewPostService(repos.PostRepo, repos.PostVoteRepo, repos.PostPollRepo, repos.PostImageRepo, eventBus),
+		PostService:         service.NewPostService(repos.PostRepo, repos.PostVoteRepo, repos.PollVoteRepo, repos.UserRepo, repos.CommunityRepo, eventBus),
 		CommentService:      service.NewCommentService(repos.CommentRepo, eventBus),
 		ReputationService:   service.NewReputationService(repos.UserRepo, eventBus),
 		NotificationService: service.NewNotificationService(repos.NotificationRepo, repos.UserRepo, repos.PostRepo, repos.CommentRepo, eventBus, redisClient),

@@ -144,7 +144,7 @@ func (m *messageService) handleNewMessage(event bus.Event) {
 		RecipientIDs: recipientIDs,
 		EventType:    bus.BroadcastEventMessageCreated,
 		TempID:       tempMessageID,
-		Data:         *dto.FromMessage(message),
+		Data:         dto.FromMessage(message),
 	}
 
 	m.eventBus.Publish(broadcastEvent)

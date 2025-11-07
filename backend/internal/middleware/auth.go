@@ -1,14 +1,15 @@
 package middleware
 
 import (
-	"github.com/giakiet05/lkforum/internal/auth"
-	"github.com/gin-gonic/gin"
 	"net/http"
 	"strings"
+
+	"github.com/giakiet05/lkforum/internal/auth"
+	"github.com/gin-gonic/gin"
 )
 
-// AuthMiddleware parse access token và nhét AuthUser vào context
-func AuthMiddleware() gin.HandlerFunc {
+// RequireAuth parse access token và nhét AuthUser vào context
+func RequireAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
@@ -33,6 +34,35 @@ func AuthMiddleware() gin.HandlerFunc {
 		}
 
 		// Nhét user vào context
+		c.Set("authUser", user)
+		c.Next()
+	}
+}
+
+// LoadUserIfAuthenticated tries to parse the access token and load the user into the context.
+// Unlike RequireAuth, it does not fail if the token is missing or invalid.
+func LoadUserIfAuthenticated() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		authHeader := c.GetHeader("Authorization")
+		if authHeader == "" {
+			c.Next()
+			return
+		}
+
+		parts := strings.SplitN(authHeader, " ", 2)
+		if len(parts) != 2 || parts[0] != "Bearer" {
+			c.Next()
+			return
+		}
+
+		token := parts[1]
+		user, err := auth.ParseAccessToken(token)
+		if err != nil {
+			c.Next()
+			return
+		}
+
+		// If token is valid, set the user in the context
 		c.Set("authUser", user)
 		c.Next()
 	}

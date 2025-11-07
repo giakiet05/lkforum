@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/giakiet05/lkforum/internal/apperror"
 	"github.com/giakiet05/lkforum/internal/config"
 	"github.com/giakiet05/lkforum/internal/model"
 	"go.mongodb.org/mongo-driver/bson"
@@ -14,11 +15,12 @@ import (
 var ErrVoteNotFound = errors.New("vote not found")
 
 type PostVoteRepo interface {
-	Vote(ctx context.Context, vote *model.Vote) error
-	RemoveVote(ctx context.Context, postID, userID primitive.ObjectID) error
-	GetUserVote(ctx context.Context, postID, userID primitive.ObjectID) (*model.Vote, error)
-	FindUserVotesOnPosts(ctx context.Context, userID primitive.ObjectID, postIDs []primitive.ObjectID) (map[primitive.ObjectID]string, error)
+	Vote(ctx context.Context, userID, postID string, voteValue bool) error
+	RemoveVote(ctx context.Context, userID, postID string) error
+	GetUserVote(ctx context.Context, userID, postID string) (*model.Vote, error)
+	FindUserVotes(ctx context.Context, userID string, postIDs []string) (map[string]string, error)
 }
+
 type postVoteRepo struct {
 	client         *mongo.Client
 	postCollection *mongo.Collection
@@ -33,41 +35,56 @@ func NewPostVoteRepo(client *mongo.Client, db *mongo.Database) PostVoteRepo {
 	}
 }
 
-// GetUserVote lấy phiếu bầu hiện tại của một người dùng cho một bài đăng.
-// Trả về (nil, nil) nếu người dùng chưa vote.
-func (r *postVoteRepo) GetUserVote(ctx context.Context, postID, userID primitive.ObjectID) (*model.Vote, error) {
+func (r *postVoteRepo) GetUserVote(ctx context.Context, userID, postID string) (*model.Vote, error) {
+	userObjID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return nil, apperror.ErrInvalidID
+	}
+	postObjID, err := primitive.ObjectIDFromHex(postID)
+	if err != nil {
+		return nil, apperror.ErrInvalidID
+	}
+
 	var vote model.Vote
 	filter := bson.M{
-		"target_id":   postID,
-		"user_id":     userID,
+		"target_id":   postObjID,
+		"user_id":     userObjID,
 		"target_type": model.VoteTargetPost,
 	}
 
-	err := r.voteCollection.FindOne(ctx, filter).Decode(&vote)
+	err = r.voteCollection.FindOne(ctx, filter).Decode(&vote)
 	if err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
-			return nil, nil // Người dùng chưa vote, đây không phải là lỗi
+			return nil, nil // Not an error, just means no vote exists
 		}
 		return nil, err
 	}
 	return &vote, nil
 }
-func (r *postVoteRepo) FindUserVotesOnPosts(ctx context.Context, userID primitive.ObjectID, postIDs []primitive.ObjectID) (map[primitive.ObjectID]string, error) {
+
+func (r *postVoteRepo) FindUserVotes(ctx context.Context, userID string, postIDs []string) (map[string]string, error) {
 	if len(postIDs) == 0 {
-		return make(map[primitive.ObjectID]string), nil
+		return make(map[string]string), nil
 	}
 
-	// 1. Cập nhật bộ lọc (filter)
-	// Tìm tất cả các document có:
-	// - user_id trùng với userID
-	// - target_type phải là "post"
-	// - VÀ target_id nằm trong danh sách postIDs ($in)
+	userObjID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return nil, apperror.ErrInvalidID
+	}
+
+	postObjIDs := make([]primitive.ObjectID, len(postIDs))
+	for i, pid := range postIDs {
+		objID, err := primitive.ObjectIDFromHex(pid)
+		if err != nil {
+			continue // Skip invalid IDs
+		}
+		postObjIDs[i] = objID
+	}
+
 	filter := bson.M{
-		"user_id":     userID,
-		"target_type": model.VoteTargetPost, // Lọc chính xác các vote cho bài đăng
-		"target_id": bson.M{
-			"$in": postIDs,
-		},
+		"user_id":     userObjID,
+		"target_type": model.VoteTargetPost,
+		"target_id":   bson.M{"$in": postObjIDs},
 	}
 
 	cursor, err := r.voteCollection.Find(ctx, filter)
@@ -76,36 +93,32 @@ func (r *postVoteRepo) FindUserVotesOnPosts(ctx context.Context, userID primitiv
 	}
 	defer cursor.Close(ctx)
 
-	userVotesMap := make(map[primitive.ObjectID]string)
-
+	userVotesMap := make(map[string]string)
 	for cursor.Next(ctx) {
 		var vote model.Vote
 		if err := cursor.Decode(&vote); err != nil {
 			continue
 		}
-
-		// 2. Chuyển đổi giá trị bool sang string
-		// Giả định: true = upvote, false = downvote
 		if vote.Value {
-			userVotesMap[vote.TargetID] = string(model.VoteTypeUp)
+			userVotesMap[vote.TargetID.Hex()] = "up"
 		} else {
-			userVotesMap[vote.TargetID] = string(model.VoteTypeDown)
+			userVotesMap[vote.TargetID.Hex()] = "down"
 		}
 	}
 
-	if err := cursor.Err(); err != nil {
-		return nil, err
-	}
-
-	return userVotesMap, nil
+	return userVotesMap, cursor.Err()
 }
 
-// Vote xử lý việc bỏ phiếu, thay đổi phiếu hoặc hủy phiếu.
-// Đây là hàm phức tạp nhất vì nó xử lý 3 trường hợp:
-// 1. Vote mới.
-// 2. Thay đổi vote (up -> down hoặc down -> up).
-// 3. Hủy vote (up -> up hoặc down -> down).
-func (r *postVoteRepo) Vote(ctx context.Context, vote *model.Vote) error {
+func (r *postVoteRepo) Vote(ctx context.Context, userID, postID string, voteValue bool) error {
+	userObjID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return apperror.ErrInvalidID
+	}
+	postObjID, err := primitive.ObjectIDFromHex(postID)
+	if err != nil {
+		return apperror.ErrInvalidID
+	}
+
 	session, err := r.client.StartSession()
 	if err != nil {
 		return err
@@ -113,65 +126,54 @@ func (r *postVoteRepo) Vote(ctx context.Context, vote *model.Vote) error {
 	defer session.EndSession(ctx)
 
 	callback := func(sessCtx mongo.SessionContext) (interface{}, error) {
-		// Lấy vote trước đó của người dùng (nếu có)
-		previousVote, err := r.GetUserVote(sessCtx, vote.TargetID, vote.UserID)
+		previousVote, err := r.getUserVoteInTx(sessCtx, userObjID, postObjID)
 		if err != nil {
 			return nil, err
 		}
 
-		// Khởi tạo các biến để cập nhật counter
 		upInc, downInc := 0, 0
 
 		if previousVote == nil {
-			// TRƯỜNG HỢP 1: VOTE MỚI
-			// Ghi vote mới vào collection 'votes'
-			if _, err := r.voteCollection.InsertOne(sessCtx, vote); err != nil {
+			// Case 1: New vote
+			newVote := &model.Vote{
+				UserID:     userObjID,
+				TargetID:   postObjID,
+				TargetType: model.VoteTargetPost,
+				Value:      voteValue,
+			}
+			if _, err := r.voteCollection.InsertOne(sessCtx, newVote); err != nil {
 				return nil, err
 			}
-			// Cập nhật counter
-			if vote.Value { // true = upvote
+			if voteValue {
 				upInc = 1
 			} else {
 				downInc = 1
 			}
 		} else {
-			// Người dùng đã vote trước đó
-			if previousVote.Value == vote.Value {
-				// TRƯỜNG HỢP 2: HỦY VOTE (bấm lại nút cũ)
-				if err := r.removeVoteInTransaction(sessCtx, previousVote); err != nil {
-					return nil, err
-				}
-				// Không cần làm gì thêm, removeVoteInTransaction đã xử lý counter
-				return nil, nil
+			if previousVote.Value == voteValue {
+				// Case 2: Un-voting (e.g., clicking upvote again)
+				return nil, r.removeVoteInTransaction(sessCtx, previousVote)
 			} else {
-				// TRƯỜNG HỢP 3: THAY ĐỔI VOTE (up -> down hoặc down -> up)
-				// Cập nhật vote trong collection 'votes'
-				filter := bson.M{"_id": previousVote.ID}
-				update := bson.M{"$set": bson.M{"value": vote.Value}}
-				if _, err := r.voteCollection.UpdateOne(sessCtx, filter, update); err != nil {
+				// Case 3: Changing vote (e.g., from up to down)
+				update := bson.M{"$set": bson.M{"value": voteValue}}
+				if _, err := r.voteCollection.UpdateByID(sessCtx, previousVote.ID, update); err != nil {
 					return nil, err
 				}
-
-				// Cập nhật counter
-				if vote.Value { // Chuyển sang upvote (trước đó là downvote)
+				if voteValue {
 					upInc = 1
 					downInc = -1
-				} else { // Chuyển sang downvote (trước đó là upvote)
+				} else {
 					upInc = -1
 					downInc = 1
 				}
 			}
 		}
 
-		// Áp dụng thay đổi counter vào collection 'posts'
-		postFilter := bson.M{"_id": vote.TargetID}
+		// Apply counter update to the posts collection
+		postFilter := bson.M{"_id": postObjID}
 		postUpdate := bson.M{"$inc": bson.M{"votes_count.up": upInc, "votes_count.down": downInc}}
-		result, err := r.postCollection.UpdateOne(sessCtx, postFilter, postUpdate)
-		if err != nil {
+		if _, err := r.postCollection.UpdateOne(sessCtx, postFilter, postUpdate); err != nil {
 			return nil, err
-		}
-		if result.MatchedCount == 0 {
-			return nil, ErrPostNotFound
 		}
 		return nil, nil
 	}
@@ -180,8 +182,16 @@ func (r *postVoteRepo) Vote(ctx context.Context, vote *model.Vote) error {
 	return err
 }
 
-// RemoveVote xóa hoàn toàn một phiếu bầu.
-func (r *postVoteRepo) RemoveVote(ctx context.Context, postID, userID primitive.ObjectID) error {
+func (r *postVoteRepo) RemoveVote(ctx context.Context, userID, postID string) error {
+	userObjID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return apperror.ErrInvalidID
+	}
+	postObjID, err := primitive.ObjectIDFromHex(postID)
+	if err != nil {
+		return apperror.ErrInvalidID
+	}
+
 	session, err := r.client.StartSession()
 	if err != nil {
 		return err
@@ -189,14 +199,13 @@ func (r *postVoteRepo) RemoveVote(ctx context.Context, postID, userID primitive.
 	defer session.EndSession(ctx)
 
 	callback := func(sessCtx mongo.SessionContext) (interface{}, error) {
-		voteToRemove, err := r.GetUserVote(sessCtx, postID, userID)
+		voteToRemove, err := r.getUserVoteInTx(sessCtx, userObjID, postObjID)
 		if err != nil {
 			return nil, err
 		}
 		if voteToRemove == nil {
-			return nil, ErrVoteNotFound // Không có vote để xóa
+			return nil, ErrVoteNotFound
 		}
-
 		return nil, r.removeVoteInTransaction(sessCtx, voteToRemove)
 	}
 
@@ -204,18 +213,28 @@ func (r *postVoteRepo) RemoveVote(ctx context.Context, postID, userID primitive.
 	return err
 }
 
-// removeVoteInTransaction là hàm helper để xóa vote và cập nhật counter bên trong một transaction.
-func (r *postVoteRepo) removeVoteInTransaction(sessCtx mongo.SessionContext, vote *model.Vote) error {
-	// 1. Xóa vote khỏi collection 'votes'
-	filter := bson.M{"_id": vote.ID}
-	_, err := r.voteCollection.DeleteOne(sessCtx, filter)
+// getUserVoteInTx is a helper to get a vote within a transaction context.
+func (r *postVoteRepo) getUserVoteInTx(ctx context.Context, userID, postID primitive.ObjectID) (*model.Vote, error) {
+	var vote model.Vote
+	filter := bson.M{"target_id": postID, "user_id": userID, "target_type": model.VoteTargetPost}
+	err := r.voteCollection.FindOne(ctx, filter).Decode(&vote)
 	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &vote, nil
+}
+
+// removeVoteInTransaction is a helper to delete a vote and update the counter within a transaction.
+func (r *postVoteRepo) removeVoteInTransaction(sessCtx mongo.SessionContext, vote *model.Vote) error {
+	if _, err := r.voteCollection.DeleteOne(sessCtx, bson.M{"_id": vote.ID}); err != nil {
 		return err
 	}
 
-	// 2. Cập nhật (giảm) counter trong collection 'posts'
 	upInc, downInc := 0, 0
-	if vote.Value { // true = upvote
+	if vote.Value {
 		upInc = -1
 	} else {
 		downInc = -1
@@ -223,12 +242,6 @@ func (r *postVoteRepo) removeVoteInTransaction(sessCtx mongo.SessionContext, vot
 
 	postFilter := bson.M{"_id": vote.TargetID}
 	postUpdate := bson.M{"$inc": bson.M{"votes_count.up": upInc, "votes_count.down": downInc}}
-	result, err := r.postCollection.UpdateOne(sessCtx, postFilter, postUpdate)
-	if err != nil {
-		return err
-	}
-	if result.MatchedCount == 0 {
-		return ErrPostNotFound
-	}
-	return nil
+	_, err := r.postCollection.UpdateOne(sessCtx, postFilter, postUpdate)
+	return err
 }

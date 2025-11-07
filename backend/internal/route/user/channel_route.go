@@ -9,7 +9,7 @@ import (
 func RegisterChannelRoutes(rg *gin.RouterGroup, c *controller.ChannelController) {
 	channels := rg.Group("/channels")
 	// Protected routes (require authentication)
-	channels.Use(middleware.AuthMiddleware())
+	channels.Use(middleware.RequireAuth())
 	{
 		channels.POST("", c.CreateChannel)
 		channels.GET(":channel_id", c.GetChannelByID)

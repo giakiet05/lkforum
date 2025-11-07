@@ -1,17 +1,19 @@
 package dto
 
-import "github.com/giakiet05/lkforum/internal/model"
+import (
+	"github.com/giakiet05/lkforum/internal/model"
+)
 
-// Request DTOs
+// --- Request DTOs ---
 
 type UserRegisterRequest struct {
-	Username string `json:"username" binding:"required"`
+	Username string `json:"username" binding:"required,min=3,max=20"`
 	Email    string `json:"email" binding:"required,email"`
 	Password string `json:"password" binding:"required,min=6"`
 }
 
 type UserLoginRequest struct {
-	Identifier string `json:"identifier" binding:"required"` // Username or Email
+	Identifier string `json:"identifier" binding:"required"`
 	Password   string `json:"password" binding:"required"`
 }
 
@@ -29,9 +31,11 @@ type CompleteGoogleSetupRequest struct {
 	Username   string `json:"username" binding:"required,min=3,max=20"`
 }
 
-type UserUpdateRequest struct {
-	Username string `json:"username"`
-	Email    string `json:"email"`
+// UserProfileUpdateRequest defines the fields a user can update for their own profile.
+type UserProfileUpdateRequest struct {
+	Bio      *string `json:"bio"`
+	Location *string `json:"location"`
+	Website  *string `json:"website"`
 }
 
 type ChangePasswordRequest struct {
@@ -43,27 +47,42 @@ type RefreshRequest struct {
 	RefreshToken string `json:"refresh_token" binding:"required"`
 }
 
-// Response DTOs
+// --- Response DTOs ---
 
+// UserProfileResponse contains public profile information.
+type UserProfileResponse struct {
+	Avatar   model.Image `json:"avatar,omitempty"`
+	Cover    model.Image `json:"cover,omitempty"`
+	Bio      string      `json:"bio,omitempty"`	
+	Location string      `json:"location,omitempty"`
+	Website  string      `json:"website,omitempty"`
+}
+
+// UserResponse is the main user object returned in API responses.
 type UserResponse struct {
-	ID         string             `json:"id"`
-	Username   string             `json:"username"`
-	Email      string             `json:"email,omitempty"`
-	Reputation int                `json:"reputation"`
-	Title      string             `json:"title"`
-	Role       model.Role         `json:"role"`
-	Provider   model.AuthProvider `json:"provider"`
-	IsVerified bool               `json:"is_verified"`
+	ID         string              `json:"id"`	
+	Username   string              `json:"username"`
+	Email      string              `json:"email,omitempty"`
+	Reputation int                 `json:"reputation"`
+	Title      string              `json:"title"`
+	Role       model.Role          `json:"role"`
+	Provider   model.AuthProvider  `json:"provider"`
+	IsVerified bool                `json:"is_verified"`
+	Profile    UserProfileResponse `json:"profile"`
 }
 
+// AuthResponse is returned on successful login or registration.
 type AuthResponse struct {
-	User         UserResponse `json:"user"`
-	AccessToken  string       `json:"access_token"`
-	RefreshToken string       `json:"refresh_token"`
+	User         *UserResponse `json:"user"`
+	AccessToken  string        `json:"access_token"`
+	RefreshToken string        `json:"refresh_token"`
 }
 
-func FromUser(u *model.User) UserResponse {
-	return UserResponse{
+func FromUser(u *model.User) *UserResponse {
+	if u == nil {
+		return nil
+	}
+	resp := &UserResponse{
 		ID:         u.ID.Hex(),
 		Username:   u.Username,
 		Email:      u.Email,
@@ -73,17 +92,30 @@ func FromUser(u *model.User) UserResponse {
 		Provider:   u.Provider,
 		IsVerified: u.IsVerified,
 	}
+
+	if u.RoleContent.AsUser != nil {
+		resp.Profile = UserProfileResponse{
+			Avatar:   u.RoleContent.AsUser.Avatar,
+			Cover:    u.RoleContent.AsUser.Cover,
+			Bio:      u.RoleContent.AsUser.Bio,
+			Location: u.RoleContent.AsUser.Location,
+			Website:  u.RoleContent.AsUser.Website,
+		}
+	}
+
+	return resp
 }
 
-func FromUsers(users []*model.User) []UserResponse {
-	responses := make([]UserResponse, 0, len(users))
-	for _, u := range users {
-		responses = append(responses, FromUser(u))
+func FromUsers(users []*model.User) []*UserResponse {
+	responses := make([]*UserResponse, len(users))
+	for i, u := range users {
+		userResponse := FromUser(u)
+		userResponse.Email = ""
+		responses[i] = userResponse
 	}
 	return responses
 }
 
-// calculateTitle determines the user's title based on their reputation score.
 func calculateTitle(reputation int) string {
 	switch {
 	case reputation >= 10000:

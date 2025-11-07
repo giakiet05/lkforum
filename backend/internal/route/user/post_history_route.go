@@ -10,7 +10,7 @@ func RegisterPostHistoryRoutes(rg *gin.RouterGroup, c *controller.PostHistoryCon
 	postHistories := rg.Group("/post_histories")
 
 	// Protected routes (require authentication)
-	postHistories.Use(middleware.AuthMiddleware())
+	postHistories.Use(middleware.RequireAuth())
 	{
 		postHistories.POST("", c.CreatePostHistory)
 		postHistories.POST("batch", c.CreatePostHistories)

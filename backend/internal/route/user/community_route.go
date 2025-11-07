@@ -13,7 +13,7 @@ func RegisterCommunityRoutes(rg *gin.RouterGroup, c *controller.CommunityControl
 	communities.GET(":community_id", c.GetCommunityByID)
 
 	// Protected routes (require authentication)
-	communities.Use(middleware.AuthMiddleware())
+	communities.Use(middleware.RequireAuth())
 	{
 		communities.POST("", c.CreateCommunity)
 		communities.PUT("", c.UpdateCommunity)

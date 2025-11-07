@@ -9,7 +9,7 @@ import (
 func RegisterAdminCommunityRoutes(rg *gin.RouterGroup, c *controller.CommunityController) {
 	communities := rg.Group("/admin/communities")
 	// Protected routes (require authentication)
-	communities.Use(middleware.AuthMiddleware())
+	communities.Use(middleware.RequireAuth())
 	{
 		communities.GET("moderator/:moderator_id", c.GetCommunityByModeratorID)
 		communities.GET("", c.GetAllCommunities)

@@ -3,545 +3,600 @@ package service
 import (
 	"context"
 	"errors"
-	"math"
+	"mime/multipart"
 	"time"
 
+	"github.com/giakiet05/lkforum/internal/apperror"
 	"github.com/giakiet05/lkforum/internal/dto"
 	"github.com/giakiet05/lkforum/internal/model"
 	"github.com/giakiet05/lkforum/internal/platform/bus"
+	"github.com/giakiet05/lkforum/internal/platform/cloudinary"
 	"github.com/giakiet05/lkforum/internal/repo"
+	"github.com/giakiet05/lkforum/internal/util"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 var (
 	ErrPermissionDenied = errors.New("user does not have permission to perform this action")
 	ErrInvalidInput     = errors.New("invalid input provided")
 	ErrPostNotFound     = repo.ErrPostNotFound
-	ErrPollCannotEdit   = repo.ErrPollCannotEdit
 )
 
+// PostService defines the business logic for post-related operations.
 type PostService interface {
-	CreatePost(ctx context.Context, userID primitive.ObjectID, req *dto.CreatePostRequest) (*dto.PostResponse, error)
-	GetPostByID(ctx context.Context, postID, userID primitive.ObjectID) (*dto.PostResponse, error)
-	UpdatePost(ctx context.Context, postID, userID primitive.ObjectID, req *dto.UpdatePostRequest) (*dto.PostResponse, error)
-	DeletePost(ctx context.Context, postID, userID primitive.ObjectID) error
-	GetPosts(ctx context.Context, userID primitive.ObjectID, query *dto.GetPostsQuery) (*PaginatedPostsResponse, error)
-	VoteOnPost(ctx context.Context, userID, postID primitive.ObjectID, voteValue bool) (*dto.VotesCountResponse, error)
-	RemovePostVote(ctx context.Context, userID, postID primitive.ObjectID) (*dto.VotesCountResponse, error)
-	VoteOnPoll(ctx context.Context, userID, postID, optionID primitive.ObjectID) (*dto.PollResponse, error)
-	RemovePollVote(ctx context.Context, userID, postID primitive.ObjectID) (*dto.PollResponse, error)
-	AddImagesToPost(ctx context.Context, userID, postID primitive.ObjectID, req *dto.AddImageRequest) ([]dto.ImageResponse, error)
-	RemoveImagesFromPost(ctx context.Context, userID, postID primitive.ObjectID, req *dto.RemoveImageRequest) error
-	UpdatePollDetails(ctx context.Context, postID, userID primitive.ObjectID, req *dto.UpdatePollRequest) (*dto.PollResponse, error)
-	AddPollOptions(ctx context.Context, userID, postID primitive.ObjectID, req *dto.AddPollOptionRequest) (*dto.PollResponse, error)
-	UpdatePollOption(ctx context.Context, userID, postID, optionID primitive.ObjectID, newText string) (*dto.PollResponse, error)
-	RemovePollOptions(ctx context.Context, userID, postID primitive.ObjectID, req *dto.RemovePollOptionRequest) (*dto.PollResponse, error)
-	BookmarkPost(ctx context.Context, userID, postID primitive.ObjectID) error
-	RemoveBookmark(ctx context.Context, userID, postID primitive.ObjectID) error
+	CreatePost(userID string, req *dto.CreatePostRequest) (*dto.PostResponse, error)
+	GetPostByID(postID string, userID string) (*dto.PostResponse, error)
+	GetPosts(userID string, query *dto.GetPostsQuery) (*dto.PaginatedPostsResponse, error)
+	UpdatePost(postID string, userID string, req *dto.UpdatePostRequest) (*dto.PostResponse, error)
+	DeletePost(postID string, userID string) error
+
+	AddImagesToPost(userID, postID string, form *multipart.Form) ([]*model.Image, error)
+	RemoveImagesFromPost(userID, postID string, publicIDs []string) error
+
+	VoteOnPost(userID, postID string, voteValue bool) (*dto.VotesCountResponse, error)
+
+	VoteOnPoll(userID, postID, optionID string) (*dto.PollResponse, error)
+	RemovePollVote(userID, postID string) (*dto.PollResponse, error)
+	AddPollOptions(userID, postID string, options []string) (*dto.PollResponse, error)
+	RemovePollOptions(userID, postID string, optionIDs []string) (*dto.PollResponse, error)
+	UpdatePoll(userID, postID string, req *dto.UpdatePollRequest) (*dto.PollResponse, error)
+	UpdatePollOption(userID, postID, optionID string, req *dto.UpdatePollOptionRequest) (*dto.PollResponse, error)
 }
 
 type postService struct {
 	postRepo      repo.PostRepo
 	postVoteRepo  repo.PostVoteRepo
-	postPollRepo  repo.PostPollRepo
-	postImageRepo repo.PostImageRepo
+	pollVoteRepo  repo.PollVoteRepo
+	userRepo      repo.UserRepo
+	communityRepo repo.CommunityRepo
 	bus           *bus.EventBus
 }
 
+// NewPostService creates a new instance of PostService.
 func NewPostService(
 	postRepo repo.PostRepo,
 	postVoteRepo repo.PostVoteRepo,
-	postPollRepo repo.PostPollRepo,
-	postImageRepo repo.PostImageRepo,
+	pollVoteRepo repo.PollVoteRepo,
+	userRepo repo.UserRepo,
+	communityRepo repo.CommunityRepo,
 	bus *bus.EventBus,
 ) PostService {
 	return &postService{
 		postRepo:      postRepo,
 		postVoteRepo:  postVoteRepo,
-		postPollRepo:  postPollRepo,
-		postImageRepo: postImageRepo,
+		pollVoteRepo:  pollVoteRepo,
+		userRepo:      userRepo,
+		communityRepo: communityRepo,
 		bus:           bus,
 	}
 }
 
-type PaginatedPostsResponse struct {
-	CurrentPage int                 `json:"currentPage"`
-	TotalPages  int64               `json:"totalPages"`
-	TotalPosts  int64               `json:"totalPosts"`
-	HasNextPage bool                `json:"hasNextPage"`
-	Posts       []*dto.PostResponse `json:"posts"`
-}
+func (s *postService) CreatePost(userID string, req *dto.CreatePostRequest) (*dto.PostResponse, error) {
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
 
-func (s *postService) CreatePost(ctx context.Context, userID primitive.ObjectID, req *dto.CreatePostRequest) (*dto.PostResponse, error) {
-	postModel, err := mapCreateRequestToPostModel(req, userID)
+	authorID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
-		return nil, ErrInvalidInput
+		return nil, apperror.ErrInvalidID
 	}
-
-	createdPost, err := s.postRepo.Create(ctx, postModel)
+	communityID, err := primitive.ObjectIDFromHex(req.CommunityID)
 	if err != nil {
-		return nil, err
+		return nil, apperror.ErrInvalidID
 	}
 
-	// Publish event for reputation system
-	s.bus.Publish(bus.PostCreatedEvent{AuthorID: userID.Hex()})
-
-	return mapPostModelToResponse(createdPost, "", nil), nil
-}
-
-func (s *postService) VoteOnPost(ctx context.Context, userID, postID primitive.ObjectID, voteValue bool) (*dto.VotesCountResponse, error) {
-	post, err := s.postRepo.GetByID(ctx, postID)
+	// Validate community exists
+	community, err := s.communityRepo.GetByID(ctx, req.CommunityID)
 	if err != nil {
-		return nil, err
+		return nil, apperror.ErrCommunityNotFound
+	}
+	if community.IsDeleted {
+		return nil, errors.New("community is deleted")
 	}
 
-	// Prevent users from voting on their own posts
-	if post.AuthorID == userID {
-		return mapVotesToResponse(post.VotesCount), nil
+	post := &model.Post{
+		AuthorID:      authorID,
+		CommunityID:   communityID,
+		Title:         req.Title,
+		Type:          req.Type,
+		Content:       &model.PostContent{Text: req.Text},
+		VotesCount:    &model.VotesCount{Up: 1, Down: 0},
+		CommentsCount: 0,
+		IsDeleted:     false,
+		CreatedAt:     time.Now(),
 	}
 
-	vote := &model.Vote{
-		UserID:     userID,
-		TargetID:   postID,
-		TargetType: model.VoteTargetPost,
-		Value:      voteValue,
-	}
-	if err := s.postVoteRepo.Vote(ctx, vote); err != nil {
-		return nil, err
-	}
-
-	// Publish event for reputation and notification systems
-	if voteValue {
-		s.bus.Publish(bus.PostUpvotedEvent{
-			AuthorID: post.AuthorID.Hex(),
-			VoterID:  userID.Hex(),
-			PostID:   postID.Hex(),
-		})
-	} else {
-		s.bus.Publish(bus.PostDownvotedEvent{
-			AuthorID: post.AuthorID.Hex(),
-			VoterID:  userID.Hex(),
-			PostID:   postID.Hex(),
-		})
-	}
-
-	updatedPost, err := s.postRepo.GetByID(ctx, postID)
-	if err != nil {
-		return nil, err
-	}
-
-	return mapVotesToResponse(updatedPost.VotesCount), nil
-}
-
-// ... other methods ...
-
-func (s *postService) GetPostByID(ctx context.Context, postID, userID primitive.ObjectID) (*dto.PostResponse, error) {
-	post, err := s.postRepo.GetByID(ctx, postID)
-	if err != nil {
-		return nil, err
-	}
-
-	userVote, _ := s.postVoteRepo.GetUserVote(ctx, postID, userID)
-	userPollVotes, _ := s.postPollRepo.GetUserPollVotes(ctx, postID, userID)
-	var userVoteStr string
-	if userVote != nil {
-		if userVote.Value {
-			userVoteStr = "up"
-		} else {
-			userVoteStr = "down"
+	if req.Type == model.PostTypePoll && req.Poll != nil {
+		pollOptions := make([]model.PollOption, len(req.Poll.Options))
+		for i, optText := range req.Poll.Options {
+			pollOptions[i] = model.PollOption{
+				ID:    util.GenerateRandomString(8),
+				Text:  optText,
+				Votes: 0,
+			}
+		}
+		post.Content.Poll = &model.Poll{
+			Question:      req.Poll.Question,
+			Options:       pollOptions,
+			ExpiresAt:     req.Poll.ExpiresAt,
+			AllowMultiple: req.Poll.AllowMultiple,
 		}
 	}
-	return mapPostModelToResponse(post, userVoteStr, userPollVotes), nil
+
+	createdPost, err := s.postRepo.Create(ctx, post)
+	if err != nil {
+		return nil, err
+	}
+
+	s.bus.Publish(bus.PostCreatedEvent{AuthorID: userID})
+
+	return s.GetPostByID(createdPost.ID.Hex(), userID)
 }
 
-func (s *postService) GetPosts(ctx context.Context, userID primitive.ObjectID, query *dto.GetPostsQuery) (*PaginatedPostsResponse, error) {
+func (s *postService) GetPostByID(postID string, userID string) (*dto.PostResponse, error) {
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
+
+	post, err := s.postRepo.GetByID(ctx, postID)
+	if err != nil {
+		return nil, err
+	}
+
+	author, _ := s.userRepo.GetByID(ctx, post.AuthorID.Hex())
+	community, _ := s.communityRepo.GetByID(ctx, post.CommunityID.Hex())
+
+	var userVoteStr string
+	var userPollVoteIDs []string
+
+	if userID != "" {
+		vote, _ := s.postVoteRepo.GetUserVote(ctx, userID, postID)
+		if vote != nil {
+			if vote.Value {
+				userVoteStr = "up"
+			} else {
+				userVoteStr = "down"
+			}
+		}
+		if post.Type == model.PostTypePoll {
+			userPollVoteIDs, _ = s.pollVoteRepo.GetUserVoteIDs(ctx, userID, postID)
+		}
+	}
+
+	return dto.FromPost(post, author, community, userVoteStr, userPollVoteIDs), nil
+}
+
+func (s *postService) GetPosts(userID string, query *dto.GetPostsQuery) (*dto.PaginatedPostsResponse, error) {
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
+
 	filter := s.buildFilter(query)
-	totalPosts, err := s.postRepo.Count(ctx, filter)
+	findOptions := s.buildFindOptions(query)
+
+	posts, totalPosts, err := s.postRepo.Find(ctx, filter, findOptions)
 	if err != nil {
 		return nil, err
 	}
 
 	if totalPosts == 0 {
-		return &PaginatedPostsResponse{
-			CurrentPage: query.Page,
-			TotalPosts:  0,
-			TotalPages:  0,
-			HasNextPage: false,
-			Posts:       []*dto.PostResponse{},
-		}, nil
+		return &dto.PaginatedPostsResponse{Posts: []*dto.PostResponse{}}, nil
 	}
 
-	findOptions := s.buildFindOptions(query)
-	posts, err := s.postRepo.Find(ctx, filter, findOptions)
-	if err != nil {
-		return nil, err
-	}
+	authorIDs, communityIDs := s.extractIDs(posts)
+	authors, _ := s.userRepo.GetByIDs(ctx, authorIDs)
+	communities, _ := s.communityRepo.GetByIDs(ctx, communityIDs)
 
-	postIDs := make([]primitive.ObjectID, len(posts))
-	var pollPostIDs []primitive.ObjectID
+	authorsMap := s.mapUsers(authors)
+	communitiesMap := s.mapCommunities(communities)
+
+	postIDs := make([]string, len(posts))
 	for i, p := range posts {
-		postIDs[i] = p.ID
-		if p.Type == model.PostTypePoll {
-			pollPostIDs = append(pollPostIDs, p.ID)
-		}
+		postIDs[i] = p.ID.Hex()
 	}
 
-	userVotes := make(map[primitive.ObjectID]string)
-	if !userID.IsZero() {
-		userVotes, err = s.postVoteRepo.FindUserVotesOnPosts(ctx, userID, postIDs)
-		if err != nil {
-			// Ghi log lỗi nhưng không dừng request
-		}
+	var userVotes map[string]string
+	var userPollVotes map[string][]string
+	if userID != "" {
+		userVotes, _ = s.postVoteRepo.FindUserVotes(ctx, userID, postIDs)
+		userPollVotes, _ = s.pollVoteRepo.FindUserVotes(ctx, userID, postIDs)
 	}
 
-	userPollVotesMap := make(map[primitive.ObjectID][]*model.PollVote)
-	if len(pollPostIDs) > 0 && !userID.IsZero() {
-		userPollVotesMap, err = s.postPollRepo.FindUserVotesOnPolls(ctx, userID, pollPostIDs)
-		if err != nil {
-			// Ghi log lỗi nhưng không dừng request
-		}
+	responses := dto.FromPosts(posts, authorsMap, communitiesMap, userVotes, userPollVotes)
+
+	limit := query.Limit
+	if limit <= 0 {
+		limit = 10
 	}
 
-	responses := make([]*dto.PostResponse, len(posts))
-	for i, post := range posts {
-		userVoteStr := userVotes[post.ID]
-		userPollVotes := userPollVotesMap[post.ID]
-		responses[i] = mapPostModelToResponse(post, userVoteStr, userPollVotes)
-	}
-
-	totalPages := int64(math.Ceil(float64(totalPosts) / float64(query.Limit)))
-
-	return &PaginatedPostsResponse{
-		CurrentPage: query.Page,
-		TotalPosts:  totalPosts,
-		TotalPages:  totalPages,
-		HasNextPage: query.Page < int(totalPages),
-		Posts:       responses,
+	return &dto.PaginatedPostsResponse{
+		Posts: responses,
+		Pagination: dto.Pagination{
+			Page:     query.Page,
+			PageSize: limit,
+			Total:    totalPosts,
+		},
 	}, nil
 }
 
-func (s *postService) buildFilter(query *dto.GetPostsQuery) bson.M {
-	filter := bson.M{"is_deleted": bson.M{"$ne": true}}
+func (s *postService) UpdatePost(postID string, userID string, req *dto.UpdatePostRequest) (*dto.PostResponse, error) {
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
 
-	if query.CommunityID != "" {
-		if communityID, err := primitive.ObjectIDFromHex(query.CommunityID); err == nil {
-			filter["community_id"] = communityID
-		}
-	}
-
-	if query.AuthorID != "" {
-		if authorID, err := primitive.ObjectIDFromHex(query.AuthorID); err == nil {
-			filter["author_id"] = authorID
-		}
-	}
-
-	if query.Type != "" {
-		filter["type"] = query.Type
-	}
-
-	if query.Sort == "top" || query.Sort == "controversial" {
-		if timeFilter := createTimeFilter(query.TimeFrame); timeFilter != nil {
-			for key, value := range timeFilter {
-				filter[key] = value
-			}
-		}
-	}
-
-	return filter
-}
-
-func (s *postService) buildFindOptions(query *dto.GetPostsQuery) *options.FindOptions {
-	opts := options.Find()
-
-	limit := query.Limit
-	offset := (query.Page - 1) * limit
-	opts.SetLimit(int64(limit))
-	opts.SetSkip(int64(offset))
-
-	var sortDoc bson.D
-	switch query.Sort {
-	case "top":
-		sortDoc = bson.D{{Key: "votes_count.up", Value: -1}, {Key: "created_at", Value: -1}}
-	case "new":
-		fallthrough
-	default:
-		sortDoc = bson.D{{Key: "created_at", Value: -1}}
-	}
-	opts.SetSort(sortDoc)
-
-	return opts
-}
-
-func createTimeFilter(timeFrame string) bson.M {
-	if timeFrame == "" || timeFrame == "all" {
-		return nil
-	}
-
-	now := time.Now()
-	var startTime time.Time
-
-	switch timeFrame {
-	case "hour":
-		startTime = now.Add(-1 * time.Hour)
-	case "day":
-		startTime = now.Add(-24 * time.Hour)
-	case "week":
-		startTime = now.AddDate(0, 0, -7)
-	case "month":
-		startTime = now.AddDate(0, -1, 0)
-	case "year":
-		startTime = now.AddDate(-1, 0, 0)
-	default:
-		return nil
-	}
-
-	return bson.M{"created_at": bson.M{"$gte": startTime}}
-}
-
-func (s *postService) UpdatePost(ctx context.Context, postID, userID primitive.ObjectID, req *dto.UpdatePostRequest) (*dto.PostResponse, error) {
 	post, err := s.postRepo.GetByID(ctx, postID)
 	if err != nil {
 		return nil, err
 	}
-
-	if post.AuthorID != userID {
+	if post.AuthorID.Hex() != userID {
 		return nil, ErrPermissionDenied
 	}
 
-	if req.Title != "" {
-		post.Title = req.Title
+	update := repo.UpdateDocument{"$set": bson.M{}}
+	changed := false
+	if req.Title != nil {
+		update["$set"].(bson.M)["title"] = *req.Title
+		changed = true
+	}
+	if req.Text != nil {
+		update["$set"].(bson.M)["content.text"] = *req.Text
+		changed = true
 	}
 
-	if post.Content != nil {
-		if req.Text != "" {
-			post.Content.Text = req.Text
-		}
+	if !changed {
+		return s.GetPostByID(postID, userID)
 	}
 
-	if err := s.postRepo.Update(ctx, post); err != nil {
+	update["$set"].(bson.M)["updated_at"] = time.Now()
+	if err := s.postRepo.UpdateByID(ctx, postID, update); err != nil {
 		return nil, err
 	}
 
-	return mapPostModelToResponse(post, "", nil), nil
+	return s.GetPostByID(postID, userID)
 }
 
-func (s *postService) DeletePost(ctx context.Context, postID, userID primitive.ObjectID) error {
+func (s *postService) DeletePost(postID string, userID string) error {
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
+
 	post, err := s.postRepo.GetByID(ctx, postID)
 	if err != nil {
 		return err
 	}
-	if post.AuthorID != userID {
+	if post.AuthorID.Hex() != userID {
 		return ErrPermissionDenied
 	}
 	return s.postRepo.SoftDelete(ctx, postID)
 }
 
-func (s *postService) RemovePostVote(ctx context.Context, userID, postID primitive.ObjectID) (*dto.VotesCountResponse, error) {
-	if err := s.postVoteRepo.RemoveVote(ctx, postID, userID); err != nil {
-		return nil, err
-	}
+func (s *postService) AddImagesToPost(userID, postID string, form *multipart.Form) ([]*model.Image, error) {
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
 
 	post, err := s.postRepo.GetByID(ctx, postID)
 	if err != nil {
 		return nil, err
 	}
-
-	if post.VotesCount == nil {
-		return &dto.VotesCountResponse{Up: 0, Down: 0, Score: 0}, nil
+	if post.AuthorID.Hex() != userID {
+		return nil, ErrPermissionDenied
 	}
 
-	response := &dto.VotesCountResponse{
-		Up:    post.VotesCount.Up,
-		Down:  post.VotesCount.Down,
-		Score: post.VotesCount.Up - post.VotesCount.Down,
+	files := form.File["images"]
+	if len(files) == 0 {
+		return nil, errors.New("no images provided")
 	}
 
-	return response, nil
-}
+	var uploadedImages []*model.Image
+	for _, fileHeader := range files {
+		file, err := fileHeader.Open()
+		if err != nil {
+			continue
+		}
+		defer file.Close()
 
-func (s *postService) VoteOnPoll(ctx context.Context, userID, postID, optionID primitive.ObjectID) (*dto.PollResponse, error) {
-	pollVote := &model.PollVote{
-		PostID:   postID,
-		UserID:   userID,
-		OptionID: optionID,
+		result, err := cloudinary.Upload(file, fileHeader)
+		if err != nil {
+			continue
+		}
+		uploadedImages = append(uploadedImages, &model.Image{
+			URL:        result.SecureURL,
+			PublicID:   result.PublicID,
+			UploadedAt: time.Now(),
+		})
 	}
-	if err := s.postPollRepo.VotePoll(ctx, pollVote); err != nil {
+
+	if len(uploadedImages) == 0 {
+		return nil, errors.New("all image uploads failed")
+	}
+
+	update := repo.UpdateDocument{"$push": bson.M{"content.images": bson.M{"$each": uploadedImages}}}
+	if err := s.postRepo.UpdateByID(ctx, postID, update); err != nil {
 		return nil, err
 	}
+
+	return uploadedImages, nil
+}
+
+func (s *postService) RemoveImagesFromPost(userID, postID string, publicIDs []string) error {
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
+
+	post, err := s.postRepo.GetByID(ctx, postID)
+	if err != nil {
+		return err
+	}
+	if post.AuthorID.Hex() != userID {
+		return ErrPermissionDenied
+	}
+
+	update := repo.UpdateDocument{"$pull": bson.M{"content.images": bson.M{"public_id": bson.M{"$in": publicIDs}}}}
+	if err := s.postRepo.UpdateByID(ctx, postID, update); err != nil {
+		return err
+	}
+
+	for _, pid := range publicIDs {
+		go cloudinary.Delete(pid)
+	}
+
+	return nil
+}
+
+func (s *postService) VoteOnPost(userID, postID string, voteValue bool) (*dto.VotesCountResponse, error) {
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
+
+	post, err := s.postRepo.GetByID(ctx, postID)
+	if err != nil {
+		return nil, err
+	}
+	if post.AuthorID.Hex() == userID {
+		return nil, ErrPermissionDenied
+	}
+
+	prevVote, _ := s.postVoteRepo.GetUserVote(ctx, userID, postID)
+
+	if err := s.postVoteRepo.Vote(ctx, userID, postID, voteValue); err != nil {
+		return nil, err
+	}
+
+	s.publishVoteEvents(post.AuthorID.Hex(), userID, postID, prevVote, voteValue)
 
 	updatedPost, err := s.postRepo.GetByID(ctx, postID)
 	if err != nil {
 		return nil, err
 	}
-	userPollVotes, _ := s.postPollRepo.GetUserPollVotes(ctx, postID, userID)
-
-	return mapPollToResponse(updatedPost.Content.Poll, userPollVotes), nil
+	return &dto.VotesCountResponse{Up: updatedPost.VotesCount.Up, Down: updatedPost.VotesCount.Down, Score: updatedPost.VotesCount.Up - updatedPost.VotesCount.Down}, nil
 }
 
-func (s *postService) RemovePollVote(ctx context.Context, userID, postID primitive.ObjectID) (*dto.PollResponse, error) {
-	if err := s.postPollRepo.RemovePollVote(ctx, postID, userID); err != nil {
+func (s *postService) VoteOnPoll(userID, postID, optionID string) (*dto.PollResponse, error) {
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
+
+	if err := s.pollVoteRepo.Vote(ctx, userID, postID, optionID); err != nil {
 		return nil, err
 	}
+
+	return s.getPollResponse(ctx, postID, userID)
+}
+
+func (s *postService) RemovePollVote(userID, postID string) (*dto.PollResponse, error) {
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
+
+	if err := s.pollVoteRepo.RemoveVote(ctx, userID, postID); err != nil {
+		return nil, err
+	}
+
+	return s.getPollResponse(ctx, postID, userID)
+}
+
+func (s *postService) AddPollOptions(userID, postID string, options []string) (*dto.PollResponse, error) {
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
 
 	post, err := s.postRepo.GetByID(ctx, postID)
 	if err != nil {
 		return nil, err
 	}
-
-	if post.Type != model.PostTypePoll || post.Content == nil || post.Content.Poll == nil {
-		return nil, errors.New("post is not a valid poll")
-	}
-
-	response := mapPollToResponse(post.Content.Poll, []*model.PollVote{})
-
-	return response, nil
-}
-
-func (s *postService) AddImagesToPost(ctx context.Context, userID, postID primitive.ObjectID, req *dto.AddImageRequest) ([]dto.ImageResponse, error) {
-	post, err := s.postRepo.GetByID(ctx, postID)
-	if err != nil {
-		return nil, err
-	}
-	if post.AuthorID != userID {
+	if post.AuthorID.Hex() != userID {
 		return nil, ErrPermissionDenied
 	}
 
-	newImages := make([]model.Image, len(req.Images))
-	for i, imgReq := range req.Images {
-		newImages[i] = model.Image{
-			ID:         primitive.NewObjectID(),
-			URL:        imgReq.URL,
-			UploadedAt: time.Now(),
+	newOptions := make([]model.PollOption, len(options))
+	for i, text := range options {
+		newOptions[i] = model.PollOption{ID: util.GenerateRandomString(8), Text: text}
+	}
+
+	update := repo.UpdateDocument{"$push": bson.M{"content.poll.options": bson.M{"$each": newOptions}}}
+	if err := s.postRepo.UpdateByID(ctx, postID, update); err != nil {
+		return nil, err
+	}
+
+	return s.getPollResponse(ctx, postID, userID)
+}
+
+func (s *postService) RemovePollOptions(userID, postID string, optionIDs []string) (*dto.PollResponse, error) {
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
+
+	post, err := s.postRepo.GetByID(ctx, postID)
+	if err != nil {
+		return nil, err
+	}
+	if post.AuthorID.Hex() != userID {
+		return nil, ErrPermissionDenied
+	}
+
+	update := repo.UpdateDocument{"$pull": bson.M{"content.poll.options": bson.M{"id": bson.M{"$in": optionIDs}}}}
+	if err := s.postRepo.UpdateByID(ctx, postID, update); err != nil {
+		return nil, err
+	}
+
+	return s.getPollResponse(ctx, postID, userID)
+}
+
+func (s *postService) UpdatePoll(userID, postID string, req *dto.UpdatePollRequest) (*dto.PollResponse, error) {
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
+
+	post, err := s.postRepo.GetByID(ctx, postID)
+	if err != nil {
+		return nil, err
+	}
+	if post.AuthorID.Hex() != userID {
+		return nil, ErrPermissionDenied
+	}
+
+	updateData := bson.M{}
+	if req.Question != nil {
+		updateData["content.poll.question"] = *req.Question
+	}
+	if req.ExpiresAt != nil {
+		updateData["content.poll.expires_at"] = *req.ExpiresAt
+	}
+	if req.AllowMultiple != nil {
+		updateData["content.poll.allow_multiple"] = *req.AllowMultiple
+	}
+
+	if len(updateData) == 0 {
+		return s.getPollResponse(ctx, postID, userID)
+	}
+
+	update := repo.UpdateDocument{"$set": updateData}
+	if err := s.postRepo.UpdateByID(ctx, postID, update); err != nil {
+		return nil, err
+	}
+
+	return s.getPollResponse(ctx, postID, userID)
+}
+
+func (s *postService) UpdatePollOption(userID, postID, optionID string, req *dto.UpdatePollOptionRequest) (*dto.PollResponse, error) {
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
+
+	post, err := s.postRepo.GetByID(ctx, postID)
+	if err != nil {
+		return nil, err
+	}
+	if post.AuthorID.Hex() != userID {
+		return nil, ErrPermissionDenied
+	}
+
+	filter := repo.Filter{"_id": post.ID, "content.poll.options.id": optionID}
+	update := repo.UpdateDocument{"$set": bson.M{"content.poll.options.$.text": req.Text}}
+
+	if err := s.postRepo.Update(ctx, filter, update); err != nil {
+		return nil, err
+	}
+
+	return s.getPollResponse(ctx, postID, userID)
+}
+
+func (s *postService) getPollResponse(ctx context.Context, postID, userID string) (*dto.PollResponse, error) {
+	post, err := s.postRepo.GetByID(ctx, postID)
+	if err != nil {
+		return nil, err
+	}
+	userPollVoteIDs, _ := s.pollVoteRepo.GetUserVoteIDs(ctx, userID, postID)
+	return dto.FromPoll(post.Content.Poll, userPollVoteIDs), nil
+}
+
+func (s *postService) publishVoteEvents(authorID, voterID, postID string, prevVote *model.Vote, newVoteValue bool) {
+
+	if prevVote == nil {
+		if newVoteValue {
+			s.bus.Publish(bus.PostUpvotedEvent{AuthorID: authorID, VoterID: voterID, PostID: postID})
+		} else {
+			s.bus.Publish(bus.PostDownvotedEvent{AuthorID: authorID, VoterID: voterID, PostID: postID})
+		}
+	} else if prevVote.Value != newVoteValue {
+		if newVoteValue {
+			s.bus.Publish(bus.PostDownvoteRemovedEvent{AuthorID: authorID, VoterID: voterID, PostID: postID})
+			s.bus.Publish(bus.PostUpvotedEvent{AuthorID: authorID, VoterID: voterID, PostID: postID})
+		} else {
+			s.bus.Publish(bus.PostUpvoteRemovedEvent{AuthorID: authorID, VoterID: voterID, PostID: postID})
+			s.bus.Publish(bus.PostDownvotedEvent{AuthorID: authorID, VoterID: voterID, PostID: postID})
 		}
 	}
-
-	if err := s.postImageRepo.AddImages(ctx, postID, newImages); err != nil {
-		return nil, err
-	}
-
-	res := make([]dto.ImageResponse, len(newImages))
-	for i, img := range newImages {
-		res[i] = dto.ImageResponse{ID: img.ID.Hex(), URL: img.URL}
-	}
-	return res, nil
 }
 
-func (s *postService) RemoveImagesFromPost(ctx context.Context, userID, postID primitive.ObjectID, req *dto.RemoveImageRequest) error {
-	post, err := s.postRepo.GetByID(ctx, postID)
-	if err != nil {
-		return err
-	}
-	if post.AuthorID != userID {
-		return ErrPermissionDenied
-	}
+// --- Helper methods ---
 
-	imageObjectIDs := make([]primitive.ObjectID, len(req.ImageIDs))
-	for i, idStr := range req.ImageIDs {
-		id, err := primitive.ObjectIDFromHex(idStr)
-		if err != nil {
-			return ErrInvalidInput
+func (s *postService) buildFilter(query *dto.GetPostsQuery) repo.Filter {
+	filter := repo.Filter{"is_deleted": false}
+	if query.CommunityID != "" {
+		if id, err := primitive.ObjectIDFromHex(query.CommunityID); err == nil {
+			filter["community_id"] = id
 		}
-		imageObjectIDs[i] = id
 	}
-
-	return s.postImageRepo.RemoveImages(ctx, postID, imageObjectIDs)
-}
-
-func (s *postService) UpdatePollDetails(ctx context.Context, postID, userID primitive.ObjectID, req *dto.UpdatePollRequest) (*dto.PollResponse, error) {
-	post, err := s.postRepo.GetByID(ctx, postID)
-	if err != nil {
-		return nil, err
-	}
-	if post.AuthorID != userID {
-		return nil, ErrPermissionDenied
-	}
-
-	if err := s.postPollRepo.UpdatePoll(ctx, postID, req.Question, req.ExpiresAt, &req.AllowMultiple); err != nil {
-		return nil, err
-	}
-
-	return s.getUpdatedPollResponse(ctx, postID, userID)
-}
-
-func (s *postService) AddPollOptions(ctx context.Context, userID, postID primitive.ObjectID, req *dto.AddPollOptionRequest) (*dto.PollResponse, error) {
-	post, err := s.postRepo.GetByID(ctx, postID)
-	if err != nil {
-		return nil, err
-	}
-	if post.AuthorID != userID {
-		return nil, ErrPermissionDenied
-	}
-
-	newOptions := make([]model.PollOption, len(req.Options))
-	for i, text := range req.Options {
-		newOptions[i] = model.PollOption{ID: primitive.NewObjectID(), Text: text, Votes: 0}
-	}
-
-	if err := s.postPollRepo.AddPollOptions(ctx, postID, newOptions); err != nil {
-		return nil, err
-	}
-	return s.getUpdatedPollResponse(ctx, postID, userID)
-}
-
-func (s *postService) UpdatePollOption(ctx context.Context, userID, postID, optionID primitive.ObjectID, newText string) (*dto.PollResponse, error) {
-	post, err := s.postRepo.GetByID(ctx, postID)
-	if err != nil {
-		return nil, err
-	}
-	if post.AuthorID != userID {
-		return nil, ErrPermissionDenied
-	}
-
-	if err := s.postPollRepo.UpdatePollOption(ctx, postID, optionID, newText); err != nil {
-		return nil, err
-	}
-
-	return s.getUpdatedPollResponse(ctx, postID, userID)
-}
-func (s *postService) RemovePollOptions(ctx context.Context, userID, postID primitive.ObjectID, req *dto.RemovePollOptionRequest) (*dto.PollResponse, error) {
-	post, err := s.postRepo.GetByID(ctx, postID)
-	if err != nil {
-		return nil, err
-	}
-	if post.AuthorID != userID {
-		return nil, ErrPermissionDenied
-	}
-
-	optionObjectIDs := make([]primitive.ObjectID, len(req.OptionIDs))
-	for i, idStr := range req.OptionIDs {
-		id, err := primitive.ObjectIDFromHex(idStr)
-		if err != nil {
-			return nil, ErrInvalidInput
+	if query.AuthorID != "" {
+		if id, err := primitive.ObjectIDFromHex(query.AuthorID); err == nil {
+			filter["author_id"] = id
 		}
-		optionObjectIDs[i] = id
 	}
-
-	if err := s.postPollRepo.RemovePollOptions(ctx, postID, optionObjectIDs); err != nil {
-		return nil, err
+	if query.Type != "" {
+		filter["type"] = query.Type
 	}
-	return s.getUpdatedPollResponse(ctx, postID, userID)
+	return filter
 }
 
-func (s *postService) BookmarkPost(ctx context.Context, userID, postID primitive.ObjectID) error {
-	return errors.New("bookmark not implemented")
-}
-
-func (s *postService) RemoveBookmark(ctx context.Context, userID, postID primitive.ObjectID) error {
-	return errors.New("bookmark not implemented")
-}
-
-func (s *postService) getUpdatedPollResponse(ctx context.Context, postID, userID primitive.ObjectID) (*dto.PollResponse, error) {
-	post, err := s.postRepo.GetByID(ctx, postID)
-	if err != nil {
-		return nil, err
+func (s *postService) buildFindOptions(query *dto.GetPostsQuery) *repo.FindOptions {
+	page := query.Page
+	if page <= 0 {
+		page = 1
 	}
-	userPollVotes, err := s.postPollRepo.GetUserPollVotes(ctx, postID, userID)
-	if err != nil {
-		return nil, err
+	limit := query.Limit
+	if limit <= 0 {
+		limit = 10
 	}
-	return mapPollToResponse(post.Content.Poll, userPollVotes), nil
+	if limit > 100 {
+		limit = 100
+	}
+
+	opts := &repo.FindOptions{
+		Skip:  int64((page - 1) * limit),
+		Limit: int64(limit),
+		Sort:  map[string]int{"created_at": -1},
+	}
+
+	switch query.Sort {
+	case "top":
+		opts.Sort = map[string]int{"votes_count.up": -1}
+	case "hot":
+		opts.Sort = map[string]int{"created_at": -1} // Simplified hot sort
+	}
+
+	return opts
 }
 
-// (File mapper.go và các hàm mapper khác giữ nguyên như câu trả lời trước)
+func (s *postService) extractIDs(posts []*model.Post) ([]string, []string) {
+	authorIDMap := make(map[string]bool)
+	communityIDMap := make(map[string]bool)
+	for _, post := range posts {
+		authorIDMap[post.AuthorID.Hex()] = true
+		communityIDMap[post.CommunityID.Hex()] = true
+	}
+
+	authorIDs := make([]string, 0, len(authorIDMap))
+	for id := range authorIDMap {
+		authorIDs = append(authorIDs, id)
+	}
+	communityIDs := make([]string, 0, len(communityIDMap))
+	for id := range communityIDMap {
+		communityIDs = append(communityIDs, id)
+	}
+	return authorIDs, communityIDs
+}
+
+func (s *postService) mapUsers(users []*model.User) map[string]*model.User {
+	authorsMap := make(map[string]*model.User, len(users))
+	for _, u := range users {
+		authorsMap[u.ID.Hex()] = u
+	}
+	return authorsMap
+}
+
+func (s *postService) mapCommunities(communities []*model.Community) map[string]*model.Community {
+	communitiesMap := make(map[string]*model.Community, len(communities))
+	for _, c := range communities {
+		communitiesMap[c.ID.Hex()] = c
+	}
+	return communitiesMap
+}

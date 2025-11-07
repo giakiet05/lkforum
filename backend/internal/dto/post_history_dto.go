@@ -27,10 +27,10 @@ func FromPostHistory(postHistory *model.PostHistory) *PostHistoryResponse {
 	}
 }
 
-func FromPostHistories(postHistories []*model.PostHistory) []PostHistoryResponse {
-	responses := make([]PostHistoryResponse, len(postHistories))
+func FromPostHistories(postHistories []*model.PostHistory) []*PostHistoryResponse {
+	responses := make([]*PostHistoryResponse, len(postHistories))
 	for i, ph := range postHistories {
-		responses[i] = *FromPostHistory(ph)
+		responses[i] = FromPostHistory(ph)
 	}
 	return responses
 }

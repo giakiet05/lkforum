@@ -87,12 +87,7 @@ func (s *notificationService) handlePostUpvoted(event bus.Event) {
 		return
 	}
 
-	postObjID, err := primitive.ObjectIDFromHex(postID)
-	if err != nil {
-		return
-	}
-
-	post, err := s.postRepo.GetByID(ctx, postObjID)
+	post, err := s.postRepo.GetByID(ctx, postID) // Sửa lỗi ở đây
 	if err != nil {
 		return
 	}

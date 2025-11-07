@@ -14,7 +14,7 @@ func RegisterCommentRoutes(rg *gin.RouterGroup, c *controller.CommentController)
 	comments.GET("post", c.GetCommentByPostID)
 
 	// Protected routes (require authentication)
-	comments.Use(middleware.AuthMiddleware())
+	comments.Use(middleware.RequireAuth())
 	{
 		comments.POST("", c.CreateComment)
 		comments.DELETE("/:comment_id", c.DeleteCommentByID)
