@@ -85,6 +85,15 @@ func (s *postService) CreatePost(userID string, req *dto.CreatePostRequest) (*dt
 		return nil, apperror.ErrInvalidID
 	}
 
+	// Validate community exists
+	community, err := s.communityRepo.GetByID(ctx, req.CommunityID)
+	if err != nil {
+		return nil, apperror.ErrCommunityNotFound
+	}
+	if community.IsDeleted {
+		return nil, errors.New("community is deleted")
+	}
+
 	post := &model.Post{
 		AuthorID:      authorID,
 		CommunityID:   communityID,
@@ -119,7 +128,6 @@ func (s *postService) CreatePost(userID string, req *dto.CreatePostRequest) (*dt
 		return nil, err
 	}
 
-	go s.postVoteRepo.Vote(context.Background(), userID, createdPost.ID.Hex(), true)
 	s.bus.Publish(bus.PostCreatedEvent{AuthorID: userID})
 
 	return s.GetPostByID(createdPost.ID.Hex(), userID)
@@ -170,7 +178,7 @@ func (s *postService) GetPosts(userID string, query *dto.GetPostsQuery) (*dto.Pa
 	}
 
 	if totalPosts == 0 {
-		return &dto.PaginatedPostsResponse{Posts: []dto.PostResponse{}}, nil
+		return &dto.PaginatedPostsResponse{Posts: []*dto.PostResponse{}}, nil
 	}
 
 	authorIDs, communityIDs := s.extractIDs(posts)
@@ -342,17 +350,12 @@ func (s *postService) VoteOnPost(userID, postID string, voteValue bool) (*dto.Vo
 		return nil, ErrPermissionDenied
 	}
 
-	// We need to know the previous vote state to publish the correct event
-	prevVote, err := s.postVoteRepo.GetUserVote(ctx, userID, postID)
-	if err != nil {
-		return nil, err
-	}
+	prevVote, _ := s.postVoteRepo.GetUserVote(ctx, userID, postID)
 
 	if err := s.postVoteRepo.Vote(ctx, userID, postID, voteValue); err != nil {
 		return nil, err
 	}
 
-	// Business logic for publishing events based on vote change
 	s.publishVoteEvents(post.AuthorID.Hex(), userID, postID, prevVote, voteValue)
 
 	updatedPost, err := s.postRepo.GetByID(ctx, postID)
@@ -496,30 +499,20 @@ func (s *postService) getPollResponse(ctx context.Context, postID, userID string
 }
 
 func (s *postService) publishVoteEvents(authorID, voterID, postID string, prevVote *model.Vote, newVoteValue bool) {
+
 	if prevVote == nil {
-		// New vote
 		if newVoteValue {
 			s.bus.Publish(bus.PostUpvotedEvent{AuthorID: authorID, VoterID: voterID, PostID: postID})
 		} else {
 			s.bus.Publish(bus.PostDownvotedEvent{AuthorID: authorID, VoterID: voterID, PostID: postID})
 		}
-	} else {
-		if prevVote.Value == newVoteValue {
-			// Un-voting
-			if newVoteValue {
-				s.bus.Publish(bus.PostUpvoteRemovedEvent{AuthorID: authorID, VoterID: voterID, PostID: postID})
-			} else {
-				s.bus.Publish(bus.PostDownvoteRemovedEvent{AuthorID: authorID, VoterID: voterID, PostID: postID})
-			}
+	} else if prevVote.Value != newVoteValue {
+		if newVoteValue {
+			s.bus.Publish(bus.PostDownvoteRemovedEvent{AuthorID: authorID, VoterID: voterID, PostID: postID})
+			s.bus.Publish(bus.PostUpvotedEvent{AuthorID: authorID, VoterID: voterID, PostID: postID})
 		} else {
-			// Changing vote
-			if newVoteValue {
-				s.bus.Publish(bus.PostDownvoteRemovedEvent{AuthorID: authorID, VoterID: voterID, PostID: postID})
-				s.bus.Publish(bus.PostUpvotedEvent{AuthorID: authorID, VoterID: voterID, PostID: postID})
-			} else {
-				s.bus.Publish(bus.PostUpvoteRemovedEvent{AuthorID: authorID, VoterID: voterID, PostID: postID})
-				s.bus.Publish(bus.PostDownvotedEvent{AuthorID: authorID, VoterID: voterID, PostID: postID})
-			}
+			s.bus.Publish(bus.PostUpvoteRemovedEvent{AuthorID: authorID, VoterID: voterID, PostID: postID})
+			s.bus.Publish(bus.PostDownvotedEvent{AuthorID: authorID, VoterID: voterID, PostID: postID})
 		}
 	}
 }

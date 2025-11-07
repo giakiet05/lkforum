@@ -53,10 +53,10 @@ func FromMessage(message *model.Message) *MessageResponse {
 	}
 }
 
-func FromMessages(messages []model.Message) []MessageResponse {
-	var messageResponses []MessageResponse
+func FromMessages(messages []model.Message) []*MessageResponse {
+	var messageResponses []*MessageResponse
 	for _, msg := range messages {
-		messageResponses = append(messageResponses, *FromMessage(&msg))
+		messageResponses = append(messageResponses, FromMessage(&msg))
 	}
 	return messageResponses
 }

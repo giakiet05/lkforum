@@ -9,41 +9,41 @@ type Pagination struct {
 }
 
 type PaginatedUsersResponse struct {
-	Users      []UserResponse `json:"users"`
-	Pagination Pagination     `json:"pagination"`
+	Users      []*UserResponse `json:"users"`
+	Pagination Pagination      `json:"pagination"`
 }
 
 type PaginatedCommunitiesResponse struct {
-	Communities []CommunityResponse `json:"communities"`
-	Pagination  Pagination          `json:"pagination"`
+	Communities []*CommunityResponse `json:"communities"`
+	Pagination  Pagination           `json:"pagination"`
 }
 
 type PaginatedMembershipsResponse struct {
-	Memberships []model.Membership `json:"memberships"`
-	Pagination  Pagination         `json:"pagination"`
+	Memberships []*model.Membership `json:"memberships"`
+	Pagination  Pagination          `json:"pagination"`
 }
 
 type PaginatedPostsResponse struct {
-	Posts      []PostResponse `json:"posts"`
-	Pagination Pagination     `json:"pagination"`
+	Posts      []*PostResponse `json:"posts"`
+	Pagination Pagination      `json:"pagination"`
 }
 
 type PaginatedCommentsResponse struct {
-	Comments   []CommentResponse `json:"comments"`
-	Pagination Pagination        `json:"pagination"`
+	Comments   []*CommentResponse `json:"comments"`
+	Pagination Pagination         `json:"pagination"`
 }
 
 type PaginatedChannelsResponse struct {
-	Channels   []ChannelResponse `json:"channels"`
-	Pagination Pagination        `json:"pagination"`
+	Channels   []*ChannelResponse `json:"channels"`
+	Pagination Pagination         `json:"pagination"`
 }
 
 type PaginatedMessagesResponse struct {
-	Messages   []MessageResponse `json:"messages"`
-	Pagination Pagination        `json:"pagination"`
+	Messages   []*MessageResponse `json:"messages"`
+	Pagination Pagination         `json:"pagination"`
 }
 
 type PaginatedPostHistoryResponse struct {
-	PostHistories []PostHistoryResponse `json:"post_histories"`
-	Pagination    Pagination            `json:"pagination"`
+	PostHistories []*PostHistoryResponse `json:"post_histories"`
+	Pagination    Pagination             `json:"pagination"`
 }

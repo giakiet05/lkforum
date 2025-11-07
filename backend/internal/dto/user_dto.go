@@ -53,14 +53,14 @@ type RefreshRequest struct {
 type UserProfileResponse struct {
 	Avatar   model.Image `json:"avatar,omitempty"`
 	Cover    model.Image `json:"cover,omitempty"`
-	Bio      string      `json:"bio,omitempty"`
+	Bio      string      `json:"bio,omitempty"`	
 	Location string      `json:"location,omitempty"`
 	Website  string      `json:"website,omitempty"`
 }
 
 // UserResponse is the main user object returned in API responses.
 type UserResponse struct {
-	ID         string              `json:"id"`
+	ID         string              `json:"id"`	
 	Username   string              `json:"username"`
 	Email      string              `json:"email,omitempty"`
 	Reputation int                 `json:"reputation"`
@@ -73,13 +73,16 @@ type UserResponse struct {
 
 // AuthResponse is returned on successful login or registration.
 type AuthResponse struct {
-	User         UserResponse `json:"user"`
-	AccessToken  string       `json:"access_token"`
-	RefreshToken string       `json:"refresh_token"`
+	User         *UserResponse `json:"user"`
+	AccessToken  string        `json:"access_token"`
+	RefreshToken string        `json:"refresh_token"`
 }
 
-func FromUser(u *model.User) UserResponse {
-	resp := UserResponse{
+func FromUser(u *model.User) *UserResponse {
+	if u == nil {
+		return nil
+	}
+	resp := &UserResponse{
 		ID:         u.ID.Hex(),
 		Username:   u.Username,
 		Email:      u.Email,
@@ -103,8 +106,8 @@ func FromUser(u *model.User) UserResponse {
 	return resp
 }
 
-func FromUsers(users []*model.User) []UserResponse {
-	responses := make([]UserResponse, len(users))
+func FromUsers(users []*model.User) []*UserResponse {
+	responses := make([]*UserResponse, len(users))
 	for i, u := range users {
 		userResponse := FromUser(u)
 		userResponse.Email = ""

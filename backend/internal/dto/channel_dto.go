@@ -81,10 +81,10 @@ func FromChannel(channel *model.Channel) *ChannelResponse {
 	}
 }
 
-func FromChannels(channels []model.Channel) []ChannelResponse {
-	responses := make([]ChannelResponse, len(channels))
+func FromChannels(channels []model.Channel) []*ChannelResponse {
+	responses := make([]*ChannelResponse, len(channels))
 	for i, ch := range channels {
-		responses[i] = *FromChannel(&ch)
+		responses[i] = FromChannel(&ch)
 	}
 	return responses
 }

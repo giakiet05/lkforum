@@ -21,7 +21,7 @@ import (
 type MembershipService interface {
 	CreateMembership(req *dto.CreateMembershipRequest, userID string) (*model.Membership, error)
 	GetMembershipByID(membershipID string) (*model.Membership, error)
-	GetMembershipsByUserID(userID string) ([]model.Membership, error)
+	GetMembershipsByUserID(userID string) ([]*model.Membership, error)
 	GetAllMemberships(page int, pageSize int) (*dto.PaginatedMembershipsResponse, error)
 	GetMembershipByCommunityID(communityID string, page int, pageSize int) (*dto.PaginatedMembershipsResponse, error)
 	DeleteMembership(req *dto.DeleteMembershipRequest, userID string) error
@@ -105,7 +105,7 @@ func (m *membershipService) GetMembershipByID(membershipID string) (*model.Membe
 	return membership, nil
 }
 
-func (m *membershipService) GetMembershipsByUserID(userID string) ([]model.Membership, error) {
+func (m *membershipService) GetMembershipsByUserID(userID string) ([]*model.Membership, error) {
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
 

@@ -10,10 +10,10 @@ import (
 
 // CreatePostRequest defines the structure for creating a new text or poll post.
 type CreatePostRequest struct {
-	CommunityID string         `json:"community_id" binding:"required"`
-	Title       string         `json:"title" binding:"required,min=3,max=300"`
-	Type        model.PostType `json:"type" binding:"required,oneof=text poll"`
-	Text        string         `json:"text,omitempty"`
+	CommunityID string             `json:"community_id" binding:"required"`
+	Title       string             `json:"title" binding:"required,min=3,max=300"`
+	Type        model.PostType     `json:"type" binding:"required,oneof=text poll"`
+	Text        string             `json:"text,omitempty"`
 	Poll        *CreatePollRequest `json:"poll,omitempty"`
 }
 
@@ -71,7 +71,7 @@ type RemoveImagesRequest struct {
 // GetPostsQuery defines the query parameters for fetching posts.
 type GetPostsQuery struct {
 	CommunityID string `form:"community_id"`
-	AuthorID    string `form:"author_id"`
+	AuthorID    string `form:"author_id"`	
 	Type        string `form:"type"`
 	Sort        string `form:"sort"`
 	TimeFrame   string `form:"time"`
@@ -84,7 +84,7 @@ type GetPostsQuery struct {
 // PostResponse is the detailed post object returned to the client.
 type PostResponse struct {
 	ID            string                 `json:"id"`
-	Author        AuthorResponse         `json:"author"`
+	Author        AuthorResponse         `json:"author"`	
 	Community     CommunityShortResponse `json:"community"`
 	Title         string                 `json:"title"`
 	Type          model.PostType         `json:"type"`
@@ -111,10 +111,10 @@ type CommunityShortResponse struct {
 
 // PostContentResponse holds the actual content of the post.
 type PostContentResponse struct {
-	Text   string          `json:"text,omitempty"`
-	Images []model.Image   `json:"images,omitempty"`
-	Video  *model.Video    `json:"video,omitempty"`
-	Poll   *PollResponse   `json:"poll,omitempty"`
+	Text   string        `json:"text,omitempty"`
+	Images []model.Image `json:"images,omitempty"`
+	Video  *model.Video  `json:"video,omitempty"`
+	Poll   *PollResponse `json:"poll,omitempty"`
 }
 
 // PollResponse is the detailed poll object for responses.
@@ -158,15 +158,15 @@ func FromPost(post *model.Post, author *model.User, community *model.Community, 
 	}
 
 	resp := &PostResponse{
-		ID:        post.ID.Hex(),
-		Author:    AuthorResponse{ID: author.ID.Hex(), Username: author.Username, Avatar: author.RoleContent.AsUser.Avatar},
-		Community: CommunityShortResponse{ID: community.ID.Hex(), Name: community.Name},
-		Title:     post.Title,
-		Type:      post.Type,
+		ID:            post.ID.Hex(),
+		Author:        AuthorResponse{ID: author.ID.Hex(), Username: author.Username, Avatar: author.RoleContent.AsUser.Avatar},
+		Community:     CommunityShortResponse{ID: community.ID.Hex(), Name: community.Name},
+		Title:         post.Title,
+		Type:          post.Type,
 		CommentsCount: post.CommentsCount,
-		CreatedAt: post.CreatedAt,
-		UpdatedAt: post.UpdatedAt,
-		UserVote:  userVote,
+		CreatedAt:     post.CreatedAt,
+		UpdatedAt:     post.UpdatedAt,
+		UserVote:      userVote,
 	}
 
 	if post.VotesCount != nil {
@@ -218,15 +218,15 @@ func FromPoll(poll *model.Poll, userVoteIDs []string) *PollResponse {
 }
 
 // FromPosts creates a slice of PostResponse with optimized data fetching.
-func FromPosts(posts []*model.Post, authors map[string]*model.User, communities map[string]*model.Community, userVotes map[string]string, userPollVotes map[string][]string) []PostResponse {
-	responses := make([]PostResponse, len(posts))
+func FromPosts(posts []*model.Post, authors map[string]*model.User, communities map[string]*model.Community, userVotes map[string]string, userPollVotes map[string][]string) []*PostResponse {
+	responses := make([]*PostResponse, len(posts))
 	for i, post := range posts {
 		author := authors[post.AuthorID.Hex()]
 		community := communities[post.CommunityID.Hex()]
 		userVote := userVotes[post.ID.Hex()]
 		userPollVote := userPollVotes[post.ID.Hex()]
 
-		responses[i] = *FromPost(post, author, community, userVote, userPollVote)
+		responses[i] = FromPost(post, author, community, userVote, userPollVote)
 	}
 	return responses
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/giakiet05/lkforum/internal/dto"
 	"github.com/giakiet05/lkforum/internal/model"
 	"github.com/giakiet05/lkforum/internal/platform/bus"
+	"github.com/giakiet05/lkforum/internal/platform/cloudinary"
 	"github.com/giakiet05/lkforum/internal/repo"
 	"github.com/giakiet05/lkforum/internal/util"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -17,13 +18,15 @@ import (
 
 // UserService handles business logic related to user management.
 type UserService interface {
-	UpdateUser(user *model.User) (*model.User, error)
+	UpdateProfile(userID string, req *dto.UserProfileUpdateRequest) (*dto.UserResponse, error)
+	UpdateAvatar(userID string, imageURL string, publicID string) (*dto.UserResponse, error)
+	UpdateCover(userID string, imageURL string, publicID string) (*dto.UserResponse, error)
 	DeleteUser(id string) error
 	ChangePassword(userID, oldPassword, newPassword string) error
 
-	GetUserByID(id string) (*model.User, error)
-	GetUserByUsername(username string) (*model.User, error)
-	GetUserByEmail(email string) (*model.User, error)
+	GetUserByID(id string) (*dto.UserResponse, error)
+	GetUserByUsername(username string) (*dto.UserResponse, error)
+	GetUserByEmail(email string) (*dto.UserResponse, error)
 	GetUsers(page, pageSize int) (*dto.PaginatedUsersResponse, error)
 	GetAllUsers() ([]*model.User, error)
 }
@@ -40,18 +43,83 @@ func NewUserService(userRepo repo.UserRepo, bus *bus.EventBus) UserService {
 	}
 }
 
-func (s *userService) UpdateUser(user *model.User) (*model.User, error) {
+func (s *userService) UpdateProfile(userID string, req *dto.UserProfileUpdateRequest) (*dto.UserResponse, error) {
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
-	// TODO: Add validation logic here. For example, check if the new username or email is already taken by another user.
-	updatedUser, err := s.userRepo.Update(ctx, user)
+
+	user, err := s.userRepo.GetByID(ctx, userID)
 	if err != nil {
-		if errors.Is(err, mongo.ErrNoDocuments) {
-			return nil, apperror.ErrUserNotFound
-		}
 		return nil, err
 	}
-	return updatedUser, nil
+
+	if user.RoleContent.AsUser == nil {
+		user.RoleContent.AsUser = &model.UserRoleContent{}
+	}
+
+	if req.Bio != nil {
+		user.RoleContent.AsUser.Bio = *req.Bio
+	}
+	if req.Location != nil {
+		user.RoleContent.AsUser.Location = *req.Location
+	}
+	if req.Website != nil {
+		user.RoleContent.AsUser.Website = *req.Website
+	}
+
+	updatedUser, err := s.userRepo.Update(ctx, user)
+	if err != nil {
+		return nil, err
+	}
+
+	return dto.FromUser(updatedUser), nil
+}
+
+func (s *userService) updateImage(userID string, imageURL string, publicID string, imageType string) (*dto.UserResponse, error) {
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
+
+	user, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	if user.RoleContent.AsUser == nil {
+		user.RoleContent.AsUser = &model.UserRoleContent{}
+	}
+
+	var oldPublicID string
+	newImage := model.Image{URL: imageURL, PublicID: publicID}
+
+	if imageType == "avatar" {
+		oldPublicID = user.RoleContent.AsUser.Avatar.PublicID
+		user.RoleContent.AsUser.Avatar = newImage
+	} else if imageType == "cover" {
+		oldPublicID = user.RoleContent.AsUser.Cover.PublicID
+		user.RoleContent.AsUser.Cover = newImage
+	}
+
+	updatedUser, err := s.userRepo.Update(ctx, user)
+	if err != nil {
+		return nil, err
+	}
+
+	if oldPublicID != "" {
+		go cloudinary.Delete(oldPublicID)
+	}
+
+	if imageType == "avatar" {
+		s.eventBus.Publish(bus.UserChangeAvatarEventType{UserID: userID, NewAvatar: imageURL})
+	}
+
+	return dto.FromUser(updatedUser), nil
+}
+
+func (s *userService) UpdateAvatar(userID string, imageURL string, publicID string) (*dto.UserResponse, error) {
+	return s.updateImage(userID, imageURL, publicID, "avatar")
+}
+
+func (s *userService) UpdateCover(userID string, imageURL string, publicID string) (*dto.UserResponse, error) {
+	return s.updateImage(userID, imageURL, publicID, "cover")
 }
 
 func (s *userService) DeleteUser(id string) error {
@@ -60,7 +128,6 @@ func (s *userService) DeleteUser(id string) error {
 
 	if auth.TokenSvc != nil {
 		if err := auth.TokenSvc.InvalidateAllUserTokens(ctx, id); err != nil {
-			// Log the error but continue with deletion
 			fmt.Printf("Failed to invalidate tokens for user %s: %v\n", id, err)
 		}
 	}
@@ -86,9 +153,8 @@ func (s *userService) ChangePassword(userID, oldPassword, newPassword string) er
 		return err
 	}
 
-	// Ensure this user is a local user and has a password
 	if user.Provider != model.ProviderLocal || user.Password == "" {
-		return apperror.ErrLoginMethodMismatch // Cannot change password for OAuth users this way
+		return apperror.ErrLoginMethodMismatch
 	}
 
 	if bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(oldPassword)) != nil {
@@ -110,7 +176,7 @@ func (s *userService) ChangePassword(userID, oldPassword, newPassword string) er
 	return nil
 }
 
-func (s *userService) GetUserByID(id string) (*model.User, error) {
+func (s *userService) GetUserByID(id string) (*dto.UserResponse, error) {
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
 	user, err := s.userRepo.GetByID(ctx, id)
@@ -120,10 +186,10 @@ func (s *userService) GetUserByID(id string) (*model.User, error) {
 		}
 		return nil, err
 	}
-	return user, nil
+	return dto.FromUser(user), nil
 }
 
-func (s *userService) GetUserByUsername(username string) (*model.User, error) {
+func (s *userService) GetUserByUsername(username string) (*dto.UserResponse, error) {
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
 	user, err := s.userRepo.GetByUsername(ctx, username)
@@ -133,10 +199,10 @@ func (s *userService) GetUserByUsername(username string) (*model.User, error) {
 		}
 		return nil, err
 	}
-	return user, nil
+	return dto.FromUser(user), nil
 }
 
-func (s *userService) GetUserByEmail(email string) (*model.User, error) {
+func (s *userService) GetUserByEmail(email string) (*dto.UserResponse, error) {
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
 	user, err := s.userRepo.GetByEmail(ctx, email)
@@ -146,7 +212,7 @@ func (s *userService) GetUserByEmail(email string) (*model.User, error) {
 		}
 		return nil, err
 	}
-	return user, nil
+	return dto.FromUser(user), nil
 }
 
 func (s *userService) GetUsers(page, pageSize int) (*dto.PaginatedUsersResponse, error) {

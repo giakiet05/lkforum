@@ -45,9 +45,8 @@ func (c *UserController) GetUserByUsername(ctx *gin.Context) {
 		return
 	}
 
-	publicProfile := dto.FromUser(user)
-	publicProfile.Email = ""
-	dto.SendSuccess(ctx, http.StatusOK, "User profile retrieved successfully", publicProfile)
+	user.Email = "" // Hide email for public profile
+	dto.SendSuccess(ctx, http.StatusOK, "User profile retrieved successfully", user)
 }
 
 // GetMyProfile retrieves the profile of the currently authenticated user.
@@ -64,7 +63,7 @@ func (c *UserController) GetMyProfile(ctx *gin.Context) {
 		return
 	}
 
-	dto.SendSuccess(ctx, http.StatusOK, "Profile retrieved successfully", dto.FromUser(user))
+	dto.SendSuccess(ctx, http.StatusOK, "Profile retrieved successfully", user)
 }
 
 // UpdateProfile allows a user to update their own profile information.
@@ -87,7 +86,7 @@ func (c *UserController) UpdateProfile(ctx *gin.Context) {
 		return
 	}
 
-	dto.SendSuccess(ctx, http.StatusOK, "Profile updated successfully", dto.FromUser(updatedUser))
+	dto.SendSuccess(ctx, http.StatusOK, "Profile updated successfully", updatedUser)
 }
 
 // UploadAvatar handles avatar image uploads.
@@ -111,12 +110,13 @@ func (c *UserController) UploadAvatar(ctx *gin.Context) {
 		return
 	}
 
-	if err := c.service.UpdateAvatar(authUser.(auth.AuthUser).ID, result.SecureURL, result.PublicID); err != nil {
+	updatedUser, err := c.service.UpdateAvatar(authUser.(auth.AuthUser).ID, result.SecureURL, result.PublicID)
+	if err != nil {
 		dto.SendError(ctx, http.StatusInternalServerError, "Failed to update avatar", "DB_UPDATE_FAILED")
 		return
 	}
 
-	dto.SendSuccess(ctx, http.StatusOK, "Avatar updated successfully", gin.H{"avatar_url": result.SecureURL})
+	dto.SendSuccess(ctx, http.StatusOK, "Avatar updated successfully", updatedUser)
 }
 
 // UploadCover handles cover image uploads.
@@ -140,12 +140,13 @@ func (c *UserController) UploadCover(ctx *gin.Context) {
 		return
 	}
 
-	if err := c.service.UpdateCover(authUser.(auth.AuthUser).ID, result.SecureURL, result.PublicID); err != nil {
+	updatedUser, err := c.service.UpdateCover(authUser.(auth.AuthUser).ID, result.SecureURL, result.PublicID)
+	if err != nil {
 		dto.SendError(ctx, http.StatusInternalServerError, "Failed to update cover", "DB_UPDATE_FAILED")
 		return
 	}
 
-	dto.SendSuccess(ctx, http.StatusOK, "Cover updated successfully", gin.H{"cover_url": result.SecureURL})
+	dto.SendSuccess(ctx, http.StatusOK, "Cover updated successfully", updatedUser)
 }
 
 func (c *UserController) ChangePassword(ctx *gin.Context) {

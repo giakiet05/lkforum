@@ -39,7 +39,7 @@ type CommentResponse struct {
 	IsDeleted bool                `json:"is_deleted"`
 }
 
-func FromComments(comments []model.Comment) []CommentResponse {
+func FromComments(comments []model.Comment) []*CommentResponse {
 	commentMap := make(map[string]*CommentResponse)
 	for _, c := range comments {
 		resp := FromComment(&c)
@@ -69,9 +69,9 @@ func FromComments(comments []model.Comment) []CommentResponse {
 		}
 	}
 
-	result := make([]CommentResponse, len(roots))
+	result := make([]*CommentResponse, len(roots))
 	for i, r := range roots {
-		result[i] = *r
+		result[i] = r
 	}
 	return result
 }

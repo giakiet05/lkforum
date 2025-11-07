@@ -15,9 +15,9 @@ import (
 type MembershipRepo interface {
 	Create(ctx context.Context, membership *model.Membership) (*model.Membership, error)
 	GetByID(ctx context.Context, id string) (*model.Membership, error)
-	GetByUserID(ctx context.Context, userID string) ([]model.Membership, error)
-	GetAllPaginated(ctx context.Context, page int, pageSize int) ([]model.Membership, int64, error)
-	GetByCommunityIDPaginated(ctx context.Context, communityID string, page int, pageSize int) ([]model.Membership, int64, error)
+	GetByUserID(ctx context.Context, userID string) ([]*model.Membership, error)
+	GetAllPaginated(ctx context.Context, page int, pageSize int) ([]*model.Membership, int64, error)
+	GetByCommunityIDPaginated(ctx context.Context, communityID string, page int, pageSize int) ([]*model.Membership, int64, error)
 	Delete(ctx context.Context, id string) error
 
 	CountMembersByCommunityID(ctx context.Context, communityID string) (int64, error)
@@ -73,7 +73,7 @@ func (m *membershipRepo) GetByID(ctx context.Context, id string) (*model.Members
 	return membership, nil
 }
 
-func (m *membershipRepo) GetByUserID(ctx context.Context, userID string) ([]model.Membership, error) {
+func (m *membershipRepo) GetByUserID(ctx context.Context, userID string) ([]*model.Membership, error) {
 	userObjectID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
 		return nil, err
@@ -85,7 +85,7 @@ func (m *membershipRepo) GetByUserID(ctx context.Context, userID string) ([]mode
 	}
 	defer cursor.Close(ctx)
 
-	var memberships []model.Membership
+	var memberships []*model.Membership
 	if err := cursor.All(ctx, &memberships); err != nil {
 		return nil, err
 	}
@@ -93,7 +93,7 @@ func (m *membershipRepo) GetByUserID(ctx context.Context, userID string) ([]mode
 	return memberships, nil
 }
 
-func (m *membershipRepo) GetAllPaginated(ctx context.Context, page int, pageSize int) ([]model.Membership, int64, error) {
+func (m *membershipRepo) GetAllPaginated(ctx context.Context, page int, pageSize int) ([]*model.Membership, int64, error) {
 	skip := (page - 1) * pageSize
 	opts := options.Find().SetSkip(int64(skip)).SetLimit(int64(pageSize))
 
@@ -103,7 +103,7 @@ func (m *membershipRepo) GetAllPaginated(ctx context.Context, page int, pageSize
 	}
 	defer cursor.Close(ctx)
 
-	var memberships []model.Membership
+	var memberships []*model.Membership
 	if err := cursor.All(ctx, &memberships); err != nil {
 		return nil, 0, err
 	}
@@ -116,7 +116,7 @@ func (m *membershipRepo) GetAllPaginated(ctx context.Context, page int, pageSize
 	return memberships, count, nil
 }
 
-func (m *membershipRepo) GetByCommunityIDPaginated(ctx context.Context, communityID string, page int, pageSize int) ([]model.Membership, int64, error) {
+func (m *membershipRepo) GetByCommunityIDPaginated(ctx context.Context, communityID string, page int, pageSize int) ([]*model.Membership, int64, error) {
 	communityObjectID, err := primitive.ObjectIDFromHex(communityID)
 	if err != nil {
 		return nil, 0, err
@@ -132,7 +132,7 @@ func (m *membershipRepo) GetByCommunityIDPaginated(ctx context.Context, communit
 	}
 	defer cursor.Close(ctx)
 
-	var memberships []model.Membership
+	var memberships []*model.Membership
 	if err := cursor.All(ctx, &memberships); err != nil {
 		return nil, 0, err
 	}

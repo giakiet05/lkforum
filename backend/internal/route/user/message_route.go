@@ -10,7 +10,7 @@ func RegisterMessageRoutes(rg *gin.RouterGroup, c *controller.MessageController)
 	messages := rg.Group("/messages")
 
 	// Protected routes (require authentication)
-	messages.Use(middleware.AuthMiddleware())
+	messages.Use(middleware.RequireAuth())
 	{
 		messages.GET(":message_id", c.GetMessageByID)
 		messages.GET("filter", c.GetMessageFilter)

@@ -11,13 +11,19 @@ const (
 
 	TopicUserChangeAvatar = "user.avatar"
 
-	TopicPostCreated         = "post.created"
-	TopicPostUpvoted         = "post.upvoted"
-	TopicPostDownvoted       = "post.downvoted"
-	TopicCommentCreated      = "comment.created"
-	TopicCommentUpvoted      = "comment.upvoted"
-	TopicCommentDownvoted    = "comment.downvoted"
-	TopicNotificationCreated = "notification.created"
+	TopicPostCreated           = "post.created"
+	TopicPostUpvoted           = "post.upvoted"
+	TopicPostDownvoted         = "post.downvoted"
+	TopicPostUpvoteRemoved     = "post.upvote_removed"
+	TopicPostDownvoteRemoved   = "post.downvote_removed"
+
+	TopicCommentCreated        = "comment.created"
+	TopicCommentUpvoted        = "comment.upvoted"
+	TopicCommentDownvoted      = "comment.downvoted"
+	TopicCommentUpvoteRemoved  = "comment.upvote_removed"
+	TopicCommentDownvoteRemoved= "comment.downvote_removed"
+
+	TopicNotificationCreated   = "notification.created"
 
 	TopicNewMessage    = "message.new"
 	TopicMessageError  = "message.error"
@@ -46,10 +52,7 @@ type BroadcastEvent struct {
 	Data         interface{}        `json:"data"`
 }
 
-func (e BroadcastEvent) Topic() string {
-	return TopicBroadcast
-}
-
+func (e BroadcastEvent) Topic() string { return TopicBroadcast }
 func (e BroadcastEvent) Payload() map[string]interface{} {
 	return map[string]interface{}{
 		"recipient_ids": e.RecipientIDs,
@@ -64,15 +67,9 @@ type UserChangeAvatarEventType struct {
 	NewAvatar string
 }
 
-func (e UserChangeAvatarEventType) Topic() string {
-	return TopicUserChangeAvatar
-}
-
+func (e UserChangeAvatarEventType) Topic() string { return TopicUserChangeAvatar }
 func (e UserChangeAvatarEventType) Payload() map[string]interface{} {
-	return map[string]interface{}{
-		"user_id":    e.UserID,
-		"new_avatar": e.NewAvatar,
-	}
+	return map[string]interface{}{"user_id": e.UserID, "new_avatar": e.NewAvatar}
 }
 
 // --- Post Events ---
@@ -81,9 +78,7 @@ type PostCreatedEvent struct {
 	AuthorID string
 }
 
-func (e PostCreatedEvent) Topic() string {
-	return TopicPostCreated
-}
+func (e PostCreatedEvent) Topic() string { return TopicPostCreated }
 func (e PostCreatedEvent) Payload() map[string]interface{} {
 	return map[string]interface{}{"authorId": e.AuthorID}
 }
@@ -94,15 +89,9 @@ type PostUpvotedEvent struct {
 	PostID   string
 }
 
-func (e PostUpvotedEvent) Topic() string {
-	return TopicPostUpvoted
-}
+func (e PostUpvotedEvent) Topic() string { return TopicPostUpvoted }
 func (e PostUpvotedEvent) Payload() map[string]interface{} {
-	return map[string]interface{}{
-		"authorId": e.AuthorID,
-		"voterId":  e.VoterID,
-		"postId":   e.PostID,
-	}
+	return map[string]interface{}{"authorId": e.AuthorID, "voterId": e.VoterID, "postId": e.PostID}
 }
 
 type PostDownvotedEvent struct {
@@ -111,15 +100,31 @@ type PostDownvotedEvent struct {
 	PostID   string
 }
 
-func (e PostDownvotedEvent) Topic() string {
-	return TopicPostDownvoted
-}
+func (e PostDownvotedEvent) Topic() string { return TopicPostDownvoted }
 func (e PostDownvotedEvent) Payload() map[string]interface{} {
-	return map[string]interface{}{
-		"authorId": e.AuthorID,
-		"voterId":  e.VoterID,
-		"postId":   e.PostID,
-	}
+	return map[string]interface{}{"authorId": e.AuthorID, "voterId": e.VoterID, "postId": e.PostID}
+}
+
+type PostUpvoteRemovedEvent struct {
+	AuthorID string
+	VoterID  string
+	PostID   string
+}
+
+func (e PostUpvoteRemovedEvent) Topic() string { return TopicPostUpvoteRemoved }
+func (e PostUpvoteRemovedEvent) Payload() map[string]interface{} {
+	return map[string]interface{}{"authorId": e.AuthorID, "voterId": e.VoterID, "postId": e.PostID}
+}
+
+type PostDownvoteRemovedEvent struct {
+	AuthorID string
+	VoterID  string
+	PostID   string
+}
+
+func (e PostDownvoteRemovedEvent) Topic() string { return TopicPostDownvoteRemoved }
+func (e PostDownvoteRemovedEvent) Payload() map[string]interface{} {
+	return map[string]interface{}{"authorId": e.AuthorID, "voterId": e.VoterID, "postId": e.PostID}
 }
 
 // --- Comment Events ---
@@ -131,16 +136,9 @@ type CommentCreatedEvent struct {
 	ParentAuthorID string
 }
 
-func (e CommentCreatedEvent) Topic() string {
-	return TopicCommentCreated
-}
+func (e CommentCreatedEvent) Topic() string { return TopicCommentCreated }
 func (e CommentCreatedEvent) Payload() map[string]interface{} {
-	return map[string]interface{}{
-		"authorId":       e.AuthorID,
-		"postId":         e.PostID,
-		"commentId":      e.CommentID,
-		"parentAuthorId": e.ParentAuthorID,
-	}
+	return map[string]interface{}{"authorId": e.AuthorID, "postId": e.PostID, "commentId": e.CommentID, "parentAuthorId": e.ParentAuthorID}
 }
 
 // --- Notification Events ---
@@ -150,14 +148,9 @@ type NotificationCreatedEvent struct {
 	Notification dto.NotificationResponse
 }
 
-func (e NotificationCreatedEvent) Topic() string {
-	return TopicNotificationCreated
-}
+func (e NotificationCreatedEvent) Topic() string { return TopicNotificationCreated }
 func (e NotificationCreatedEvent) Payload() map[string]interface{} {
-	return map[string]interface{}{
-		"recipientId":  e.RecipientID,
-		"notification": e.Notification,
-	}
+	return map[string]interface{}{"recipientId": e.RecipientID, "notification": e.Notification}
 }
 
 // --- Message Events ---
@@ -171,10 +164,7 @@ type NewMessageEvent struct {
 	Content        string            `json:"content"`
 }
 
-func (e NewMessageEvent) Topic() string {
-	return TopicNewMessage
-}
-
+func (e NewMessageEvent) Topic() string { return TopicNewMessage }
 func (e NewMessageEvent) Payload() map[string]interface{} {
 	return map[string]interface{}{
 		"temp_message_id": e.TempMessageID,
@@ -194,10 +184,7 @@ type MessageErrorEvent struct {
 	ErrorMsg      string `json:"error_msg"`
 }
 
-func (e MessageErrorEvent) Topic() string {
-	return TopicMessageError
-}
-
+func (e MessageErrorEvent) Topic() string { return TopicMessageError }
 func (e MessageErrorEvent) Payload() map[string]interface{} {
 	return map[string]interface{}{
 		"sender_id":       e.SenderID,
@@ -214,16 +201,9 @@ type TypingMessageEvent struct {
 	IsTyping  bool   `json:"is_typing"`
 }
 
-func (e TypingMessageEvent) Topic() string {
-	return TopicTypingMessage
-}
-
+func (e TypingMessageEvent) Topic() string { return TopicTypingMessage }
 func (e TypingMessageEvent) Payload() map[string]interface{} {
-	return map[string]interface{}{
-		"channel_id": e.ChannelID,
-		"sender_id":  e.SenderID,
-		"is_typing":  e.IsTyping,
-	}
+	return map[string]interface{}{"channel_id": e.ChannelID, "sender_id": e.SenderID, "is_typing": e.IsTyping}
 }
 
 type InChatMessageEvent struct {
@@ -232,14 +212,7 @@ type InChatMessageEvent struct {
 	IsInChat  bool   `json:"is_in_chat"`
 }
 
-func (e InChatMessageEvent) Topic() string {
-	return TopicInChatMessage
-}
-
+func (e InChatMessageEvent) Topic() string { return TopicInChatMessage }
 func (e InChatMessageEvent) Payload() map[string]interface{} {
-	return map[string]interface{}{
-		"channel_id": e.ChannelID,
-		"user_id":    e.UserID,
-		"is_in_chat": e.IsInChat,
-	}
+	return map[string]interface{}{"channel_id": e.ChannelID, "user_id": e.UserID, "is_in_chat": e.IsInChat}
 }
