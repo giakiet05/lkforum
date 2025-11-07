@@ -19,7 +19,7 @@ type PollVote struct {
 	ID        primitive.ObjectID `bson:"_id,omitempty" json:"id"`
 	PostID    primitive.ObjectID `bson:"post_id" json:"post_id"`
 	UserID    primitive.ObjectID `bson:"user_id" json:"user_id"`
-	OptionID  primitive.ObjectID `bson:"option_id" json:"option_id"`
+	OptionID  string             `bson:"option_id" json:"option_id"`
 	CreatedAt time.Time          `bson:"created_at,omitempty" json:"created_at,omitempty"`
 }
 type VoteType string

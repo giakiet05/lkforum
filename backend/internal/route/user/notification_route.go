@@ -8,7 +8,7 @@ import (
 
 func RegisterNotificationRoutes(rg *gin.RouterGroup, c *controller.NotificationController) {
 	notifications := rg.Group("/notifications")
-	notifications.Use(middleware.AuthMiddleware()) // All notification routes require authentication
+	notifications.Use(middleware.RequireAuth()) // All notification routes require authentication
 	{
 		notifications.GET("", c.GetNotifications)
 		notifications.PUT("/read-all", c.MarkAllAsRead)

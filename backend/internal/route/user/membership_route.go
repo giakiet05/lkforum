@@ -10,7 +10,7 @@ func RegisterMembershipRoutes(rg *gin.RouterGroup, c *controller.MembershipContr
 	memberships := rg.Group("/memberships")
 
 	// Protected routes (require authentication)
-	memberships.Use(middleware.AuthMiddleware())
+	memberships.Use(middleware.RequireAuth())
 	{
 		memberships.POST("", c.CreateMembership)
 		memberships.GET("", c.GetAllMemberships)

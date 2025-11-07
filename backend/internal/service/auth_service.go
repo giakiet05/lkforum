@@ -10,8 +10,8 @@ import (
 	"github.com/giakiet05/lkforum/internal/apperror"
 	"github.com/giakiet05/lkforum/internal/auth"
 	"github.com/giakiet05/lkforum/internal/config"
-	"github.com/giakiet05/lkforum/internal/email"
 	"github.com/giakiet05/lkforum/internal/model"
+	"github.com/giakiet05/lkforum/internal/platform/email"
 	"github.com/giakiet05/lkforum/internal/repo"
 	"github.com/giakiet05/lkforum/internal/util"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -88,7 +88,7 @@ func (s *authService) RegisterUser(username, email, password string) (*model.Use
 		IsVerified:                false,
 		VerificationCode:          otp,
 		VerificationCodeExpiresAt: &otpExpiresAt,
-		CreateAt:                  time.Now(),
+		CreatedAt:                 time.Now(),
 	}
 
 	createdUser, err := s.userRepo.Create(ctx, user)
@@ -308,9 +308,11 @@ func (s *authService) CompleteGoogleSetup(setupToken, username string) (*model.U
 		ProviderID: claims.GoogleID,
 		Role:       model.UserRole,
 		IsVerified: true,
-		CreateAt:   time.Now(),
+		CreatedAt:  time.Now(),
 		RoleContent: model.RoleContent{
-			User: &model.UserRoleContent{Avatar: claims.Picture},
+			AsUser: &model.UserRoleContent{
+				Avatar: model.Image{URL: claims.Picture},
+			},
 		},
 	}
 

@@ -2,10 +2,12 @@ package repo
 
 import (
 	"context"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo/options"
 	"time"
 
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo/options"
+
+	"github.com/giakiet05/lkforum/internal/apperror"
 	"github.com/giakiet05/lkforum/internal/config"
 	"github.com/giakiet05/lkforum/internal/model"
 	"go.mongodb.org/mongo-driver/bson"
@@ -19,6 +21,7 @@ type UserRepo interface {
 	UpdateReputation(ctx context.Context, userID string, points int) error
 
 	GetByID(ctx context.Context, id string) (*model.User, error)
+	GetByIDs(ctx context.Context, ids []string) ([]*model.User, error)
 	GetByUsername(ctx context.Context, username string) (*model.User, error)
 	GetByEmail(ctx context.Context, email string) (*model.User, error)
 	GetAll(ctx context.Context) ([]*model.User, error)
@@ -31,6 +34,32 @@ type userRepo struct {
 
 func NewUserRepo(db *mongo.Database) UserRepo {
 	return &userRepo{userCollection: db.Collection(config.UserColName)}
+}
+
+func (r *userRepo) GetByIDs(ctx context.Context, ids []string) ([]*model.User, error) {
+	if len(ids) == 0 {
+		return []*model.User{}, nil
+	}
+
+	objIDs := make([]primitive.ObjectID, 0, len(ids))
+	for _, id := range ids {
+		if objID, err := primitive.ObjectIDFromHex(id); err == nil {
+			objIDs = append(objIDs, objID)
+		}
+	}
+
+	filter := bson.M{"_id": bson.M{"$in": objIDs}}
+	cursor, err := r.userCollection.Find(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var users []*model.User
+	if err := cursor.All(ctx, &users); err != nil {
+		return nil, err
+	}
+	return users, nil
 }
 
 func (r *userRepo) GetAll(ctx context.Context) ([]*model.User, error) {
@@ -80,7 +109,7 @@ func (r *userRepo) Update(ctx context.Context, user *model.User) (*model.User, e
 func (r *userRepo) Delete(ctx context.Context, id string) error {
 	objectID, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
-		return err
+		return apperror.ErrInvalidID
 	}
 	filter := bson.M{"_id": objectID, "deleted_at": bson.M{"$exists": false}}
 	update := bson.M{"$set": bson.M{"deleted_at": time.Now()}}
@@ -97,7 +126,7 @@ func (r *userRepo) Delete(ctx context.Context, id string) error {
 func (r *userRepo) UpdateReputation(ctx context.Context, userID string, points int) error {
 	objectID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
-		return err // Invalid ID format
+		return err
 	}
 
 	filter := bson.M{"_id": objectID}
@@ -111,7 +140,7 @@ func (r *userRepo) UpdateReputation(ctx context.Context, userID string, points i
 	}
 
 	if result.MatchedCount == 0 {
-		return mongo.ErrNoDocuments // User not found
+		return mongo.ErrNoDocuments
 	}
 
 	return nil
@@ -120,7 +149,7 @@ func (r *userRepo) UpdateReputation(ctx context.Context, userID string, points i
 func (r *userRepo) GetByID(ctx context.Context, id string) (*model.User, error) {
 	objectID, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
-		return nil, err
+		return nil, apperror.ErrInvalidID
 	}
 	filter := bson.M{"_id": objectID, "deleted_at": bson.M{"$exists": false}}
 	var user model.User

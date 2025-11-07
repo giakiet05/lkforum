@@ -23,6 +23,7 @@ type AppConfig struct {
 	SMTP                 SMTPConfig
 	Redis                RedisConfig
 	Google               GoogleConfig
+	Cloudinary           CloudinaryConfig
 }
 
 // SMTPConfig holds the email server configuration
@@ -46,6 +47,15 @@ type GoogleConfig struct {
 	ClientID     string
 	ClientSecret string
 	RedirectURL  string
+}
+
+// CloudinaryConfig holds the Cloudinary configuration
+type CloudinaryConfig struct {
+	CloudName    string
+	APIKey       string
+	APISecret    string
+	UploadFolder string
+	UploadPreset string
 }
 
 // Cfg is a global variable holding the application's configuration
@@ -89,6 +99,12 @@ func LoadConfig() {
 	Cfg.Google.ClientID = getEnv("GOOGLE_CLIENT_ID", "")
 	Cfg.Google.ClientSecret = getEnv("GOOGLE_CLIENT_SECRET", "")
 	Cfg.Google.RedirectURL = getEnv("GOOGLE_REDIRECT_URL", "")
+
+	Cfg.Cloudinary.CloudName = getEnv("CLOUDINARY_CLOUD_NAME", "")
+	Cfg.Cloudinary.APIKey = getEnv("CLOUDINARY_API_KEY", "")
+	Cfg.Cloudinary.APISecret = getEnv("CLOUDINARY_API_SECRET", "")
+	Cfg.Cloudinary.UploadFolder = getEnv("CLOUDINARY_FOLDER", "lkforum")
+	Cfg.Cloudinary.UploadPreset = getEnv("CLOUDINARY_UPLOAD_PRESET", "lkforum_preset")
 
 	log.Println("Configuration loaded successfully")
 }

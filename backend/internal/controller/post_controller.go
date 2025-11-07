@@ -8,7 +8,6 @@ import (
 	"github.com/giakiet05/lkforum/internal/dto"
 	"github.com/giakiet05/lkforum/internal/service"
 	"github.com/gin-gonic/gin"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type PostController struct {
@@ -19,22 +18,20 @@ func NewPostController(service service.PostService) *PostController {
 	return &PostController{service: service}
 }
 
-// === CRUD Operations ===
-
 func (c *PostController) CreatePost(ctx *gin.Context) {
+	authUser, exists := ctx.Get("authUser")
+	if !exists {
+		dto.SendError(ctx, http.StatusUnauthorized, apperror.ErrForbidden.Message, apperror.ErrForbidden.Code)
+		return
+	}
+
 	var req dto.CreatePostRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		dto.SendError(ctx, http.StatusBadRequest, "Invalid request payload", apperror.ErrBadRequest.Code)
 		return
 	}
 
-	userID, err := c.getAuthUserID(ctx)
-	if err != nil {
-		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
-		return
-	}
-
-	post, err := c.service.CreatePost(ctx.Request.Context(), userID, &req)
+	post, err := c.service.CreatePost(authUser.(auth.AuthUser).ID, &req)
 	if err != nil {
 		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
@@ -44,20 +41,14 @@ func (c *PostController) CreatePost(ctx *gin.Context) {
 }
 
 func (c *PostController) GetPostByID(ctx *gin.Context) {
-	postID, err := c.parseObjectID(ctx.Param("id"))
-	if err != nil {
-		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
-		return
+	postID := ctx.Param("id")
+
+	var userID string
+	if val, exists := ctx.Get("authUser"); exists {
+		userID = val.(auth.AuthUser).ID
 	}
 
-	// For GET requests, a missing auth user is not a hard error.
-	// We pass a NilObjectID to the service to indicate an anonymous user.
-	userID, err := c.getAuthUserID(ctx)
-	if err != nil {
-		userID = primitive.NilObjectID
-	}
-
-	post, err := c.service.GetPostByID(ctx.Request.Context(), postID, userID)
+	post, err := c.service.GetPostByID(postID, userID)
 	if err != nil {
 		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
@@ -73,21 +64,12 @@ func (c *PostController) GetPosts(ctx *gin.Context) {
 		return
 	}
 
-	if query.Page == 0 {
-		query.Page = 1
-	}
-	if query.Limit == 0 {
-		query.Limit = 20
-	} else if query.Limit > 100 {
-		query.Limit = 100
+	var userID string
+	if val, exists := ctx.Get("authUser"); exists {
+		userID = val.(auth.AuthUser).ID
 	}
 
-	userID, err := c.getAuthUserID(ctx)
-	if err != nil {
-		userID = primitive.NilObjectID
-	}
-
-	posts, err := c.service.GetPosts(ctx.Request.Context(), userID, &query)
+	posts, err := c.service.GetPosts(userID, &query)
 	if err != nil {
 		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
@@ -97,17 +79,13 @@ func (c *PostController) GetPosts(ctx *gin.Context) {
 }
 
 func (c *PostController) UpdatePost(ctx *gin.Context) {
-	postID, err := c.parseObjectID(ctx.Param("id"))
-	if err != nil {
-		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
+	authUser, exists := ctx.Get("authUser")
+	if !exists {
+		dto.SendError(ctx, http.StatusUnauthorized, apperror.ErrForbidden.Message, apperror.ErrForbidden.Code)
 		return
 	}
 
-	userID, err := c.getAuthUserID(ctx)
-	if err != nil {
-		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
-		return
-	}
+	postID := ctx.Param("id")
 
 	var req dto.UpdatePostRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -115,7 +93,7 @@ func (c *PostController) UpdatePost(ctx *gin.Context) {
 		return
 	}
 
-	updatedPost, err := c.service.UpdatePost(ctx.Request.Context(), postID, userID, &req)
+	updatedPost, err := c.service.UpdatePost(postID, authUser.(auth.AuthUser).ID, &req)
 	if err != nil {
 		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
@@ -125,117 +103,39 @@ func (c *PostController) UpdatePost(ctx *gin.Context) {
 }
 
 func (c *PostController) DeletePost(ctx *gin.Context) {
-	postID, err := c.parseObjectID(ctx.Param("id"))
+	authUser, exists := ctx.Get("authUser")
+	if !exists {
+		dto.SendError(ctx, http.StatusUnauthorized, apperror.ErrForbidden.Message, apperror.ErrForbidden.Code)
+		return
+	}
+
+	postID := ctx.Param("id")
+
+	err := c.service.DeletePost(postID, authUser.(auth.AuthUser).ID)
 	if err != nil {
 		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
 	}
 
-	userID, err := c.getAuthUserID(ctx)
-	if err != nil {
-		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
-		return
-	}
-
-	err = c.service.DeletePost(ctx.Request.Context(), postID, userID)
-	if err != nil {
-		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
-		return
-	}
-
-	dto.SendSuccess(ctx, http.StatusOK, "Post deleted successfully", gin.H{"id": postID.Hex()})
+	dto.SendSuccess(ctx, http.StatusOK, "Post deleted successfully", gin.H{"id": postID})
 }
-
-// === Interactions ===
-
-func (c *PostController) VoteOnPost(ctx *gin.Context) {
-	postID, err := c.parseObjectID(ctx.Param("id"))
-	if err != nil {
-		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
-		return
-	}
-
-	userID, err := c.getAuthUserID(ctx)
-	if err != nil {
-		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
-		return
-	}
-
-	var req struct {
-		Value *bool `json:"value" binding:"required"`
-	}
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		dto.SendError(ctx, http.StatusBadRequest, "Invalid request: 'value' field is required", apperror.ErrBadRequest.Code)
-		return
-	}
-
-	votesCount, err := c.service.VoteOnPost(ctx.Request.Context(), userID, postID, *req.Value)
-	if err != nil {
-		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
-		return
-	}
-
-	dto.SendSuccess(ctx, http.StatusOK, "Vote cast successfully", votesCount)
-}
-
-func (c *PostController) VoteOnPoll(ctx *gin.Context) {
-	postID, err := c.parseObjectID(ctx.Param("id"))
-	if err != nil {
-		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
-		return
-	}
-
-	userID, err := c.getAuthUserID(ctx)
-	if err != nil {
-		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
-		return
-	}
-
-	var req struct {
-		OptionID string `json:"option_id" binding:"required"`
-	}
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		dto.SendError(ctx, http.StatusBadRequest, "Invalid request: 'option_id' is required", apperror.ErrBadRequest.Code)
-		return
-	}
-
-	optionID, err := c.parseObjectID(req.OptionID)
-	if err != nil {
-		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
-		return
-	}
-
-	poll, err := c.service.VoteOnPoll(ctx.Request.Context(), userID, postID, optionID)
-	if err != nil {
-		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
-		return
-	}
-
-	dto.SendSuccess(ctx, http.StatusOK, "Poll vote cast successfully", poll)
-}
-
-// === Image Management ===
 
 func (c *PostController) AddImagesToPost(ctx *gin.Context) {
-	postID, err := c.parseObjectID(ctx.Param("id"))
+	authUser, exists := ctx.Get("authUser")
+	if !exists {
+		dto.SendError(ctx, http.StatusUnauthorized, apperror.ErrForbidden.Message, apperror.ErrForbidden.Code)
+		return
+	}
+
+	postID := ctx.Param("id")
+
+	form, err := ctx.MultipartForm()
 	if err != nil {
-		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
+		dto.SendError(ctx, http.StatusBadRequest, "Invalid form data", apperror.ErrBadRequest.Code)
 		return
 	}
 
-	userID, err := c.getAuthUserID(ctx)
-	if err != nil {
-		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
-		return
-	}
-
-	var req dto.AddImageRequest
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		dto.SendError(ctx, http.StatusBadRequest, "Invalid image data", apperror.ErrBadRequest.Code)
-		return
-	}
-
-	images, err := c.service.AddImagesToPost(ctx.Request.Context(), userID, postID, &req)
+	images, err := c.service.AddImagesToPost(authUser.(auth.AuthUser).ID, postID, form)
 	if err != nil {
 		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
@@ -245,25 +145,21 @@ func (c *PostController) AddImagesToPost(ctx *gin.Context) {
 }
 
 func (c *PostController) RemoveImagesFromPost(ctx *gin.Context) {
-	postID, err := c.parseObjectID(ctx.Param("id"))
-	if err != nil {
-		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
+	authUser, exists := ctx.Get("authUser")
+	if !exists {
+		dto.SendError(ctx, http.StatusUnauthorized, apperror.ErrForbidden.Message, apperror.ErrForbidden.Code)
 		return
 	}
 
-	userID, err := c.getAuthUserID(ctx)
-	if err != nil {
-		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
-		return
-	}
+	postID := ctx.Param("id")
 
-	var req dto.RemoveImageRequest
+	var req dto.RemoveImagesRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		dto.SendError(ctx, http.StatusBadRequest, "Image IDs are required", apperror.ErrBadRequest.Code)
+		dto.SendError(ctx, http.StatusBadRequest, "Invalid request: 'public_ids' are required", apperror.ErrBadRequest.Code)
 		return
 	}
 
-	if err := c.service.RemoveImagesFromPost(ctx.Request.Context(), userID, postID, &req); err != nil {
+	if err := c.service.RemoveImagesFromPost(authUser.(auth.AuthUser).ID, postID, req.PublicIDs); err != nil {
 		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
 	}
@@ -271,56 +167,112 @@ func (c *PostController) RemoveImagesFromPost(ctx *gin.Context) {
 	dto.SendSuccess(ctx, http.StatusOK, "Images removed successfully", nil)
 }
 
-// === Poll Management ===
+func (c *PostController) VoteOnPost(ctx *gin.Context) {
+	authUser, exists := ctx.Get("authUser")
+	if !exists {
+		dto.SendError(ctx, http.StatusUnauthorized, apperror.ErrForbidden.Message, apperror.ErrForbidden.Code)
+		return
+	}
 
-func (c *PostController) UpdatePollDetails(ctx *gin.Context) {
-	postID, err := c.parseObjectID(ctx.Param("id"))
+	postID := ctx.Param("id")
+
+	var req dto.PostVoteRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		dto.SendError(ctx, http.StatusBadRequest, "Invalid request: 'value' field is required", apperror.ErrBadRequest.Code)
+		return
+	}
+
+	votesCount, err := c.service.VoteOnPost(authUser.(auth.AuthUser).ID, postID, *req.Value)
 	if err != nil {
 		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
 	}
 
-	userID, err := c.getAuthUserID(ctx)
+	dto.SendSuccess(ctx, http.StatusOK, "Vote cast successfully", votesCount)
+}
+
+func (c *PostController) VoteOnPoll(ctx *gin.Context) {
+	authUser, exists := ctx.Get("authUser")
+	if !exists {
+		dto.SendError(ctx, http.StatusUnauthorized, apperror.ErrForbidden.Message, apperror.ErrForbidden.Code)
+		return
+	}
+
+	postID := ctx.Param("id")
+
+	var req dto.PollVoteRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		dto.SendError(ctx, http.StatusBadRequest, "Invalid request: 'option_id' is required", apperror.ErrBadRequest.Code)
+		return
+	}
+
+	poll, err := c.service.VoteOnPoll(authUser.(auth.AuthUser).ID, postID, req.OptionID)
 	if err != nil {
 		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
 	}
+
+	dto.SendSuccess(ctx, http.StatusOK, "Poll vote cast successfully", poll)
+}
+
+func (c *PostController) RemovePollVote(ctx *gin.Context) {
+	authUser, exists := ctx.Get("authUser")
+	if !exists {
+		dto.SendError(ctx, http.StatusUnauthorized, apperror.ErrForbidden.Message, apperror.ErrForbidden.Code)
+		return
+	}
+
+	postID := ctx.Param("id")
+
+	poll, err := c.service.RemovePollVote(authUser.(auth.AuthUser).ID, postID)
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
+		return
+	}
+
+	dto.SendSuccess(ctx, http.StatusOK, "Poll vote removed successfully", poll)
+}
+
+func (c *PostController) UpdatePoll(ctx *gin.Context) {
+	authUser, exists := ctx.Get("authUser")
+	if !exists {
+		dto.SendError(ctx, http.StatusUnauthorized, apperror.ErrForbidden.Message, apperror.ErrForbidden.Code)
+		return
+	}
+
+	postID := ctx.Param("id")
 
 	var req dto.UpdatePollRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		dto.SendError(ctx, http.StatusBadRequest, "Invalid poll data", apperror.ErrBadRequest.Code)
+		dto.SendError(ctx, http.StatusBadRequest, "Invalid request payload", apperror.ErrBadRequest.Code)
 		return
 	}
 
-	poll, err := c.service.UpdatePollDetails(ctx.Request.Context(), postID, userID, &req)
+	poll, err := c.service.UpdatePoll(authUser.(auth.AuthUser).ID, postID, &req)
 	if err != nil {
 		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
 	}
 
-	dto.SendSuccess(ctx, http.StatusOK, "Poll details updated successfully", poll)
+	dto.SendSuccess(ctx, http.StatusOK, "Poll updated successfully", poll)
 }
 
 func (c *PostController) AddPollOptions(ctx *gin.Context) {
-	postID, err := c.parseObjectID(ctx.Param("id"))
-	if err != nil {
-		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
+	authUser, exists := ctx.Get("authUser")
+	if !exists {
+		dto.SendError(ctx, http.StatusUnauthorized, apperror.ErrForbidden.Message, apperror.ErrForbidden.Code)
 		return
 	}
 
-	userID, err := c.getAuthUserID(ctx)
-	if err != nil {
-		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
-		return
-	}
+	postID := ctx.Param("id")
 
-	var req dto.AddPollOptionRequest
+	var req dto.AddPollOptionsRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		dto.SendError(ctx, http.StatusBadRequest, "Invalid poll options", apperror.ErrBadRequest.Code)
+		dto.SendError(ctx, http.StatusBadRequest, "Invalid request: 'options' are required", apperror.ErrBadRequest.Code)
 		return
 	}
 
-	poll, err := c.service.AddPollOptions(ctx.Request.Context(), userID, postID, &req)
+	poll, err := c.service.AddPollOptions(authUser.(auth.AuthUser).ID, postID, req.Options)
 	if err != nil {
 		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
@@ -329,60 +281,22 @@ func (c *PostController) AddPollOptions(ctx *gin.Context) {
 	dto.SendSuccess(ctx, http.StatusOK, "Poll options added successfully", poll)
 }
 
-func (c *PostController) UpdatePollOption(ctx *gin.Context) {
-	userID, err := c.getAuthUserID(ctx)
-	if err != nil {
-		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
-		return
-	}
-
-	postID, err := c.parseObjectID(ctx.Param("id"))
-	if err != nil {
-		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
-		return
-	}
-
-	optionID, err := c.parseObjectID(ctx.Param("optionID"))
-	if err != nil {
-		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
-		return
-	}
-
-	var req dto.UpdatePollOptionRequest
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		dto.SendError(ctx, http.StatusBadRequest, "Invalid option text", apperror.ErrBadRequest.Code)
-		return
-	}
-
-	pollResponse, err := c.service.UpdatePollOption(ctx.Request.Context(), userID, postID, optionID, req.Text)
-	if err != nil {
-		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
-		return
-	}
-
-	dto.SendSuccess(ctx, http.StatusOK, "Poll option updated successfully", pollResponse)
-}
-
 func (c *PostController) RemovePollOptions(ctx *gin.Context) {
-	postID, err := c.parseObjectID(ctx.Param("id"))
-	if err != nil {
-		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
+	authUser, exists := ctx.Get("authUser")
+	if !exists {
+		dto.SendError(ctx, http.StatusUnauthorized, apperror.ErrForbidden.Message, apperror.ErrForbidden.Code)
 		return
 	}
 
-	userID, err := c.getAuthUserID(ctx)
-	if err != nil {
-		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
-		return
-	}
+	postID := ctx.Param("id")
 
-	var req dto.RemovePollOptionRequest
+	var req dto.RemovePollOptionsRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		dto.SendError(ctx, http.StatusBadRequest, "Option IDs are required", apperror.ErrBadRequest.Code)
+		dto.SendError(ctx, http.StatusBadRequest, "Invalid request: 'option_ids' are required", apperror.ErrBadRequest.Code)
 		return
 	}
 
-	poll, err := c.service.RemovePollOptions(ctx.Request.Context(), userID, postID, &req)
+	poll, err := c.service.RemovePollOptions(authUser.(auth.AuthUser).ID, postID, req.OptionIDs)
 	if err != nil {
 		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
@@ -391,34 +305,27 @@ func (c *PostController) RemovePollOptions(ctx *gin.Context) {
 	dto.SendSuccess(ctx, http.StatusOK, "Poll options removed successfully", poll)
 }
 
-// === Helpers ===
-
-// getAuthUserID is a helper to get the authenticated user's ObjectID.
-// It returns an error if the user is not authenticated or the ID is invalid.
-func (c *PostController) getAuthUserID(ctx *gin.Context) (primitive.ObjectID, error) {
+func (c *PostController) UpdatePollOption(ctx *gin.Context) {
 	authUser, exists := ctx.Get("authUser")
 	if !exists {
-		return primitive.NilObjectID, apperror.ErrForbidden // Or a more specific "UNAUTHORIZED" error
+		dto.SendError(ctx, http.StatusUnauthorized, apperror.ErrForbidden.Message, apperror.ErrForbidden.Code)
+		return
 	}
 
-	user, ok := authUser.(auth.AuthUser)
-	if !ok {
-		return primitive.NilObjectID, apperror.ErrInternal
+	postID := ctx.Param("id")
+	optionID := ctx.Param("optionID")
+
+	var req dto.UpdatePollOptionRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		dto.SendError(ctx, http.StatusBadRequest, "Invalid request payload", apperror.ErrBadRequest.Code)
+		return
 	}
 
-	userID, err := primitive.ObjectIDFromHex(user.ID)
+	poll, err := c.service.UpdatePollOption(authUser.(auth.AuthUser).ID, postID, optionID, &req)
 	if err != nil {
-		return primitive.NilObjectID, apperror.ErrInvalidToken // Invalid ID in token
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
+		return
 	}
 
-	return userID, nil
-}
-
-// parseObjectID is a helper to parse an ObjectID from a string.
-func (c *PostController) parseObjectID(idStr string) (primitive.ObjectID, error) {
-	id, err := primitive.ObjectIDFromHex(idStr)
-	if err != nil {
-		return primitive.NilObjectID, apperror.ErrInvalidID
-	}
-	return id, nil
+	dto.SendSuccess(ctx, http.StatusOK, "Poll option updated successfully", poll)
 }

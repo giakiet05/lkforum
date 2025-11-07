@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/giakiet05/lkforum/internal/apperror"
 	"github.com/giakiet05/lkforum/internal/config"
 	"github.com/giakiet05/lkforum/internal/model"
 	"go.mongodb.org/mongo-driver/bson"
@@ -16,6 +17,7 @@ import (
 type CommunityRepo interface {
 	Create(ctx context.Context, community *model.Community) (*model.Community, error)
 	GetByID(ctx context.Context, id string) (*model.Community, error)
+	GetByIDs(ctx context.Context, ids []string) ([]*model.Community, error)
 	GetFilter(ctx context.Context, name string, description string, createFrom time.Time, page int, pageSize int) ([]model.Community, int64, error)
 	GetByModeratorIDPaginated(ctx context.Context, moderatorID string, page int, pageSize int) ([]model.Community, int64, error)
 	GetAllPaginated(ctx context.Context, page int, pageSize int) ([]model.Community, int64, error)
@@ -38,6 +40,32 @@ func NewCommunityRepo(db *mongo.Database) CommunityRepo {
 	}
 }
 
+func (c *communityRepo) GetByIDs(ctx context.Context, ids []string) ([]*model.Community, error) {
+	if len(ids) == 0 {
+		return []*model.Community{}, nil
+	}
+
+	objIDs := make([]primitive.ObjectID, 0, len(ids))
+	for _, id := range ids {
+		if objID, err := primitive.ObjectIDFromHex(id); err == nil {
+			objIDs = append(objIDs, objID)
+		}
+	}
+
+	filter := bson.M{"_id": bson.M{"$in": objIDs}}
+	cursor, err := c.communityCollection.Find(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var communities []*model.Community
+	if err := cursor.All(ctx, &communities); err != nil {
+		return nil, err
+	}
+	return communities, nil
+}
+
 func (c *communityRepo) Create(ctx context.Context, community *model.Community) (*model.Community, error) {
 	result, err := c.communityCollection.InsertOne(ctx, community)
 	if err != nil {
@@ -54,7 +82,7 @@ func (c *communityRepo) Create(ctx context.Context, community *model.Community) 
 func (c *communityRepo) GetByID(ctx context.Context, id string) (*model.Community, error) {
 	communityObjectID, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
-		return nil, err
+		return nil, apperror.ErrInvalidID
 	}
 
 	var community model.Community
@@ -76,7 +104,6 @@ func (c *communityRepo) GetFilter(
 ) ([]model.Community, int64, error) {
 	filter := bson.M{}
 	if name != "" {
-		// case-insensitive regex match
 		filter["name"] = bson.M{"$regex": name, "$options": "i"}
 	}
 	if description != "" {

@@ -6,41 +6,37 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// RegisterPostRoutes đăng ký các routes cho Post.
-// Middleware AuthMiddleware() sẽ xác thực token và đưa thông tin user vào context.
-// Middleware AuthOptional() sẽ làm tương tự nhưng không báo lỗi nếu không có token.
 func RegisterPostRoutes(rg *gin.RouterGroup, c *controller.PostController) {
 	posts := rg.Group("/posts")
 
-	// --- 👁️ Public / Optional Auth Routes ---
-	// Các route này ai cũng có thể truy cập.
-	// Dùng AuthOptional để làm giàu dữ liệu (VD: trạng thái vote) cho người đã đăng nhập.
+	// --- Public routes that can be enriched with auth info ---
+	// Anyone can access these. If a valid token is provided, extra info (like user's vote) is added.
+	posts.GET("", middleware.LoadUserIfAuthenticated(), c.GetPosts)
+	posts.GET("/:id", middleware.LoadUserIfAuthenticated(), c.GetPostByID)
+
+	// --- Private routes that require authentication ---
+	private := posts.Group("/")
+	private.Use(middleware.RequireAuth())
 	{
+		// Basic CRUD
+		private.POST("", c.CreatePost)
+		private.PUT("/:id", c.UpdatePost)
+		private.DELETE("/:id", c.DeletePost)
 
-	}
+		// Image Management
+		private.POST("/:id/images", c.AddImagesToPost)
+		private.DELETE("/:id/images", c.RemoveImagesFromPost) // Body: { "public_ids": [...] }
 
-	// --- 🛡️ Private / Required Auth Routes ---
-	// Các route này yêu cầu phải đăng nhập.
-	posts.Use(middleware.AuthMiddleware())
-	{
-		posts.GET("", c.GetPosts)        // Xem danh sách bài đăng
-		posts.GET("/:id", c.GetPostByID) // Xem chi tiết một bài đăng
-		posts.POST("", c.CreatePost)
-		posts.PUT("/:id", c.UpdatePost)
-		posts.DELETE("/:id", c.DeletePost)
+		// Poll Management
+		private.PUT("/:id/poll", c.UpdatePoll)
+		private.POST("/:id/poll/options", c.AddPollOptions)
+		private.DELETE("/:id/poll/options", c.RemovePollOptions) // Body: { "option_ids": [...] }
+		private.PUT("/:id/poll/options/:optionID", c.UpdatePollOption)
 
-		// Tương tác
-		posts.POST("/:id/vote", c.VoteOnPost)
-		posts.POST("/:id/poll/vote", c.VoteOnPoll)
-
-		// Quản lý Image
-		posts.POST("/:id/images", c.AddImagesToPost)
-		posts.DELETE("/:id/images", c.RemoveImagesFromPost)
-
-		// Quản lý Poll
-		posts.PUT("/:id/poll", c.UpdatePollDetails)
-		posts.POST("/:id/poll/options", c.AddPollOptions)
-		posts.DELETE("/:id/poll/options", c.RemovePollOptions)
-		posts.PUT("/:id/poll/options/:optionID", c.UpdatePollOption)
+		// Voting
+		private.POST("/:id/vote", c.VoteOnPost)
+		// DELETE /:id/vote is removed because POST /:id/vote handles un-voting
+		private.POST("/:id/poll/vote", c.VoteOnPoll)
+		private.DELETE("/:id/poll/vote", c.RemovePollVote)
 	}
 }

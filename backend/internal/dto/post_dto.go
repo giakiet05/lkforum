@@ -1,123 +1,232 @@
 package dto
 
-import "time"
+import (
+	"time"
 
-// Request DTO
+	"github.com/giakiet05/lkforum/internal/model"
+)
 
+// --- Request DTOs ---
+
+// CreatePostRequest defines the structure for creating a new text or poll post.
 type CreatePostRequest struct {
-	CommunityID string `json:"community_id" validate:"required"`
-	Title       string `json:"title" validate:"required,min=3,max=300"`
-	Type        string `json:"type" validate:"required,oneof=text image video poll"`
-	//
-	Text   string               `json:"text,omitempty"`
-	Images []ImageUploadRequest `json:"images,omitempty"`
-	Video  *VideoUploadRequest  `json:"video,omitempty"`
-	Poll   *CreatePollRequest   `json:"poll,omitempty"`
-}
-type ImageUploadRequest struct {
-	URL string `json:"url" validate:"required"`
+	CommunityID string         `json:"community_id" binding:"required"`
+	Title       string         `json:"title" binding:"required,min=3,max=300"`
+	Type        model.PostType `json:"type" binding:"required,oneof=text poll"`
+	Text        string         `json:"text,omitempty"`
+	Poll        *CreatePollRequest `json:"poll,omitempty"`
 }
 
-type VideoUploadRequest struct {
-	URL       string `json:"url" validate:"required"`
-	Thumbnail string `json:"thumbnail,omitempty"`
-}
+// CreatePollRequest defines the structure for creating a poll within a post.
 type CreatePollRequest struct {
-	Question      string     `json:"question" validate:"required,min=10,max=500"`
-	Options       []string   `json:"options" validate:"required,min=2,dive,min=1,max=200"`
+	Question      string     `json:"question" binding:"required,min=2,max=500"`
+	Options       []string   `json:"options" binding:"required,min=2,dive,min=1,max=200"`
 	ExpiresAt     *time.Time `json:"expires_at,omitempty"`
 	AllowMultiple bool       `json:"allow_multiple,omitempty"`
 }
 
+// UpdatePostRequest defines the structure for updating a post's simple fields.
 type UpdatePostRequest struct {
-	Title string `json:"title" validate:"max=300"`
-	Text  string `json:"text" validate:"max=300"`
-}
-type AddImageRequest struct {
-	Images []ImageUploadRequest `json:"images" validate:"required,min=1,dive,min=1"`
+	Title *string `json:"title,omitempty"`
+	Text  *string `json:"text,omitempty"`
 }
 
-type RemoveImageRequest struct {
-	ImageIDs []string `json:"image_ids" validate:"required"`
-}
+// UpdatePollRequest defines the structure for updating a poll's fields.
 type UpdatePollRequest struct {
-	Question      string     `json:"question" validate:"required,min=10,max=500"`
+	Question      *string    `json:"question,omitempty"`
 	ExpiresAt     *time.Time `json:"expires_at,omitempty"`
-	AllowMultiple bool       `json:"allow_multiple,omitempty"`
+	AllowMultiple *bool      `json:"allow_multiple,omitempty"`
 }
-type AddPollOptionRequest struct {
-	Options []string `json:"options" validate:"required"`
-}
+
+// UpdatePollOptionRequest defines the structure for updating a single poll option.
 type UpdatePollOptionRequest struct {
-	Text string `json:"text" validate:"required,min=3,max=300"`
-}
-type RemovePollOptionRequest struct {
-	OptionIDs []string `json:"option_ids" validate:"required"`
+	Text string `json:"text" binding:"required,min=1,max=200"`
 }
 
-// Response DTO
+// AddPollOptionsRequest defines the structure for adding new options to a poll.
+type AddPollOptionsRequest struct {
+	Options []string `json:"options" binding:"required,min=1,dive,min=1"`
+}
+
+// RemovePollOptionsRequest defines the structure for removing options from a poll.
+type RemovePollOptionsRequest struct {
+	OptionIDs []string `json:"option_ids" binding:"required,min=1"`
+}
+
+// PostVoteRequest defines the structure for voting on a post.
+type PostVoteRequest struct {
+	Value *bool `json:"value" binding:"required"`
+}
+
+// PollVoteRequest defines the structure for voting on a poll.
+type PollVoteRequest struct {
+	OptionID string `json:"option_id" binding:"required"`
+}
+
+// RemoveImagesRequest defines the structure for removing images from a post.
+type RemoveImagesRequest struct {
+	PublicIDs []string `json:"public_ids" binding:"required,min=1"`
+}
+
+// GetPostsQuery defines the query parameters for fetching posts.
+type GetPostsQuery struct {
+	CommunityID string `form:"community_id"`
+	AuthorID    string `form:"author_id"`
+	Type        string `form:"type"`
+	Sort        string `form:"sort"`
+	TimeFrame   string `form:"time"`
+	Page        int    `form:"page"`
+	Limit       int    `form:"limit"`
+}
+
+// --- Response DTOs ---
+
+// PostResponse is the detailed post object returned to the client.
 type PostResponse struct {
-	ID             string               `json:"id"`
-	AuthorID       string               `json:"author_id"`
-	AuthorUsername string               `json:"author_username"`
-	AuthorAvatar   string               `json:"author_avatar"`
-	CommunityID    string               `json:"community_id"`
-	CommunityName  string               `json:"community_name"`
-	Title          string               `json:"title"`
-	Type           string               `json:"type"`
-	Content        *PostContentResponse `json:"content,omitempty"`
-	VotesCount     *VotesCountResponse  `json:"votes_count"`
-	//Vote của Uer
-	UserVote      string     `json:"user_vote,omitempty"`
-	CommentsCount int        `json:"comments_count"`
-	CreatedAt     time.Time  `json:"created_at"`
-	UpdatedAt     *time.Time `json:"updated_at,omitempty"`
+	ID            string                 `json:"id"`
+	Author        AuthorResponse         `json:"author"`
+	Community     CommunityShortResponse `json:"community"`
+	Title         string                 `json:"title"`
+	Type          model.PostType         `json:"type"`
+	Content       PostContentResponse    `json:"content"`
+	VotesCount    *VotesCountResponse    `json:"votes_count,omitempty"`
+	UserVote      string                 `json:"user_vote,omitempty"`
+	CommentsCount int                    `json:"comments_count"`
+	CreatedAt     time.Time              `json:"created_at"`
+	UpdatedAt     *time.Time             `json:"updated_at,omitempty"`
 }
 
+// AuthorResponse contains short public information about a user.
+type AuthorResponse struct {
+	ID       string      `json:"id"`
+	Username string      `json:"username"`
+	Avatar   model.Image `json:"avatar,omitempty"`
+}
+
+// CommunityShortResponse contains short public information about a community.
+type CommunityShortResponse struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// PostContentResponse holds the actual content of the post.
 type PostContentResponse struct {
 	Text   string          `json:"text,omitempty"`
-	Images []ImageResponse `json:"images,omitempty"`
+	Images []model.Image   `json:"images,omitempty"`
+	Video  *model.Video    `json:"video,omitempty"`
 	Poll   *PollResponse   `json:"poll,omitempty"`
-	Video  *VideoResponse  `json:"video,omitempty"`
 }
-type ImageResponse struct {
-	ID  string `json:"id"`
-	URL string `json:"url"`
-}
+
+// PollResponse is the detailed poll object for responses.
 type PollResponse struct {
 	Question      string               `json:"question"`
 	Options       []PollOptionResponse `json:"options"`
 	TotalVotes    int                  `json:"total_votes"`
-	UserVoteIDs   []string             `json:"user_vote_ids"`
+	UserVoteIDs   []string             `json:"user_vote_ids,omitempty"`
 	ExpiresAt     *time.Time           `json:"expires_at,omitempty"`
-	AllowMultiple bool                 `json:"allow_multiple,omitempty"`
+	AllowMultiple bool                 `json:"allow_multiple"`
 }
+
+// PollOptionResponse represents a single poll option in a response.
 type PollOptionResponse struct {
 	ID         string  `json:"id"`
 	Text       string  `json:"text"`
 	Votes      int     `json:"votes"`
 	Percentage float64 `json:"percentage"`
 }
+
+// VotesCountResponse represents the vote counts for a post or comment.
 type VotesCountResponse struct {
 	Up    int `json:"up"`
 	Down  int `json:"down"`
 	Score int `json:"score"`
 }
-type VideoResponse struct {
-	ID        string `json:"id"`
-	Thumbnail string `json:"thumbnail"`
-	URL       string `json:"url"`
+
+// --- Mapping Functions ---
+
+// FromPost creates a PostResponse from a Post model and enriched data.
+func FromPost(post *model.Post, author *model.User, community *model.Community, userVote string, userPollVoteIDs []string) *PostResponse {
+	if post == nil {
+		return nil
+	}
+
+	if author == nil {
+		author = &model.User{Username: "[deleted]"} // Graceful handling of deleted user
+	}
+	if community == nil {
+		community = &model.Community{Name: "[deleted]"} // Graceful handling of deleted community
+	}
+
+	resp := &PostResponse{
+		ID:        post.ID.Hex(),
+		Author:    AuthorResponse{ID: author.ID.Hex(), Username: author.Username, Avatar: author.RoleContent.AsUser.Avatar},
+		Community: CommunityShortResponse{ID: community.ID.Hex(), Name: community.Name},
+		Title:     post.Title,
+		Type:      post.Type,
+		CommentsCount: post.CommentsCount,
+		CreatedAt: post.CreatedAt,
+		UpdatedAt: post.UpdatedAt,
+		UserVote:  userVote,
+	}
+
+	if post.VotesCount != nil {
+		resp.VotesCount = &VotesCountResponse{Up: post.VotesCount.Up, Down: post.VotesCount.Down, Score: post.VotesCount.Up - post.VotesCount.Down}
+	}
+
+	if post.Content != nil {
+		resp.Content = PostContentResponse{
+			Text:   post.Content.Text,
+			Images: post.Content.Images,
+			Video:  post.Content.Video,
+		}
+		if post.Content.Poll != nil {
+			resp.Content.Poll = FromPoll(post.Content.Poll, userPollVoteIDs)
+		}
+	}
+
+	return resp
 }
 
-// dto/post_dto.go
-type GetPostsQuery struct {
-	CommunityID string `form:"community_id"` // Nên dùng 'form' thay vì 'query' cho nhất quán với Gin
-	AuthorID    string `form:"author_id"`
-	Type        string `form:"type" validate:"omitempty,oneof=text image video poll"`
-	Sort        string `form:"sort" validate:"omitempty,oneof=hot new top controversial"`
-	TimeFrame   string `form:"time" validate:"omitempty,oneof=hour day week month year all"`
+// FromPoll creates a PollResponse from a Poll model.
+func FromPoll(poll *model.Poll, userVoteIDs []string) *PollResponse {
+	if poll == nil {
+		return nil
+	}
 
-	// Page và Limit đã được tối ưu
-	Page  int `form:"page" validate:"omitempty,min=1"`
-	Limit int `form:"limit" validate:"omitempty,min=1"` // Bỏ max=100 để tự xử lý trong controller
+	options := make([]PollOptionResponse, len(poll.Options))
+	for i, opt := range poll.Options {
+		percentage := 0.0
+		if poll.TotalVotes > 0 {
+			percentage = (float64(opt.Votes) / float64(poll.TotalVotes)) * 100
+		}
+		options[i] = PollOptionResponse{
+			ID:         opt.ID,
+			Text:       opt.Text,
+			Votes:      opt.Votes,
+			Percentage: percentage,
+		}
+	}
+
+	return &PollResponse{
+		Question:      poll.Question,
+		Options:       options,
+		TotalVotes:    poll.TotalVotes,
+		UserVoteIDs:   userVoteIDs,
+		ExpiresAt:     poll.ExpiresAt,
+		AllowMultiple: poll.AllowMultiple,
+	}
+}
+
+// FromPosts creates a slice of PostResponse with optimized data fetching.
+func FromPosts(posts []*model.Post, authors map[string]*model.User, communities map[string]*model.Community, userVotes map[string]string, userPollVotes map[string][]string) []PostResponse {
+	responses := make([]PostResponse, len(posts))
+	for i, post := range posts {
+		author := authors[post.AuthorID.Hex()]
+		community := communities[post.CommunityID.Hex()]
+		userVote := userVotes[post.ID.Hex()]
+		userPollVote := userPollVotes[post.ID.Hex()]
+
+		responses[i] = *FromPost(post, author, community, userVote, userPollVote)
+	}
+	return responses
 }
