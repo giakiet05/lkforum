@@ -311,7 +311,7 @@ func (s *authService) CompleteGoogleSetup(setupToken, username string) (*model.U
 		CreatedAt:  time.Now(),
 		RoleContent: model.RoleContent{
 			AsUser: &model.UserRoleContent{
-				Avatar: model.Image{URL: claims.Picture},
+				Avatar: &model.Image{URL: claims.Picture},
 			},
 		},
 	}

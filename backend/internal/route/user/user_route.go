@@ -12,6 +12,11 @@ func RegisterUserRoutes(rg *gin.RouterGroup, c *controller.UserController) {
 	// Public routes - anyone can view a user's profile
 	users.GET("/profile/:username", c.GetUserByUsername)
 
+	// Metadata endpoints - public, used for dropdowns
+	users.GET("/provinces", c.GetProvinces)
+	users.GET("/interests", c.GetInterests)
+	users.GET("/genders", c.GetGenders)
+
 	// Routes for the currently authenticated user ("me")
 	me := users.Group("/me")
 	me.Use(middleware.RequireAuth())
@@ -20,6 +25,8 @@ func RegisterUserRoutes(rg *gin.RouterGroup, c *controller.UserController) {
 		me.PUT("/profile", c.UpdateProfile)
 		me.PUT("/password", c.ChangePassword)
 		me.POST("/avatar", c.UploadAvatar)
+		me.DELETE("/avatar", c.DeleteAvatar)
 		me.POST("/cover", c.UploadCover)
+		me.DELETE("/cover", c.DeleteCover)
 	}
 }

@@ -98,9 +98,9 @@ type PostResponse struct {
 
 // AuthorResponse contains short public information about a user.
 type AuthorResponse struct {
-	ID       string      `json:"id"`
-	Username string      `json:"username"`
-	Avatar   model.Image `json:"avatar,omitempty"`
+	ID       string       `json:"id"`
+	Username string       `json:"username"`
+	Avatar   *model.Image `json:"avatar,omitempty"`
 }
 
 // CommunityShortResponse contains short public information about a community.

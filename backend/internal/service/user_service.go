@@ -3,6 +3,7 @@ package service
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/giakiet05/lkforum/internal/apperror"
 	"github.com/giakiet05/lkforum/internal/auth"
@@ -21,6 +22,8 @@ type UserService interface {
 	UpdateProfile(userID string, req *dto.UserProfileUpdateRequest) (*dto.UserResponse, error)
 	UpdateAvatar(userID string, imageURL string, publicID string) (*dto.UserResponse, error)
 	UpdateCover(userID string, imageURL string, publicID string) (*dto.UserResponse, error)
+	DeleteAvatar(userID string) (*dto.UserResponse, error)
+	DeleteCover(userID string) (*dto.UserResponse, error)
 	DeleteUser(id string) error
 	ChangePassword(userID, oldPassword, newPassword string) error
 
@@ -56,14 +59,99 @@ func (s *userService) UpdateProfile(userID string, req *dto.UserProfileUpdateReq
 		user.RoleContent.AsUser = &model.UserRoleContent{}
 	}
 
+	// Update Bio
 	if req.Bio != nil {
-		user.RoleContent.AsUser.Bio = *req.Bio
+		if *req.Bio == "" {
+			user.RoleContent.AsUser.Bio = nil // Delete bio
+		} else {
+			user.RoleContent.AsUser.Bio = req.Bio
+		}
 	}
+
+	// Update Gender
+	if req.Gender != nil {
+		if *req.Gender == "" {
+			user.RoleContent.AsUser.Gender = nil // Delete gender
+		} else {
+			gender := model.Gender(*req.Gender)
+			if !model.IsValidGender(gender) {
+				return nil, apperror.ErrInvalidGender
+			}
+			user.RoleContent.AsUser.Gender = &gender
+		}
+	}
+
+	// Update DateOfBirth
+	if req.DateOfBirth != nil {
+		if *req.DateOfBirth == "" {
+			user.RoleContent.AsUser.DateOfBirth = nil // Delete date of birth
+		} else {
+			dob, err := time.Parse("2006-01-02", *req.DateOfBirth)
+			if err != nil {
+				return nil, apperror.ErrInvalidDateFormat
+			}
+			// Validate age >= 13
+			age := time.Now().Year() - dob.Year()
+			if age < 13 {
+				return nil, apperror.ErrAgeTooYoung
+			}
+			if age > 150 {
+				return nil, apperror.ErrInvalidBirthDate
+			}
+			user.RoleContent.AsUser.DateOfBirth = &dob
+		}
+	}
+
+	// Update Location
 	if req.Location != nil {
-		user.RoleContent.AsUser.Location = *req.Location
+		if *req.Location == "" {
+			user.RoleContent.AsUser.Location = nil // Delete location
+		} else {
+			province := model.VNProvince(*req.Location)
+			if !model.IsValidProvince(province) {
+				return nil, apperror.ErrInvalidProvince
+			}
+			user.RoleContent.AsUser.Location = &province
+		}
 	}
-	if req.Website != nil {
-		user.RoleContent.AsUser.Website = *req.Website
+
+	// Update Interests
+	if req.Interests != nil {
+		if len(req.Interests) == 0 {
+			user.RoleContent.AsUser.Interests = nil // Delete all interests
+		} else {
+			if len(req.Interests) > 10 {
+				return nil, apperror.ErrTooManyInterests
+			}
+			interests := make([]model.Interest, len(req.Interests))
+			for i, interestStr := range req.Interests {
+				interest := model.Interest(interestStr)
+				if !model.IsValidInterest(interest) {
+					return nil, fmt.Errorf("%w: %s", apperror.ErrInvalidInterest, interestStr)
+				}
+				interests[i] = interest
+			}
+			user.RoleContent.AsUser.Interests = interests
+		}
+	}
+
+	// Update Social Links
+	if req.SocialLinks != nil {
+		if user.RoleContent.AsUser.SocialLinks == nil {
+			user.RoleContent.AsUser.SocialLinks = &model.SocialLinks{}
+		}
+		if req.SocialLinks.Website != nil {
+			user.RoleContent.AsUser.SocialLinks.Website = req.SocialLinks.Website
+		}
+		if req.SocialLinks.Facebook != nil {
+			user.RoleContent.AsUser.SocialLinks.Facebook = req.SocialLinks.Facebook
+		}
+		if req.SocialLinks.YouTube != nil {
+			user.RoleContent.AsUser.SocialLinks.YouTube = req.SocialLinks.YouTube
+		}
+		if req.SocialLinks.GitHub != nil {
+			user.RoleContent.AsUser.SocialLinks.GitHub = req.SocialLinks.GitHub
+		}
 	}
 
 	updatedUser, err := s.userRepo.Update(ctx, user)
@@ -88,13 +176,17 @@ func (s *userService) updateImage(userID string, imageURL string, publicID strin
 	}
 
 	var oldPublicID string
-	newImage := model.Image{URL: imageURL, PublicID: publicID}
+	newImage := &model.Image{URL: imageURL, PublicID: publicID}
 
 	if imageType == "avatar" {
-		oldPublicID = user.RoleContent.AsUser.Avatar.PublicID
+		if user.RoleContent.AsUser.Avatar != nil {
+			oldPublicID = user.RoleContent.AsUser.Avatar.PublicID
+		}
 		user.RoleContent.AsUser.Avatar = newImage
 	} else if imageType == "cover" {
-		oldPublicID = user.RoleContent.AsUser.Cover.PublicID
+		if user.RoleContent.AsUser.Cover != nil {
+			oldPublicID = user.RoleContent.AsUser.Cover.PublicID
+		}
 		user.RoleContent.AsUser.Cover = newImage
 	}
 
@@ -120,6 +212,70 @@ func (s *userService) UpdateAvatar(userID string, imageURL string, publicID stri
 
 func (s *userService) UpdateCover(userID string, imageURL string, publicID string) (*dto.UserResponse, error) {
 	return s.updateImage(userID, imageURL, publicID, "cover")
+}
+
+func (s *userService) DeleteAvatar(userID string) (*dto.UserResponse, error) {
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
+
+	user, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	if user.RoleContent.AsUser == nil {
+		return dto.FromUser(user), nil
+	}
+
+	var oldPublicID string
+	if user.RoleContent.AsUser.Avatar != nil {
+		oldPublicID = user.RoleContent.AsUser.Avatar.PublicID
+	}
+	user.RoleContent.AsUser.Avatar = nil
+
+	updatedUser, err := s.userRepo.Update(ctx, user)
+	if err != nil {
+		return nil, err
+	}
+
+	if oldPublicID != "" {
+		go cloudinary.Delete(oldPublicID)
+	}
+
+	s.eventBus.Publish(bus.UserChangeAvatarEventType{UserID: userID, NewAvatar: ""})
+
+	return dto.FromUser(updatedUser), nil
+}
+
+func (s *userService) DeleteCover(userID string) (*dto.UserResponse, error) {
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
+
+	user, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	if user.RoleContent.AsUser == nil {
+		return dto.FromUser(user), nil
+	}
+
+	var oldPublicID string
+	if user.RoleContent.AsUser.Cover != nil {
+		oldPublicID = user.RoleContent.AsUser.Cover.PublicID
+	}
+	user.RoleContent.AsUser.Cover = nil
+
+	updatedUser, err := s.userRepo.Update(ctx, user)
+	if err != nil {
+		return nil, err
+	}
+
+	if oldPublicID != "" {
+		go cloudinary.Delete(oldPublicID)
+	}
+
+	return dto.FromUser(updatedUser), nil
 }
 
 func (s *userService) DeleteUser(id string) error {

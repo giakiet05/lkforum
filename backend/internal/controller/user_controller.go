@@ -7,6 +7,7 @@ import (
 	"github.com/giakiet05/lkforum/internal/apperror"
 	"github.com/giakiet05/lkforum/internal/auth"
 	"github.com/giakiet05/lkforum/internal/dto"
+	"github.com/giakiet05/lkforum/internal/model"
 	"github.com/giakiet05/lkforum/internal/platform/cloudinary"
 	"github.com/giakiet05/lkforum/internal/service"
 	"github.com/gin-gonic/gin"
@@ -97,20 +98,19 @@ func (c *UserController) UploadAvatar(ctx *gin.Context) {
 		return
 	}
 
-	file, header, err := ctx.Request.FormFile("avatar")
+	form, err := ctx.MultipartForm()
 	if err != nil {
-		dto.SendError(ctx, http.StatusBadRequest, "Missing avatar file", "MISSING_FILE")
+		dto.SendError(ctx, http.StatusBadRequest, "Invalid form data", "INVALID_FORM")
 		return
 	}
-	defer file.Close()
 
-	result, err := cloudinary.Upload(file, header)
+	images, err := cloudinary.UploadImages(form.File["avatar"])
 	if err != nil {
 		dto.SendError(ctx, http.StatusInternalServerError, "Failed to upload image", "UPLOAD_FAILED")
 		return
 	}
 
-	updatedUser, err := c.service.UpdateAvatar(authUser.(auth.AuthUser).ID, result.SecureURL, result.PublicID)
+	updatedUser, err := c.service.UpdateAvatar(authUser.(auth.AuthUser).ID, images[0].URL, images[0].PublicID)
 	if err != nil {
 		dto.SendError(ctx, http.StatusInternalServerError, "Failed to update avatar", "DB_UPDATE_FAILED")
 		return
@@ -127,26 +127,59 @@ func (c *UserController) UploadCover(ctx *gin.Context) {
 		return
 	}
 
-	file, header, err := ctx.Request.FormFile("cover")
+	form, err := ctx.MultipartForm()
 	if err != nil {
-		dto.SendError(ctx, http.StatusBadRequest, "Missing cover file", "MISSING_FILE")
+		dto.SendError(ctx, http.StatusBadRequest, "Invalid form data", "INVALID_FORM")
 		return
 	}
-	defer file.Close()
 
-	result, err := cloudinary.Upload(file, header)
+	images, err := cloudinary.UploadImages(form.File["cover"])
 	if err != nil {
 		dto.SendError(ctx, http.StatusInternalServerError, "Failed to upload image", "UPLOAD_FAILED")
 		return
 	}
 
-	updatedUser, err := c.service.UpdateCover(authUser.(auth.AuthUser).ID, result.SecureURL, result.PublicID)
+	updatedUser, err := c.service.UpdateCover(authUser.(auth.AuthUser).ID, images[0].URL, images[0].PublicID)
 	if err != nil {
 		dto.SendError(ctx, http.StatusInternalServerError, "Failed to update cover", "DB_UPDATE_FAILED")
 		return
 	}
 
 	dto.SendSuccess(ctx, http.StatusOK, "Cover updated successfully", updatedUser)
+}
+
+// DeleteAvatar removes the user's avatar.
+func (c *UserController) DeleteAvatar(ctx *gin.Context) {
+	authUser, exists := ctx.Get("authUser")
+	if !exists {
+		dto.SendError(ctx, http.StatusUnauthorized, apperror.ErrForbidden.Message, apperror.ErrForbidden.Code)
+		return
+	}
+
+	updatedUser, err := c.service.DeleteAvatar(authUser.(auth.AuthUser).ID)
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
+		return
+	}
+
+	dto.SendSuccess(ctx, http.StatusOK, "Avatar deleted successfully", updatedUser)
+}
+
+// DeleteCover removes the user's cover image.
+func (c *UserController) DeleteCover(ctx *gin.Context) {
+	authUser, exists := ctx.Get("authUser")
+	if !exists {
+		dto.SendError(ctx, http.StatusUnauthorized, apperror.ErrForbidden.Message, apperror.ErrForbidden.Code)
+		return
+	}
+
+	updatedUser, err := c.service.DeleteCover(authUser.(auth.AuthUser).ID)
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
+		return
+	}
+
+	dto.SendSuccess(ctx, http.StatusOK, "Cover deleted successfully", updatedUser)
 }
 
 func (c *UserController) ChangePassword(ctx *gin.Context) {
@@ -169,6 +202,24 @@ func (c *UserController) ChangePassword(ctx *gin.Context) {
 	}
 
 	dto.SendSuccess(ctx, http.StatusOK, "Password changed successfully", nil)
+}
+
+// GetProvinces returns list of all Vietnamese provinces
+func (c *UserController) GetProvinces(ctx *gin.Context) {
+	provinces := model.GetAllProvinces()
+	dto.SendSuccess(ctx, http.StatusOK, "Provinces retrieved successfully", provinces)
+}
+
+// GetInterests returns list of all available interests
+func (c *UserController) GetInterests(ctx *gin.Context) {
+	interests := model.GetAllInterests()
+	dto.SendSuccess(ctx, http.StatusOK, "Interests retrieved successfully", interests)
+}
+
+// GetGenders returns list of all available genders
+func (c *UserController) GetGenders(ctx *gin.Context) {
+	genders := model.GetAllGenders()
+	dto.SendSuccess(ctx, http.StatusOK, "Genders retrieved successfully", genders)
 }
 
 // --- Admin-only actions ---
