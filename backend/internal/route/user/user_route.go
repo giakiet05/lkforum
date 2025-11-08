@@ -28,5 +28,7 @@ func RegisterUserRoutes(rg *gin.RouterGroup, c *controller.UserController) {
 		me.DELETE("/avatar", c.DeleteAvatar)
 		me.POST("/cover", c.UploadCover)
 		me.DELETE("/cover", c.DeleteCover)
+		me.GET("/settings", c.GetSettings)
+		me.PUT("/settings", c.UpdateSettings)
 	}
 }

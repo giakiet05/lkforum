@@ -9,24 +9,30 @@ import (
 
 // --- Request DTOs ---
 
-type UserRegisterRequest struct {
-	Username string `json:"username" binding:"required,min=3,max=20"`
-	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required,min=6"`
+// New Registration Flow (Verify Email First)
+type SendEmailVerificationRequest struct {
+	Email string `json:"email" binding:"required,email"`
 }
 
-type UserLoginRequest struct {
-	Identifier string `json:"identifier" binding:"required"`
-	Password   string `json:"password" binding:"required"`
-}
-
-type VerifyEmailRequest struct {
+type VerifyEmailCodeRequest struct {
 	Email string `json:"email" binding:"required,email"`
 	OTP   string `json:"otp" binding:"required,len=6"`
 }
 
-type ResendVerificationEmailRequest struct {
+type CompleteRegistrationRequest struct {
+	VerificationToken string `json:"verification_token" binding:"required"`
+	Username          string `json:"username" binding:"required,min=3,max=20"`
+	Password          string `json:"password" binding:"required,min=6"`
+}
+
+type ResendOTPRequest struct {
 	Email string `json:"email" binding:"required,email"`
+}
+
+// Login
+type UserLoginRequest struct {
+	Identifier string `json:"identifier" binding:"required"`
+	Password   string `json:"password" binding:"required"`
 }
 
 type CompleteGoogleSetupRequest struct {

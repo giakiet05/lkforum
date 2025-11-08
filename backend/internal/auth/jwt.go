@@ -12,10 +12,12 @@ import (
 	"github.com/google/uuid"
 )
 
-// AuthUser represents the user parsed from a token.
+// AuthUser represents the authenticated user with their settings cached.
+// This is populated in middleware by querying DB once per request.
 type AuthUser struct {
-	ID   string
-	Role string
+	ID       string
+	Role     string
+	Settings interface{} // Will hold *model.UserSettings, using interface{} to avoid circular import
 }
 
 // SetupTokenClaims holds the claims for the short-lived token used for completing Google user setup.
@@ -24,6 +26,14 @@ type SetupTokenClaims struct {
 	Email    string `json:"email"`
 	Name     string `json:"name"`
 	Picture  string `json:"picture"`
+	jwt.RegisteredClaims
+}
+
+// VerificationTokenClaims holds the claims for email verification after OTP is verified.
+// This token allows the user to complete registration within 15 minutes.
+type VerificationTokenClaims struct {
+	Email string `json:"email"`
+	Nonce string `json:"nonce"` // Prevents replay attacks
 	jwt.RegisteredClaims
 }
 
@@ -119,6 +129,40 @@ func ParseSetupToken(tokenStr string) (*SetupTokenClaims, error) {
 	return &claims, nil
 }
 
+// ====== Verification Token (for Email Verification) ======
+
+// CreateVerificationToken creates a short-lived token after email OTP is verified.
+func CreateVerificationToken(email, nonce string) (string, error) {
+	claims := VerificationTokenClaims{
+		Email: email,
+		Nonce: nonce,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(15 * time.Minute)), // Valid for 15 minutes
+			Issuer:    config.Cfg.JWTIssuer,
+		},
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString([]byte(config.Cfg.JWTSecret + "-verification"))
+}
+
+// ParseVerificationToken validates the verification token and returns the claims.
+func ParseVerificationToken(tokenStr string) (*VerificationTokenClaims, error) {
+	var claims VerificationTokenClaims
+	token, err := jwt.ParseWithClaims(tokenStr, &claims, func(t *jwt.Token) (interface{}, error) {
+		return []byte(config.Cfg.JWTSecret + "-verification"), nil
+	})
+
+	if err != nil {
+		return nil, apperror.ErrInvalidToken
+	}
+
+	if !token.Valid {
+		return nil, apperror.ErrInvalidToken
+	}
+
+	return &claims, nil
+}
+
 // ====== PARSE ======
 
 func ParseAccessToken(tokenStr string) (AuthUser, error) {
@@ -159,7 +203,8 @@ func ParseAccessToken(tokenStr string) (AuthUser, error) {
 		}
 	}
 
-	return AuthUser{ID: userID, Role: role}, nil
+	// Settings will be loaded by middleware through DB query
+	return AuthUser{ID: userID, Role: role, Settings: nil}, nil
 }
 
 func ParseRefreshToken(tokenStr string) (string, error) {

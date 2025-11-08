@@ -15,20 +15,19 @@ const (
 )
 
 type User struct {
-	ID                        primitive.ObjectID `bson:"_id,omitempty" json:"id"`
-	Username                  string             `bson:"username" json:"username"`
-	Email                     string             `bson:"email" json:"email"`
-	Reputation                int                `bson:"reputation" json:"reputation"`
-	Password                  string             `bson:"password,omitempty" json:"-"`
-	Provider                  AuthProvider       `bson:"provider" json:"provider"`
-	ProviderID                string             `bson:"provider_id,omitempty" json:"-"`
-	Role                      Role               `bson:"role" json:"role"`
-	RoleContent               RoleContent        `bson:"role_content,omitempty" json:"role_content,omitempty"`
-	IsVerified                bool               `bson:"is_verified" json:"is_verified"`
-	VerificationCode          string             `bson:"verification_code,omitempty" json:"-"`
-	VerificationCodeExpiresAt *time.Time         `bson:"verification_code_expires_at,omitempty" json:"-"`
-	CreatedAt                 time.Time          `bson:"created_at,omitempty" json:"created_at,omitempty"`
-	DeletedAt                 *time.Time         `bson:"deleted_at,omitempty" json:"deleted_at,omitempty"`
+	ID          primitive.ObjectID `bson:"_id,omitempty" json:"id"`
+	Username    string             `bson:"username" json:"username"`
+	Email       string             `bson:"email" json:"email"`
+	Reputation  int                `bson:"reputation" json:"reputation"`
+	Password    string             `bson:"password,omitempty" json:"-"`
+	Provider    AuthProvider       `bson:"provider" json:"provider"`
+	ProviderID  string             `bson:"provider_id,omitempty" json:"-"`
+	Role        Role               `bson:"role" json:"role"`
+	RoleContent RoleContent        `bson:"role_content,omitempty" json:"role_content,omitempty"`
+	Settings    *UserSettings      `bson:"settings,omitempty" json:"settings,omitempty"`
+	IsVerified  bool               `bson:"is_verified" json:"is_verified"` // Always true for local users after registration
+	CreatedAt   time.Time          `bson:"created_at,omitempty" json:"created_at,omitempty"`
+	DeletedAt   *time.Time         `bson:"deleted_at,omitempty" json:"deleted_at,omitempty"`
 }
 
 type Role string

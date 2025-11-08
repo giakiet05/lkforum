@@ -11,13 +11,14 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, c *controller.AuthController) {
 
 	auth.POST("/refresh", c.RefreshToken)
 
-	// Local Authentication
+	// Local Authentication - New Flow (Verify Email First)
 	local := auth.Group("/local")
 	{
-		local.POST("/register", c.RegisterUser)
+		local.POST("/send-verification", c.SendEmailVerification)
+		local.POST("/verify-email", c.VerifyEmailCode)
+		local.POST("/complete-registration", c.CompleteRegistration)
+		local.POST("/resend-otp", c.ResendOTP)
 		local.POST("/login", c.Login)
-		local.POST("/verify-email", c.VerifyEmail)
-		local.POST("/resend-verification-email", c.ResendVerificationEmail)
 	}
 
 	// Google OAuth2

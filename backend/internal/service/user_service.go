@@ -32,6 +32,9 @@ type UserService interface {
 	GetUserByEmail(email string) (*dto.UserResponse, error)
 	GetUsers(page, pageSize int) (*dto.PaginatedUsersResponse, error)
 	GetAllUsers() ([]*model.User, error)
+
+	GetSettings(userID string) (*dto.SettingsResponse, error)
+	UpdateSettings(userID string, req *dto.UpdateSettingsRequest) (*dto.SettingsResponse, error)
 }
 
 type userService struct {
@@ -403,4 +406,110 @@ func (s *userService) GetAllUsers() ([]*model.User, error) {
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
 	return s.userRepo.GetAll(ctx)
+}
+
+func (s *userService) GetSettings(userID string) (*dto.SettingsResponse, error) {
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
+
+	user, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return nil, apperror.ErrUserNotFound
+		}
+		return nil, err
+	}
+
+	// Return user settings or default settings
+	return dto.FromSettings(user.Settings), nil
+}
+
+func (s *userService) UpdateSettings(userID string, req *dto.UpdateSettingsRequest) (*dto.SettingsResponse, error) {
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
+
+	user, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return nil, apperror.ErrUserNotFound
+		}
+		return nil, err
+	}
+
+	// Initialize settings if nil
+	if user.Settings == nil {
+		user.Settings = model.NewDefaultSettings()
+	}
+
+	// Update Appearance settings
+	if req.Appearance != nil {
+		if req.Appearance.Theme != nil {
+			if !model.IsValidTheme(*req.Appearance.Theme) {
+				return nil, apperror.ErrBadRequest
+			}
+			user.Settings.Appearance.Theme = *req.Appearance.Theme
+		}
+		if req.Appearance.FontSize != nil {
+			if !model.IsValidFontSize(*req.Appearance.FontSize) {
+				return nil, apperror.ErrBadRequest
+			}
+			user.Settings.Appearance.FontSize = *req.Appearance.FontSize
+		}
+	}
+
+	// Update Notification settings
+	if req.Notifications != nil {
+		if req.Notifications.InAppEnabled != nil {
+			user.Settings.Notifications.InAppEnabled = *req.Notifications.InAppEnabled
+		}
+		if req.Notifications.EmailEnabled != nil {
+			user.Settings.Notifications.EmailEnabled = *req.Notifications.EmailEnabled
+		}
+		if req.Notifications.NotifyOnComment != nil {
+			user.Settings.Notifications.NotifyOnComment = *req.Notifications.NotifyOnComment
+		}
+		if req.Notifications.NotifyOnMention != nil {
+			user.Settings.Notifications.NotifyOnMention = *req.Notifications.NotifyOnMention
+		}
+		if req.Notifications.NotifyOnUpvote != nil {
+			user.Settings.Notifications.NotifyOnUpvote = *req.Notifications.NotifyOnUpvote
+		}
+		if req.Notifications.NotifyOnMessage != nil {
+			user.Settings.Notifications.NotifyOnMessage = *req.Notifications.NotifyOnMessage
+		}
+	}
+
+	// Update Privacy settings
+	if req.Privacy != nil {
+		if req.Privacy.ShowProfile != nil {
+			user.Settings.Privacy.ShowProfile = *req.Privacy.ShowProfile
+		}
+		if req.Privacy.ShowEmail != nil {
+			user.Settings.Privacy.ShowEmail = *req.Privacy.ShowEmail
+		}
+		if req.Privacy.ShowPostHistory != nil {
+			user.Settings.Privacy.ShowPostHistory = *req.Privacy.ShowPostHistory
+		}
+		if req.Privacy.AllowDirectMessages != nil {
+			user.Settings.Privacy.AllowDirectMessages = *req.Privacy.AllowDirectMessages
+		}
+		if req.Privacy.AllowMentions != nil {
+			user.Settings.Privacy.AllowMentions = *req.Privacy.AllowMentions
+		}
+	}
+
+	// Update Content settings
+	if req.Content != nil {
+		if req.Content.AllowNSFW != nil {
+			user.Settings.Content.AllowNSFW = *req.Content.AllowNSFW
+		}
+	}
+
+	// Save updated user
+	updatedUser, err := s.userRepo.Update(ctx, user)
+	if err != nil {
+		return nil, err
+	}
+
+	return dto.FromSettings(updatedUser.Settings), nil
 }

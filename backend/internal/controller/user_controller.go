@@ -222,6 +222,46 @@ func (c *UserController) GetGenders(ctx *gin.Context) {
 	dto.SendSuccess(ctx, http.StatusOK, "Genders retrieved successfully", genders)
 }
 
+// GetSettings retrieves the current user's settings
+func (c *UserController) GetSettings(ctx *gin.Context) {
+	authUser, exists := ctx.Get("authUser")
+	if !exists {
+		dto.SendError(ctx, http.StatusUnauthorized, apperror.ErrForbidden.Message, apperror.ErrForbidden.Code)
+		return
+	}
+
+	settings, err := c.service.GetSettings(authUser.(auth.AuthUser).ID)
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
+		return
+	}
+
+	dto.SendSuccess(ctx, http.StatusOK, "Settings retrieved successfully", settings)
+}
+
+// UpdateSettings updates the current user's settings
+func (c *UserController) UpdateSettings(ctx *gin.Context) {
+	authUser, exists := ctx.Get("authUser")
+	if !exists {
+		dto.SendError(ctx, http.StatusUnauthorized, apperror.ErrForbidden.Message, apperror.ErrForbidden.Code)
+		return
+	}
+
+	var req dto.UpdateSettingsRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		dto.SendError(ctx, http.StatusBadRequest, apperror.Message(apperror.ErrBadRequest), apperror.ErrBadRequest.Code)
+		return
+	}
+
+	settings, err := c.service.UpdateSettings(authUser.(auth.AuthUser).ID, &req)
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
+		return
+	}
+
+	dto.SendSuccess(ctx, http.StatusOK, "Settings updated successfully", settings)
+}
+
 // --- Admin-only actions ---
 
 func (c *UserController) DeleteUser(ctx *gin.Context) {
