@@ -66,6 +66,11 @@ type RefreshRequest struct {
 	RefreshToken string `json:"refresh_token" binding:"required"`
 }
 
+type LogoutRequest struct {
+	AccessToken  string `json:"access_token" binding:"required"`
+	RefreshToken string `json:"refresh_token" binding:"required"`
+}
+
 // --- Response DTOs ---
 
 // UserProfileResponse contains public profile information.

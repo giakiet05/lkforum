@@ -137,6 +137,22 @@ func (c *AuthController) RefreshToken(ctx *gin.Context) {
 	dto.SendSuccess(ctx, http.StatusOK, "Tokens refreshed successfully", data)
 }
 
+func (c *AuthController) Logout(ctx *gin.Context) {
+	var req dto.LogoutRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		dto.SendError(ctx, http.StatusBadRequest, apperror.Message(apperror.ErrBadRequest), apperror.ErrBadRequest.Code)
+		return
+	}
+
+	err := c.authService.Logout(req.AccessToken, req.RefreshToken)
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
+		return
+	}
+
+	dto.SendSuccess(ctx, http.StatusOK, "Logged out successfully", nil)
+}
+
 // --- Google OAuth ---
 
 func (c *AuthController) GoogleLogin(ctx *gin.Context) {

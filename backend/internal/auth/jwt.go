@@ -195,10 +195,18 @@ func ParseAccessToken(tokenStr string) (AuthUser, error) {
 
 	userID, _ := claims["sub"].(string)
 	role, _ := claims["role"].(string)
+	jti, _ := claims["jti"].(string)
 
 	if TokenSvc != nil {
 		ctx := context.Background()
+
+		// Check if user is deleted/invalidated
 		if !TokenSvc.IsUserValid(ctx, userID) {
+			return AuthUser{}, apperror.ErrTokenInvalidated
+		}
+
+		// Check if this specific token is blacklisted (logout)
+		if jti != "" && TokenSvc.IsTokenBlacklisted(ctx, jti) {
 			return AuthUser{}, apperror.ErrTokenInvalidated
 		}
 	}
@@ -236,10 +244,18 @@ func ParseRefreshToken(tokenStr string) (string, error) {
 	}
 
 	userID, _ := claims["sub"].(string)
+	jti, _ := claims["jti"].(string)
 
 	if TokenSvc != nil {
 		ctx := context.Background()
+
+		// Check if user is deleted/invalidated
 		if !TokenSvc.IsUserValid(ctx, userID) {
+			return "", apperror.ErrTokenInvalidated
+		}
+
+		// Check if this specific refresh token is blacklisted (logout)
+		if jti != "" && TokenSvc.IsTokenBlacklisted(ctx, jti) {
 			return "", apperror.ErrTokenInvalidated
 		}
 	}

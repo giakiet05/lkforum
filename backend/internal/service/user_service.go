@@ -13,6 +13,7 @@ import (
 	"github.com/giakiet05/lkforum/internal/platform/cloudinary"
 	"github.com/giakiet05/lkforum/internal/repo"
 	"github.com/giakiet05/lkforum/internal/util"
+	"github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/mongo"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -35,17 +36,21 @@ type UserService interface {
 
 	GetSettings(userID string) (*dto.SettingsResponse, error)
 	UpdateSettings(userID string, req *dto.UpdateSettingsRequest) (*dto.SettingsResponse, error)
+
+	CheckUsernameAvailability(username string) (bool, error)
 }
 
 type userService struct {
-	userRepo repo.UserRepo
-	eventBus *bus.EventBus
+	userRepo    repo.UserRepo
+	eventBus    *bus.EventBus
+	redisClient *redis.Client
 }
 
-func NewUserService(userRepo repo.UserRepo, bus *bus.EventBus) UserService {
+func NewUserService(userRepo repo.UserRepo, bus *bus.EventBus, redisClient *redis.Client) UserService {
 	return &userService{
-		userRepo: userRepo,
-		eventBus: bus,
+		userRepo:    userRepo,
+		eventBus:    bus,
+		redisClient: redisClient,
 	}
 }
 
@@ -512,4 +517,42 @@ func (s *userService) UpdateSettings(userID string, req *dto.UpdateSettingsReque
 	}
 
 	return dto.FromSettings(updatedUser.Settings), nil
+}
+
+func (s *userService) CheckUsernameAvailability(username string) (bool, error) {
+	// Try cache first
+	if s.redisClient != nil {
+		ctx, cancel := util.NewDefaultRedisContext()
+		defer cancel()
+
+		cacheKey := fmt.Sprintf("username_exists:%s", username)
+		cached, err := s.redisClient.Get(ctx, cacheKey).Result()
+		if err == nil {
+			// Cache hit - "false" means available, "true" means taken
+			return cached == "false", nil
+		}
+	}
+
+	// Cache miss - query database
+	dbCtx, cancel := util.NewDefaultDBContext()
+	defer cancel()
+
+	_, err := s.userRepo.GetByUsername(dbCtx, username)
+	exists := !errors.Is(err, mongo.ErrNoDocuments)
+
+	// Cache the result (5 minutes TTL)
+	if s.redisClient != nil {
+		ctx, cancel := util.NewDefaultRedisContext()
+		defer cancel()
+
+		cacheKey := fmt.Sprintf("username_exists:%s", username)
+		value := "false"
+		if exists {
+			value = "true"
+		}
+		// Ignore cache write errors, not critical
+		_ = s.redisClient.Set(ctx, cacheKey, value, 5*time.Minute).Err()
+	}
+
+	return !exists, nil
 }

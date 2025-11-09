@@ -22,6 +22,7 @@ func NewTokenService(redisClient *redis.Client) *TokenService {
 }
 
 // InvalidateAllUserTokens marks a user as deleted in Redis
+// Used for: Delete user account
 func (s *TokenService) InvalidateAllUserTokens(ctx context.Context, userID string) error {
 	key := fmt.Sprintf(config.RedisInvalidatedUserKey, userID)
 	return s.redisClient.Set(ctx, key, time.Now().Unix(), 90*24*time.Hour).Err()
@@ -32,4 +33,18 @@ func (s *TokenService) IsUserValid(ctx context.Context, userID string) bool {
 	key := fmt.Sprintf(config.RedisInvalidatedUserKey, userID)
 	exists, err := s.redisClient.Exists(ctx, key).Result()
 	return exists == 0 && err == nil
+}
+
+// InvalidateToken blacklists a specific token by its JTI
+// Used for: Logout (invalidate only current session)
+func (s *TokenService) InvalidateToken(ctx context.Context, jti string, ttl time.Duration) error {
+	key := fmt.Sprintf(config.RedisBlacklistedTokenKey, jti)
+	return s.redisClient.Set(ctx, key, time.Now().Unix(), ttl).Err()
+}
+
+// IsTokenBlacklisted checks if a token is blacklisted by JTI
+func (s *TokenService) IsTokenBlacklisted(ctx context.Context, jti string) bool {
+	key := fmt.Sprintf(config.RedisBlacklistedTokenKey, jti)
+	exists, err := s.redisClient.Exists(ctx, key).Result()
+	return exists > 0 && err == nil
 }

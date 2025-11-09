@@ -14,6 +14,8 @@ import (
 	"github.com/giakiet05/lkforum/internal/platform/email"
 	"github.com/giakiet05/lkforum/internal/repo"
 	"github.com/giakiet05/lkforum/internal/util"
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/mongo"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -41,6 +43,7 @@ type AuthService interface {
 	ResendOTP(email string) error
 	Login(identifier, password string) (*model.User, string, string, error)
 	RefreshToken(refreshToken string) (string, string, error)
+	Logout(accessToken, refreshToken string) error
 
 	// Google OAuth
 	ProcessGoogleCallback(code string) (*GoogleAuthResult, error)
@@ -51,13 +54,15 @@ type authService struct {
 	userRepo              repo.UserRepo
 	emailVerificationRepo repo.EmailVerificationRepo
 	emailSender           email.Sender
+	redisClient           *redis.Client
 }
 
-func NewAuthService(userRepo repo.UserRepo, emailVerificationRepo repo.EmailVerificationRepo, emailSender email.Sender) AuthService {
+func NewAuthService(userRepo repo.UserRepo, emailVerificationRepo repo.EmailVerificationRepo, emailSender email.Sender, redisClient *redis.Client) AuthService {
 	return &authService{
 		userRepo:              userRepo,
 		emailVerificationRepo: emailVerificationRepo,
 		emailSender:           emailSender,
+		redisClient:           redisClient,
 	}
 }
 
@@ -212,6 +217,9 @@ func (s *authService) CompleteRegistration(verificationToken, username, password
 	// Delete verification record (cleanup)
 	_ = s.emailVerificationRepo.Delete(ctx, claims.Email)
 
+	// Invalidate username cache
+	s.invalidateUsernameCache(username)
+
 	// Generate access & refresh tokens
 	accessToken, refreshToken, err := auth.GenerateToken(createdUser.ID.Hex(), string(createdUser.Role))
 	if err != nil {
@@ -321,6 +329,41 @@ func (s *authService) RefreshToken(refreshToken string) (string, string, error) 
 	return accessToken, newRefreshToken, nil
 }
 
+func (s *authService) Logout(accessToken, refreshToken string) error {
+	if auth.TokenSvc == nil {
+		return apperror.ErrInternal
+	}
+
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
+
+	// Parse access token to get JTI
+	accessJTI, err := extractJTI(accessToken)
+	if err != nil {
+		return apperror.ErrInvalidToken
+	}
+
+	// Parse refresh token to get JTI
+	refreshJTI, err := extractJTI(refreshToken)
+	if err != nil {
+		return apperror.ErrInvalidToken
+	}
+
+	// Blacklist access token
+	accessTTL := time.Minute * time.Duration(config.Cfg.TokenTTL)
+	if err := auth.TokenSvc.InvalidateToken(ctx, accessJTI, accessTTL); err != nil {
+		return err
+	}
+
+	// Blacklist refresh token
+	refreshTTL := time.Hour * time.Duration(config.Cfg.RefreshTokenTTL)
+	if err := auth.TokenSvc.InvalidateToken(ctx, refreshJTI, refreshTTL); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // --- Google OAuth ---
 
 func (s *authService) ProcessGoogleCallback(code string) (*GoogleAuthResult, error) {
@@ -400,6 +443,9 @@ func (s *authService) CompleteGoogleSetup(setupToken, username string) (*model.U
 		return nil, "", "", err
 	}
 
+	// Invalidate username cache
+	s.invalidateUsernameCache(username)
+
 	accessToken, refreshToken, err := auth.GenerateToken(createdUser.ID.Hex(), string(createdUser.Role))
 	if err != nil {
 		return nil, "", "", err
@@ -423,4 +469,36 @@ func generateOTP() string {
 func generateNonce() string {
 	rand.Seed(time.Now().UnixNano())
 	return fmt.Sprintf("%032d", rand.Int63())
+}
+
+func extractJTI(tokenStr string) (string, error) {
+	token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
+		return []byte(config.Cfg.JWTSecret), nil
+	})
+
+	if err != nil {
+		return "", err
+	}
+
+	if claims, ok := token.Claims.(jwt.MapClaims); ok {
+		if jti, ok := claims["jti"].(string); ok {
+			return jti, nil
+		}
+	}
+
+	return "", fmt.Errorf("jti not found in token")
+}
+
+// invalidateUsernameCache removes the cached username availability check
+func (s *authService) invalidateUsernameCache(username string) {
+	if s.redisClient == nil {
+		return
+	}
+
+	ctx, cancel := util.NewDefaultRedisContext()
+	defer cancel()
+
+	cacheKey := fmt.Sprintf("username_exists:%s", username)
+	// Ignore error, cache invalidation is not critical
+	_ = s.redisClient.Del(ctx, cacheKey).Err()
 }

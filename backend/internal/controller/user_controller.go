@@ -262,6 +262,27 @@ func (c *UserController) UpdateSettings(ctx *gin.Context) {
 	dto.SendSuccess(ctx, http.StatusOK, "Settings updated successfully", settings)
 }
 
+// CheckUsername checks if a username is available for registration.
+// This is a public endpoint for real-time username availability checking.
+func (c *UserController) CheckUsername(ctx *gin.Context) {
+	var req struct {
+		Username string `json:"username" binding:"required,min=3,max=20"`
+	}
+
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		dto.SendError(ctx, http.StatusBadRequest, apperror.Message(apperror.ErrBadRequest), apperror.ErrBadRequest.Code)
+		return
+	}
+
+	available, err := c.service.CheckUsernameAvailability(req.Username)
+	if err != nil {
+		dto.SendError(ctx, http.StatusInternalServerError, apperror.Message(apperror.ErrInternal), apperror.ErrInternal.Code)
+		return
+	}
+
+	dto.SendSuccess(ctx, http.StatusOK, "", gin.H{"available": available})
+}
+
 // --- Admin-only actions ---
 
 func (c *UserController) DeleteUser(ctx *gin.Context) {

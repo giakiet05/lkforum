@@ -80,8 +80,8 @@ func initRepos(client *mongo.Client, db *mongo.Database) *Repos {
 
 func initServices(repos *Repos, redisClient *redis.Client, emailSender email.Sender, eventBus *bus.EventBus) *Services {
 	return &Services{
-		AuthService:         service.NewAuthService(repos.UserRepo, repos.EmailVerificationRepo, emailSender),
-		UserService:         service.NewUserService(repos.UserRepo, eventBus),
+		AuthService:         service.NewAuthService(repos.UserRepo, repos.EmailVerificationRepo, emailSender, redisClient),
+		UserService:         service.NewUserService(repos.UserRepo, eventBus, redisClient),
 		CommunityService:    service.NewCommunityService(repos.CommunityRepo, eventBus),
 		MembershipService:   service.NewMembershipService(repos.MembershipRepo, redisClient),
 		PostService:         service.NewPostService(repos.PostRepo, repos.PostVoteRepo, repos.PollVoteRepo, repos.UserRepo, repos.CommunityRepo, eventBus),
@@ -120,7 +120,7 @@ func initRoutes(controllers *Controllers, r *gin.Engine) {
 		c.JSON(200, gin.H{"message": "Welcome to LKForum API!"})
 	})
 
-	userroute.RegisterAuthRoutes(api, &controllers.AuthController)
+	userroute.RegisterAuthRoutes(api, &controllers.AuthController, &controllers.UserController)
 	userroute.RegisterUserRoutes(api, &controllers.UserController)
 	userroute.RegisterCommunityRoutes(api, &controllers.CommunityController)
 	userroute.RegisterMembershipRoutes(api, &controllers.MembershipController)

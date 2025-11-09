@@ -10,9 +10,10 @@ import (
 
 const (
 	// Redis key patterns
-	RedisInvalidatedUserKey = "invalidated:user:%s"
-	RedisActiveUsersKey     = "channel:%s:active_users"
-	RedisMembersCountKey    = "community:%s:member_count"
+	RedisInvalidatedUserKey  = "invalidated:user:%s"  // For delete user - invalidate all tokens
+	RedisBlacklistedTokenKey = "blacklisted:token:%s" // For logout - invalidate specific token by JTI
+	RedisActiveUsersKey      = "channel:%s:active_users"
+	RedisMembersCountKey     = "community:%s:member_count"
 )
 
 // NewRedisClient creates and returns a new Redis client using the global AppConfig.
