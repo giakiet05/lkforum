@@ -12,7 +12,7 @@
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
 
   let activeTab = $state<"login" | "register">("login");
-  let step = $state<"register" | "verify">("register");
+  let step = $state<"email" | "otp" | "register">("email"); // Step 1: email → Step 2: otp → Step 3: register
   let isLoading = $state(false);
   let error = $state("");
 
@@ -34,7 +34,7 @@
     password = "";
     confirmPassword = "";
     otp = ["", "", "", "", "", ""];
-    step = "register";
+    step = "email";
     activeTab = "login";
     error = "";
     if (countdownInterval) clearInterval(countdownInterval);
@@ -58,7 +58,7 @@
       if (pendingEmail) {
         email = pendingEmail;
         activeTab = "register";
-        step = "verify";
+        step = "otp";
         error =
           "Bạn chưa xác thực email. Vui lòng nhập mã OTP đã gửi đến email của bạn.";
         startCountdown();
@@ -120,7 +120,7 @@
 
         // Chuyển sang tab register để hiển thị màn OTP
         activeTab = "register";
-        step = "verify";
+        step = "otp";
         error =
           "Tài khoản chưa được xác thực. Vui lòng nhập mã OTP đã gửi đến email của bạn.";
 
@@ -172,7 +172,7 @@
 
         // Chuyển sang tab register để hiển thị màn OTP
         activeTab = "register";
-        step = "verify";
+        step = "otp";
         error =
           "Tài khoản chưa được xác thực. Vui lòng nhập mã OTP đã gửi đến email của bạn.";
 
@@ -197,18 +197,91 @@
 
   function handleSwitchToLogin() {
     activeTab = "login";
-    step = "register";
+    step = "email";
     error = "";
 
     // Xóa pending verification khi chuyển sang đăng nhập
     localStorage.removeItem("pending_verification_email");
   }
 
-  // Step 1: Register
+  // Step 1: Nhập Email → Backend gửi OTP
+  async function handleEmailSubmit(e: Event) {
+    e.preventDefault();
+
+    if (!email) {
+      error = "Vui lòng nhập email";
+      return;
+    }
+
+    isLoading = true;
+    error = "";
+
+    try {
+      // TODO: Gọi API backend để gửi OTP
+      // const res = await fetch(`${API_BASE_URL}/api/auth/send-otp`, {
+      //   method: "POST",
+      //   headers: { "Content-Type": "application/json" },
+      //   body: JSON.stringify({ email }),
+      // });
+
+      // Mock: Giả lập gửi OTP thành công
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      console.log("Mock: OTP sent to", email);
+
+      // Chuyển sang step nhập OTP
+      step = "otp";
+      error = "";
+      localStorage.setItem("pending_verification_email", email);
+      startCountdown();
+    } catch (err: any) {
+      console.error("Send OTP error:", err);
+      error = "Không thể gửi mã OTP. Vui lòng thử lại.";
+    } finally {
+      isLoading = false;
+    }
+  }
+
+  // Step 2: Verify OTP → Chuyển sang step Register
+  async function handleVerifyOTPStep(e: Event) {
+    e.preventDefault();
+
+    const otpCode = otp.join("");
+    if (otpCode.length !== 6) {
+      error = "Vui lòng nhập đầy đủ 6 chữ số";
+      return;
+    }
+
+    isLoading = true;
+    error = "";
+
+    try {
+      // TODO: Gọi API backend để verify OTP
+      // const res = await fetch(`${API_BASE_URL}/api/auth/verify-otp`, {
+      //   method: "POST",
+      //   headers: { "Content-Type": "application/json" },
+      //   body: JSON.stringify({ email, otp: otpCode }),
+      // });
+
+      // Mock: Giả lập verify thành công
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      console.log("Mock: OTP verified for", email);
+
+      // Chuyển sang step đăng ký (username + password)
+      step = "register";
+      error = "";
+    } catch (err: any) {
+      console.error("Verify OTP error:", err);
+      error = "Mã OTP không đúng. Vui lòng thử lại.";
+    } finally {
+      isLoading = false;
+    }
+  }
+
+  // Step 3: Register - nhập username, password → Hoàn tất đăng ký
   async function handleRegisterSubmit(e: Event) {
     e.preventDefault();
 
-    if (!email || !username || !password || !confirmPassword) {
+    if (!username || !password || !confirmPassword) {
       error = "Vui lòng điền đầy đủ thông tin";
       return;
     }
@@ -221,47 +294,42 @@
     error = "";
 
     try {
-      const res = await fetch(`${API_BASE_URL}/api/auth/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, username, password }),
-      });
+      // TODO: Gọi API backend để hoàn tất đăng ký
+      // const res = await fetch(`${API_BASE_URL}/api/auth/complete-register`, {
+      //   method: "POST",
+      //   headers: { "Content-Type": "application/json" },
+      //   body: JSON.stringify({ email, username, password }),
+      // });
 
-      if (!res.ok) {
-        // Xử lý 409 Conflict - tài khoản đã tồn tại nhưng chưa verify
-        if (res.status === 409) {
-          console.log("409 Conflict - Tài khoản chưa verify, gửi lại OTP");
+      // Mock: Giả lập đăng ký thành công với tokens
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const mockData = {
+        user: {
+          id: "mock-user-id",
+          email: email,
+          username: username,
+          role: "user",
+          is_verified: true,
+        },
+        access_token: "mock-access-token-" + Date.now(),
+        refresh_token: "mock-refresh-token-" + Date.now(),
+      };
 
-          // Gửi lại OTP cho email này
-          await resendOTP(email);
+      console.log("Mock: Register complete", mockData);
 
-          // Chuyển sang màn verify OTP
-          step = "verify";
-          error = "";
+      // Lưu tokens và user vào localStorage
+      localStorage.setItem("access_token", mockData.access_token);
+      localStorage.setItem("refresh_token", mockData.refresh_token);
+      localStorage.setItem("user", JSON.stringify(mockData.user));
 
-          // Lưu email để tracking
-          localStorage.setItem("pending_verification_email", email);
+      // Update authStore
+      setAuth(mockData.user, mockData.access_token);
 
-          startCountdown();
-          return;
-        }
+      // Xóa pending verification
+      localStorage.removeItem("pending_verification_email");
 
-        const errObj = await res
-          .json()
-          .catch(() => ({ error: `HTTP ${res.status}` }));
-        throw errObj.error || errObj.message || "Lỗi đăng ký";
-      }
-
-      step = "verify";
-      error = "";
-
-      // Lưu email để tracking pending verification
-      localStorage.setItem("pending_verification_email", email);
-
-      // Lưu mapping username -> email để dùng cho đăng nhập
-      localStorage.setItem(`user_email_${username}`, email);
-
-      startCountdown(); // Bắt đầu đếm ngược
+      // Đóng modal
+      handleClose();
     } catch (err: any) {
       error = typeof err === "string" ? err : err.message || "Lỗi khi đăng ký";
     } finally {
@@ -269,7 +337,8 @@
     }
   }
 
-  // Step 2: Verify OTP
+  // OLD FUNCTION - Giữ lại để không break login flow
+  // Step 2: Verify OTP (OLD - for login with unverified email)
   async function handleVerifyOTP(e: Event) {
     e.preventDefault();
 
@@ -326,16 +395,19 @@
     error = "";
 
     try {
-      const res = await fetch(
-        `${API_BASE_URL}/api/auth/resend-verification-email`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email }),
-        }
-      );
+      // TODO: Gọi API backend
+      // const res = await fetch(
+      //   `${API_BASE_URL}/api/auth/resend-verification-email`,
+      //   {
+      //     method: "POST",
+      //     headers: { "Content-Type": "application/json" },
+      //     body: JSON.stringify({ email }),
+      //   }
+      // );
 
-      if (!res.ok) throw new Error("Không thể gửi lại mã OTP");
+      // Mock: Giả lập gửi lại OTP
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      console.log("Mock: Resend OTP to", email);
 
       alert("Mã OTP mới đã được gửi đến email của bạn!");
       startCountdown(); // Bắt đầu đếm ngược lại
@@ -426,9 +498,11 @@
   onClose={handleClose}
   title={activeTab === "login"
     ? "Đăng nhập vào LKForum"
-    : step === "register"
+    : step === "email"
       ? "Tạo tài khoản mới"
-      : "Xác thực Email"}
+      : step === "otp"
+        ? "Xác thực Email"
+        : "Hoàn tất đăng ký"}
 >
   {#if activeTab === "login"}
     <Login
@@ -438,9 +512,13 @@
       {error}
       on:switchMode={handleSwitchToRegister}
     />
-  {:else if step === "register"}
-    <!-- Register Form -->
-    <form on:submit={handleRegisterSubmit} class="auth-form">
+  {:else if step === "email"}
+    <!-- Step 1: Nhập Email -->
+    <form on:submit={handleEmailSubmit} class="auth-form">
+      <p class="form-description">
+        Nhập email để bắt đầu đăng ký tài khoản LKForum.
+      </p>
+
       <div class="input-group">
         <label for="email">Email</label>
         <input
@@ -449,39 +527,7 @@
           bind:value={email}
           placeholder="Nhập email của bạn"
           disabled={isLoading}
-        />
-      </div>
-
-      <div class="input-group">
-        <label for="username">Username</label>
-        <input
-          type="text"
-          id="username"
-          bind:value={username}
-          placeholder="Chọn một tên đăng nhập"
-          disabled={isLoading}
-        />
-      </div>
-
-      <div class="input-group">
-        <label for="password">Mật khẩu</label>
-        <input
-          type="password"
-          id="password"
-          bind:value={password}
-          placeholder="Tạo mật khẩu"
-          disabled={isLoading}
-        />
-      </div>
-
-      <div class="input-group">
-        <label for="confirmPassword">Xác nhận mật khẩu</label>
-        <input
-          type="password"
-          id="confirmPassword"
-          bind:value={confirmPassword}
-          placeholder="Nhập lại mật khẩu"
-          disabled={isLoading}
+          required
         />
       </div>
 
@@ -491,7 +537,7 @@
 
       <Button
         type="submit"
-        label={isLoading ? "Đang xử lý..." : "Đăng Ký"}
+        label={isLoading ? "Đang gửi..." : "Tiếp Tục"}
         variant="primary"
         disabled={isLoading}
       />
@@ -502,24 +548,10 @@
           Đăng nhập
         </button>
       </div>
-
-      <!-- Google Login -->
-      <div class="social-divider">
-        <span>hoặc</span>
-      </div>
-
-      <Button
-        label="Đăng nhập với Google"
-        variant="google"
-        disabled={isLoading}
-        onclick={() => {
-          window.location.href = `${API_BASE_URL}/api/auth/google/login`;
-        }}
-      />
     </form>
-  {:else}
-    <!-- Verify OTP Form -->
-    <form on:submit={handleVerifyOTP} class="auth-form otp-form">
+  {:else if step === "otp"}
+    <!-- Step 2: Verify OTP -->
+    <form on:submit={handleVerifyOTPStep} class="auth-form otp-form">
       <p class="otp-instruction">
         Chúng tôi đã gửi mã OTP đến email <strong>{email}</strong>
       </p>
@@ -565,7 +597,11 @@
           <button
             type="button"
             class="back-btn"
-            on:click={handleBackToRegister}
+            on:click={() => {
+              step = "email";
+              otp = ["", "", "", "", "", ""];
+              error = "";
+            }}
             disabled={isLoading}
           >
             Quay lại
@@ -583,11 +619,85 @@
 
       <div class="switch-mode">
         Đã có tài khoản?
+        <button type="button" class="link-btn" on:click={handleSwitchToLogin}>
+          Đăng nhập
+        </button>
+      </div>
+    </form>
+  {:else if step === "register"}
+    <!-- Step 3: Register Form (Username + Password) -->
+    <form on:submit={handleRegisterSubmit} class="auth-form">
+      <p class="form-description">
+        Tạo tên đăng nhập và mật khẩu cho tài khoản của bạn.
+      </p>
+
+      <div class="input-group">
+        <label for="username">Tên đăng nhập</label>
+        <input
+          type="text"
+          id="username"
+          bind:value={username}
+          placeholder="Chọn một tên đăng nhập"
+          disabled={isLoading}
+          required
+        />
+      </div>
+
+      <div class="input-group">
+        <label for="password">Mật khẩu</label>
+        <input
+          type="password"
+          id="password"
+          bind:value={password}
+          placeholder="Tạo mật khẩu"
+          disabled={isLoading}
+          required
+        />
+      </div>
+
+      <div class="input-group">
+        <label for="confirmPassword">Xác nhận mật khẩu</label>
+        <input
+          type="password"
+          id="confirmPassword"
+          bind:value={confirmPassword}
+          placeholder="Nhập lại mật khẩu"
+          disabled={isLoading}
+          required
+        />
+      </div>
+
+      {#if error}
+        <div class="error" role="alert">{error}</div>
+      {/if}
+
+      <Button
+        type="submit"
+        label={isLoading ? "Đang xử lý..." : "Hoàn Tất"}
+        variant="primary"
+        disabled={isLoading}
+      />
+
+      <div class="otp-actions">
         <button
           type="button"
-          class="login-link-btn"
-          on:click={handleSwitchToLogin}
+          class="back-btn"
+          on:click={() => {
+            step = "otp";
+            username = "";
+            password = "";
+            confirmPassword = "";
+            error = "";
+          }}
+          disabled={isLoading}
         >
+          Quay lại
+        </button>
+      </div>
+
+      <div class="switch-mode">
+        Đã có tài khoản?
+        <button type="button" class="link-btn" on:click={handleSwitchToLogin}>
           Đăng nhập
         </button>
       </div>
@@ -605,6 +715,13 @@
     display: flex;
     flex-direction: column;
     gap: 16px;
+  }
+
+  .form-description {
+    color: #666;
+    font-size: 14px;
+    margin: -8px 0 8px 0;
+    line-height: 1.5;
   }
 
   .input-group {
