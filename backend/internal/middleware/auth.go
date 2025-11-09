@@ -5,8 +5,18 @@ import (
 	"strings"
 
 	"github.com/giakiet05/lkforum/internal/auth"
+	"github.com/giakiet05/lkforum/internal/repo"
+	"github.com/giakiet05/lkforum/internal/util"
 	"github.com/gin-gonic/gin"
 )
+
+// userRepo is injected at startup to load user settings in middleware
+var userRepo repo.UserRepo
+
+// SetUserRepo injects the user repository for middleware to use
+func SetUserRepo(repo repo.UserRepo) {
+	userRepo = repo
+}
 
 // RequireAuth parse access token và nhét AuthUser vào context
 func RequireAuth() gin.HandlerFunc {
@@ -33,7 +43,18 @@ func RequireAuth() gin.HandlerFunc {
 			return
 		}
 
-		// Nhét user vào context
+		// Load user settings from DB once per request
+		if userRepo != nil {
+			ctx, cancel := util.NewDefaultDBContext()
+			defer cancel()
+
+			dbUser, err := userRepo.GetByID(ctx, user.ID)
+			if err == nil && dbUser.Settings != nil {
+				user.Settings = dbUser.Settings
+			}
+		}
+
+		// Nhét user vào context with settings cached
 		c.Set("authUser", user)
 		c.Next()
 	}
@@ -62,7 +83,18 @@ func LoadUserIfAuthenticated() gin.HandlerFunc {
 			return
 		}
 
-		// If token is valid, set the user in the context
+		// Load user settings from DB once per request
+		if userRepo != nil {
+			ctx, cancel := util.NewDefaultDBContext()
+			defer cancel()
+
+			dbUser, err := userRepo.GetByID(ctx, user.ID)
+			if err == nil && dbUser.Settings != nil {
+				user.Settings = dbUser.Settings
+			}
+		}
+
+		// If token is valid, set the user in the context with settings cached
 		c.Set("authUser", user)
 		c.Next()
 	}

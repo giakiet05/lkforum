@@ -17,20 +17,21 @@ var (
 )
 
 const (
-	UserColName            = "users"
-	PostColName            = "posts"
-	CommunityColName       = "communities"
-	CommentColName         = "comments"
-	ChannelColName         = "channels"
-	MessageColName         = "messages"
-	VoteColName            = "votes"
-	PollVoteColName        = "poll_votes"
-	NotificationColName    = "notifications"
-	ReportColName          = "reports"
-	MembershipColName      = "memberships"
-	LikedPostColName       = "liked_posts"
-	SavedPostColName       = "saved_posts"
-	UserPostHistoryColName = "user_post_history"
+	UserColName              = "users"
+	PostColName              = "posts"
+	CommunityColName         = "communities"
+	CommentColName           = "comments"
+	ChannelColName           = "channels"
+	MessageColName           = "messages"
+	VoteColName              = "votes"
+	PollVoteColName          = "poll_votes"
+	NotificationColName      = "notifications"
+	ReportColName            = "reports"
+	MembershipColName        = "memberships"
+	LikedPostColName         = "liked_posts"
+	SavedPostColName         = "saved_posts"
+	UserPostHistoryColName   = "user_post_history"
+	EmailVerificationColName = "email_verifications"
 )
 
 // NewMongoClient creates and returns a new MongoDB client
@@ -92,6 +93,7 @@ func verifyCollections(ctx context.Context, db *mongo.Database) error {
 		LikedPostColName,
 		SavedPostColName,
 		UserPostHistoryColName,
+		EmailVerificationColName,
 	}
 
 	existing := make(map[string]bool, len(collections))

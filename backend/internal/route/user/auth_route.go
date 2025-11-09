@@ -6,25 +6,28 @@ import (
 )
 
 // RegisterAuthRoutes registers all authentication-related routes.
-func RegisterAuthRoutes(rg *gin.RouterGroup, c *controller.AuthController) {
+func RegisterAuthRoutes(rg *gin.RouterGroup, authCtrl *controller.AuthController, userCtrl *controller.UserController) {
 	auth := rg.Group("/auth")
 
-	auth.POST("/refresh", c.RefreshToken)
+	auth.POST("/refresh", authCtrl.RefreshToken)
+	auth.POST("/logout", authCtrl.Logout)
+	auth.POST("/check-username", userCtrl.CheckUsername) // Public endpoint for username availability check
 
-	// Local Authentication
+	// Local Authentication - New Flow (Verify Email First)
 	local := auth.Group("/local")
 	{
-		local.POST("/register", c.RegisterUser)
-		local.POST("/login", c.Login)
-		local.POST("/verify-email", c.VerifyEmail)
-		local.POST("/resend-verification-email", c.ResendVerificationEmail)
+		local.POST("/send-verification", authCtrl.SendEmailVerification)
+		local.POST("/verify-email", authCtrl.VerifyEmailCode)
+		local.POST("/complete-registration", authCtrl.CompleteRegistration)
+		local.POST("/resend-otp", authCtrl.ResendOTP)
+		local.POST("/login", authCtrl.Login)
 	}
 
 	// Google OAuth2
 	google := auth.Group("/google")
 	{
-		google.GET("/login", c.GoogleLogin)
-		google.GET("/callback", c.GoogleCallback)
-		google.POST("/complete-setup", c.CompleteGoogleSetup)
+		google.GET("/login", authCtrl.GoogleLogin)
+		google.GET("/callback", authCtrl.GoogleCallback)
+		google.POST("/complete-setup", authCtrl.CompleteGoogleSetup)
 	}
 }

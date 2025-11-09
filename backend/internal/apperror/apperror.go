@@ -58,7 +58,8 @@ func isErrorType(err error, targets ...error) bool {
 func StatusFromError(err error) int {
 	switch {
 	// 400 Bad Request
-	case isErrorType(err, ErrBadRequest, ErrInvalidID, ErrInvalidMembershipData, ErrInvalidOTP, ErrOTPExpired):
+	case isErrorType(err, ErrBadRequest, ErrInvalidID, ErrInvalidMembershipData, ErrInvalidOTP, ErrOTPExpired,
+		ErrInvalidGender, ErrInvalidDateFormat, ErrAgeTooYoung, ErrInvalidBirthDate, ErrInvalidProvince, ErrTooManyInterests, ErrInvalidInterest):
 		return http.StatusBadRequest
 	// 401 Unauthorized
 	case isErrorType(err, ErrInvalidCredentials, ErrInvalidToken, ErrInvalidClaims, ErrInvalidIssuer, ErrInvalidAudience, ErrTokenInvalidated):
@@ -67,7 +68,7 @@ func StatusFromError(err error) int {
 	case isErrorType(err, ErrForbidden, ErrUserInactive, ErrUserNotMember, ErrEmailNotVerified):
 		return http.StatusForbidden
 	// 404 Not Found
-	case isErrorType(err, ErrUserNotFound, ErrCommunityNotFound, ErrMembershipNotFound):
+	case isErrorType(err, ErrUserNotFound, ErrCommunityNotFound, ErrCommunityDeleted, ErrMembershipNotFound):
 		return http.StatusNotFound
 	// 409 Conflict
 	case isErrorType(err, ErrUsernameExists, ErrEmailExists, ErrCommunityNameExists, ErrAlreadyMember, ErrEmailAlreadyVerified, ErrLoginMethodMismatch):
@@ -108,9 +109,19 @@ var (
 	ErrEmailExists    = AppError{Code: "EMAIL_EXISTS", Message: "Email already exists"}
 	ErrUserInactive   = AppError{Code: "USER_INACTIVE", Message: "User account is inactive"}
 
+	// Profile validation
+	ErrInvalidGender     = AppError{Code: "INVALID_GENDER", Message: "Invalid gender value"}
+	ErrInvalidDateFormat = AppError{Code: "INVALID_DATE_FORMAT", Message: "Invalid date format, use YYYY-MM-DD"}
+	ErrAgeTooYoung       = AppError{Code: "AGE_TOO_YOUNG", Message: "Must be at least 13 years old"}
+	ErrInvalidBirthDate  = AppError{Code: "INVALID_BIRTH_DATE", Message: "Invalid birth date"}
+	ErrInvalidProvince   = AppError{Code: "INVALID_PROVINCE", Message: "Invalid province"}
+	ErrTooManyInterests  = AppError{Code: "TOO_MANY_INTERESTS", Message: "Maximum 10 interests allowed"}
+	ErrInvalidInterest   = AppError{Code: "INVALID_INTEREST", Message: "Invalid interest"}
+
 	// Community-related
 	ErrCommunityNotFound   = AppError{Code: "COMMUNITY_NOT_FOUND", Message: "Community not found"}
 	ErrCommunityNameExists = AppError{Code: "COMMUNITY_NAME_EXISTS", Message: "Community name already exists"}
+	ErrCommunityDeleted    = AppError{Code: "COMMUNITY_DELETED", Message: "Community has been deleted"}
 	ErrUserNotMember       = AppError{Code: "USER_NOT_MEMBER", Message: "User is not a member of this community"}
 
 	// Membership-related

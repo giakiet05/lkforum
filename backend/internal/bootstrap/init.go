@@ -6,6 +6,7 @@ import (
 	"github.com/giakiet05/lkforum/internal/auth"
 	"github.com/giakiet05/lkforum/internal/config"
 	"github.com/giakiet05/lkforum/internal/controller"
+	"github.com/giakiet05/lkforum/internal/middleware"
 	"github.com/giakiet05/lkforum/internal/platform/bus"
 	"github.com/giakiet05/lkforum/internal/platform/email"
 	"github.com/giakiet05/lkforum/internal/platform/ws"
@@ -29,6 +30,7 @@ type Repos struct {
 	repo.ChannelRepo
 	repo.MessageRepo
 	repo.PostHistoryRepo
+	repo.EmailVerificationRepo
 }
 
 type Services struct {
@@ -61,24 +63,25 @@ type Controllers struct {
 
 func initRepos(client *mongo.Client, db *mongo.Database) *Repos {
 	return &Repos{
-		UserRepo:         repo.NewUserRepo(db),
-		CommunityRepo:    repo.NewCommunityRepo(db),
-		MembershipRepo:   repo.NewMembershipRepo(db),
-		PostRepo:         repo.NewPostRepo(db),
-		PostVoteRepo:     repo.NewPostVoteRepo(client, db),
-		PollVoteRepo:     repo.NewPollVoteRepo(client, db),
-		CommentRepo:      repo.NewCommentRepo(db),
-		NotificationRepo: repo.NewNotificationRepo(db),
-		ChannelRepo:      repo.NewChannelRepo(db),
-		MessageRepo:      repo.NewMessageRepo(db),
-		PostHistoryRepo:  repo.NewPostHistoryRepo(db),
+		UserRepo:              repo.NewUserRepo(db),
+		CommunityRepo:         repo.NewCommunityRepo(db),
+		MembershipRepo:        repo.NewMembershipRepo(db),
+		PostRepo:              repo.NewPostRepo(db),
+		PostVoteRepo:          repo.NewPostVoteRepo(client, db),
+		PollVoteRepo:          repo.NewPollVoteRepo(client, db),
+		CommentRepo:           repo.NewCommentRepo(db),
+		NotificationRepo:      repo.NewNotificationRepo(db),
+		ChannelRepo:           repo.NewChannelRepo(db),
+		MessageRepo:           repo.NewMessageRepo(db),
+		PostHistoryRepo:       repo.NewPostHistoryRepo(db),
+		EmailVerificationRepo: repo.NewEmailVerificationRepo(db),
 	}
 }
 
 func initServices(repos *Repos, redisClient *redis.Client, emailSender email.Sender, eventBus *bus.EventBus) *Services {
 	return &Services{
-		AuthService:         service.NewAuthService(repos.UserRepo, emailSender),
-		UserService:         service.NewUserService(repos.UserRepo, eventBus),
+		AuthService:         service.NewAuthService(repos.UserRepo, repos.EmailVerificationRepo, emailSender, redisClient),
+		UserService:         service.NewUserService(repos.UserRepo, eventBus, redisClient),
 		CommunityService:    service.NewCommunityService(repos.CommunityRepo, eventBus),
 		MembershipService:   service.NewMembershipService(repos.MembershipRepo, redisClient),
 		PostService:         service.NewPostService(repos.PostRepo, repos.PostVoteRepo, repos.PollVoteRepo, repos.UserRepo, repos.CommunityRepo, eventBus),
@@ -117,7 +120,7 @@ func initRoutes(controllers *Controllers, r *gin.Engine) {
 		c.JSON(200, gin.H{"message": "Welcome to LKForum API!"})
 	})
 
-	userroute.RegisterAuthRoutes(api, &controllers.AuthController)
+	userroute.RegisterAuthRoutes(api, &controllers.AuthController, &controllers.UserController)
 	userroute.RegisterUserRoutes(api, &controllers.UserController)
 	userroute.RegisterCommunityRoutes(api, &controllers.CommunityController)
 	userroute.RegisterMembershipRoutes(api, &controllers.MembershipController)
@@ -163,6 +166,10 @@ func Init() (*gin.Engine, error) {
 	repos := initRepos(client, db)
 	services := initServices(repos, redisClient, emailSender, eventBus)
 	controllers := initControllers(services, wsHub)
+
+	// Inject userRepo into middleware for settings caching
+	middleware.SetUserRepo(repos.UserRepo)
+
 	initRoutes(controllers, router)
 
 	// Start background services

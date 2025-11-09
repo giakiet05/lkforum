@@ -1,10 +1,13 @@
 package controller
 
 import (
+	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/giakiet05/lkforum/internal/apperror"
 	"github.com/giakiet05/lkforum/internal/auth"
+	"github.com/giakiet05/lkforum/internal/config"
 	"github.com/giakiet05/lkforum/internal/dto"
 	"github.com/giakiet05/lkforum/internal/service"
 	"github.com/gin-gonic/gin"
@@ -21,22 +24,22 @@ func NewAuthController(authService service.AuthService) *AuthController {
 	return &AuthController{authService: authService}
 }
 
-// --- Local Authentication ---
+// --- Local Authentication - New Flow (Verify Email First) ---
 
-func (c *AuthController) RegisterUser(ctx *gin.Context) {
-	var req dto.UserRegisterRequest
+func (c *AuthController) SendEmailVerification(ctx *gin.Context) {
+	var req dto.SendEmailVerificationRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		dto.SendError(ctx, http.StatusBadRequest, apperror.Message(apperror.ErrBadRequest), apperror.ErrBadRequest.Code)
 		return
 	}
 
-	user, err := c.authService.RegisterUser(req.Username, req.Email, req.Password)
+	err := c.authService.SendEmailVerification(req.Email)
 	if err != nil {
 		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
 	}
 
-	dto.SendSuccess(ctx, http.StatusCreated, "Registration successful. Please check your email for a verification code.", gin.H{"user_id": user.ID.Hex()})
+	dto.SendSuccess(ctx, http.StatusOK, "Verification code sent to your email. Please check your inbox.", nil)
 }
 
 func (c *AuthController) Login(ctx *gin.Context) {
@@ -60,14 +63,31 @@ func (c *AuthController) Login(ctx *gin.Context) {
 	dto.SendSuccess(ctx, http.StatusOK, "Login successful", data)
 }
 
-func (c *AuthController) VerifyEmail(ctx *gin.Context) {
-	var req dto.VerifyEmailRequest
+func (c *AuthController) VerifyEmailCode(ctx *gin.Context) {
+	var req dto.VerifyEmailCodeRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		dto.SendError(ctx, http.StatusBadRequest, apperror.Message(apperror.ErrBadRequest), apperror.ErrBadRequest.Code)
 		return
 	}
 
-	user, accessToken, refreshToken, err := c.authService.VerifyEmail(req.Email, req.OTP)
+	verificationToken, err := c.authService.VerifyEmailCode(req.Email, req.OTP)
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
+		return
+	}
+
+	data := gin.H{"verification_token": verificationToken}
+	dto.SendSuccess(ctx, http.StatusOK, "Email verified successfully. You can now complete your registration.", data)
+}
+
+func (c *AuthController) CompleteRegistration(ctx *gin.Context) {
+	var req dto.CompleteRegistrationRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		dto.SendError(ctx, http.StatusBadRequest, apperror.Message(apperror.ErrBadRequest), apperror.ErrBadRequest.Code)
+		return
+	}
+
+	user, accessToken, refreshToken, err := c.authService.CompleteRegistration(req.VerificationToken, req.Username, req.Password)
 	if err != nil {
 		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
@@ -78,23 +98,23 @@ func (c *AuthController) VerifyEmail(ctx *gin.Context) {
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
 	}
-	dto.SendSuccess(ctx, http.StatusOK, "Email verified successfully. You are now logged in.", data)
+	dto.SendSuccess(ctx, http.StatusCreated, "Registration completed successfully. You are now logged in.", data)
 }
 
-func (c *AuthController) ResendVerificationEmail(ctx *gin.Context) {
-	var req dto.ResendVerificationEmailRequest
+func (c *AuthController) ResendOTP(ctx *gin.Context) {
+	var req dto.ResendOTPRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		dto.SendError(ctx, http.StatusBadRequest, apperror.Message(apperror.ErrBadRequest), apperror.ErrBadRequest.Code)
 		return
 	}
 
-	err := c.authService.ResendVerificationEmail(req.Email)
+	err := c.authService.ResendOTP(req.Email)
 	if err != nil {
 		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
 	}
 
-	dto.SendSuccess(ctx, http.StatusOK, "A new verification email has been sent.", nil)
+	dto.SendSuccess(ctx, http.StatusOK, "A new verification code has been sent to your email.", nil)
 }
 
 func (c *AuthController) RefreshToken(ctx *gin.Context) {
@@ -117,6 +137,22 @@ func (c *AuthController) RefreshToken(ctx *gin.Context) {
 	dto.SendSuccess(ctx, http.StatusOK, "Tokens refreshed successfully", data)
 }
 
+func (c *AuthController) Logout(ctx *gin.Context) {
+	var req dto.LogoutRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		dto.SendError(ctx, http.StatusBadRequest, apperror.Message(apperror.ErrBadRequest), apperror.ErrBadRequest.Code)
+		return
+	}
+
+	err := c.authService.Logout(req.AccessToken, req.RefreshToken)
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
+		return
+	}
+
+	dto.SendSuccess(ctx, http.StatusOK, "Logged out successfully", nil)
+}
+
 // --- Google OAuth ---
 
 func (c *AuthController) GoogleLogin(ctx *gin.Context) {
@@ -128,36 +164,40 @@ func (c *AuthController) GoogleLogin(ctx *gin.Context) {
 func (c *AuthController) GoogleCallback(ctx *gin.Context) {
 	code := ctx.Query("code")
 	if code == "" {
-		dto.SendError(ctx, http.StatusBadRequest, "Authorization code not provided", "MISSING_AUTH_CODE")
+		// Redirect to FE with error
+		redirectURL := fmt.Sprintf("%s/auth/error?message=missing_auth_code", config.Cfg.FrontendURL)
+		ctx.Redirect(http.StatusTemporaryRedirect, redirectURL)
 		return
 	}
 
 	result, err := c.authService.ProcessGoogleCallback(code)
 	if err != nil {
-		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
+		// Redirect to FE with error
+		redirectURL := fmt.Sprintf("%s/auth/error?message=%s", config.Cfg.FrontendURL, url.QueryEscape(apperror.Message(err)))
+		ctx.Redirect(http.StatusTemporaryRedirect, redirectURL)
 		return
 	}
 
 	switch result.Status {
 	case service.StatusLoginSuccess:
-		data := dto.AuthResponse{
-			User:         dto.FromUser(result.User),
-			AccessToken:  result.AccessToken,
-			RefreshToken: result.RefreshToken,
-		}
-		dto.SendSuccess(ctx, http.StatusOK, "Login successful", data)
+		// Redirect to FE with tokens in hash fragment
+		redirectURL := fmt.Sprintf("%s/auth/callback#access_token=%s&refresh_token=%s",
+			config.Cfg.FrontendURL,
+			url.QueryEscape(result.AccessToken),
+			url.QueryEscape(result.RefreshToken))
+		ctx.Redirect(http.StatusTemporaryRedirect, redirectURL)
 
 	case service.StatusSetupRequired:
-		data := gin.H{"setup_token": result.SetupToken}
-		ctx.AbortWithStatusJSON(http.StatusPreconditionRequired, dto.ApiResponse{
-			Success:   false,
-			Message:   "User requires setup. Please choose a username.",
-			Data:      data,
-			ErrorCode: "USER_SETUP_REQUIRED",
-		})
+		// Redirect to FE with setup_token in hash fragment
+		redirectURL := fmt.Sprintf("%s/auth/google-setup#setup_token=%s",
+			config.Cfg.FrontendURL,
+			url.QueryEscape(result.SetupToken))
+		ctx.Redirect(http.StatusTemporaryRedirect, redirectURL)
 
 	default:
-		dto.SendError(ctx, http.StatusInternalServerError, "An unknown error occurred during Google login", apperror.ErrInternal.Code)
+		// Redirect to FE with error
+		redirectURL := fmt.Sprintf("%s/auth/error?message=unknown_error", config.Cfg.FrontendURL)
+		ctx.Redirect(http.StatusTemporaryRedirect, redirectURL)
 	}
 }
 

@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"errors"
 	"mime/multipart"
 	"time"
 
@@ -18,9 +17,7 @@ import (
 )
 
 var (
-	ErrPermissionDenied = errors.New("user does not have permission to perform this action")
-	ErrInvalidInput     = errors.New("invalid input provided")
-	ErrPostNotFound     = repo.ErrPostNotFound
+	ErrPostNotFound = repo.ErrPostNotFound
 )
 
 // PostService defines the business logic for post-related operations.
@@ -91,7 +88,7 @@ func (s *postService) CreatePost(userID string, req *dto.CreatePostRequest) (*dt
 		return nil, apperror.ErrCommunityNotFound
 	}
 	if community.IsDeleted {
-		return nil, errors.New("community is deleted")
+		return nil, apperror.ErrCommunityDeleted
 	}
 
 	post := &model.Post{
@@ -226,7 +223,7 @@ func (s *postService) UpdatePost(postID string, userID string, req *dto.UpdatePo
 		return nil, err
 	}
 	if post.AuthorID.Hex() != userID {
-		return nil, ErrPermissionDenied
+		return nil, apperror.ErrForbidden
 	}
 
 	update := repo.UpdateDocument{"$set": bson.M{}}
@@ -261,7 +258,7 @@ func (s *postService) DeletePost(postID string, userID string) error {
 		return err
 	}
 	if post.AuthorID.Hex() != userID {
-		return ErrPermissionDenied
+		return apperror.ErrForbidden
 	}
 	return s.postRepo.SoftDelete(ctx, postID)
 }
@@ -275,35 +272,12 @@ func (s *postService) AddImagesToPost(userID, postID string, form *multipart.For
 		return nil, err
 	}
 	if post.AuthorID.Hex() != userID {
-		return nil, ErrPermissionDenied
+		return nil, apperror.ErrForbidden
 	}
 
-	files := form.File["images"]
-	if len(files) == 0 {
-		return nil, errors.New("no images provided")
-	}
-
-	var uploadedImages []*model.Image
-	for _, fileHeader := range files {
-		file, err := fileHeader.Open()
-		if err != nil {
-			continue
-		}
-		defer file.Close()
-
-		result, err := cloudinary.Upload(file, fileHeader)
-		if err != nil {
-			continue
-		}
-		uploadedImages = append(uploadedImages, &model.Image{
-			URL:        result.SecureURL,
-			PublicID:   result.PublicID,
-			UploadedAt: time.Now(),
-		})
-	}
-
-	if len(uploadedImages) == 0 {
-		return nil, errors.New("all image uploads failed")
+	uploadedImages, err := cloudinary.UploadImages(form.File["images"])
+	if err != nil {
+		return nil, err
 	}
 
 	update := repo.UpdateDocument{"$push": bson.M{"content.images": bson.M{"$each": uploadedImages}}}
@@ -323,7 +297,7 @@ func (s *postService) RemoveImagesFromPost(userID, postID string, publicIDs []st
 		return err
 	}
 	if post.AuthorID.Hex() != userID {
-		return ErrPermissionDenied
+		return apperror.ErrForbidden
 	}
 
 	update := repo.UpdateDocument{"$pull": bson.M{"content.images": bson.M{"public_id": bson.M{"$in": publicIDs}}}}
@@ -347,7 +321,7 @@ func (s *postService) VoteOnPost(userID, postID string, voteValue bool) (*dto.Vo
 		return nil, err
 	}
 	if post.AuthorID.Hex() == userID {
-		return nil, ErrPermissionDenied
+		return nil, apperror.ErrForbidden
 	}
 
 	prevVote, _ := s.postVoteRepo.GetUserVote(ctx, userID, postID)
@@ -396,7 +370,7 @@ func (s *postService) AddPollOptions(userID, postID string, options []string) (*
 		return nil, err
 	}
 	if post.AuthorID.Hex() != userID {
-		return nil, ErrPermissionDenied
+		return nil, apperror.ErrForbidden
 	}
 
 	newOptions := make([]model.PollOption, len(options))
@@ -421,7 +395,7 @@ func (s *postService) RemovePollOptions(userID, postID string, optionIDs []strin
 		return nil, err
 	}
 	if post.AuthorID.Hex() != userID {
-		return nil, ErrPermissionDenied
+		return nil, apperror.ErrForbidden
 	}
 
 	update := repo.UpdateDocument{"$pull": bson.M{"content.poll.options": bson.M{"id": bson.M{"$in": optionIDs}}}}
@@ -441,7 +415,7 @@ func (s *postService) UpdatePoll(userID, postID string, req *dto.UpdatePollReque
 		return nil, err
 	}
 	if post.AuthorID.Hex() != userID {
-		return nil, ErrPermissionDenied
+		return nil, apperror.ErrForbidden
 	}
 
 	updateData := bson.M{}
@@ -476,7 +450,7 @@ func (s *postService) UpdatePollOption(userID, postID, optionID string, req *dto
 		return nil, err
 	}
 	if post.AuthorID.Hex() != userID {
-		return nil, ErrPermissionDenied
+		return nil, apperror.ErrForbidden
 	}
 
 	filter := repo.Filter{"_id": post.ID, "content.poll.options.id": optionID}
