@@ -16,21 +16,16 @@
   // UI state
   let loading = false;
   let error: string | null = null;
-  let step: "register" | "verify" = "register"; // Step 1: register → Step 2: verify OTP
+  let step: "email" | "otp" | "register" = "email"; // Step 1: email → Step 2: otp → Step 3: register
 
   function togglePasswordVisibility() {
     showPassword = !showPassword;
   }
 
-  // Step 1: Đăng ký - nhập email, username, password → backend gửi OTP
-  async function handleRegisterSubmit() {
-    // validate cơ bản
-    if (!email || !username || !password || !confirmPassword) {
-      error = "Vui lòng điền đầy đủ thông tin";
-      return;
-    }
-    if (password !== confirmPassword) {
-      error = "Mật khẩu xác nhận không khớp!";
+  // Step 1: Nhập Email → Backend gửi OTP
+  async function handleEmailSubmit() {
+    if (!email) {
+      error = "Vui lòng nhập email";
       return;
     }
 
@@ -38,39 +33,23 @@
     error = null;
 
     try {
-      const res = await fetch(`${API_BASE_URL}/api/auth/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, username, password }),
-      });
+      // TODO: Gọi API backend để gửi OTP
+      // const res = await fetch(`${API_BASE_URL}/api/auth/send-otp`, {
+      //   method: "POST",
+      //   headers: { "Content-Type": "application/json" },
+      //   body: JSON.stringify({ email }),
+      // });
 
-      if (!res.ok) {
-        let errObj: any = {};
-        try {
-          errObj = await res.json();
-        } catch {
-          try {
-            const text = await res.text();
-            errObj = { error: text || `HTTP ${res.status}` };
-          } catch {
-            errObj = { error: `HTTP ${res.status}` };
-          }
-        }
-        throw errObj.error || errObj.message || "Lỗi đăng ký";
-      }
+      // Mock: Giả lập gửi OTP thành công
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      console.log("Mock: OTP sent to", email);
 
-      const data = await res.json();
-      console.log("Register response:", data);
-
-      // Chuyển sang step verify OTP
-      step = "verify";
+      // Chuyển sang step nhập OTP
+      step = "otp";
       error = null;
     } catch (err: any) {
-      console.error("Register error:", err);
-      if (typeof err === "string") error = err;
-      else if (err && (err.message || err.error))
-        error = err.message || err.error;
-      else error = "Lỗi khi đăng ký. Vui lòng thử lại.";
+      console.error("Send OTP error:", err);
+      error = "Không thể gửi mã OTP. Vui lòng thử lại.";
     } finally {
       loading = false;
     }
@@ -87,55 +66,80 @@
     error = null;
 
     try {
-      const res = await fetch(`${API_BASE_URL}/api/auth/verify-email`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, otp }),
-      });
+      // TODO: Gọi API backend để verify OTP
+      // const res = await fetch(`${API_BASE_URL}/api/auth/verify-otp`, {
+      //   method: "POST",
+      //   headers: { "Content-Type": "application/json" },
+      //   body: JSON.stringify({ email, otp }),
+      // });
 
-      if (!res.ok) {
-        let errObj: any = {};
-        try {
-          errObj = await res.json();
-        } catch {
-          try {
-            const text = await res.text();
-            errObj = { error: text || `HTTP ${res.status}` };
-          } catch {
-            errObj = { error: `HTTP ${res.status}` };
-          }
-        }
-        throw errObj.error || errObj.message || "Mã OTP không đúng";
-      }
+      // Mock: Giả lập verify thành công
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      console.log("Mock: OTP verified for", email);
 
-      const data = await res.json();
-      console.log("Verify OTP response:", data);
+      // Chuyển sang step đăng ký (username + password)
+      step = "register";
+      error = null;
+    } catch (err: any) {
+      console.error("Verify OTP error:", err);
+      error = "Mã OTP không đúng. Vui lòng thử lại.";
+    } finally {
+      loading = false;
+    }
+  }
+
+  // Step 3: Đăng ký - nhập username, password
+  async function handleRegisterSubmit() {
+    if (!username || !password || !confirmPassword) {
+      error = "Vui lòng điền đầy đủ thông tin";
+      return;
+    }
+    if (password !== confirmPassword) {
+      error = "Mật khẩu xác nhận không khớp!";
+      return;
+    }
+
+    loading = true;
+    error = null;
+
+    try {
+      // TODO: Gọi API backend để hoàn tất đăng ký
+      // const res = await fetch(`${API_BASE_URL}/api/auth/complete-register`, {
+      //   method: "POST",
+      //   headers: { "Content-Type": "application/json" },
+      //   body: JSON.stringify({ email, username, password }),
+      // });
+
+      // Mock: Giả lập đăng ký thành công với tokens
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const mockData = {
+        user: {
+          id: "mock-user-id",
+          email: email,
+          username: username,
+          role: "user",
+          is_verified: true,
+        },
+        access_token: "mock-access-token-" + Date.now(),
+        refresh_token: "mock-refresh-token-" + Date.now(),
+      };
+
+      console.log("Mock: Register complete", mockData);
 
       // Lưu tokens và user vào localStorage
-      if (data.access_token) {
-        localStorage.setItem("access_token", data.access_token);
-      }
-      if (data.refresh_token) {
-        localStorage.setItem("refresh_token", data.refresh_token);
-      }
-      if (data.user) {
-        localStorage.setItem("user", JSON.stringify(data.user));
-      }
+      localStorage.setItem("access_token", mockData.access_token);
+      localStorage.setItem("refresh_token", mockData.refresh_token);
+      localStorage.setItem("user", JSON.stringify(mockData.user));
 
-      // Update authStore để UI hiển thị avatar ngay lập tức
-      if (data.user && data.access_token) {
-        setAuth(data.user, data.access_token);
-      }
+      // Update authStore
+      setAuth(mockData.user, mockData.access_token);
 
       // Redirect về trang chính
       alert("Đăng ký thành công! Chào mừng bạn đến với LKForum.");
       push("/");
     } catch (err: any) {
       console.error("Register error:", err);
-      if (typeof err === "string") error = err;
-      else if (err && (err.message || err.error))
-        error = err.message || err.error;
-      else error = "Lỗi khi đăng ký. Vui lòng thử lại.";
+      error = "Lỗi khi đăng ký. Vui lòng thử lại.";
     } finally {
       loading = false;
     }
@@ -146,18 +150,16 @@
     error = null;
 
     try {
-      const res = await fetch(
-        `${API_BASE_URL}/api/auth/resend-verification-email`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email }),
-        }
-      );
+      // TODO: Gọi API backend để gửi lại OTP
+      // const res = await fetch(`${API_BASE_URL}/api/auth/resend-otp`, {
+      //   method: "POST",
+      //   headers: { "Content-Type": "application/json" },
+      //   body: JSON.stringify({ email }),
+      // });
 
-      if (!res.ok) {
-        throw new Error("Không thể gửi lại mã OTP");
-      }
+      // Mock: Giả lập gửi lại OTP
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      console.log("Mock: Resend OTP to", email);
 
       alert("Mã OTP mới đã được gửi đến email của bạn!");
       error = null;
@@ -169,9 +171,17 @@
     }
   }
 
-  function handleBackToRegister() {
-    step = "register";
+  function handleBackToEmail() {
+    step = "email";
     otp = "";
+    error = null;
+  }
+
+  function handleBackToOTP() {
+    step = "otp";
+    username = "";
+    password = "";
+    confirmPassword = "";
     error = null;
   }
 </script>
@@ -187,14 +197,12 @@
       <span>LKForum</span>
     </a>
     <div class="form-wrapper">
-      {#if step === "register"}
+      {#if step === "email"}
+        <!-- Step 1: Nhập Email -->
         <h2 style="color:black;">Tạo tài khoản mới</h2>
-        <p>Tham gia cộng đồng LKForum ngay hôm nay.</p>
+        <p>Nhập email để bắt đầu đăng ký tài khoản LKForum.</p>
 
-        <form
-          on:submit|preventDefault={handleRegisterSubmit}
-          class="register-form"
-        >
+        <form on:submit|preventDefault={handleEmailSubmit} class="email-form">
           <div class="input-group">
             <label for="email">Email</label>
             <input
@@ -202,9 +210,90 @@
               id="email"
               bind:value={email}
               placeholder="Nhập email của bạn"
+              required
             />
           </div>
 
+          {#if error}
+            <div class="error" role="alert">{error}</div>
+          {/if}
+
+          <Button
+            type="submit"
+            label={loading ? "Đang gửi..." : "Tiếp Tục"}
+            variant="primary"
+            disabled={loading}
+          />
+        </form>
+
+        <p class="login-link">
+          Đã có tài khoản? <a href="/#/login">Đăng nhập</a>
+        </p>
+      {:else if step === "otp"}
+        <!-- Step 2: Verify OTP -->
+        <h2 style="color:black;">Xác thực Email</h2>
+        <p>Chúng tôi đã gửi mã OTP đến <strong>{email}</strong></p>
+        <p class="otp-hint">
+          Vui lòng kiểm tra hộp thư và nhập mã gồm 6 chữ số
+        </p>
+
+        <form on:submit|preventDefault={handleVerifyOTP} class="verify-form">
+          <div class="input-group">
+            <label for="otp">Mã OTP</label>
+            <input
+              type="text"
+              id="otp"
+              bind:value={otp}
+              placeholder="Nhập 6 chữ số"
+              maxlength="6"
+              class="otp-input"
+              required
+            />
+          </div>
+
+          {#if error}
+            <div class="error" role="alert">{error}</div>
+          {/if}
+
+          <Button
+            type="submit"
+            label={loading ? "Đang xác thực..." : "Xác Nhận"}
+            variant="primary"
+            disabled={loading}
+          />
+        </form>
+
+        <div class="otp-actions">
+          <button
+            type="button"
+            class="link-btn"
+            on:click={handleResendOTP}
+            disabled={loading}
+          >
+            Gửi lại mã OTP
+          </button>
+          <button
+            type="button"
+            class="link-btn"
+            on:click={handleBackToEmail}
+            disabled={loading}
+          >
+            Quay lại
+          </button>
+        </div>
+
+        <p class="login-link">
+          Đã có tài khoản? <a href="/#/login">Đăng nhập</a>
+        </p>
+      {:else if step === "register"}
+        <!-- Step 3: Đăng ký Username + Password -->
+        <h2 style="color:black;">Hoàn tất đăng ký</h2>
+        <p>Tạo tên đăng nhập và mật khẩu cho tài khoản của bạn.</p>
+
+        <form
+          on:submit|preventDefault={handleRegisterSubmit}
+          class="register-form"
+        >
           <div class="input-group">
             <label for="username">Tên đăng nhập</label>
             <input
@@ -212,6 +301,7 @@
               id="username"
               bind:value={username}
               placeholder="Chọn một tên đăng nhập"
+              required
             />
           </div>
 
@@ -222,10 +312,13 @@
               id="password"
               bind:value={password}
               placeholder="Tạo mật khẩu"
+              required
             />
             <span
               class="password-toggle-icon"
               on:click={togglePasswordVisibility}
+              role="button"
+              tabindex="0"
             >
               {#if showPassword}
                 <svg
@@ -270,6 +363,7 @@
               id="confirmPassword"
               bind:value={confirmPassword}
               placeholder="Nhập lại mật khẩu"
+              required
             />
           </div>
 
@@ -279,43 +373,7 @@
 
           <Button
             type="submit"
-            label={loading ? "Đang đăng ký..." : "Đăng Ký"}
-            variant="primary"
-            disabled={loading}
-          />
-        </form>
-
-        <p class="login-link">
-          Đã có tài khoản? <a href="/#/login">Đăng nhập</a>
-        </p>
-      {:else}
-        <!-- Step 2: Verify OTP -->
-        <h2 style="color:black;">Xác thực Email</h2>
-        <p>Chúng tôi đã gửi mã OTP đến <strong>{email}</strong></p>
-        <p class="otp-hint">
-          Vui lòng kiểm tra hộp thư và nhập mã gồm 6 chữ số
-        </p>
-
-        <form on:submit|preventDefault={handleVerifyOTP} class="verify-form">
-          <div class="input-group">
-            <label for="otp">Mã OTP</label>
-            <input
-              type="text"
-              id="otp"
-              bind:value={otp}
-              placeholder="Nhập 6 chữ số"
-              maxlength="6"
-              class="otp-input"
-            />
-          </div>
-
-          {#if error}
-            <div class="error" role="alert">{error}</div>
-          {/if}
-
-          <Button
-            type="submit"
-            label={loading ? "Đang xác thực..." : "Xác Nhận"}
+            label={loading ? "Đang đăng ký..." : "Hoàn Tất"}
             variant="primary"
             disabled={loading}
           />
@@ -325,15 +383,7 @@
           <button
             type="button"
             class="link-btn"
-            on:click={handleResendOTP}
-            disabled={loading}
-          >
-            Gửi lại mã OTP
-          </button>
-          <button
-            type="button"
-            class="link-btn"
-            on:click={handleBackToRegister}
+            on:click={handleBackToOTP}
             disabled={loading}
           >
             Quay lại
@@ -428,13 +478,22 @@
     outline: none;
     border-bottom-color: var(--primary-color);
   }
-  .signin-link {
-    /* Đổi tên từ signup-link */
+
+  .error {
+    background-color: #fee;
+    color: #c33;
+    padding: 0.75rem;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+    font-size: 0.9em;
+  }
+
+  .login-link {
     text-align: center;
     margin-top: 2rem;
     color: #555;
   }
-  .signin-link a {
+  .login-link a {
     color: var(--primary-color);
     text-decoration: none;
     font-weight: 600;
