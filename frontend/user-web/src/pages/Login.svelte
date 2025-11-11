@@ -1,16 +1,13 @@
 <script lang="ts">
   import { createEventDispatcher } from "svelte";
   import Button from "../components/Button.svelte";
-  import type { RegisterDto } from "../dtos/auth-dto";
+  import type {CompleteRegistrationRequest, LoginRequest} from "../dtos/auth-dto";
 
-  export type LoginData = {
-    identifier: string;
-    password: string;
-  };
+
 
   export type Props = {
     mode?: "login" | "register";
-    onSubmit: (data: LoginData | RegisterDto) => void;
+    onSubmit: (data: LoginRequest| CompleteRegistrationRequest) => void;
     isLoading?: boolean;
     error?: string;
   };

@@ -132,7 +132,7 @@
       localStorage.setItem("user", JSON.stringify(mockData.user));
 
       // Update authStore
-      setAuth(mockData.user, mockData.access_token);
+      setAuth(mockData.user);
 
       // Redirect về trang chính
       alert("Đăng ký thành công! Chào mừng bạn đến với LKForum.");

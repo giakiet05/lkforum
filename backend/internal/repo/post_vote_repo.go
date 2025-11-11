@@ -12,8 +12,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-var ErrVoteNotFound = errors.New("vote not found")
-
 type PostVoteRepo interface {
 	Vote(ctx context.Context, userID, postID string, voteValue bool) error
 	RemoveVote(ctx context.Context, userID, postID string) error
@@ -204,7 +202,7 @@ func (r *postVoteRepo) RemoveVote(ctx context.Context, userID, postID string) er
 			return nil, err
 		}
 		if voteToRemove == nil {
-			return nil, ErrVoteNotFound
+			return nil, apperror.ErrVoteNotFound
 		}
 		return nil, r.removeVoteInTransaction(sessCtx, voteToRemove)
 	}

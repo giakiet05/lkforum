@@ -3,7 +3,7 @@
   import { push } from "svelte-spa-router";
   import Post from "../components/Post.svelte";
   import CreatePostModal from "../components/CreatePostModal.svelte";
-  import type { PostData } from "../types/post";
+  import type { PostResponse } from "../dtos/post-dto"
   import { mockCommunityRules } from "../mocks/community-rules.mock";
 
   type CommunityProps = {
@@ -34,7 +34,11 @@
   };
 
   // Mock posts for this community
-  const posts: PostData[] = [
+  // TODO: Replace with API call
+  const posts: PostResponse[] = [];
+
+  /* Old mock data
+  const posts: PostResponse[] = [
     {
       id: "1",
       type: "text",
@@ -61,6 +65,7 @@
       images: ["/GirlFromNowhere.jpg"],
     },
   ];
+  */
 
   function toggleJoin() {
     isJoined = !isJoined;

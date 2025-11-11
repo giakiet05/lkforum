@@ -3,9 +3,10 @@
   import routes from "./routes";
   import Topbar from "./components/Topbar.svelte";
   import Sidebar from "./components/Sidebar.svelte";
-  import { authStore } from "./stores/auth-store";
-  import { logout } from "./services/auth-service";
+  import { authStore, getInitialAuthState } from "./stores/auth-store";
+  import { logout, validateAuth } from "./services/auth-service";
   import { push } from "svelte-spa-router";
+  import { onMount } from "svelte";
 
   const sidebarItems = [
     {
@@ -37,6 +38,33 @@
     | { name: string; avatar?: string; karma?: number }
     | undefined = undefined;
 
+  let isAuthChecking = true;
+
+  // Validate auth khi app khởi động
+  onMount(async () => {
+    await validateAuth();
+    isAuthChecking = false;
+  });
+
+  // Listen event từ token.ts khi refresh token thành công
+  onMount(() => {
+    const handleAuthRefreshed = () => {
+      authStore.set(getInitialAuthState());
+    };
+
+    const handleAuthUnauthorized = () => {
+      logout();
+    };
+
+    window.addEventListener("auth:refreshed", handleAuthRefreshed);
+    window.addEventListener("auth:unauthorized", handleAuthUnauthorized);
+
+    return () => {
+      window.removeEventListener("auth:refreshed", handleAuthRefreshed);
+      window.removeEventListener("auth:unauthorized", handleAuthUnauthorized);
+    };
+  });
+
   // Subscribe to authStore để update realtime khi login/logout
   authStore.subscribe((state) => {
     if (state.user) {
@@ -51,7 +79,6 @@
   });
 
   function handleLogout() {
-    alert("Đăng xuất!");
     logout();
   }
 
@@ -60,25 +87,61 @@
   }
 </script>
 
-<div class="app-layout">
-  <Topbar user={topbarUser} onLogout={handleLogout} />
+{#if isAuthChecking}
+  <div class="loading-screen">
+    <div class="loading-spinner"></div>
+    <p>Đang kiểm tra đăng nhập...</p>
+  </div>
+{:else}
+  <div class="app-layout">
+    <Topbar user={topbarUser} onLogout={handleLogout} />
 
-  <Sidebar
-    items={sidebarItems}
-    onNavigate={handleNavigate}
-    bind:compact={isSidebarCompact}
-  />
+    <Sidebar
+      items={sidebarItems}
+      onNavigate={handleNavigate}
+      bind:compact={isSidebarCompact}
+    />
 
-  <main class="main-content" data-compact={isSidebarCompact}>
-    <Router {routes} />
-  </main>
-</div>
+    <main class="main-content" data-compact={isSidebarCompact}>
+      <Router {routes} />
+    </main>
+  </div>
+{/if}
 
 <style>
   :root {
     --sidebar-width: 256px;
     --sidebar-compact-width: 64px;
     --topbar-height: 56px;
+  }
+
+  .loading-screen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    background-color: white;
+  }
+
+  .loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #ff4500;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+
+  .loading-screen p {
+    margin-top: 16px;
+    color: #666;
+    font-size: 14px;
   }
 
   .app-layout {

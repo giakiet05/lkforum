@@ -1,153 +1,142 @@
-import type { LoginRequest, LoginResponse, RegisterDto } from "../dtos/auth-dto";
 import type {
-    RefreshTokenRequest,
-    RefreshTokenResponse,
+    LoginRequest,
+    AuthResponse,
+    CompleteRegistrationRequest,
+    VerifyEmailRequest,
+    sendEmailVerificationRequest,
+    LogoutRequest,
+    CompleteGoogleSetupRequest
 } from "../dtos/auth-dto";
-import type { User } from "../models/user";
-import { setAuth, clearAuth } from "../stores/auth-store";
-import {
-    setAccessToken,
-    getAccessToken,
-    clearAccessToken,
-    setRefreshToken,
-    getRefreshToken,
-    clearRefreshToken,
-    setUser,
-    getUser,
-    clearUser
-} from "./storage-service";
+import {setAuth, clearAuth} from "../stores/auth-store";
+import {publicFetch, handleApiResponse, API_BASE_URL} from "./api";
+import {ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY, USER_KEY} from "../constants/auth-constants";
+import {getValidAccessToken, isTokenExpired} from "../auth/token";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
+// --- Authentication Flows ---
 
-// Check if user is logged in (has a valid access token)
-export function isLoggedIn(): boolean {
-  return !!getAccessToken();
+/**
+ * Validate auth state khi app khởi động
+ * Tự động refresh token nếu cần, hoặc clear auth nếu hết hạn
+ */
+export async function validateAuth(): Promise<void> {
+    const accessToken = localStorage.getItem(ACCESS_TOKEN_KEY);
+    const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+
+    // Không có token nào → chắc chắn chưa login
+    if (!accessToken && !refreshToken) {
+        clearAuth();
+        return;
+    }
+
+    // Có access token và còn hạn → OK
+    if (accessToken && !isTokenExpired(accessToken)) {
+        // User vẫn đang login, authStore đã đúng
+        return;
+    }
+
+    // Access token hết hạn, thử refresh
+    if (refreshToken) {
+        const newToken = await getValidAccessToken();
+        if (newToken) {
+            // Refresh thành công → update authStore
+            const user = localStorage.getItem(USER_KEY) ? JSON.parse(localStorage.getItem(USER_KEY)!) : null;
+            if (user) {
+                setAuth(user);
+            }
+            return;
+        }
+    }
+
+    // Refresh token cũng hết hạn hoặc không có → logout
+    clearAuth();
+    localStorage.removeItem(ACCESS_TOKEN_KEY);
+    localStorage.removeItem(REFRESH_TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
 }
 
-// Decode JWT token payload
-function decodeToken(token: string): any {
-  try {
-    const payload = token.split(".")[1];
-    const decoded = atob(payload);
-    return JSON.parse(decoded);
-  } catch {
-    return null;
-  }
+export async function sendVerificationEmail(email: string): Promise<void> {
+    const reqBody: sendEmailVerificationRequest = {email};
+    const res = await publicFetch(`/api/auth/local/send-verification`, {
+        method: "POST",
+        body: JSON.stringify(reqBody),
+    });
+    // We only care about success/failure, not the data
+    await handleApiResponse(res);
 }
 
-// Check if token is expired
-export function isTokenExpired(token: string): boolean {
-  const decoded = decodeToken(token);
-  if (!decoded || !decoded.exp) return true;
-  const now = Math.floor(Date.now() / 1000); // seconds
-  return decoded.exp < now;
+export async function verifyEmail(email: string, otp: string): Promise<string> {
+    const reqBody: VerifyEmailRequest = {email, otp};
+    const res = await publicFetch(`/api/auth/local/verify-email`, {
+        method: "POST",
+        body: JSON.stringify(reqBody),
+    });
+    const data = await handleApiResponse(res);
+    // Assuming the response data is { verification_token: "..." }
+    return data.verification_token;
 }
 
-// Get a valid access token, refresh if expired, return null if cannot refresh
-export async function getValidAccessToken(): Promise<string | null> {
-  const token = getAccessToken();
-  if (token && !isTokenExpired(token)) {
-    return token;
-  }
-
-  // If token is expired or missing, try to refresh
-  const refreshToken = getRefreshToken();
-  if (!refreshToken) {
-    return null;
-  }
-
-  const reqBody: RefreshTokenRequest = { refresh_token: refreshToken };
-
-  try {
-    const res = await fetch("/api/auth/refresh", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(reqBody),
+export async function completeRegistration(req: CompleteRegistrationRequest): Promise<AuthResponse> {
+    const res = await publicFetch(`/api/auth/local/complete-registration`, {
+        method: "POST",
+        body: JSON.stringify(req),
     });
 
-    if (!res.ok) return null;
-
-    const data: RefreshTokenResponse = await res.json();
-    setAccessToken(data.access_token); // Save new access token
-    setRefreshToken(data.refresh_token); // Save new refresh token
-    return data.access_token;
-  } catch (err) {
-    console.error("Refresh token error:", err);
-    return null;
-  }
+    const data: AuthResponse = await handleApiResponse(res);
+    localStorage.setItem(ACCESS_TOKEN_KEY, data.access_token);
+    localStorage.setItem(REFRESH_TOKEN_KEY, data.refresh_token);
+    localStorage.setItem(USER_KEY, JSON.stringify(data.user));
+    setAuth(data.user);
+    return data;
 }
 
-export async function register(data: RegisterDto): Promise<LoginResponse> {
-  const res = await fetch(`${API_BASE_URL}/api/auth/local/register`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
-
-  if (!res.ok) {
-    let errObj: any = {};
-    try {
-      errObj = await res.json();
-    } catch (e) {
-      try {
-        const text = await res.text();
-        errObj = { error: text || `HTTP ${res.status}` };
-      } catch {
-        errObj = { error: `HTTP ${res.status}` };
-      }
-    }
-    throw errObj.error || "Unknown error";
-  }
-
-  const response: LoginResponse = await res.json();
-  setAccessToken(response.access_token);
-  setRefreshToken(response.refresh_token);
-  setUser(response.user);
-  setAuth(response.user, response.access_token);
-  return response;
-}
-
-export async function login(credentials: LoginRequest): Promise<LoginResponse> {
-    console.log('Login request:', credentials);
-    const res = await fetch(`${API_BASE_URL}/api/auth/local/login`, {
+export async function login(credentials: LoginRequest): Promise<AuthResponse> {
+    const res = await publicFetch(`/api/auth/local/login`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(credentials),
     });
 
-    console.log('Login response status:', res.status);
-    
-    if (!res.ok) {
-        let errObj: any = {};
-        try {
-            errObj = await res.json();
-            console.log('Login error response:', errObj);
-        } catch (e) {
-            try {
-                const text = await res.text();
-                console.log('Login error text:', text);
-                errObj = { error: text || `HTTP ${res.status}` };
-            } catch {
-                errObj = { error: `HTTP ${res.status}` };
-            }
-        }
-        // Throw the entire error object to preserve error_code
-        throw errObj;
+    const data: AuthResponse = await handleApiResponse(res);
+    localStorage.setItem(ACCESS_TOKEN_KEY, data.access_token);
+    localStorage.setItem(REFRESH_TOKEN_KEY, data.refresh_token);
+    localStorage.setItem(USER_KEY, JSON.stringify(data.user));
+    setAuth(data.user);
+    return data;
+}
+
+export async function logout() {
+    const req: LogoutRequest = {
+        access_token: localStorage.getItem(ACCESS_TOKEN_KEY) || "",
+        refresh_token: localStorage.getItem(REFRESH_TOKEN_KEY) || ""
     }
 
-    const response: LoginResponse = await res.json();
-    console.log('Login success:', response);
-    setAccessToken(response.access_token);
-    setRefreshToken(response.refresh_token);
-    setUser(response.user);
-    setAuth(response.user, response.access_token);
-    return response;
+    const res = await publicFetch("/api/auth/logout", {
+        method: "POST",
+        body: JSON.stringify(req)
+    })
+
+    localStorage.removeItem(ACCESS_TOKEN_KEY);
+    localStorage.removeItem(REFRESH_TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
+    clearAuth();
+    window.location.reload(); // Keep reload for now as requested
 }
 
-export function logout(): void {
-  clearAccessToken();
-  clearRefreshToken();
-  clearUser();
-  clearAuth();
-  window.location.reload();
+export async function completeGoogleSetup(setupToken: string, username: string): Promise<AuthResponse> {
+    const req: CompleteGoogleSetupRequest = {
+        setup_token: setupToken,
+        username
+    };
+
+    const res = await publicFetch(`/api/auth/google/complete-setup`, {
+        method: "POST",
+        body: JSON.stringify(req),
+    });
+
+    const data: AuthResponse = await handleApiResponse(res);
+    localStorage.setItem(ACCESS_TOKEN_KEY, data.access_token);
+    localStorage.setItem(REFRESH_TOKEN_KEY, data.refresh_token);
+    localStorage.setItem(USER_KEY, JSON.stringify(data.user));
+    setAuth(data.user);
+    return data;
 }
+

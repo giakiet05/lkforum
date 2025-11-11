@@ -2,6 +2,7 @@ package controller
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 
@@ -17,6 +18,27 @@ import (
 // AuthController handles authentication-related requests.
 type AuthController struct {
 	authService service.AuthService
+}
+
+// redirectWithHash redirects to a URL with hash fragment using HTML meta refresh
+// This is necessary because HTTP redirects strip hash fragments
+func redirectWithHash(ctx *gin.Context, url string) {
+	html := fmt.Sprintf(`
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Redirecting...</title>
+    <script>
+        window.location.href = %q;
+    </script>
+</head>
+<body>
+    <p>Redirecting...</p>
+</body>
+</html>
+`, url)
+	ctx.Data(http.StatusOK, "text/html; charset=utf-8", []byte(html))
 }
 
 // NewAuthController creates a new AuthController.
@@ -130,9 +152,9 @@ func (c *AuthController) RefreshToken(ctx *gin.Context) {
 		return
 	}
 
-	data := gin.H{
-		"access_token":  accessToken,
-		"refresh_token": refreshToken,
+	data := dto.RefreshResponse{
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
 	}
 	dto.SendSuccess(ctx, http.StatusOK, "Tokens refreshed successfully", data)
 }
@@ -165,39 +187,48 @@ func (c *AuthController) GoogleCallback(ctx *gin.Context) {
 	code := ctx.Query("code")
 	if code == "" {
 		// Redirect to FE with error
-		redirectURL := fmt.Sprintf("%s/auth/error?message=missing_auth_code", config.Cfg.FrontendURL)
-		ctx.Redirect(http.StatusTemporaryRedirect, redirectURL)
+		redirectURL := fmt.Sprintf("%s/#/auth/error?message=missing_auth_code", config.Cfg.FrontendURL)
+		log.Printf("GoogleCallback: Missing code, redirecting to: %s", redirectURL)
+		redirectWithHash(ctx, redirectURL)
 		return
 	}
+
+	log.Printf("GoogleCallback: Processing code: %s", code[:10]+"...")
 
 	result, err := c.authService.ProcessGoogleCallback(code)
 	if err != nil {
 		// Redirect to FE with error
-		redirectURL := fmt.Sprintf("%s/auth/error?message=%s", config.Cfg.FrontendURL, url.QueryEscape(apperror.Message(err)))
-		ctx.Redirect(http.StatusTemporaryRedirect, redirectURL)
+		redirectURL := fmt.Sprintf("%s/#/auth/error?message=%s", config.Cfg.FrontendURL, url.QueryEscape(apperror.Message(err)))
+		log.Printf("GoogleCallback: Error processing callback: %v, redirecting to: %s", err, redirectURL)
+		redirectWithHash(ctx, redirectURL)
 		return
 	}
+
+	log.Printf("GoogleCallback: Result status: %s", result.Status)
 
 	switch result.Status {
 	case service.StatusLoginSuccess:
 		// Redirect to FE with tokens in hash fragment
-		redirectURL := fmt.Sprintf("%s/auth/callback#access_token=%s&refresh_token=%s",
+		redirectURL := fmt.Sprintf("%s/#/auth/callback#access_token=%s&refresh_token=%s",
 			config.Cfg.FrontendURL,
 			url.QueryEscape(result.AccessToken),
 			url.QueryEscape(result.RefreshToken))
-		ctx.Redirect(http.StatusTemporaryRedirect, redirectURL)
+		log.Printf("GoogleCallback: Login success, redirecting to: %s", redirectURL)
+		redirectWithHash(ctx, redirectURL)
 
 	case service.StatusSetupRequired:
 		// Redirect to FE with setup_token in hash fragment
-		redirectURL := fmt.Sprintf("%s/auth/google-setup#setup_token=%s",
+		redirectURL := fmt.Sprintf("%s/#/auth/google-setup#setup_token=%s",
 			config.Cfg.FrontendURL,
 			url.QueryEscape(result.SetupToken))
-		ctx.Redirect(http.StatusTemporaryRedirect, redirectURL)
+		log.Printf("GoogleCallback: Setup required, redirecting to: %s", redirectURL)
+		redirectWithHash(ctx, redirectURL)
 
 	default:
 		// Redirect to FE with error
-		redirectURL := fmt.Sprintf("%s/auth/error?message=unknown_error", config.Cfg.FrontendURL)
-		ctx.Redirect(http.StatusTemporaryRedirect, redirectURL)
+		redirectURL := fmt.Sprintf("%s/#/auth/error?message=unknown_error", config.Cfg.FrontendURL)
+		log.Printf("GoogleCallback: Unknown status, redirecting to: %s", redirectURL)
+		redirectWithHash(ctx, redirectURL)
 	}
 }
 

@@ -2,32 +2,84 @@
   import { onMount } from "svelte";
   import { push } from "svelte-spa-router";
   import { setAuth } from "../stores/auth-store";
-  import {
-    setAccessToken,
-    setRefreshToken,
-    setUser,
-  } from "../services/storage-service";
+  import { ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY, USER_KEY } from "../constants/auth-constants";
 
   let status = $state<"loading" | "success" | "error">("loading");
   let errorMessage = $state("");
 
+  /**
+   * Decode JWT token để lấy user info
+   * JWT format: header.payload.signature
+   */
+  function decodeJWT(token: string): any {
+    try {
+      const base64Url = token.split(".")[1];
+      const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+      const jsonPayload = decodeURIComponent(
+        atob(base64)
+          .split("")
+          .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+          .join("")
+      );
+      return JSON.parse(jsonPayload);
+    } catch (err) {
+      console.error("Error decoding JWT:", err);
+      return null;
+    }
+  }
+
   onMount(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const accessToken = urlParams.get("access_token");
-    const refreshToken = urlParams.get("refresh_token");
-    const userJson = urlParams.get("user");
+    // Đọc hash fragment thay vì query params
+    // URL format: /#/auth/callback#access_token=...&refresh_token=...
+    // window.location.hash = "#/auth/callback#access_token=..."
+    const fullHash = window.location.hash;
 
-    if (accessToken && refreshToken && userJson) {
+    console.log("Full URL:", window.location.href);
+    console.log("Full hash:", fullHash);
+
+    // Tìm dấu # thứ 2 (chứa tokens)
+    const secondHashIndex = fullHash.indexOf("#", 1);
+    if (secondHashIndex === -1) {
+      status = "error";
+      errorMessage = "Thiếu thông tin xác thực";
+      return;
+    }
+
+    // Lấy phần sau dấu # thứ 2
+    const tokenHash = fullHash.substring(secondHashIndex + 1); // "access_token=...&refresh_token=..."
+    const params = new URLSearchParams(tokenHash);
+    const accessToken = params.get("access_token");
+    const refreshToken = params.get("refresh_token");
+
+    console.log("Token hash:", tokenHash);
+    console.log("Access token:", accessToken ? "Found" : "Not found");
+    console.log("Refresh token:", refreshToken ? "Found" : "Not found");
+
+    if (accessToken && refreshToken) {
       try {
-        const user = JSON.parse(decodeURIComponent(userJson));
+        // Decode access token để lấy user info
+        const payload = decodeJWT(accessToken);
+        if (!payload || !payload.user_id) {
+          throw new Error("Invalid token payload");
+        }
 
-        // Lưu vào storage
-        setAccessToken(accessToken);
-        setRefreshToken(refreshToken);
-        setUser(user);
+        // Construct user object từ JWT payload
+        const user = {
+          id: payload.user_id,
+          username: payload.username,
+          email: payload.email,
+          avatar_url: payload.avatar_url || "",
+          bio: payload.bio || "",
+          is_verified: true, // Google users are always verified
+        };
+
+        // Lưu vào localStorage
+        localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
+        localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+        localStorage.setItem(USER_KEY, JSON.stringify(user));
 
         // Update auth store
-        setAuth(user, accessToken);
+        setAuth(user);
 
         status = "success";
 
@@ -36,9 +88,9 @@
           push("/");
         }, 1000);
       } catch (err) {
-        console.error("Error parsing user data:", err);
+        console.error("Error processing tokens:", err);
         status = "error";
-        errorMessage = "Không thể xử lý thông tin người dùng";
+        errorMessage = "Không thể xử lý thông tin đăng nhập";
       }
     } else {
       status = "error";

@@ -9,6 +9,8 @@ import ManageCommunities from './pages/ManageCommunities.svelte';
 import ModTools from './pages/ModTools.svelte';
 import Messages from './pages/Messages.svelte';
 import GoogleCallback from './pages/GoogleCallback.svelte';
+import GoogleSetup from './pages/GoogleSetup.svelte';
+import AuthError from './pages/AuthError.svelte';
 
 const routes = {
     '/': Home,
@@ -21,7 +23,9 @@ const routes = {
     '/lk/:name/mod': ModTools,
     '/communities/manage': ManageCommunities,
     '/messages': Messages,
-    '/auth/google/callback': GoogleCallback,
+    '/auth/callback': GoogleCallback,
+    '/auth/google-setup': GoogleSetup,
+    '/auth/error': AuthError,
 };
 
 export default routes;
