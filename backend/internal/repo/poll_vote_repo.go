@@ -2,7 +2,6 @@ package repo
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"github.com/giakiet05/lkforum/internal/apperror"
@@ -12,8 +11,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
-
-var ErrPollVoted = errors.New("user has already voted for this option")
 
 // PollVoteRepo defines the data access layer for post polls.
 type PollVoteRepo interface {
@@ -124,11 +121,11 @@ func (r *pollVoteRepo) Vote(ctx context.Context, userID, postID, optionID string
 	callback := func(sessCtx mongo.SessionContext) (interface{}, error) {
 		var post model.Post
 		if err := r.postCollection.FindOne(sessCtx, bson.M{"_id": postObjID}).Decode(&post); err != nil {
-			return nil, ErrPostNotFound
+			return nil, apperror.ErrPostNotFound
 		}
 
 		if post.Type != model.PostTypePoll || post.Content == nil || post.Content.Poll == nil {
-			return nil, errors.New("post is not a poll")
+			return nil, apperror.ErrBadRequest
 		}
 
 		userVoteIDs, err := r.getUserVoteIDsInTx(sessCtx, userObjID, postObjID)
@@ -144,7 +141,7 @@ func (r *pollVoteRepo) Vote(ctx context.Context, userID, postID, optionID string
 			}
 		}
 		if isAlreadyVoted {
-			return nil, ErrPollVoted
+			return nil, apperror.ErrPollVoted
 		}
 
 		if !post.Content.Poll.AllowMultiple && len(userVoteIDs) > 0 {
@@ -223,20 +220,13 @@ func (r *pollVoteRepo) removeVotesInTransaction(sessCtx context.Context, userID,
 		return err
 	}
 
-	// Decrement counters in the Post document
 	filter := bson.M{"_id": postID, "content.poll.options.id": bson.M{"$in": votes}}
 	update := bson.M{"$inc": bson.M{"content.poll.options.$.votes": -1, "content.poll.total_votes": -len(votes)}}
 
-	// Note: This positional operator `$` will only update the first matched element in the array.
-	// A more complex update or multiple updates would be needed to decrement multiple different options correctly.
-	// For simplicity, we assume a user votes for one option, or we accept this limitation for now.
-	// A better approach for multi-decrement is to fetch the post, calculate new votes, and $set the whole options array.
-	// However, that is much more complex. The current approach is a known simplification.
 	if _, err := r.postCollection.UpdateMany(sessCtx, filter, update); err != nil {
 		return err
 	}
 
-	// Delete vote records
 	_, err = r.pollVoteCollection.DeleteMany(sessCtx, bson.M{"post_id": postID, "user_id": userID})
 	return err
 }

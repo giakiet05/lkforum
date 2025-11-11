@@ -1,8 +1,12 @@
 <script lang="ts">
   import Post from "../components/Post.svelte";
-  import type { PostData } from "../types/post.ts";
+  import type { PostResponse } from "../dtos/post-dto";
 
-  const posts: PostData[] = [
+  // TODO: Replace with API call to fetch posts
+  const posts: PostResponse[] = [];
+
+  /* Old mock data - needs to be replaced with real API data
+  const posts: PostResponse[] = [
     {
       id: "1",
       type: "text",
@@ -64,6 +68,7 @@
         "https://i1.sndcdn.com/artworks-000307576689-fkq1mv-t500x500.jpg",
     },
   ];
+  */
 
   let sortBy: "best" | "hot" | "new" | "top" | "rising" | "" = "";
 </script>

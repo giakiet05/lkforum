@@ -1,71 +1,107 @@
-import { getValidAccessToken, logout } from "./auth-service";
+import { getValidAccessToken } from "../auth/token";
+import type { ApiResponse } from "../dtos/response-dto";
+import { ApiErrorCode } from "../errors/error-codes";
+import { ApiError } from "../errors/api-error";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
+
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
+
+/**
+ * Handles the response from the Fetch API.
+ * Checks for network errors and API-level errors (based on `success` field).
+ * @param res - The Response object from a fetch call.
+ * @returns The `data` field from the API response.
+ * @throws {ApiError} If the response is not ok, `success` is false, or JSON parse fails.
+ */
+export async function handleApiResponse(res: Response): Promise<any> {
+    try {
+        const json: ApiResponse = await res.json();
+        if (!res.ok || !json.success) {
+            // Use the message from the API, or a default one
+            const message = json.message || `Request failed with status ${res.status}`;
+            throw new ApiError(message, json.error_code as ApiErrorCode);
+        }
+        return json.data;
+    } catch (error) {
+        // JSON parse error hoặc ApiError đã throw ở trên
+        if (error instanceof ApiError) {
+            throw error; // Re-throw ApiError
+        }
+        // JSON parse error
+        console.error("Failed to parse API response:", error);
+        throw new ApiError(
+            "Phản hồi từ server không hợp lệ.",
+            ApiErrorCode.INTERNAL_ERROR
+        );
+    }
+}
+
+/**
+ * A wrapper for the standard Fetch API that includes base URL and default headers.
+ * This function is for public endpoints that do not require authentication.
+ * @param path - The API endpoint path (e.g., "/api/auth/login").
+ * @param options - Standard RequestInit options.
+ * @returns The raw Response object.
+ * @throws {ApiError} If network error occurs (mất mạng, timeout, CORS, DNS fail).
+ */
+export async function publicFetch(path: string, options: RequestInit = {}): Promise<Response> {
+    const url = path.startsWith("http") ? path : API_BASE_URL + path;
+
+    const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        ...((options.headers as Record<string, string>) || {}),
+    };
+
+    try {
+        return await fetch(url, { ...options, headers });
+    } catch (error) {
+        // Network errors: mất mạng, timeout, CORS, DNS fail
+        console.error("Network error in publicFetch:", error);
+        throw new ApiError(
+            "Không thể kết nối đến server. Vui lòng kiểm tra kết nối mạng.",
+            ApiErrorCode.SERVICE_UNAVAILABLE
+        );
+    }
+}
+
 
 /**
  * Centralized API request function for authenticated calls.
- * Handles token refresh, error management, and header setup.
- * @param path - API endpoint path (relative or absolute)
- * @param options - Fetch API options
- * @returns Response data or throws error
+ * This function automatically adds the Authorization header and handles token refreshing.
+ * @param path - API endpoint path.
+ * @param options - Fetch API options.
+ * @returns The raw Response object.
+ * @throws {ApiError} If the request fails, token cannot be refreshed, or network error occurs.
  */
-export async function apiFetch(
-  path: string,
-  options: RequestInit = {}
-): Promise<any> {
-  // Get a valid access token (refresh if needed)
-  const accessToken = await getValidAccessToken();
-  if (!accessToken) {
-    logout();
-    throw new Error("Not authenticated");
-  }
-
-  // Check if body is FormData for correct Content-Type
-  const isFormData = options.body instanceof FormData;
-
-  // Normalize headers to a plain object
-  const headers: Record<string, string> = {
-    ...((options.headers as Record<string, string>) || {}),
-    Authorization: `Bearer ${accessToken}`,
-    ...(!isFormData ? { "Content-Type": "application/json" } : {}),
-  };
-  options.headers = headers;
-
-  // Build full URL
-  const url =
-    path.startsWith("http://") || path.startsWith("https://")
-      ? path
-      : API_BASE_URL + path;
-
-  // Make the request
-  const res = await fetch(url, options);
-
-  // Handle unauthorized (token expired)
-  if (res.status === 401) {
-    logout();
-    throw new Error("Token expired");
-  }
-
-  // Handle other errors
-  if (!res.ok) {
-    let errObj: any = {};
-    try {
-      errObj = await res.json();
-    } catch (e) {
-      try {
-        const text = await res.text();
-        errObj = { error: text || `HTTP ${res.status}` };
-      } catch {
-        errObj = { error: `HTTP ${res.status}` };
-      }
+export async function authenticatedFetch(path: string, options: RequestInit = {}): Promise<Response> {
+    const url = path.startsWith("http") ? path : API_BASE_URL + path;
+    const accessToken = await getValidAccessToken();
+    if (!accessToken) {
+        // Dispatch event để App.svelte handle logout
+        window.dispatchEvent(new CustomEvent('auth:unauthorized'));
+        throw new ApiError("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.", ApiErrorCode.FORBIDDEN);
     }
-    throw errObj.error || "Unknown error";
-  }
 
-  // Return parsed response data
-  try {
-    return await res.json();
-  } catch {
-    return res;
-  }
+    const isFormData = options.body instanceof FormData;
+
+    const headers: Record<string, string> = {
+        ...((options.headers as Record<string, string>) || {}),
+        Authorization: `Bearer ${accessToken}`,
+    };
+
+    // Do not set Content-Type for FormData, the browser does it.
+    if (!isFormData) {
+        headers["Content-Type"] = "application/json";
+    }
+
+    try {
+        return await fetch(url, { ...options, headers });
+    } catch (error) {
+        // Network errors: mất mạng, timeout, CORS, DNS fail
+        console.error("Network error in authenticatedFetch:", error);
+        throw new ApiError(
+            "Không thể kết nối đến server. Vui lòng kiểm tra kết nối mạng.",
+            ApiErrorCode.SERVICE_UNAVAILABLE
+        );
+    }
 }

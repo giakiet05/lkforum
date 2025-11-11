@@ -10,35 +10,6 @@ import (
 // --- Request DTOs ---
 
 // New Registration Flow (Verify Email First)
-type SendEmailVerificationRequest struct {
-	Email string `json:"email" binding:"required,email"`
-}
-
-type VerifyEmailCodeRequest struct {
-	Email string `json:"email" binding:"required,email"`
-	OTP   string `json:"otp" binding:"required,len=6"`
-}
-
-type CompleteRegistrationRequest struct {
-	VerificationToken string `json:"verification_token" binding:"required"`
-	Username          string `json:"username" binding:"required,min=3,max=20"`
-	Password          string `json:"password" binding:"required,min=6"`
-}
-
-type ResendOTPRequest struct {
-	Email string `json:"email" binding:"required,email"`
-}
-
-// Login
-type UserLoginRequest struct {
-	Identifier string `json:"identifier" binding:"required"`
-	Password   string `json:"password" binding:"required"`
-}
-
-type CompleteGoogleSetupRequest struct {
-	SetupToken string `json:"setup_token" binding:"required"`
-	Username   string `json:"username" binding:"required,min=3,max=20"`
-}
 
 // UserProfileUpdateRequest defines the fields a user can update for their own profile.
 type UserProfileUpdateRequest struct {
@@ -60,15 +31,6 @@ type SocialLinksInput struct {
 type ChangePasswordRequest struct {
 	OldPassword string `json:"old_password" binding:"required"`
 	NewPassword string `json:"new_password" binding:"required,min=6"`
-}
-
-type RefreshRequest struct {
-	RefreshToken string `json:"refresh_token" binding:"required"`
-}
-
-type LogoutRequest struct {
-	AccessToken  string `json:"access_token" binding:"required"`
-	RefreshToken string `json:"refresh_token" binding:"required"`
 }
 
 // --- Response DTOs ---
@@ -105,13 +67,6 @@ type UserResponse struct {
 	Provider   model.AuthProvider  `json:"provider"`
 	IsVerified bool                `json:"is_verified"`
 	Profile    UserProfileResponse `json:"profile"`
-}
-
-// AuthResponse is returned on successful login or registration.
-type AuthResponse struct {
-	User         *UserResponse `json:"user"`
-	AccessToken  string        `json:"access_token"`
-	RefreshToken string        `json:"refresh_token"`
 }
 
 func FromUser(u *model.User) *UserResponse {

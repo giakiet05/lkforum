@@ -1,15 +1,15 @@
 <script lang="ts">
   import { fade } from "svelte/transition";
   import { push } from "svelte-spa-router";
-  import type { PostData } from "../types/post";
+  import type { PostResponse } from "../dtos/post-dto"
 
   type PostProps = {
-    post: PostData;
+    post: PostResponse;
   };
 
   let { post }: PostProps = $props();
 
-  let selectedOptions = $state<number[]>([]);
+  let selectedOptions = $state<string[]>([]);
   let hasVoted = $state(false);
 
   function handlePostClick() {
@@ -23,13 +23,13 @@
 
   function handleCommunityClick(e: MouseEvent) {
     e.stopPropagation();
-    push(`/lk/${post.community}`);
+    push(`/lk/${post.community.name}`);
   }
 
-  function handleVote(optionId: number) {
+  function handleVote(optionId: string) {
     if (hasVoted) return;
 
-    if (post.poll?.multipleChoice) {
+    if (post.content.poll?.allow_multiple) {
       const index = selectedOptions.indexOf(optionId);
       if (index > -1) {
         selectedOptions.splice(index, 1);
@@ -46,18 +46,18 @@
     if (selectedOptions.length === 0) return;
     // Here you would typically send the vote to a server
     // For this example, we'll just simulate it
-    if (post.poll) {
-      for (const option of post.poll.options) {
+    if (post.content.poll) {
+      for (const option of post.content.poll.options) {
         if (selectedOptions.includes(option.id)) {
           option.votes++;
         }
       }
-      post.poll.totalVotes += selectedOptions.length;
+      post.content.poll.total_votes += selectedOptions.length;
     }
     hasVoted = true;
   }
 
-  function handlePollOptionClick(e: MouseEvent, optionId: number) {
+  function handlePollOptionClick(e: MouseEvent, optionId: string) {
     e.stopPropagation();
     handleVote(optionId);
   }
@@ -77,13 +77,13 @@
   <div class="post-main">
     <div class="post-header">
       <div class="post-header-left">
-        <img src="/avatar.jpg" alt="User avatar" class="author-avatar" />
+        <img src={post.author.avatar?.url || "/avatar.jpg"} alt="User avatar" class="author-avatar" />
         <span class="community-name" onclick={handleCommunityClick}
-          >lk/{post.community}</span
+          >lk/{post.community.name}</span
         >
         <span class="meta-divider">•</span>
-        <span class="author">Posted by u/{post.author}</span>
-        <span class="time">{post.time}</span>
+        <span class="author">Posted by u/{post.author.username}</span>
+        <span class="time">{new Date(post.created_at).toLocaleDateString()}</span>
       </div>
       <div class="post-header-right">
         <button class="join-btn" onclick={handleButtonClick}>Join</button>
@@ -100,24 +100,27 @@
     <h2 class="post-title">{post.title}</h2>
 
     <div class="post-content">
-      {#if post.type === "text"}
-        <p class="text-content">{post.content}</p>
-      {:else if post.type === "image" && post.images}
+      {#if post.type === "text" && post.content.text}
+        <p class="text-content">{post.content.text}</p>
+      {/if}
+      {#if post.content.images && post.content.images.length > 0}
         <div class="image-gallery">
-          {#each post.images as src, i}
-            <img {src} alt="Post content {i + 1}" class="post-image" />
+          {#each post.content.images as image, i}
+            <img src={image.url} alt="Post content {i + 1}" class="post-image" />
           {/each}
         </div>
-      {:else if post.type === "video" && post.videoUrl}
-        <video controls poster={post.thumbnailUrl} class="post-video">
-          <source src={post.videoUrl} type="video/mp4" />
+      {/if}
+      {#if post.content.video}
+        <video controls poster={post.content.video.thumbnail} class="post-video">
+          <source src={post.content.video.url} type="video/mp4" />
           Your browser does not support the video tag.
         </video>
-      {:else if post.type === "poll" && post.poll}
+      {/if}
+      {#if post.type === "poll" && post.content.poll}
         <div class="poll-container">
-          <h3 class="poll-question">{post.poll.question}</h3>
+          <h3 class="poll-question">{post.content.poll.question}</h3>
           <div class="poll-options">
-            {#each post.poll.options as option}
+            {#each post.content.poll.options as option}
               <button
                 class="poll-option"
                 class:selected={selectedOptions.includes(option.id)}
@@ -127,16 +130,13 @@
                 {#if hasVoted}
                   <div
                     class="poll-result-bar"
-                    style="width: {getVotePercentage(
-                      option.votes,
-                      post.poll.totalVotes
-                    )}%;"
+                    style="width: {option.percentage}%;"
                   ></div>
                   <span class="poll-option-text">{option.text}</span>
                   <span class="poll-option-votes">{option.votes} votes</span>
                 {:else}
                   <div class="radio-check">
-                    {#if post.poll.multipleChoice}
+                    {#if post.content.poll.allow_multiple}
                       <div
                         class="checkbox"
                         class:checked={selectedOptions.includes(option.id)}
@@ -163,7 +163,7 @@
             </button>
           {/if}
           <p class="poll-footer">
-            {post.poll.totalVotes} votes • {post.poll.multipleChoice
+            {post.content.poll.total_votes} votes • {post.content.poll.allow_multiple
               ? "Multiple choices allowed"
               : "Single choice"}
           </p>
@@ -178,7 +178,7 @@
           aria-label="Upvote"
           onclick={handleButtonClick}>▲</button
         >
-        <span class="vote-count">{post.upvotes - post.downvotes}</span>
+        <span class="vote-count">{post.votes_count?.score || 0}</span>
         <button
           class="footer-btn vote-btn"
           aria-label="Downvote"
@@ -187,7 +187,7 @@
       </div>
       <button class="footer-btn" onclick={handlePostClick}>
         <img src="/CommentIcon.svg" alt="Comments" width="20" height="20" />
-        <span>{post.commentsCount} Comments</span>
+        <span>{post.comments_count} Comments</span>
       </button>
       <button class="footer-btn" onclick={handleButtonClick}>
         <svg

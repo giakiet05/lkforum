@@ -1,6 +1,7 @@
 <script lang="ts">
   import Post from "../components/Post.svelte";
-  import type { PostData } from "../types/post";
+  import type {PostResponse} from "../dtos/post-dto";
+
 
   const user = {
     name: "Long",
@@ -10,7 +11,11 @@
     coverImage: "/banner_sample1.jpg",
   };
 
-  const posts: PostData[] = [
+  // TODO: Replace with API call
+  const posts: PostResponse[] = [];
+
+  /* Old mock data
+  const posts: PostResponse[] = [
     {
       id: "1",
       type: "text",
@@ -37,6 +42,7 @@
       images: ["/discuss.jpg"],
     },
   ];
+  */
 
   let activeTab: "posts" | "comments" | "upvoted" | "downvoted" = "posts";
   let sortBy: "hot" | "newest" | "oldest" = "hot";

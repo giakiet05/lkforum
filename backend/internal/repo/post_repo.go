@@ -12,8 +12,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-var ErrPostNotFound = errors.New("post not found")
-
 // PostRepo defines the data access layer for posts, independent of the database implementation.
 type PostRepo interface {
 	Create(ctx context.Context, post *model.Post) (*model.Post, error)
@@ -55,7 +53,7 @@ func (r *postRepo) GetByID(ctx context.Context, id string) (*model.Post, error) 
 
 	if err := r.collection.FindOne(ctx, filter).Decode(&post); err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
-			return nil, ErrPostNotFound
+			return nil, apperror.ErrPostNotFound
 		}
 		return nil, err
 	}
@@ -138,7 +136,7 @@ func (r *postRepo) UpdateByID(ctx context.Context, id string, update UpdateDocum
 		return err
 	}
 	if result.MatchedCount == 0 {
-		return ErrPostNotFound
+		return apperror.ErrPostNotFound
 	}
 	return nil
 }
@@ -159,7 +157,7 @@ func (r *postRepo) Delete(ctx context.Context, id string) error {
 		return err
 	}
 	if result.DeletedCount == 0 {
-		return ErrPostNotFound
+		return apperror.ErrPostNotFound
 	}
 	return nil
 }

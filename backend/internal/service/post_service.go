@@ -16,10 +16,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-var (
-	ErrPostNotFound = repo.ErrPostNotFound
-)
-
 // PostService defines the business logic for post-related operations.
 type PostService interface {
 	CreatePost(userID string, req *dto.CreatePostRequest) (*dto.PostResponse, error)
@@ -82,15 +78,6 @@ func (s *postService) CreatePost(userID string, req *dto.CreatePostRequest) (*dt
 		return nil, apperror.ErrInvalidID
 	}
 
-	// Validate community exists
-	community, err := s.communityRepo.GetByID(ctx, req.CommunityID)
-	if err != nil {
-		return nil, apperror.ErrCommunityNotFound
-	}
-	if community.IsDeleted {
-		return nil, apperror.ErrCommunityDeleted
-	}
-
 	post := &model.Post{
 		AuthorID:      authorID,
 		CommunityID:   communityID,
@@ -125,6 +112,7 @@ func (s *postService) CreatePost(userID string, req *dto.CreatePostRequest) (*dt
 		return nil, err
 	}
 
+	go s.postVoteRepo.Vote(context.Background(), userID, createdPost.ID.Hex(), true)
 	s.bus.Publish(bus.PostCreatedEvent{AuthorID: userID})
 
 	return s.GetPostByID(createdPost.ID.Hex(), userID)
@@ -275,9 +263,32 @@ func (s *postService) AddImagesToPost(userID, postID string, form *multipart.For
 		return nil, apperror.ErrForbidden
 	}
 
-	uploadedImages, err := cloudinary.UploadImages(form.File["images"])
-	if err != nil {
-		return nil, err
+	files := form.File["images"]
+	if len(files) == 0 {
+		return nil, apperror.ErrBadRequest
+	}
+
+	var uploadedImages []*model.Image
+	for _, fileHeader := range files {
+		file, err := fileHeader.Open()
+		if err != nil {
+			continue
+		}
+		defer file.Close()
+
+		result, err := cloudinary.Upload(file)
+		if err != nil {
+			continue
+		}
+		uploadedImages = append(uploadedImages, &model.Image{
+			URL:        result.SecureURL,
+			PublicID:   result.PublicID,
+			UploadedAt: time.Now(),
+		})
+	}
+
+	if len(uploadedImages) == 0 {
+		return nil, apperror.ErrInternal
 	}
 
 	update := repo.UpdateDocument{"$push": bson.M{"content.images": bson.M{"$each": uploadedImages}}}
@@ -473,7 +484,6 @@ func (s *postService) getPollResponse(ctx context.Context, postID, userID string
 }
 
 func (s *postService) publishVoteEvents(authorID, voterID, postID string, prevVote *model.Vote, newVoteValue bool) {
-
 	if prevVote == nil {
 		if newVoteValue {
 			s.bus.Publish(bus.PostUpvotedEvent{AuthorID: authorID, VoterID: voterID, PostID: postID})

@@ -1,9 +1,22 @@
-import type { User } from "../models/user";
+import type { UserResponse } from "./user-dto";
 
-export interface RegisterDto {
+export interface sendEmailVerificationRequest {
+    email: string;
+}
+
+export interface VerifyEmailRequest {
+    email: string;
+    otp: string;
+}
+
+export interface CompleteRegistrationRequest {
+  verification_token: string;
   username: string;
-  email: string;
   password: string;
+}
+
+export interface ResendOTPRequest {
+    email: string;
 }
 
 export interface LoginRequest {
@@ -15,14 +28,19 @@ export interface RefreshTokenRequest {
   refresh_token: string;
 }
 
-export interface RegisterResponse extends LoginResponse {
-  user: User;
-  access_token: string; 
-  refresh_token: string;
+export interface LogoutRequest {
+    access_token: string;
+    refresh_token: string;
 }
 
-export interface LoginResponse {
-  user: User;
+export interface CompleteGoogleSetupRequest {
+    setup_token: string;
+    username: string;
+}
+
+
+export interface AuthResponse {
+  user: UserResponse;
   access_token: string;
   refresh_token: string;
 }

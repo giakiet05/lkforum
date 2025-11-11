@@ -1,15 +1,14 @@
 <script lang="ts">
   import Modal from "./Modal.svelte";
   import Login from "../pages/Login.svelte";
-  import { login } from "../services/auth-service";
-  import type { LoginRequest } from "../dtos/auth-dto";
-  import { setAuth } from "../stores/auth-store";
+  import { login, sendVerificationEmail, verifyEmail, completeRegistration } from "../services/auth-service";
+  import type { LoginRequest, CompleteRegistrationRequest } from "../dtos/auth-dto";
   import Button from "./Button.svelte";
+  import { ApiError } from "../errors/api-error";
+  import { ApiErrorCode } from "../errors/error-codes";
 
   let { show = false, onClose }: { show: boolean; onClose: () => void } =
     $props();
-
-  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
 
   let activeTab = $state<"login" | "register">("login");
   let step = $state<"email" | "otp" | "register">("email"); // Step 1: email → Step 2: otp → Step 3: register
@@ -22,6 +21,7 @@
   let password = $state("");
   let confirmPassword = $state("");
   let otp = $state(["", "", "", "", "", ""]); // 6 ô OTP
+  let verificationToken = $state(""); // Lưu verification token sau khi verify OTP
 
   // OTP countdown timer
   let countdown = $state(60);
@@ -51,20 +51,6 @@
     onClose();
   }
 
-  // Check for pending email verification on mount
-  $effect(() => {
-    if (show) {
-      const pendingEmail = localStorage.getItem("pending_verification_email");
-      if (pendingEmail) {
-        email = pendingEmail;
-        activeTab = "register";
-        step = "otp";
-        error =
-          "Bạn chưa xác thực email. Vui lòng nhập mã OTP đã gửi đến email của bạn.";
-        startCountdown();
-      }
-    }
-  });
 
   function startCountdown() {
     countdown = 60;
@@ -87,104 +73,21 @@
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   }
 
-  // Helper function to resend OTP
-  async function resendOTP(emailAddress: string) {
-    const res = await fetch(
-      `${API_BASE_URL}/api/auth/resend-verification-email`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: emailAddress }),
-      }
-    );
-
-    if (!res.ok) {
-      throw new Error("Không thể gửi lại mã OTP");
-    }
-  }
-
   const handleLogin = async (data: LoginRequest) => {
     try {
       isLoading = true;
       error = "";
-      const response = await login(data);
 
-      // Kiểm tra nếu user chưa verify email (nếu backend cho phép login)
-      if (!response.user.is_verified) {
-        // Lưu email để hiển thị trong màn OTP
-        email = response.user.email;
-        localStorage.setItem("pending_verification_email", response.user.email);
+      await login(data); // Gọi login, tự động lưu tokens và update authStore
+      handleClose(); // Đóng modal, hoàn tất!
 
-        // Gửi lại OTP
-        await resendOTP(response.user.email);
-
-        // Chuyển sang tab register để hiển thị màn OTP
-        activeTab = "register";
-        step = "otp";
-        error =
-          "Tài khoản chưa được xác thực. Vui lòng nhập mã OTP đã gửi đến email của bạn.";
-
-        // Bắt đầu countdown
-        startCountdown();
-        return;
+    } catch (err) {
+      if (err instanceof ApiError) {
+        // Hiển thị message từ backend (đã tiếng Việt)
+        error = err.message;
+      } else {
+        error = "Đã xảy ra lỗi không mong muốn";
       }
-
-      handleClose();
-    } catch (err: any) {
-      console.log("Login error:", err);
-      console.log("Login error type:", typeof err);
-      console.log("Login error.error_code:", err?.error_code);
-
-      // Xử lý lỗi 403 - Email chưa verify
-      if (
-        err &&
-        typeof err === "object" &&
-        err.error_code === "EMAIL_NOT_VERIFIED"
-      ) {
-        console.log("Detected EMAIL_NOT_VERIFIED, switching to verify screen");
-
-        // Lấy email từ data.identifier (có thể là email hoặc username)
-        if (data.identifier.includes("@")) {
-          email = data.identifier;
-        } else {
-          // Nếu là username, thử lấy email từ localStorage
-          const savedEmail = localStorage.getItem(
-            `user_email_${data.identifier}`
-          );
-          if (savedEmail) {
-            email = savedEmail;
-          } else {
-            error =
-              "Tài khoản chưa được xác thực. Vui lòng đăng nhập bằng email để tiếp tục verify.";
-            return;
-          }
-        }
-
-        localStorage.setItem("pending_verification_email", email);
-
-        // Gửi lại OTP
-        try {
-          await resendOTP(email);
-        } catch (resendErr) {
-          error = "Không thể gửi mã OTP. Vui lòng thử lại.";
-          return;
-        }
-
-        // Chuyển sang tab register để hiển thị màn OTP
-        activeTab = "register";
-        step = "otp";
-        error =
-          "Tài khoản chưa được xác thực. Vui lòng nhập mã OTP đã gửi đến email của bạn.";
-
-        // Bắt đầu countdown
-        startCountdown();
-        return;
-      }
-
-      error =
-        err instanceof Error
-          ? err.message
-          : err.message || err.error || "Login failed";
     } finally {
       isLoading = false;
     }
@@ -217,25 +120,19 @@
     error = "";
 
     try {
-      // TODO: Gọi API backend để gửi OTP
-      // const res = await fetch(`${API_BASE_URL}/api/auth/send-otp`, {
-      //   method: "POST",
-      //   headers: { "Content-Type": "application/json" },
-      //   body: JSON.stringify({ email }),
-      // });
-
-      // Mock: Giả lập gửi OTP thành công
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      console.log("Mock: OTP sent to", email);
+      await sendVerificationEmail(email);
 
       // Chuyển sang step nhập OTP
       step = "otp";
       error = "";
       localStorage.setItem("pending_verification_email", email);
       startCountdown();
-    } catch (err: any) {
-      console.error("Send OTP error:", err);
-      error = "Không thể gửi mã OTP. Vui lòng thử lại.";
+    } catch (err) {
+      if (err instanceof ApiError) {
+        error = err.message;
+      } else {
+        error = "Không thể gửi mã OTP. Vui lòng thử lại.";
+      }
     } finally {
       isLoading = false;
     }
@@ -255,23 +152,18 @@
     error = "";
 
     try {
-      // TODO: Gọi API backend để verify OTP
-      // const res = await fetch(`${API_BASE_URL}/api/auth/verify-otp`, {
-      //   method: "POST",
-      //   headers: { "Content-Type": "application/json" },
-      //   body: JSON.stringify({ email, otp: otpCode }),
-      // });
-
-      // Mock: Giả lập verify thành công
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      console.log("Mock: OTP verified for", email);
+      // Verify OTP trả về verification_token
+      verificationToken = await verifyEmail(email, otpCode);
 
       // Chuyển sang step đăng ký (username + password)
       step = "register";
       error = "";
-    } catch (err: any) {
-      console.error("Verify OTP error:", err);
-      error = "Mã OTP không đúng. Vui lòng thử lại.";
+    } catch (err) {
+      if (err instanceof ApiError) {
+        error = err.message;
+      } else {
+        error = "Mã OTP không đúng. Vui lòng thử lại.";
+      }
     } finally {
       isLoading = false;
     }
@@ -294,95 +186,25 @@
     error = "";
 
     try {
-      // TODO: Gọi API backend để hoàn tất đăng ký
-      // const res = await fetch(`${API_BASE_URL}/api/auth/complete-register`, {
-      //   method: "POST",
-      //   headers: { "Content-Type": "application/json" },
-      //   body: JSON.stringify({ email, username, password }),
-      // });
-
-      // Mock: Giả lập đăng ký thành công với tokens
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      const mockData = {
-        user: {
-          id: "mock-user-id",
-          email: email,
-          username: username,
-          role: "user",
-          is_verified: true,
-        },
-        access_token: "mock-access-token-" + Date.now(),
-        refresh_token: "mock-refresh-token-" + Date.now(),
+      const registrationData: CompleteRegistrationRequest = {
+        username,
+        password,
+        verification_token: verificationToken
       };
 
-      console.log("Mock: Register complete", mockData);
-
-      // Lưu tokens và user vào localStorage
-      localStorage.setItem("access_token", mockData.access_token);
-      localStorage.setItem("refresh_token", mockData.refresh_token);
-      localStorage.setItem("user", JSON.stringify(mockData.user));
-
-      // Update authStore
-      setAuth(mockData.user, mockData.access_token);
+      await completeRegistration(registrationData);
 
       // Xóa pending verification
       localStorage.removeItem("pending_verification_email");
 
       // Đóng modal
       handleClose();
-    } catch (err: any) {
-      error = typeof err === "string" ? err : err.message || "Lỗi khi đăng ký";
-    } finally {
-      isLoading = false;
-    }
-  }
-
-  // OLD FUNCTION - Giữ lại để không break login flow
-  // Step 2: Verify OTP (OLD - for login with unverified email)
-  async function handleVerifyOTP(e: Event) {
-    e.preventDefault();
-
-    const otpCode = otp.join("");
-    if (otpCode.length !== 6) {
-      error = "Vui lòng nhập đầy đủ 6 chữ số";
-      return;
-    }
-
-    isLoading = true;
-    error = "";
-
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/auth/verify-email`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, otp: otpCode }),
-      });
-
-      if (!res.ok) {
-        const errObj = await res
-          .json()
-          .catch(() => ({ error: "Mã OTP không đúng" }));
-        throw errObj.error || errObj.message || "Mã OTP không đúng";
+    } catch (err) {
+      if (err instanceof ApiError) {
+        error = err.message;
+      } else {
+        error = "Lỗi khi đăng ký";
       }
-
-      const data = await res.json();
-
-      // Lưu tokens và user
-      localStorage.setItem("access_token", data.access_token);
-      localStorage.setItem("refresh_token", data.refresh_token);
-      localStorage.setItem("user", JSON.stringify(data.user));
-
-      // Update authStore
-      setAuth(data.user, data.access_token);
-
-      // Xóa pending verification
-      localStorage.removeItem("pending_verification_email");
-
-      // Đóng modal và reset form
-      handleClose();
-    } catch (err: any) {
-      error =
-        typeof err === "string" ? err : err.message || "Mã OTP không đúng";
     } finally {
       isLoading = false;
     }
@@ -395,24 +217,15 @@
     error = "";
 
     try {
-      // TODO: Gọi API backend
-      // const res = await fetch(
-      //   `${API_BASE_URL}/api/auth/resend-verification-email`,
-      //   {
-      //     method: "POST",
-      //     headers: { "Content-Type": "application/json" },
-      //     body: JSON.stringify({ email }),
-      //   }
-      // );
-
-      // Mock: Giả lập gửi lại OTP
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      console.log("Mock: Resend OTP to", email);
-
+      await sendVerificationEmail(email);
       alert("Mã OTP mới đã được gửi đến email của bạn!");
       startCountdown(); // Bắt đầu đếm ngược lại
-    } catch (err: any) {
-      error = "Không thể gửi lại mã OTP";
+    } catch (err) {
+      if (err instanceof ApiError) {
+        error = err.message;
+      } else {
+        error = "Không thể gửi lại mã OTP";
+      }
     } finally {
       isLoading = false;
     }

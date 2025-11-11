@@ -68,10 +68,10 @@ func StatusFromError(err error) int {
 	case isErrorType(err, ErrForbidden, ErrUserInactive, ErrUserNotMember, ErrEmailNotVerified):
 		return http.StatusForbidden
 	// 404 Not Found
-	case isErrorType(err, ErrUserNotFound, ErrCommunityNotFound, ErrCommunityDeleted, ErrMembershipNotFound):
+	case isErrorType(err, ErrUserNotFound, ErrCommunityNotFound, ErrCommunityDeleted, ErrMembershipNotFound, ErrPostNotFound, ErrVoteNotFound):
 		return http.StatusNotFound
 	// 409 Conflict
-	case isErrorType(err, ErrUsernameExists, ErrEmailExists, ErrCommunityNameExists, ErrAlreadyMember, ErrEmailAlreadyVerified, ErrLoginMethodMismatch):
+	case isErrorType(err, ErrUsernameExists, ErrEmailExists, ErrCommunityNameExists, ErrAlreadyMember, ErrEmailAlreadyVerified, ErrLoginMethodMismatch, ErrPollVoted, ErrPollCannotEdit):
 		return http.StatusConflict
 	// 500 Internal Server Error
 	case isErrorType(err, ErrInternal, ErrNoFieldsToUpdate, ErrMembershipCreateFailed, ErrMembershipDeleteFailed):
@@ -83,59 +83,65 @@ func StatusFromError(err error) int {
 
 var (
 	// Auth-related
-	ErrInvalidCredentials   = AppError{Code: "INVALID_CREDENTIALS", Message: "Invalid username or password"}
-	ErrInvalidToken         = AppError{Code: "INVALID_TOKEN", Message: "Invalid or expired token"}
-	ErrInvalidClaims        = AppError{Code: "INVALID_CLAIMS", Message: "Invalid token claims"}
-	ErrInvalidIssuer        = AppError{Code: "INVALID_ISSUER", Message: "Invalid token issuer"}
-	ErrInvalidAudience      = AppError{Code: "INVALID_AUDIENCE", Message: "Invalid token audience"}
-	ErrTokenInvalidated     = AppError{Code: "TOKEN_INVALIDATED", Message: "Token has been invalidated"}
-	ErrForbidden            = AppError{Code: "FORBIDDEN", Message: "You do not have permission to perform this action"}
-	ErrBadRequest           = AppError{Code: "BAD_REQUEST", Message: "Bad request"}
-	ErrEmailNotVerified     = AppError{Code: "EMAIL_NOT_VERIFIED", Message: "Email has not been verified"}
-	ErrEmailAlreadyVerified = AppError{Code: "EMAIL_ALREADY_VERIFIED", Message: "Email has already been verified"}
-	ErrInvalidOTP           = AppError{Code: "INVALID_OTP", Message: "Invalid verification code"}
-	ErrOTPExpired           = AppError{Code: "OTP_EXPIRED", Message: "Verification code has expired"}
-	ErrLoginMethodMismatch  = AppError{Code: "LOGIN_METHOD_MISMATCH", Message: "This email is registered with a different login method. Please use the original method."}
+	ErrInvalidCredentials   = AppError{Code: "INVALID_CREDENTIALS", Message: "Email hoặc mật khẩu không đúng"}
+	ErrInvalidToken         = AppError{Code: "INVALID_TOKEN", Message: "Token không hợp lệ hoặc đã hết hạn"}
+	ErrInvalidClaims        = AppError{Code: "INVALID_CLAIMS", Message: "Thông tin token không hợp lệ"}
+	ErrInvalidIssuer        = AppError{Code: "INVALID_ISSUER", Message: "Nguồn phát hành token không hợp lệ"}
+	ErrInvalidAudience      = AppError{Code: "INVALID_AUDIENCE", Message: "Đối tượng token không hợp lệ"}
+	ErrTokenInvalidated     = AppError{Code: "TOKEN_INVALIDATED", Message: "Token đã bị vô hiệu hóa"}
+	ErrForbidden            = AppError{Code: "FORBIDDEN", Message: "Bạn không có quyền thực hiện hành động này"}
+	ErrBadRequest           = AppError{Code: "BAD_REQUEST", Message: "Yêu cầu không hợp lệ"}
+	ErrEmailNotVerified     = AppError{Code: "EMAIL_NOT_VERIFIED", Message: "Email chưa được xác thực"}
+	ErrEmailAlreadyVerified = AppError{Code: "EMAIL_ALREADY_VERIFIED", Message: "Email đã được xác thực"}
+	ErrInvalidOTP           = AppError{Code: "INVALID_OTP", Message: "Mã xác thực không đúng"}
+	ErrOTPExpired           = AppError{Code: "OTP_EXPIRED", Message: "Mã xác thực đã hết hạn"}
+	ErrLoginMethodMismatch  = AppError{Code: "LOGIN_METHOD_MISMATCH", Message: "Email này đã được đăng ký bằng phương thức khác. Vui lòng sử dụng phương thức đăng nhập ban đầu."}
 
 	// Generic
-	ErrInternal          = AppError{Code: "INTERNAL_ERROR", Message: "Internal server error"}
-	ErrNoFieldsToUpdate  = AppError{Code: "NO_FIELDS_TO_UPDATE", Message: "No fields provided to update"}
-	ErrInvalidID         = AppError{Code: "INVALID_ID", Message: "Invalid ID format"}
-	ErrPaginationInvalid = AppError{Code: "PAGINATION_INVALID", Message: "Page number or page size is invalid. Page size must be smaller than 500."}
+	ErrInternal          = AppError{Code: "INTERNAL_ERROR", Message: "Lỗi hệ thống"}
+	ErrNoFieldsToUpdate  = AppError{Code: "NO_FIELDS_TO_UPDATE", Message: "Không có trường nào để cập nhật"}
+	ErrInvalidID         = AppError{Code: "INVALID_ID", Message: "Định dạng ID không hợp lệ"}
+	ErrPaginationInvalid = AppError{Code: "PAGINATION_INVALID", Message: "Số trang hoặc kích thước trang không hợp lệ. Kích thước trang phải nhỏ hơn 500."}
 
 	// User-related
-	ErrUserNotFound   = AppError{Code: "USER_NOT_FOUND", Message: "User not found"}
-	ErrUsernameExists = AppError{Code: "USERNAME_EXISTS", Message: "Username already exists"}
-	ErrEmailExists    = AppError{Code: "EMAIL_EXISTS", Message: "Email already exists"}
-	ErrUserInactive   = AppError{Code: "USER_INACTIVE", Message: "User account is inactive"}
+	ErrUserNotFound   = AppError{Code: "USER_NOT_FOUND", Message: "Không tìm thấy người dùng"}
+	ErrUsernameExists = AppError{Code: "USERNAME_EXISTS", Message: "Tên người dùng đã tồn tại"}
+	ErrEmailExists    = AppError{Code: "EMAIL_EXISTS", Message: "Email đã được sử dụng"}
+	ErrUserInactive   = AppError{Code: "USER_INACTIVE", Message: "Tài khoản người dùng đã bị vô hiệu hóa"}
 
 	// Profile validation
-	ErrInvalidGender     = AppError{Code: "INVALID_GENDER", Message: "Invalid gender value"}
-	ErrInvalidDateFormat = AppError{Code: "INVALID_DATE_FORMAT", Message: "Invalid date format, use YYYY-MM-DD"}
-	ErrAgeTooYoung       = AppError{Code: "AGE_TOO_YOUNG", Message: "Must be at least 13 years old"}
-	ErrInvalidBirthDate  = AppError{Code: "INVALID_BIRTH_DATE", Message: "Invalid birth date"}
-	ErrInvalidProvince   = AppError{Code: "INVALID_PROVINCE", Message: "Invalid province"}
-	ErrTooManyInterests  = AppError{Code: "TOO_MANY_INTERESTS", Message: "Maximum 10 interests allowed"}
-	ErrInvalidInterest   = AppError{Code: "INVALID_INTEREST", Message: "Invalid interest"}
+	ErrInvalidGender     = AppError{Code: "INVALID_GENDER", Message: "Giá trị giới tính không hợp lệ"}
+	ErrInvalidDateFormat = AppError{Code: "INVALID_DATE_FORMAT", Message: "Định dạng ngày không hợp lệ, sử dụng YYYY-MM-DD"}
+	ErrAgeTooYoung       = AppError{Code: "AGE_TOO_YOUNG", Message: "Phải từ 13 tuổi trở lên"}
+	ErrInvalidBirthDate  = AppError{Code: "INVALID_BIRTH_DATE", Message: "Ngày sinh không hợp lệ"}
+	ErrInvalidProvince   = AppError{Code: "INVALID_PROVINCE", Message: "Tỉnh/thành phố không hợp lệ"}
+	ErrTooManyInterests  = AppError{Code: "TOO_MANY_INTERESTS", Message: "Tối đa 10 sở thích"}
+	ErrInvalidInterest   = AppError{Code: "INVALID_INTEREST", Message: "Sở thích không hợp lệ"}
 
 	// Community-related
-	ErrCommunityNotFound   = AppError{Code: "COMMUNITY_NOT_FOUND", Message: "Community not found"}
-	ErrCommunityNameExists = AppError{Code: "COMMUNITY_NAME_EXISTS", Message: "Community name already exists"}
-	ErrCommunityDeleted    = AppError{Code: "COMMUNITY_DELETED", Message: "Community has been deleted"}
-	ErrUserNotMember       = AppError{Code: "USER_NOT_MEMBER", Message: "User is not a member of this community"}
+	ErrCommunityNotFound   = AppError{Code: "COMMUNITY_NOT_FOUND", Message: "Không tìm thấy cộng đồng"}
+	ErrCommunityNameExists = AppError{Code: "COMMUNITY_NAME_EXISTS", Message: "Tên cộng đồng đã tồn tại"}
+	ErrCommunityDeleted    = AppError{Code: "COMMUNITY_DELETED", Message: "Cộng đồng đã bị xóa"}
+	ErrUserNotMember       = AppError{Code: "USER_NOT_MEMBER", Message: "Bạn chưa tham gia cộng đồng này"}
 
 	// Membership-related
-	ErrMembershipNotFound     = AppError{Code: "MEMBERSHIP_NOT_FOUND", Message: "Membership not found"}
-	ErrAlreadyMember          = AppError{Code: "ALREADY_MEMBER", Message: "User is already a member of this community"}
-	ErrMembershipCreateFailed = AppError{Code: "MEMBERSHIP_CREATE_FAILED", Message: "Failed to create membership"}
-	ErrMembershipDeleteFailed = AppError{Code: "MEMBERSHIP_DELETE_FAILED", Message: "Failed to delete membership"}
-	ErrInvalidMembershipData  = AppError{Code: "INVALID_MEMBERSHIP_DATA", Message: "Invalid membership data"}
+	ErrMembershipNotFound     = AppError{Code: "MEMBERSHIP_NOT_FOUND", Message: "Không tìm thấy thành viên"}
+	ErrAlreadyMember          = AppError{Code: "ALREADY_MEMBER", Message: "Bạn đã là thành viên của cộng đồng này"}
+	ErrMembershipCreateFailed = AppError{Code: "MEMBERSHIP_CREATE_FAILED", Message: "Không thể tạo thành viên"}
+	ErrMembershipDeleteFailed = AppError{Code: "MEMBERSHIP_DELETE_FAILED", Message: "Không thể xóa thành viên"}
+	ErrInvalidMembershipData  = AppError{Code: "INVALID_MEMBERSHIP_DATA", Message: "Dữ liệu thành viên không hợp lệ"}
+
+	// Post-related
+	ErrPostNotFound   = AppError{Code: "POST_NOT_FOUND", Message: "Không tìm thấy bài viết"}
+	ErrVoteNotFound   = AppError{Code: "VOTE_NOT_FOUND", Message: "Không tìm thấy bình chọn"}
+	ErrPollVoted      = AppError{Code: "POLL_ALREADY_VOTED", Message: "Bạn đã bình chọn lựa chọn này rồi"}
+	ErrPollCannotEdit = AppError{Code: "POLL_CANNOT_EDIT", Message: "Không thể chỉnh sửa bình chọn sau khi đã có người bình chọn"}
 
 	// Comment-related
-	ErrCommentNotFound = AppError{Code: "COMMENT_NOT_FOUND", Message: "Comment not found"}
-	ErrDepthInvalid    = AppError{Code: "DEPTH_TOO_HIGH", Message: "Depth can not be smaller than 0 or larger than 2"}
+	ErrCommentNotFound = AppError{Code: "COMMENT_NOT_FOUND", Message: "Không tìm thấy bình luận"}
+	ErrDepthInvalid    = AppError{Code: "DEPTH_TOO_HIGH", Message: "Độ sâu phải từ 0 đến 2"}
 
 	// Messaging-related
-	ErrChannelNotFound = AppError{Code: "CHANNEL_NOT_FOUND", Message: "Channel not found"}
-	ErrNoMessageFound  = AppError{Code: "NO_MESSAGE_FOUND", Message: "No message found"}
+	ErrChannelNotFound = AppError{Code: "CHANNEL_NOT_FOUND", Message: "Không tìm thấy kênh"}
+	ErrNoMessageFound  = AppError{Code: "NO_MESSAGE_FOUND", Message: "Không tìm thấy tin nhắn"}
 )
