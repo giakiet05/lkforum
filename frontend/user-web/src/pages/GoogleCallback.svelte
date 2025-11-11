@@ -29,29 +29,28 @@
   }
 
   onMount(() => {
-    // Đọc hash fragment thay vì query params
-    // URL format: /#/auth/callback#access_token=...&refresh_token=...
-    // window.location.hash = "#/auth/callback#access_token=..."
-    const fullHash = window.location.hash;
+    // Đọc tokens từ query params trong hash
+    // URL format: /#/auth/callback?access_token=...&refresh_token=...
+    // window.location.hash = "#/auth/callback?access_token=...&refresh_token=..."
+    const hash = window.location.hash; // "#/auth/callback?access_token=..."
 
-    console.log("Full URL:", window.location.href);
-    console.log("Full hash:", fullHash);
-
-    // Tìm dấu # thứ 2 (chứa tokens)
-    const secondHashIndex = fullHash.indexOf("#", 1);
-    if (secondHashIndex === -1) {
+    // Tìm vị trí dấu ?
+    const queryIndex = hash.indexOf("?");
+    if (queryIndex === -1) {
       status = "error";
       errorMessage = "Thiếu thông tin xác thực";
       return;
     }
 
-    // Lấy phần sau dấu # thứ 2
-    const tokenHash = fullHash.substring(secondHashIndex + 1); // "access_token=...&refresh_token=..."
-    const params = new URLSearchParams(tokenHash);
-    const accessToken = params.get("access_token");
-    const refreshToken = params.get("refresh_token");
+    // Lấy phần query string sau dấu ?
+    const queryString = hash.substring(queryIndex + 1); // "access_token=...&refresh_token=..."
+    const urlParams = new URLSearchParams(queryString);
+    const accessToken = urlParams.get("access_token");
+    const refreshToken = urlParams.get("refresh_token");
 
-    console.log("Token hash:", tokenHash);
+    console.log("Full URL:", window.location.href);
+    console.log("Hash:", hash);
+    console.log("Query string:", queryString);
     console.log("Access token:", accessToken ? "Found" : "Not found");
     console.log("Refresh token:", refreshToken ? "Found" : "Not found");
 

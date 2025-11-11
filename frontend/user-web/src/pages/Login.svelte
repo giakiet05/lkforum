@@ -55,19 +55,10 @@
   // Xử lý submit form
   async function handleSubmit() {
     if (!validate()) return;
-
-    if (mode === "register") {
-      onSubmit({
-        username: identifier,
-        email: email,
-        password: password,
-      });
-    } else {
       onSubmit({
         identifier: identifier,
         password: password,
       });
-    }
   }
 
   function handleGoogleLogin() {

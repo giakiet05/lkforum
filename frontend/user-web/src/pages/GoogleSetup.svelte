@@ -12,27 +12,27 @@
   let status = $state<"form" | "error">("form");
 
   onMount(() => {
-    // Đọc setup_token từ hash fragment
-    // URL format: /#/auth/google-setup#setup_token=...
-    // window.location.hash = "#/auth/google-setup#setup_token=..."
-    const fullHash = window.location.hash; // "#/auth/google-setup#setup_token=..."
+    // Đọc setup_token từ query params trong hash
+    // URL format: /#/auth/google-setup?setup_token=...
+    // window.location.hash = "#/auth/google-setup?setup_token=..."
+    const hash = window.location.hash; // "#/auth/google-setup?setup_token=..."
 
-    console.log("Full hash:", fullHash);
-
-    // Tìm dấu # thứ 2 (chứa token data)
-    const secondHashIndex = fullHash.indexOf("#", 1);
-    if (secondHashIndex === -1) {
+    // Tìm vị trí dấu ?
+    const queryIndex = hash.indexOf("?");
+    if (queryIndex === -1) {
       status = "error";
       error = "Không tìm thấy mã xác thực. Vui lòng thử đăng nhập lại.";
       return;
     }
 
-    // Lấy phần sau dấu # thứ 2
-    const tokenHash = fullHash.substring(secondHashIndex + 1); // "setup_token=..."
-    const params = new URLSearchParams(tokenHash);
-    const token = params.get("setup_token");
+    // Lấy phần query string sau dấu ?
+    const queryString = hash.substring(queryIndex + 1); // "setup_token=..."
+    const urlParams = new URLSearchParams(queryString);
+    const token = urlParams.get("setup_token");
 
-    console.log("Token hash:", tokenHash);
+    console.log("Full URL:", window.location.href);
+    console.log("Hash:", hash);
+    console.log("Query string:", queryString);
     console.log("Parsed token:", token ? "Found" : "Not found");
 
     if (token) {

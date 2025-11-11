@@ -208,8 +208,8 @@ func (c *AuthController) GoogleCallback(ctx *gin.Context) {
 
 	switch result.Status {
 	case service.StatusLoginSuccess:
-		// Redirect to FE with tokens in hash fragment
-		redirectURL := fmt.Sprintf("%s/#/auth/callback#access_token=%s&refresh_token=%s",
+		// Redirect to FE with tokens in query params (can't use hash fragment due to SPA router limitation)
+		redirectURL := fmt.Sprintf("%s/#/auth/callback?access_token=%s&refresh_token=%s",
 			config.Cfg.FrontendURL,
 			url.QueryEscape(result.AccessToken),
 			url.QueryEscape(result.RefreshToken))
@@ -217,8 +217,8 @@ func (c *AuthController) GoogleCallback(ctx *gin.Context) {
 		redirectWithHash(ctx, redirectURL)
 
 	case service.StatusSetupRequired:
-		// Redirect to FE with setup_token in hash fragment
-		redirectURL := fmt.Sprintf("%s/#/auth/google-setup#setup_token=%s",
+		// Redirect to FE with setup_token in query params (can't use hash fragment due to SPA router limitation)
+		redirectURL := fmt.Sprintf("%s/#/auth/google-setup?setup_token=%s",
 			config.Cfg.FrontendURL,
 			url.QueryEscape(result.SetupToken))
 		log.Printf("GoogleCallback: Setup required, redirecting to: %s", redirectURL)
