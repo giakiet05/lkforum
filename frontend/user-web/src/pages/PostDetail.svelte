@@ -2,7 +2,7 @@
   import { onMount } from "svelte";
   import { push } from "svelte-spa-router";
   import CommentSection from "../components/CommentSection.svelte";
-  import type { PostResponse } from "../dtos/post-dto"
+  import type { PostResponse } from "../dtos/post-dto";
 
   type PostDetailProps = {
     params?: { id: string };

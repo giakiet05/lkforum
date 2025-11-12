@@ -3,21 +3,27 @@
   import { push } from "svelte-spa-router";
   import Post from "../components/Post.svelte";
   import type { PostResponse } from "../dtos/post-dto";
+  import type { CommentResponse } from "../dtos/comment-dto";
   import type { UserResponse } from "../dtos/user-dto";
   import {
     getMyProfile,
     uploadAvatar,
     uploadCover,
   } from "../services/user-service";
+  import { getPostsByUserId } from "../services/post-service";
+  import { getCommentsByUserId } from "../services/comment-service";
   import { ApiError } from "../errors/api-error";
 
   let user = $state<UserResponse | null>(null);
   let isLoadingUser = $state(true);
   let errorMessage = $state<string | null>(null);
 
-  // TODO: Replace with API call for posts
   let posts = $state<PostResponse[]>([]);
+  let comments = $state<CommentResponse[]>([]);
   let isLoadingPosts = $state(false);
+  let isLoadingComments = $state(false);
+  let postsError = $state<string | null>(null);
+  let commentsError = $state<string | null>(null);
 
   let activeTab = $state<"posts" | "comments" | "upvoted" | "downvoted">(
     "posts"
@@ -31,6 +37,20 @@
 
   onMount(() => {
     loadUserProfile();
+  });
+
+  // Watch for tab changes to load data
+  $effect(() => {
+    if (user && activeTab === "posts" && posts.length === 0 && !postsError) {
+      loadUserPosts();
+    } else if (
+      user &&
+      activeTab === "comments" &&
+      comments.length === 0 &&
+      !commentsError
+    ) {
+      loadUserComments();
+    }
   });
 
   async function loadUserProfile() {
@@ -128,6 +148,46 @@
     push("/settings");
   }
 
+  async function loadUserPosts() {
+    if (!user) return;
+
+    try {
+      isLoadingPosts = true;
+      postsError = null;
+      posts = await getPostsByUserId(user.id, 1, 20);
+    } catch (error) {
+      console.error("Failed to load posts:", error);
+      if (error instanceof ApiError) {
+        postsError = error.message;
+      } else {
+        postsError = "Failed to load posts. Please try again.";
+      }
+      posts = [];
+    } finally {
+      isLoadingPosts = false;
+    }
+  }
+
+  async function loadUserComments() {
+    if (!user) return;
+
+    try {
+      isLoadingComments = true;
+      commentsError = null;
+      comments = await getCommentsByUserId(user.id, 1, 20);
+    } catch (error) {
+      console.error("Failed to load comments:", error);
+      if (error instanceof ApiError) {
+        commentsError = error.message;
+      } else {
+        commentsError = "Failed to load comments. Please try again.";
+      }
+      comments = [];
+    } finally {
+      isLoadingComments = false;
+    }
+  }
+
   function formatDate(dateString?: string): string {
     if (!dateString) return "Unknown";
     const date = new Date(dateString);
@@ -173,17 +233,20 @@
         {:else}
           <div class="cover-placeholder"></div>
         {/if}
-        <button
-          class="change-cover-btn"
-          onclick={() => coverFileInput.click()}
-          disabled={isUploadingCover}
-        >
-          {#if isUploadingCover}
-            <div class="mini-spinner"></div>
-          {:else}
-            <img src="/change_profile_image.png" alt="Change cover" />
-          {/if}
-        </button>
+        <div class="cover-actions">
+          <button
+            class="change-cover-btn"
+            onclick={() => coverFileInput.click()}
+            disabled={isUploadingCover}
+            title="Change cover"
+          >
+            {#if isUploadingCover}
+              <div class="mini-spinner"></div>
+            {:else}
+              <img src="/change_profile_image.png" alt="Change cover" />
+            {/if}
+          </button>
+        </div>
       </div>
       <div class="profile-info-bar">
         <div class="profile-details">
@@ -203,6 +266,7 @@
               class="change-avatar-btn"
               onclick={() => avatarFileInput.click()}
               disabled={isUploadingAvatar}
+              title="Change avatar"
             >
               {#if isUploadingAvatar}
                 <div class="mini-spinner"></div>
@@ -271,6 +335,11 @@
                 <div class="spinner"></div>
                 <p>Loading posts...</p>
               </div>
+            {:else if postsError}
+              <div class="error-state">
+                <p>{postsError}</p>
+                <button class="retry-btn" onclick={loadUserPosts}>Retry</button>
+              </div>
             {:else if posts.length === 0}
               <div class="empty-state">
                 <p>No posts yet</p>
@@ -283,11 +352,52 @@
               </div>
             {/if}
           {:else if activeTab === "comments"}
-            <p>Comments will be shown here.</p>
+            {#if isLoadingComments}
+              <div class="loading-posts">
+                <div class="spinner"></div>
+                <p>Loading comments...</p>
+              </div>
+            {:else if commentsError}
+              <div class="error-state">
+                <p>{commentsError}</p>
+                <button class="retry-btn" onclick={loadUserComments}
+                  >Retry</button
+                >
+              </div>
+            {:else if comments.length === 0}
+              <div class="empty-state">
+                <p>No comments yet</p>
+              </div>
+            {:else}
+              <div class="comments-list">
+                {#each comments as comment}
+                  <div class="comment-item">
+                    <div class="comment-header">
+                      <img
+                        src={comment.author.avatar?.url || "/avatar.jpg"}
+                        alt={comment.author.username}
+                        class="comment-avatar"
+                      />
+                      <span class="comment-author"
+                        >{comment.author.username}</span
+                      >
+                      <span class="comment-time">{comment.created_at}</span>
+                    </div>
+                    <div class="comment-content">{comment.content}</div>
+                  </div>
+                {/each}
+              </div>
+            {/if}
           {:else if activeTab === "upvoted"}
-            <p>Upvoted posts will be shown here.</p>
+            <div class="coming-soon">
+              <p>Upvoted posts feature coming soon...</p>
+              <p class="note">Backend API needed</p>
+            </div>
           {:else if activeTab === "downvoted"}
-            <p>Downvoted posts will be shown here.</p>
+            <div class="coming-soon">
+              <p>Downvoted posts feature coming soon...</p>
+              <p class="note">Backend API needed</p>
+            </div>
           {/if}
         </div>
       </div>
@@ -298,6 +408,153 @@
             <p class="bio">
               {user.profile.bio || "No bio yet."}
             </p>
+
+            <!-- Personal Info -->
+            {#if user.profile.gender || user.profile.age || user.profile.location}
+              <div class="personal-info">
+                {#if user.profile.gender}
+                  <div class="info-item">
+                    <img
+                      src="/gender_icon.svg"
+                      alt="Gender"
+                      width="16"
+                      height="16"
+                    />
+                    <span
+                      >{user.profile.gender === "male"
+                        ? "Nam"
+                        : user.profile.gender === "female"
+                          ? "Nữ"
+                          : "Không tiết lộ"}</span
+                    >
+                  </div>
+                {/if}
+                {#if user.profile.age}
+                  <div class="info-item">
+                    <img
+                      src="/Calendar_duotone.svg"
+                      alt="Age"
+                      width="16"
+                      height="16"
+                    />
+                    <span>{user.profile.age} tuổi</span>
+                  </div>
+                {/if}
+                {#if user.profile.location}
+                  <div class="info-item">
+                    <img
+                      src="/location_icon.svg"
+                      alt="Location"
+                      width="16"
+                      height="16"
+                    />
+                    <span>{user.profile.location}</span>
+                  </div>
+                {/if}
+              </div>
+            {/if}
+
+            <!-- Interests -->
+            {#if user.profile.interests && user.profile.interests.length > 0}
+              <div class="interests-section">
+                <h4>Sở thích</h4>
+                <div class="interests-tags">
+                  {#each user.profile.interests as interest}
+                    <span class="interest-tag">{interest}</span>
+                  {/each}
+                </div>
+              </div>
+            {/if}
+
+            <!-- Social Links -->
+            {#if user.profile.social_links && (user.profile.social_links.website || user.profile.social_links.facebook || user.profile.social_links.youtube || user.profile.social_links.github)}
+              <div class="social-links-section">
+                <h4>Liên kết</h4>
+                <div class="social-links">
+                  {#if user.profile.social_links.website}
+                    <a
+                      href={user.profile.social_links.website}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="social-link social-website"
+                    >
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 16 16"
+                        fill="currentColor"
+                      >
+                        <path
+                          d="M8 0a8 8 0 1 0 0 16A8 8 0 0 0 8 0zM4.5 7.5a.5.5 0 0 0 0 1h5.793l-2.147 2.146a.5.5 0 0 0 .708.708l3-3a.5.5 0 0 0 0-.708l-3-3a.5.5 0 1 0-.708.708L10.293 7.5H4.5z"
+                        />
+                      </svg>
+                      Website
+                    </a>
+                  {/if}
+                  {#if user.profile.social_links.facebook}
+                    <a
+                      href={user.profile.social_links.facebook}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="social-link social-facebook"
+                    >
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 16 16"
+                        fill="currentColor"
+                      >
+                        <path
+                          d="M16 8.049c0-4.446-3.582-8.05-8-8.05C3.58 0-.002 3.603-.002 8.05c0 4.017 2.926 7.347 6.75 7.951v-5.625h-2.03V8.05H6.75V6.275c0-2.017 1.195-3.131 3.022-3.131.876 0 1.791.157 1.791.157v1.98h-1.009c-.993 0-1.303.621-1.303 1.258v1.51h2.218l-.354 2.326H9.25V16c3.824-.604 6.75-3.934 6.75-7.951z"
+                        />
+                      </svg>
+                      Facebook
+                    </a>
+                  {/if}
+                  {#if user.profile.social_links.youtube}
+                    <a
+                      href={user.profile.social_links.youtube}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="social-link social-youtube"
+                    >
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 16 16"
+                        fill="currentColor"
+                      >
+                        <path
+                          d="M8.051 1.999h.089c.822.003 4.987.033 6.11.335a2.01 2.01 0 0 1 1.415 1.42c.101.38.172.883.22 1.402l.01.104.022.26.008.104c.065.914.073 1.77.074 1.957v.075c-.001.194-.01 1.108-.082 2.06l-.008.105-.009.104c-.05.572-.124 1.14-.235 1.558a2.007 2.007 0 0 1-1.415 1.42c-1.16.312-5.569.334-6.18.335h-.142c-.309 0-1.587-.006-2.927-.052l-.17-.006-.087-.004-.171-.007-.171-.007c-1.11-.049-2.167-.128-2.654-.26a2.007 2.007 0 0 1-1.415-1.419c-.111-.417-.185-.986-.235-1.558L.09 9.82l-.008-.104A31.4 31.4 0 0 1 0 7.68v-.123c.002-.215.01-.958.064-1.778l.007-.103.003-.052.008-.104.022-.26.01-.104c.048-.519.119-1.023.22-1.402a2.007 2.007 0 0 1 1.415-1.42c.487-.13 1.544-.21 2.654-.26l.17-.007.172-.006.086-.003.171-.007A99.788 99.788 0 0 1 7.858 2h.193zM6.4 5.209v4.818l4.157-2.408L6.4 5.209z"
+                        />
+                      </svg>
+                      YouTube
+                    </a>
+                  {/if}
+                  {#if user.profile.social_links.github}
+                    <a
+                      href={user.profile.social_links.github}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="social-link social-github"
+                    >
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 16 16"
+                        fill="currentColor"
+                      >
+                        <path
+                          d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.012 8.012 0 0 0 16 8c0-4.42-3.58-8-8-8z"
+                        />
+                      </svg>
+                      GitHub
+                    </a>
+                  {/if}
+                </div>
+              </div>
+            {/if}
+
             <div class="user-stats">
               <div class="stat">
                 <span class="stat-value"
@@ -318,7 +575,7 @@
             </div>
             <div class="cake-day">
               <i class="fas fa-birthday-cake"></i>
-              Member since: {formatDate(user.profile.stats?.member_since)}
+              {user.profile.stats?.member_since || "Member"}
             </div>
           </div>
         </div>
@@ -349,6 +606,14 @@
     margin: 8px 24px;
   }
 
+  .cover-actions {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    display: flex;
+    gap: 0.5rem;
+  }
+
   .cover-image {
     width: 100%;
     height: 100%;
@@ -356,9 +621,6 @@
   }
 
   .change-cover-btn {
-    position: absolute;
-    top: 1rem;
-    right: 1rem;
     width: 40px;
     height: 40px;
     border: none;
@@ -691,6 +953,113 @@
     line-height: 1.4;
   }
 
+  .personal-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin: 1rem 0;
+    padding: 1rem 0;
+    border-top: 1px solid #e6e6e6;
+  }
+
+  .info-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #7c7c7c;
+    font-size: 0.9rem;
+  }
+
+  .info-item img {
+    flex-shrink: 0;
+    opacity: 0.7;
+  }
+
+  .interests-section {
+    margin: 1rem 0;
+    padding: 1rem 0;
+    border-top: 1px solid #e6e6e6;
+  }
+
+  .interests-section h4 {
+    margin: 0 0 0.75rem 0;
+    color: #1a1a1b;
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+
+  .interests-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .interest-tag {
+    padding: 0.35rem 0.75rem;
+    background-color: #f6f7f8;
+    color: #153060;
+    border-radius: 16px;
+    font-size: 0.85rem;
+    font-weight: 500;
+  }
+
+  .social-links-section {
+    margin: 1rem 0;
+    padding: 1rem 0;
+    border-top: 1px solid #e6e6e6;
+  }
+
+  .social-links-section h4 {
+    margin: 0 0 0.75rem 0;
+    color: #1a1a1b;
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+
+  .social-links {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .social-link {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    color: #153060;
+    text-decoration: none;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+  }
+
+  .social-link:hover {
+    background-color: #f6f7f8;
+  }
+
+  .social-link svg {
+    flex-shrink: 0;
+  }
+
+  /* Social media brand colors */
+  .social-facebook svg {
+    color: #1877f2;
+  }
+
+  .social-youtube svg {
+    color: #ff0000;
+  }
+
+  .social-github svg {
+    color: #181717;
+  }
+
+  .social-website svg {
+    color: #0066cc;
+  }
+
   .user-stats {
     display: flex;
     justify-content: space-between;
@@ -804,6 +1173,69 @@
     text-align: center;
     padding: 3rem;
     color: #7c7c7c;
+  }
+
+  /* Coming Soon State */
+  .coming-soon {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: #7c7c7c;
+  }
+
+  .coming-soon p {
+    margin: 0.5rem 0;
+  }
+
+  .coming-soon .note {
+    font-size: 0.85rem;
+    color: #999;
+    font-style: italic;
+  }
+
+  /* Comments List */
+  .comments-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .comment-item {
+    background: white;
+    border: 1px solid #e6e6e6;
+    border-radius: 4px;
+    padding: 1rem;
+  }
+
+  .comment-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .comment-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+  }
+
+  .comment-author {
+    font-weight: 600;
+    color: #1a1a1b;
+    font-size: 0.9rem;
+  }
+
+  .comment-time {
+    color: #7c7c7c;
+    font-size: 0.85rem;
+    margin-left: auto;
+  }
+
+  .comment-content {
+    color: #1a1a1b;
+    line-height: 1.5;
+    padding-left: 2.5rem;
   }
 
   /* Placeholder styles */
