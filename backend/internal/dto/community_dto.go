@@ -41,9 +41,9 @@ type RemoveModeratorRequest struct {
 type CommunityResponse struct {
 	ID             string                 `json:"id"`
 	Name           string                 `json:"name"`
-	Description    string                 `json:"description"`
-	Avatar         string                 `json:"avatar"`
-	Banner         string                 `json:"banner"`
+	Description    *string                `json:"description"`
+	Avatar         *string                `json:"avatar"`
+	Banner         *string                `json:"banner"`
 	Setting        model.CommunitySetting `json:"setting"`
 	Moderators     []model.Moderator      `json:"moderators"`
 	PostCount      int64                  `json:"post_count"`
@@ -65,9 +65,9 @@ func FromCommunity(community *model.Community) *CommunityResponse {
 	return &CommunityResponse{
 		ID:             community.ID.Hex(),
 		Name:           community.Name,
-		Description:    *community.Description,
-		Avatar:         *community.Avatar,
-		Banner:         *community.Banner,
+		Description:    community.Description,
+		Avatar:         community.Avatar,
+		Banner:         community.Banner,
 		Setting:        community.Setting,
 		Moderators:     community.Moderators,
 		PostCount:      community.PostCount,
