@@ -9,21 +9,25 @@ import (
 const (
 	TopicBroadcast = "broadcast"
 
+	TopicWSConnected    = "ws.connected"
+	TopicWSDisconnected = "ws.disconnected"
+	TopicWSPackageSend  = "ws.send"
+
 	TopicUserChangeAvatar = "user.avatar"
 
-	TopicPostCreated           = "post.created"
-	TopicPostUpvoted           = "post.upvoted"
-	TopicPostDownvoted         = "post.downvoted"
-	TopicPostUpvoteRemoved     = "post.upvote_removed"
-	TopicPostDownvoteRemoved   = "post.downvote_removed"
+	TopicPostCreated         = "post.created"
+	TopicPostUpvoted         = "post.upvoted"
+	TopicPostDownvoted       = "post.downvoted"
+	TopicPostUpvoteRemoved   = "post.upvote_removed"
+	TopicPostDownvoteRemoved = "post.downvote_removed"
 
-	TopicCommentCreated        = "comment.created"
-	TopicCommentUpvoted        = "comment.upvoted"
-	TopicCommentDownvoted      = "comment.downvoted"
-	TopicCommentUpvoteRemoved  = "comment.upvote_removed"
-	TopicCommentDownvoteRemoved= "comment.downvote_removed"
+	TopicCommentCreated         = "comment.created"
+	TopicCommentUpvoted         = "comment.upvoted"
+	TopicCommentDownvoted       = "comment.downvoted"
+	TopicCommentUpvoteRemoved   = "comment.upvote_removed"
+	TopicCommentDownvoteRemoved = "comment.downvote_removed"
 
-	TopicNotificationCreated   = "notification.created"
+	TopicNotificationCreated = "notification.created"
 
 	TopicNewMessage    = "message.new"
 	TopicMessageError  = "message.error"
@@ -59,6 +63,41 @@ func (e BroadcastEvent) Payload() map[string]interface{} {
 		"event_type":    e.EventType,
 		"temp_id":       e.TempID,
 		"data":          e.Data,
+	}
+}
+
+type WSPackageSendEvent struct {
+	Type dto.WebSocketMessageType `json:"type"`
+	Data interface{}              `json:"data"`
+}
+
+func (e WSPackageSendEvent) Topic() string { return TopicWSPackageSend }
+func (e WSPackageSendEvent) Payload() map[string]interface{} {
+	return map[string]interface{}{
+		"type": e.Type,
+		"data": e.Data,
+	}
+}
+
+type WSConnectedEvent struct {
+	UserID string `json:"user_id"`
+}
+
+func (e WSConnectedEvent) Topic() string { return TopicWSConnected }
+func (e WSConnectedEvent) Payload() map[string]interface{} {
+	return map[string]interface{}{
+		"user_id": e.UserID,
+	}
+}
+
+type WSDisconnectedEvent struct {
+	UserID string `json:"user_id"`
+}
+
+func (e WSDisconnectedEvent) Topic() string { return TopicWSDisconnected }
+func (e WSDisconnectedEvent) Payload() map[string]interface{} {
+	return map[string]interface{}{
+		"user_id": e.UserID,
 	}
 }
 

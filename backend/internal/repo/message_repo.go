@@ -21,7 +21,10 @@ type MessageRepo interface {
 		isRead *bool, isSent *bool, isMedia *bool,
 		page int, pageSize int,
 	) ([]model.Message, int64, error)
+	Update(ctx context.Context, message *model.Message) (*model.Message, error)
 	Delete(ctx context.Context, messageID string) error
+	CountUnreadMessages(ctx context.Context, channelID string, userID string) (int64, error)
+	MarkAllRead(ctx context.Context, channelID string, userID string) error
 	IsSendByUser(ctx context.Context, messageID string, userID string) (bool, error)
 }
 
@@ -137,6 +140,20 @@ func (m *messageRepo) GetFilter(
 	return messages, total, nil
 }
 
+func (m *messageRepo) Update(ctx context.Context, message *model.Message) (*model.Message, error) {
+	filter := bson.M{"_id": message.ID}
+	update := bson.M{"$set": message}
+	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
+
+	var updated model.Message
+	err := m.messageCollection.FindOneAndUpdate(ctx, filter, update, opts).Decode(&updated)
+	if err != nil {
+		return nil, err
+	}
+
+	return &updated, nil
+}
+
 func (m *messageRepo) Delete(ctx context.Context, messageID string) error {
 	messageObjectID, err := primitive.ObjectIDFromHex(messageID)
 	if err != nil {
@@ -161,6 +178,57 @@ func (m *messageRepo) Delete(ctx context.Context, messageID string) error {
 	}
 
 	return nil
+}
+
+func (m *messageRepo) CountUnreadMessages(ctx context.Context, channelID string, userID string) (int64, error) {
+	channelObjID, err := primitive.ObjectIDFromHex(channelID)
+	if err != nil {
+		return 0, err
+	}
+	userObjID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return 0, err
+	}
+
+	filter := bson.M{
+		"channel_id": channelObjID,
+		"is_deleted": false,
+		"read_by": bson.M{
+			"$ne": userObjID,
+		},
+	}
+
+	count, err := m.messageCollection.CountDocuments(ctx, filter)
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+func (m *messageRepo) MarkAllRead(ctx context.Context, channelID string, userID string) error {
+	channelObjID, err := primitive.ObjectIDFromHex(channelID)
+	if err != nil {
+		return err
+	}
+	userObjID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return err
+	}
+
+	// Filter messages that are in this channel, not deleted, and not yet read by this user
+	filter := bson.M{
+		"channel_id": channelObjID,
+		"is_deleted": false,
+		"read_by": bson.M{
+			"$ne": userObjID,
+		},
+	}
+
+	update := bson.M{}
+
+	_, err = m.messageCollection.UpdateMany(ctx, filter, update)
+	return err
 }
 
 func (m *messageRepo) IsSendByUser(ctx context.Context, messageID string, userID string) (bool, error) {

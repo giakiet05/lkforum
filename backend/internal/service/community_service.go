@@ -44,7 +44,7 @@ func (c *communityService) Start() {
 
 	c.eventBus.Subscribe(bus.TopicUserChangeAvatar, eventChannel)
 
-	log.Println("ChannelService started and subscribed to events.")
+	log.Println("CommunityService started and subscribed to events.")
 
 	go c.processEvents(eventChannel)
 }

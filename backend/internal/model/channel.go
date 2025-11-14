@@ -31,7 +31,7 @@ type ChannelSetting struct {
 }
 
 type ChannelMember struct {
-	UserID   primitive.ObjectID `bson:"user_id" json:"user_id"`
+	ID       primitive.ObjectID `bson:"id" json:"id"`
 	Username string             `bson:"username" json:"username"`
 	Avatar   string             `bson:"avatar" json:"avatar"`
 }

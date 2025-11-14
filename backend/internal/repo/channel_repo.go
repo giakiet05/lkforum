@@ -220,7 +220,7 @@ func (c *channelRepo) IsMember(ctx context.Context, channelID string, userID str
 	}
 
 	for _, m := range channel.Members {
-		if m.UserID == userObjectID {
+		if m.ID == userObjectID {
 			return true, nil
 		}
 	}

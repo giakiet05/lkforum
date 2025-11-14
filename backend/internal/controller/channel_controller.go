@@ -31,13 +31,13 @@ func (c *ChannelController) CreateChannel(ctx *gin.Context) {
 		return
 	}
 
-	channel, err := c.channelService.CreateChannel(req, authUser.(auth.AuthUser).ID)
+	channel, unreadCount, err := c.channelService.CreateChannel(req, authUser.(auth.AuthUser).ID)
 	if err != nil {
 		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
 	}
 
-	dto.SendSuccess(ctx, http.StatusCreated, "Channel created successfully", dto.FromChannel(channel))
+	dto.SendSuccess(ctx, http.StatusCreated, "Channel created successfully", dto.FromChannel(channel, &unreadCount))
 }
 
 func (c *ChannelController) GetChannelByID(ctx *gin.Context) {
@@ -47,13 +47,19 @@ func (c *ChannelController) GetChannelByID(ctx *gin.Context) {
 		return
 	}
 
-	channel, err := c.channelService.GetChannelByID(channelID)
+	authUser, exists := ctx.Get("authUser")
+	if !exists {
+		dto.SendError(ctx, http.StatusForbidden, apperror.ErrForbidden.Message, apperror.ErrForbidden.Code)
+		return
+	}
+
+	channel, unreadCount, err := c.channelService.GetChannelByID(channelID, authUser.(auth.AuthUser).ID)
 	if err != nil {
 		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
 	}
 
-	dto.SendSuccess(ctx, http.StatusOK, "Channel retrieved successfully", dto.FromChannel(channel))
+	dto.SendSuccess(ctx, http.StatusOK, "Channel retrieved successfully", dto.FromChannel(channel, &unreadCount))
 }
 
 func (c *ChannelController) GetChannelsByUserID(ctx *gin.Context) {
@@ -69,7 +75,12 @@ func (c *ChannelController) GetChannelsByUserID(ctx *gin.Context) {
 		return
 	}
 
-	response, err := c.channelService.GetChannelsByUserID(query.UserID, authUser.(auth.AuthUser).ID, query.Page, query.PageSize)
+	response, err := c.channelService.GetChannelsByUserID(
+		query.UserID,
+		authUser.(auth.AuthUser).ID,
+		query.Page, query.PageSize,
+	)
+
 	if err != nil {
 		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
@@ -93,13 +104,13 @@ func (c *ChannelController) GetChannelByBothUserID(ctx *gin.Context) {
 		return
 	}
 
-	channel, err := c.channelService.GetChannelByBothUserID(user1ID, user2ID, authUser.(auth.AuthUser).ID)
+	channel, unreadCount, err := c.channelService.GetChannelByBothUserID(user1ID, user2ID, authUser.(auth.AuthUser).ID)
 	if err != nil {
 		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
 	}
 
-	dto.SendSuccess(ctx, http.StatusOK, "Channel retrieved successfully", dto.FromChannel(channel))
+	dto.SendSuccess(ctx, http.StatusOK, "Channel retrieved successfully", dto.FromChannel(channel, &unreadCount))
 }
 
 func (c *ChannelController) UpdateChannel(ctx *gin.Context) {
@@ -121,7 +132,7 @@ func (c *ChannelController) UpdateChannel(ctx *gin.Context) {
 		return
 	}
 
-	dto.SendSuccess(ctx, http.StatusOK, "Channel updated successfully", dto.FromChannel(channel))
+	dto.SendSuccess(ctx, http.StatusOK, "Channel updated successfully", dto.FromChannel(channel, nil))
 }
 
 func (c *ChannelController) DeleteChannelByID(ctx *gin.Context) {

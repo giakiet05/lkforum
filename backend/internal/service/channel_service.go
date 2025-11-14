@@ -15,22 +15,24 @@ import (
 
 type ChannelService interface {
 	Start()
-	CreateChannel(req *dto.CreateChannelRequest, userID string) (*model.Channel, error)
-	GetChannelByID(channelID string) (*model.Channel, error)
+	CreateChannel(req *dto.CreateChannelRequest, requesterID string) (*model.Channel, int64, error)
+	GetChannelByID(channelID string, requesterID string) (*model.Channel, int64, error)
 	GetChannelsByUserID(userID string, requesterID string, page int, pageSize int) (*dto.PaginatedChannelsResponse, error)
-	GetChannelByBothUserID(user1ID string, user2ID string, requesterID string) (*model.Channel, error)
+	GetChannelByBothUserID(user1ID string, user2ID string, requesterID string) (*model.Channel, int64, error)
 	UpdateChannel(req *dto.UpdateChannelRequest, requesterID string) (*model.Channel, error)
 	DeleteChannel(channelID string, userID string) error
 }
 
 type channelService struct {
 	channelRepository repo.ChannelRepo
+	messageRepository repo.MessageRepo
 	eventBus          *bus.EventBus
 }
 
-func NewChannelService(channelRepo repo.ChannelRepo, bus *bus.EventBus) ChannelService {
+func NewChannelService(channelRepo repo.ChannelRepo, messageRepo repo.MessageRepo, bus *bus.EventBus) ChannelService {
 	return &channelService{
 		channelRepository: channelRepo,
+		messageRepository: messageRepo,
 		eventBus:          bus,
 	}
 }
@@ -74,33 +76,33 @@ func (s *channelService) handleNewAvatar(event bus.Event) {
 	}
 }
 
-func (s *channelService) CreateChannel(req *dto.CreateChannelRequest, userID string) (*model.Channel, error) {
+func (s *channelService) CreateChannel(req *dto.CreateChannelRequest, requesterID string) (*model.Channel, int64, error) {
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
 
-	if userID != req.Member1 && userID != req.Member2 {
-		return nil, apperror.ErrForbidden
+	if requesterID != req.Member1 && requesterID != req.Member2 {
+		return nil, 0, apperror.ErrForbidden
 	}
 
 	member1ID, err := primitive.ObjectIDFromHex(req.Member1)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	member2ID, err := primitive.ObjectIDFromHex(req.Member2)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	channel := &model.Channel{
 		ID: primitive.NewObjectID(),
 		Members: []model.ChannelMember{
 			{
-				UserID:   member1ID,
+				ID:       member1ID,
 				Username: req.Member1Username,
 				Avatar:   req.Member1Avatar,
 			},
 			{
-				UserID:   member2ID,
+				ID:       member2ID,
 				Username: req.Member2Username,
 				Avatar:   req.Member2Avatar,
 			},
@@ -124,14 +126,42 @@ func (s *channelService) CreateChannel(req *dto.CreateChannelRequest, userID str
 		UpdatedAt: time.Now(),
 	}
 
-	return s.channelRepository.Create(ctx, channel)
+	channel, err = s.channelRepository.Create(ctx, channel)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	unreadMessageCount, err := s.messageRepository.CountUnreadMessages(ctx, channel.ID.Hex(), requesterID)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return channel, unreadMessageCount, nil
 }
 
-func (s *channelService) GetChannelByID(channelID string) (*model.Channel, error) {
+func (s *channelService) GetChannelByID(channelID string, requesterID string) (*model.Channel, int64, error) {
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
 
-	return s.channelRepository.GetByID(ctx, channelID)
+	channel, err := s.channelRepository.GetByID(ctx, channelID)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	isMember, err := s.channelRepository.IsMember(ctx, channelID, requesterID)
+	if err != nil {
+		return nil, 0, err
+	}
+	if !isMember {
+		return nil, 0, apperror.ErrForbidden
+	}
+
+	unreadMessageCount, err := s.messageRepository.CountUnreadMessages(ctx, channel.ID.Hex(), requesterID)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return channel, unreadMessageCount, nil
 }
 
 func (s *channelService) GetChannelsByUserID(userID string, requesterID string, page int, pageSize int) (*dto.PaginatedChannelsResponse, error) {
@@ -146,7 +176,19 @@ func (s *channelService) GetChannelsByUserID(userID string, requesterID string, 
 	if err != nil {
 		return nil, err
 	}
-	channelResponses := dto.FromChannels(channels)
+
+	unreadCounts := make([]*int64, len(channels))
+	for i, ch := range channels {
+		count, err := s.messageRepository.CountUnreadMessages(ctx, ch.ID.Hex(), userID)
+		if err != nil {
+			return nil, err
+		}
+		unreadCounts[i] = &count
+	}
+	channelResponses, err := dto.FromChannels(channels, unreadCounts)
+	if err != nil {
+		return nil, err
+	}
 
 	var response = dto.PaginatedChannelsResponse{
 		Channels: channelResponses,
@@ -160,15 +202,25 @@ func (s *channelService) GetChannelsByUserID(userID string, requesterID string, 
 	return &response, nil
 }
 
-func (s *channelService) GetChannelByBothUserID(user1ID string, user2ID string, requesterID string) (*model.Channel, error) {
+func (s *channelService) GetChannelByBothUserID(user1ID string, user2ID string, requesterID string) (*model.Channel, int64, error) {
 	if requesterID != user1ID && requesterID != user2ID {
-		return nil, apperror.ErrForbidden
+		return nil, 0, apperror.ErrForbidden
 	}
 
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
 
-	return s.channelRepository.GetByBothUserID(ctx, user1ID, user2ID)
+	channel, err := s.channelRepository.GetByBothUserID(ctx, user1ID, user2ID)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	unreadMessageCount, err := s.messageRepository.CountUnreadMessages(ctx, channel.ID.Hex(), requesterID)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return channel, unreadMessageCount, nil
 }
 
 func (s *channelService) UpdateChannel(req *dto.UpdateChannelRequest, requesterID string) (*model.Channel, error) {
@@ -182,7 +234,7 @@ func (s *channelService) UpdateChannel(req *dto.UpdateChannelRequest, requesterI
 
 	isMember := false
 	for _, member := range channel.Members {
-		if member.UserID.Hex() == requesterID {
+		if member.ID.Hex() == requesterID {
 			isMember = true
 			break
 		}

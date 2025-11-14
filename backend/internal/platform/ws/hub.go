@@ -76,7 +76,7 @@ func (h *Hub) run(eventChannel bus.EventListener) {
 				payload := event.Payload()
 				if recipientID, ok := payload["recipientId"].(string); ok {
 					if notification, ok := payload["notification"].(interface{}); ok {
-						h.sendToUser(recipientID, NewNotification, notification)
+						h.sendToUser(recipientID, dto.NewNotification, notification)
 					}
 				}
 			case bus.TopicBroadcast:
@@ -94,12 +94,12 @@ func (h *Hub) run(eventChannel bus.EventListener) {
 				errorCode, _ := payload["error_code"].(string)
 				errorMsg, _ := payload["error_msg"].(string)
 
-				errPayload := ErrorPayload{
+				errPayload := dto.ErrorPayload{
 					TempMessageID: &tempID,
 					ErrorCode:     &errorCode,
 					ErrorMsg:      errorMsg,
 				}
-				h.sendToUser(senderID, ErrorMessage, errPayload)
+				h.sendToUser(senderID, dto.ErrorMessage, errPayload)
 			default:
 				log.Printf("WebSocket client received unknown event: %s", event.Topic())
 			}
@@ -108,18 +108,18 @@ func (h *Hub) run(eventChannel bus.EventListener) {
 }
 
 func (h *Hub) handleIncoming(raw []byte, userID string) {
-	var incomingMsg WebSocketMessage
+	var incomingMsg dto.WebSocketMessage
 	if err := json.Unmarshal(raw, &incomingMsg); err != nil {
 		log.Printf("WebSocket Invalid JSON from client: %v", err)
 		return
 	}
 
 	switch incomingMsg.Type {
-	case NewMessage:
-		var payload NewMessagePayload
+	case dto.NewMessage:
+		var payload dto.NewMessagePayload
 		if err := util.DecodeJson(incomingMsg.Payload, &payload); err != nil {
 			log.Printf("WebSocket invalid new message payload from user %s: %v", userID, err)
-			h.sendToUser(userID, ErrorMessage, ErrorPayload{ErrorMsg: err.Error(), TempMessageID: nil})
+			h.sendToUser(userID, dto.ErrorMessage, dto.ErrorPayload{ErrorMsg: err.Error(), TempMessageID: nil})
 			return
 		}
 
@@ -131,11 +131,11 @@ func (h *Hub) handleIncoming(raw []byte, userID string) {
 			Type:           payload.Type,
 			Content:        payload.Content,
 		})
-	case TypingIndicator:
-		var payload TypingIndicatorPayload
+	case dto.TypingIndicator:
+		var payload dto.TypingIndicatorPayload
 		if err := util.DecodeJson(incomingMsg.Payload, &payload); err != nil {
 			log.Printf("WebSocket invalid typing indicator payload from user %s: %v", userID, err)
-			h.sendToUser(userID, ErrorMessage, ErrorPayload{ErrorMsg: err.Error()})
+			h.sendToUser(userID, dto.ErrorMessage, dto.ErrorPayload{ErrorMsg: err.Error()})
 			return
 		}
 
@@ -144,11 +144,11 @@ func (h *Hub) handleIncoming(raw []byte, userID string) {
 			SenderID:  userID,
 			IsTyping:  payload.IsTyping,
 		})
-	case InChatIndicator:
-		var payload InChatIndicatorPayload
+	case dto.InChatIndicator:
+		var payload dto.InChatIndicatorPayload
 		if err := util.DecodeJson(incomingMsg.Payload, &payload); err != nil {
 			log.Printf("WebSocket invalid in-chat indicator payload from user %s: %v", userID, err)
-			h.sendToUser(userID, ErrorMessage, ErrorPayload{ErrorMsg: err.Error()})
+			h.sendToUser(userID, dto.ErrorMessage, dto.ErrorPayload{ErrorMsg: err.Error()})
 			return
 		}
 
@@ -173,29 +173,29 @@ func (h *Hub) handleBroadcast(recipientIDs []string, eventType string, tempMessa
 		}
 
 		// Send ACK back to sender
-		ackResponse := ACKMessagePayload{
+		ackResponse := dto.ACKMessagePayload{
 			TempMessageID: tempMessageID,
 			Message:       messageData,
 		}
-		h.sendToUser(messageData.SenderID, ACKMessage, ackResponse)
+		h.sendToUser(messageData.SenderID, dto.ACKMessage, ackResponse)
 
 		// Send message to recipients
-		response := SendMessagePayload{
+		response := dto.SendMessagePayload{
 			Message: messageData,
 		}
-		h.broadcastToUsers(recipientIDs, SendMessage, response)
+		h.broadcastToUsers(recipientIDs, dto.SendMessage, response)
 	case string(bus.BroadcastEventTypingStart), string(bus.BroadcastEventTypingStop):
 		// Handle typing message
-		h.broadcastToUsers(recipientIDs, TypingIndicator, data)
+		h.broadcastToUsers(recipientIDs, dto.TypingIndicator, data)
 	default:
 		log.Printf("Unhandled broadcast event type: %s", eventType)
 	}
 }
 
 // sendToUser is a private method to send a message to a specific user.
-func (h *Hub) sendToUser(userID string, messageType WebSocketMessageType, payload interface{}) {
+func (h *Hub) sendToUser(userID string, messageType dto.WebSocketMessageType, payload interface{}) {
 	if client, ok := h.userClients[userID]; ok {
-		msg := WebSocketMessage{
+		msg := dto.WebSocketMessage{
 			Type:    messageType,
 			Payload: payload,
 		}
@@ -213,8 +213,8 @@ func (h *Hub) sendToUser(userID string, messageType WebSocketMessageType, payloa
 	}
 }
 
-func (h *Hub) broadcastToUsers(userIDs []string, messageType WebSocketMessageType, payload interface{}) {
-	msg := WebSocketMessage{
+func (h *Hub) broadcastToUsers(userIDs []string, messageType dto.WebSocketMessageType, payload interface{}) {
+	msg := dto.WebSocketMessage{
 		Type:    messageType,
 		Payload: payload,
 	}

@@ -49,7 +49,6 @@ func FromMessage(message *model.Message) *MessageResponse {
 		Type:           message.Type,
 		Content:        message.Content,
 		CreatedAt:      message.CreatedAt,
-		IsRead:         message.IsRead,
 	}
 }
 
