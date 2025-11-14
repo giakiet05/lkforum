@@ -48,6 +48,7 @@ type CommunityResponse struct {
 	Moderators     []model.Moderator      `json:"moderators"`
 	PostCount      int64                  `json:"post_count"`
 	MemberCount    int64                  `json:"member_count"`
+	Is18Plus       bool                   `json:"is_18_plus"`
 	CreateByID     string                 `json:"create_by_id,omitempty"`
 	CreateByName   string                 `json:"create_by_name,omitempty"`
 	CreateByAvatar string                 `json:"create_by_avatar,omitempty"`
@@ -72,6 +73,7 @@ func FromCommunity(community *model.Community) *CommunityResponse {
 		Moderators:     community.Moderators,
 		PostCount:      community.PostCount,
 		MemberCount:    community.MemberCount,
+		Is18Plus:       community.Is18Plus,
 		CreateByID:     community.CreateByID.Hex(),
 		CreateByName:   community.CreateByName,
 		CreateByAvatar: community.CreateByAvatar,
