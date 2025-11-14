@@ -1,14 +1,16 @@
 // --- Request DTOs ---
 
 export interface CommunitySetting {
-    is_private: boolean;
-    require_approval: boolean;
-    allow_nsfw: boolean;
+    is_private: boolean;              // Private community (only approved members can view)
+    post_require_approval: boolean;   // Posts need moderator approval
+    join_require_approval: boolean;   // Join requests need moderator approval
+    max_post_length: number;          // Maximum post length
 }
 
 export interface Moderator {
-    id: string;
+    user_id: string;
     username: string;
+    avatar?: string;
 }
 
 export interface CreateCommunityRequest {

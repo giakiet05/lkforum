@@ -1,138 +1,51 @@
 <script lang="ts">
   import { push } from "svelte-spa-router";
-
-  type Topic = {
-    id: string;
-    name: string;
-    icon: string;
-    subtopics: string[];
-  };
+  import { createCommunity } from "../services/community-service";
+  import type {
+    CreateCommunityRequest,
+    CommunitySetting,
+    CommunityResponse,
+  } from "../dtos/community-dto";
+  import { authStore } from "../stores/auth-store";
 
   interface Props {
     show: boolean;
     onClose: () => void;
+    onCommunityCreated?: (community: CommunityResponse) => void;
   }
 
-  let { show = false, onClose }: Props = $props();
+  let { show = false, onClose, onCommunityCreated }: Props = $props();
 
-  let currentStep = $state(1); // 1: form, 2: topics, 3: style
+  let currentStep = $state(1); // 1: form, 2: style (removed topics step)
   let communityName = $state("");
   let description = $state("");
   let communityType = $state<"public" | "restricted" | "private">("public");
-  let isAdultContent = $state(false);
-  let selectedTopics = $state<string[]>([]);
-  let topicSearchQuery = $state("");
+  // Removed: isAdultContent, selectedTopics, topicSearchQuery (backend doesn't support)
   let bannerImage = $state<string>("");
   let iconImage = $state<string>("");
   let isLoading = $state(false);
   let error = $state("");
 
-  // Mock topics data
-  const allTopics: Topic[] = [
-    {
-      id: "anime",
-      name: "Anime & Cosplay",
-      icon: "🎭",
-      subtopics: ["Anime & Manga", "Cosplay"],
-    },
-    {
-      id: "art",
-      name: "Art",
-      icon: "🎨",
-      subtopics: [
-        "Performing Arts",
-        "Architecture",
-        "Design",
-        "Art",
-        "Filmmaking",
-        "Digital Art",
-        "Photography",
-      ],
-    },
-    {
-      id: "business",
-      name: "Business & Finance",
-      icon: "💼",
-      subtopics: [
-        "Personal Finance",
-        "Crypto",
-        "Economics",
-        "Business News & Discussion",
-        "Deals & Marketplace",
-        "Startups & Entrepreneurship",
-        "Real Estate",
-        "Stocks & Investing",
-      ],
-    },
-    {
-      id: "collectibles",
-      name: "Collectibles & Other Hobbies",
-      icon: "⭐",
-      subtopics: ["Model Building", "Collectibles", "Other Hobbies", "Toys"],
-    },
-    {
-      id: "entertainment",
-      name: "Entertainment",
-      icon: "🎬",
-      subtopics: [
-        "Movies",
-        "Television",
-        "Streaming",
-        "Music",
-        "Podcasts & Streamers",
-        "Celebrity",
-      ],
-    },
-    {
-      id: "food",
-      name: "Food & Drink",
-      icon: "🍕",
-      subtopics: ["Food", "Drinks", "Cooking"],
-    },
-    {
-      id: "gaming",
-      name: "Gaming",
-      icon: "🎮",
-      subtopics: [
-        "Video Games",
-        "Board Games & TTRPGs",
-        "eSports",
-        "Gaming News & Discussion",
-      ],
-    },
-    {
-      id: "health",
-      name: "Health & Fitness",
-      icon: "💪",
-      subtopics: ["Fitness", "Mental Health", "Wellness", "Health"],
-    },
-  ];
+  // Get current user from auth store
+  let user = $state<any>(null);
 
-  const filteredTopics = $derived(() => {
-    if (!topicSearchQuery.trim()) return allTopics;
-    const query = topicSearchQuery.toLowerCase();
-    return allTopics.filter(
-      (topic) =>
-        topic.name.toLowerCase().includes(query) ||
-        topic.subtopics.some((sub) => sub.toLowerCase().includes(query))
-    );
+  authStore.subscribe((state) => {
+    user = state.user;
   });
-
-  function toggleTopic(subtopic: string) {
-    if (selectedTopics.includes(subtopic)) {
-      selectedTopics = selectedTopics.filter((t) => t !== subtopic);
-    } else if (selectedTopics.length < 3) {
-      selectedTopics = [...selectedTopics, subtopic];
-    }
-  }
 
   function handleBannerUpload(e: Event) {
     const input = e.target as HTMLInputElement;
     if (input.files && input.files[0]) {
       const file = input.files[0];
+      // Check file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        error = "Banner image must be less than 5MB";
+        return;
+      }
       const reader = new FileReader();
       reader.onload = (e) => {
         bannerImage = e.target?.result as string;
+        error = ""; // Clear error
       };
       reader.readAsDataURL(file);
     }
@@ -142,9 +55,15 @@
     const input = e.target as HTMLInputElement;
     if (input.files && input.files[0]) {
       const file = input.files[0];
+      // Check file size (max 2MB)
+      if (file.size > 2 * 1024 * 1024) {
+        error = "Icon image must be less than 2MB";
+        return;
+      }
       const reader = new FileReader();
       reader.onload = (e) => {
         iconImage = e.target?.result as string;
+        error = ""; // Clear error
       };
       reader.readAsDataURL(file);
     }
@@ -159,8 +78,8 @@
       error = "Community name must be at least 3 characters";
       return false;
     }
-    if (communityName.length > 21) {
-      error = "Community name must be less than 21 characters";
+    if (communityName.length > 50) {
+      error = "Community name must be less than 50 characters";
       return false;
     }
     if (!/^[a-zA-Z0-9_]+$/.test(communityName)) {
@@ -174,12 +93,8 @@
 
   function handleStep1Next() {
     if (validateStep1()) {
-      currentStep = 2;
+      currentStep = 2; // Go directly to style step
     }
-  }
-
-  function handleStep2Next() {
-    currentStep = 3;
   }
 
   function handleBack() {
@@ -194,25 +109,111 @@
     communityName = "";
     description = "";
     communityType = "public";
-    isAdultContent = false;
-    selectedTopics = [];
-    topicSearchQuery = "";
     bannerImage = "";
     iconImage = "";
     error = "";
     onClose();
   }
 
-  function handleSubmit() {
-    isLoading = true;
+  /**
+   * Map community type to backend CommunitySetting
+   */
+  function getCommunitySettings(): CommunitySetting {
+    switch (communityType) {
+      case "public":
+        return {
+          is_private: false,
+          post_require_approval: false,
+          join_require_approval: false,
+          max_post_length: 40000, // default
+        };
+      case "restricted":
+        return {
+          is_private: false,
+          post_require_approval: true,
+          join_require_approval: true,
+          max_post_length: 40000,
+        };
+      case "private":
+        return {
+          is_private: true,
+          post_require_approval: true,
+          join_require_approval: true,
+          max_post_length: 40000,
+        };
+      default:
+        return {
+          is_private: false,
+          post_require_approval: false,
+          join_require_approval: false,
+          max_post_length: 40000,
+        };
+    }
+  }
 
-    // Mock create community
-    setTimeout(() => {
-      isLoading = false;
-      alert(`Community "lk/${communityName}" created successfully!`);
+  async function handleSubmit() {
+    try {
+      isLoading = true;
+      error = "";
+
+      // Validate base64 image sizes before sending
+      if (iconImage && iconImage.length > 500000) {
+        error =
+          "Icon image is too large. Please use a smaller image (max ~375KB).";
+        currentStep = 1; // Go back to show error
+        return;
+      }
+      if (bannerImage && bannerImage.length > 1000000) {
+        error =
+          "Banner image is too large. Please use a smaller image (max ~750KB).";
+        currentStep = 1; // Go back to show error
+        return;
+      }
+
+      const requestData: CreateCommunityRequest = {
+        name: communityName,
+        description: description || undefined,
+        avatar: iconImage || undefined,
+        banner: bannerImage || undefined,
+        setting: getCommunitySettings(),
+        creator_name: user?.username,
+        creator_avatar: user?.profile?.avatar?.url,
+      };
+
+      const result = await createCommunity(requestData);
+
+      // Notify parent component about the new community
+      if (onCommunityCreated) {
+        onCommunityCreated(result);
+      }
+
+      alert(`Community "lk/${result.name}" created successfully!`);
       handleClose();
-      push(`/lk/${communityName}`);
-    }, 1000);
+      push(`/lk/${result.name}`);
+    } catch (err: any) {
+      // Handle specific error cases
+      if (
+        err.message?.includes("already exists") ||
+        err.message?.includes("đã tồn tại")
+      ) {
+        error =
+          "Community name already exists. Please choose a different name.";
+      } else if (
+        err.message?.includes("server") ||
+        err.message?.includes("500")
+      ) {
+        error =
+          "Server error occurred. Try reducing image sizes or try again later.";
+      } else {
+        error = err.message || "Failed to create community. Please try again.";
+      }
+
+      // Go back to step 1 to show error
+      currentStep = 1;
+      console.error("Create community error:", err);
+    } finally {
+      isLoading = false;
+    }
   }
 </script>
 
@@ -240,10 +241,10 @@
                 id="name"
                 bind:value={communityName}
                 placeholder="community_name"
-                maxlength="21"
+                maxlength="50"
               />
             </div>
-            <div class="char-count">{communityName.length} / 21</div>
+            <div class="char-count">{communityName.length} / 50</div>
           </div>
 
           <!-- Description -->
@@ -335,34 +336,12 @@
             </label>
           </div>
 
-          <!-- Adult Content -->
-          <div class="form-section">
-            <label class="checkbox-option">
-              <input type="checkbox" bind:checked={isAdultContent} />
-              <div class="checkbox-content">
-                <div class="checkbox-header">
-                  <img
-                    src="/stash_sensitive.svg"
-                    alt="18+"
-                    width="20"
-                    height="20"
-                  />
-                  <span class="checkbox-title">18+ year old community</span>
-                </div>
-                <p class="checkbox-description">
-                  Must be over 18 to view and contribute
-                </p>
-              </div>
-            </label>
-          </div>
-
           {#if error}
             <div class="error-message">{error}</div>
           {/if}
 
           <div class="progress-dots">
             <span class="dot active"></span>
-            <span class="dot"></span>
             <span class="dot"></span>
           </div>
         </div>
@@ -382,104 +361,8 @@
         </div>
       {/if}
 
-      <!-- Step 2: Topics -->
+      <!-- Step 2: Style -->
       {#if currentStep === 2}
-        <div class="modal-header">
-          <h2>Add topics</h2>
-          <button class="modal-close-btn" onclick={handleClose}>×</button>
-        </div>
-
-        <p class="modal-subtitle">
-          Add up to 3 topics to help interested redditors find your community.
-        </p>
-
-        <div class="search-wrapper">
-          <svg
-            class="search-icon"
-            width="20"
-            height="20"
-            viewBox="0 0 20 20"
-            fill="none"
-          >
-            <path
-              d="M9 17A8 8 0 1 0 9 1a8 8 0 0 0 0 16zM18 18l-4-4"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-            />
-          </svg>
-          <input
-            type="text"
-            placeholder="Filter topics"
-            bind:value={topicSearchQuery}
-          />
-        </div>
-
-        <div class="topics-counter">Topics {selectedTopics.length}/3</div>
-
-        <div class="topics-list">
-          {#each filteredTopics() as topic (topic.id)}
-            <div class="topic-category">
-              <div class="category-header">
-                <span class="category-icon">{topic.icon}</span>
-                <span class="category-name">{topic.name}</span>
-              </div>
-              <div class="subtopics">
-                {#each topic.subtopics as subtopic}
-                  <button
-                    type="button"
-                    class="subtopic-tag"
-                    class:selected={selectedTopics.includes(subtopic)}
-                    class:disabled={!selectedTopics.includes(subtopic) &&
-                      selectedTopics.length >= 3}
-                    onclick={() => toggleTopic(subtopic)}
-                    disabled={!selectedTopics.includes(subtopic) &&
-                      selectedTopics.length >= 3}
-                  >
-                    {subtopic}
-                    {#if selectedTopics.includes(subtopic)}
-                      <svg
-                        width="12"
-                        height="12"
-                        viewBox="0 0 12 12"
-                        fill="none"
-                      >
-                        <path
-                          d="M2 6L5 9L10 3"
-                          stroke="currentColor"
-                          stroke-width="2"
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                        />
-                      </svg>
-                    {/if}
-                  </button>
-                {/each}
-              </div>
-            </div>
-          {/each}
-        </div>
-
-        <div class="progress-dots">
-          <span class="dot"></span>
-          <span class="dot active"></span>
-          <span class="dot"></span>
-        </div>
-
-        <div class="modal-actions">
-          <button type="button" class="btn btn-secondary" onclick={handleBack}
-            >Back</button
-          >
-          <button
-            type="button"
-            class="btn btn-primary"
-            onclick={handleStep2Next}>Next</button
-          >
-        </div>
-      {/if}
-
-      <!-- Step 3: Style -->
-      {#if currentStep === 3}
         <div class="modal-header">
           <h2>Style your community</h2>
           <button class="modal-close-btn" onclick={handleClose}>×</button>
@@ -575,7 +458,6 @@
           </div>
 
           <div class="progress-dots">
-            <span class="dot"></span>
             <span class="dot"></span>
             <span class="dot active"></span>
           </div>

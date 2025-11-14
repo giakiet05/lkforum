@@ -109,16 +109,24 @@ export async function logout() {
         refresh_token: localStorage.getItem(REFRESH_TOKEN_KEY) || ""
     }
 
-    const res = await publicFetch("/api/auth/logout", {
-        method: "POST",
-        body: JSON.stringify(req)
-    })
+    try {
+        const res = await publicFetch("/api/auth/logout", {
+            method: "POST",
+            body: JSON.stringify(req)
+        })
+        await handleApiResponse(res);
+    } catch (error) {
+        // Even if logout API fails, we still clear local auth
+        console.error("Logout API failed:", error);
+    }
 
     localStorage.removeItem(ACCESS_TOKEN_KEY);
     localStorage.removeItem(REFRESH_TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
     clearAuth();
-    window.location.reload(); // Keep reload for now as requested
+    
+    // Redirect to home instead of reload to avoid infinite loop on protected pages
+    window.location.href = "/";
 }
 
 export async function completeGoogleSetup(setupToken: string, username: string): Promise<AuthResponse> {

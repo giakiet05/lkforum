@@ -14,6 +14,7 @@
     getGenders,
   } from "../services/user-service";
   import { ApiError } from "../errors/api-error";
+  import { setAuth } from "../stores/auth-store";
 
   let activeTab = $state<
     "account" | "privacy" | "notifications" | "appearance"
@@ -182,7 +183,8 @@
         return;
       }
 
-      user = await updateProfile(payload);
+      const updatedUser = await updateProfile(payload);
+      updateUserState(updatedUser); // Đồng bộ với authStore
       successMessage = "Profile updated successfully!";
     } catch (error) {
       console.error("Failed to update profile:", error);
@@ -239,18 +241,19 @@
     }
   }
 
-  async function handleSaveSettings() {
+  async function autoSaveSettings() {
     if (!editedSettings) return;
 
     try {
-      isSaving = true;
-      errorMessage = null;
-      successMessage = null;
-
+      // Save in background without blocking UI
       settings = await updateSettings(editedSettings);
       editedSettings = JSON.parse(JSON.stringify(settings));
 
-      successMessage = "Settings saved successfully!";
+      // Show brief success feedback
+      successMessage = "Saved";
+      setTimeout(() => {
+        if (successMessage === "Saved") successMessage = null;
+      }, 2000);
     } catch (error) {
       console.error("Failed to save settings:", error);
       if (error instanceof ApiError) {
@@ -258,9 +261,53 @@
       } else {
         errorMessage = "Failed to save settings.";
       }
-    } finally {
-      isSaving = false;
     }
+  }
+
+  function handleDeleteAccount() {
+    const confirmed = confirm(
+      "Are you sure you want to delete your account? This action cannot be undone and will permanently delete:\n\n" +
+        "• All your posts and comments\n" +
+        "• Your profile and settings\n" +
+        "• Your saved content\n" +
+        "• All your activity history\n\n" +
+        "Type 'DELETE' to confirm."
+    );
+
+    if (!confirmed) return;
+
+    const verification = prompt(
+      "Please type DELETE to confirm account deletion:"
+    );
+
+    if (verification !== "DELETE") {
+      alert("Account deletion cancelled. Verification text did not match.");
+      return;
+    }
+
+    // TODO: Call delete account API when available
+    alert(
+      "Delete account feature is not yet implemented in backend.\n\nRequired API: DELETE /api/users/me"
+    );
+
+    // Future implementation:
+    // try {
+    //   await deleteAccount();
+    //   clearAuth();
+    //   localStorage.clear();
+    //   push("/");
+    // } catch (error) {
+    //   errorMessage = "Failed to delete account.";
+    // }
+  }
+
+  // Helper function để update user state và đồng bộ với authStore + localStorage
+  function updateUserState(updatedUser: UserResponse) {
+    user = updatedUser;
+    // Update authStore để sync với topbar và các component khác
+    setAuth(updatedUser);
+    // Update localStorage
+    localStorage.setItem("user", JSON.stringify(updatedUser));
   }
 
   async function handleAvatarChange(event: Event) {
@@ -281,7 +328,8 @@
     try {
       isUploadingAvatar = true;
       errorMessage = null;
-      user = await uploadAvatar(file);
+      const updatedUser = await uploadAvatar(file);
+      updateUserState(updatedUser); // Đồng bộ với authStore
       successMessage = "Avatar uploaded!";
     } catch (error) {
       console.error("Failed to upload avatar:", error);
@@ -302,7 +350,8 @@
     try {
       isDeletingAvatar = true;
       errorMessage = null;
-      user = await deleteAvatar();
+      const updatedUser = await deleteAvatar();
+      updateUserState(updatedUser); // Đồng bộ với authStore
       successMessage = "Avatar deleted!";
     } catch (error) {
       console.error("Failed to delete avatar:", error);
@@ -465,6 +514,39 @@
             <p class="section-description">Manage your account information</p>
 
             <div class="form-group">
+              <span class="form-label">Profile Picture</span>
+              <div class="avatar-upload">
+                <div class="avatar-preview">
+                  {#if user.profile.avatar?.url}
+                    <img src={user.profile.avatar.url} alt="Avatar" />
+                  {:else}
+                    <div class="avatar-placeholder">
+                      {user.username[0].toUpperCase()}
+                    </div>
+                  {/if}
+                </div>
+                <div class="avatar-actions">
+                  <button
+                    class="btn-secondary"
+                    onclick={() => avatarFileInput.click()}
+                    disabled={isUploadingAvatar || isDeletingAvatar}
+                  >
+                    {isUploadingAvatar ? "Uploading..." : "Change Avatar"}
+                  </button>
+                  {#if user.profile.avatar?.url}
+                    <button
+                      class="btn-text btn-remove"
+                      onclick={handleDeleteAvatar}
+                      disabled={isUploadingAvatar || isDeletingAvatar}
+                    >
+                      {isDeletingAvatar ? "Deleting..." : "Remove"}
+                    </button>
+                  {/if}
+                </div>
+              </div>
+            </div>
+
+            <div class="form-group">
               <label for="username-label">Username</label>
               <div class="input-with-prefix">
                 <span class="input-prefix">u/</span>
@@ -587,39 +669,6 @@
               />
             </div>
 
-            <div class="form-group">
-              <span class="form-label">Profile Picture</span>
-              <div class="avatar-upload">
-                <div class="avatar-preview">
-                  {#if user.profile.avatar?.url}
-                    <img src={user.profile.avatar.url} alt="Avatar" />
-                  {:else}
-                    <div class="avatar-placeholder">
-                      {user.username[0].toUpperCase()}
-                    </div>
-                  {/if}
-                </div>
-                <div class="avatar-actions">
-                  <button
-                    class="btn-secondary"
-                    onclick={() => avatarFileInput.click()}
-                    disabled={isUploadingAvatar || isDeletingAvatar}
-                  >
-                    {isUploadingAvatar ? "Uploading..." : "Change Avatar"}
-                  </button>
-                  {#if user.profile.avatar?.url}
-                    <button
-                      class="btn-text"
-                      onclick={handleDeleteAvatar}
-                      disabled={isUploadingAvatar || isDeletingAvatar}
-                    >
-                      {isDeletingAvatar ? "Deleting..." : "Remove"}
-                    </button>
-                  {/if}
-                </div>
-              </div>
-            </div>
-
             <div class="form-actions">
               <button
                 class="btn-primary"
@@ -638,6 +687,26 @@
                 >Change Password</button
               >
             </div>
+
+            <!-- Delete Account Section -->
+            <div class="danger-zone">
+              <h3>Danger Zone</h3>
+              <div class="danger-content">
+                <div>
+                  <h4>Delete Account</h4>
+                  <p>
+                    Permanently delete your account and all of your content.
+                    This action cannot be undone.
+                  </p>
+                </div>
+                <button
+                  class="btn-danger"
+                  onclick={() => handleDeleteAccount()}
+                >
+                  Delete Account
+                </button>
+              </div>
+            </div>
           </div>
         {:else if activeTab === "privacy" && editedSettings}
           <div class="settings-section">
@@ -653,6 +722,7 @@
                 <input
                   type="checkbox"
                   bind:checked={editedSettings.privacy.show_profile}
+                  onchange={autoSaveSettings}
                 />
                 <span class="toggle-slider"></span>
               </label>
@@ -667,6 +737,7 @@
                 <input
                   type="checkbox"
                   bind:checked={editedSettings.privacy.show_email}
+                  onchange={autoSaveSettings}
                 />
                 <span class="toggle-slider"></span>
               </label>
@@ -681,6 +752,7 @@
                 <input
                   type="checkbox"
                   bind:checked={editedSettings.privacy.show_post_history}
+                  onchange={autoSaveSettings}
                 />
                 <span class="toggle-slider"></span>
               </label>
@@ -695,6 +767,7 @@
                 <input
                   type="checkbox"
                   bind:checked={editedSettings.privacy.allow_direct_messages}
+                  onchange={autoSaveSettings}
                 />
                 <span class="toggle-slider"></span>
               </label>
@@ -709,19 +782,10 @@
                 <input
                   type="checkbox"
                   bind:checked={editedSettings.privacy.allow_mentions}
+                  onchange={autoSaveSettings}
                 />
                 <span class="toggle-slider"></span>
               </label>
-            </div>
-
-            <div class="form-actions">
-              <button
-                class="btn-primary"
-                onclick={handleSaveSettings}
-                disabled={isSaving}
-              >
-                {isSaving ? "Saving..." : "Save Settings"}
-              </button>
             </div>
           </div>
         {:else if activeTab === "notifications" && editedSettings}
@@ -740,6 +804,7 @@
                 <input
                   type="checkbox"
                   bind:checked={editedSettings.notifications.in_app_enabled}
+                  onchange={autoSaveSettings}
                 />
                 <span class="toggle-slider"></span>
               </label>
@@ -754,6 +819,7 @@
                 <input
                   type="checkbox"
                   bind:checked={editedSettings.notifications.email_enabled}
+                  onchange={autoSaveSettings}
                 />
                 <span class="toggle-slider"></span>
               </label>
@@ -769,6 +835,7 @@
                 <input
                   type="checkbox"
                   bind:checked={editedSettings.notifications.notify_on_comment}
+                  onchange={autoSaveSettings}
                 />
                 <span class="toggle-slider"></span>
               </label>
@@ -782,6 +849,7 @@
                 <input
                   type="checkbox"
                   bind:checked={editedSettings.notifications.notify_on_mention}
+                  onchange={autoSaveSettings}
                 />
                 <span class="toggle-slider"></span>
               </label>
@@ -795,6 +863,7 @@
                 <input
                   type="checkbox"
                   bind:checked={editedSettings.notifications.notify_on_upvote}
+                  onchange={autoSaveSettings}
                 />
                 <span class="toggle-slider"></span>
               </label>
@@ -808,19 +877,10 @@
                 <input
                   type="checkbox"
                   bind:checked={editedSettings.notifications.notify_on_message}
+                  onchange={autoSaveSettings}
                 />
                 <span class="toggle-slider"></span>
               </label>
-            </div>
-
-            <div class="form-actions">
-              <button
-                class="btn-primary"
-                onclick={handleSaveSettings}
-                disabled={isSaving}
-              >
-                {isSaving ? "Saving..." : "Save Settings"}
-              </button>
             </div>
           </div>
         {:else if activeTab === "appearance" && editedSettings}
@@ -830,7 +890,11 @@
 
             <div class="form-group">
               <label for="theme">Theme</label>
-              <select id="theme" bind:value={editedSettings.appearance.theme}>
+              <select
+                id="theme"
+                bind:value={editedSettings.appearance.theme}
+                onchange={autoSaveSettings}
+              >
                 <option value="light">Light</option>
                 <option value="dark">Dark</option>
                 <option value="auto">Auto</option>
@@ -842,6 +906,7 @@
               <select
                 id="fontSize"
                 bind:value={editedSettings.appearance.font_size}
+                onchange={autoSaveSettings}
               >
                 <option value="small">Small</option>
                 <option value="medium">Medium</option>
@@ -858,19 +923,10 @@
                 <input
                   type="checkbox"
                   bind:checked={editedSettings.content.allow_nsfw}
+                  onchange={autoSaveSettings}
                 />
                 <span class="toggle-slider"></span>
               </label>
-            </div>
-
-            <div class="form-actions">
-              <button
-                class="btn-primary"
-                onclick={handleSaveSettings}
-                disabled={isSaving}
-              >
-                {isSaving ? "Saving..." : "Save Settings"}
-              </button>
             </div>
           </div>
         {:else if isLoadingSettings}
@@ -952,9 +1008,41 @@
   }
 
   .alert-success {
-    background-color: #efe;
-    color: #060;
-    border: 1px solid #cfc;
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    background-color: #10b981;
+    color: white;
+    border: none;
+    padding: 0.75rem 2rem 0.75rem 1rem;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+    animation:
+      slideInRight 0.3s ease,
+      fadeOut 0.3s ease 1.7s;
+    z-index: 1000;
+    font-size: 0.9rem;
+    font-weight: 500;
+  }
+
+  @keyframes slideInRight {
+    from {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+
+  @keyframes fadeOut {
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+    }
   }
 
   .alert-close {
@@ -1285,6 +1373,14 @@
     cursor: not-allowed;
   }
 
+  .btn-remove {
+    color: #ff4444;
+  }
+
+  .btn-remove:hover:not(:disabled) {
+    color: #ff0000;
+  }
+
   .password-section {
     margin-top: 3rem;
     padding-top: 2rem;
@@ -1296,6 +1392,58 @@
     font-weight: 600;
     color: #1a1a1b;
     margin: 0 0 1rem 0;
+  }
+
+  .danger-zone {
+    margin-top: 3rem;
+    padding: 2rem;
+    background-color: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: 12px;
+  }
+
+  .danger-zone h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #dc2626;
+    margin: 0 0 1rem 0;
+  }
+
+  .danger-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 2rem;
+  }
+
+  .danger-content h4 {
+    margin: 0 0 0.5rem 0;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #1a1a1b;
+  }
+
+  .danger-content p {
+    margin: 0;
+    font-size: 0.9rem;
+    color: #7c7c7c;
+    line-height: 1.5;
+  }
+
+  .btn-danger {
+    padding: 0.75rem 1.5rem;
+    background-color: #dc2626;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background-color 0.2s ease;
+  }
+
+  .btn-danger:hover {
+    background-color: #b91c1c;
   }
 
   .setting-item {

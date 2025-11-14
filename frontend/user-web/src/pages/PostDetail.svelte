@@ -10,7 +10,7 @@
 
   let { params = { id: "1" } }: PostDetailProps = $props();
 
-  let post: PostResponse | undefined = $state(undefined);
+  let post = $state<PostResponse | null>(null);
   let selectedOptions = $state<string[]>([]);
   let hasVoted = $state(false);
 
@@ -19,15 +19,121 @@
     window.scrollTo(0, 0);
 
     // TODO: Replace with API call to fetch post by ID
-    // For now, post will be undefined (no mock data)
-    // const response = await fetch(`/api/posts/${params.id}`);
-    // post = await response.json();
+    // Mock data for now
+    // post = {
+    //   id: params.id,
+    //   author: {
+    //     id: "user1",
+    //     username: "nguyenvana",
+    //     avatar: {
+    //       public_id: "avatar1",
+    //       url: "https://i.pravatar.cc/150?img=1",
+    //     },
+    //   },
+    //   community: {
+    //     id: "comm1",
+    //     name: "programming",
+    //   },
+    //   title: "What's your favorite programming language and why?",
+    //   type: "text",
+    //   content: {
+    //     text: "I've been coding for 5 years now and I've tried many languages. Currently loving TypeScript for its type safety and great tooling. What about you guys?\n\nI'm curious to hear different perspectives, especially from people working in different domains (web, mobile, systems programming, etc.).",
+    //   },
+    //   votes_count: {
+    //     up: 156,
+    //     down: 23,
+    //     score: 133,
+    //   },
+    //   user_vote: "",
+    //   comments_count: 47,
+    //   created_at: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString(), // 3 hours ago
+    // };
+
+    // Uncomment below for Image post example
+    post = {
+      id: params.id,
+      author: {
+        id: "user2",
+        username: "photographer_pro",
+        avatar: {
+          public_id: "avatar2",
+          url: "https://i.pravatar.cc/150?img=2",
+        },
+      },
+      community: {
+        id: "comm2",
+        name: "photography",
+      },
+      title: "Golden hour at the beach 🌅",
+      type: "text",
+      content: {
+        text: "Captured this beautiful sunset yesterday!",
+        images: [
+          {
+            public_id: "img1",
+            url: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800",
+            width: 800,
+            height: 600,
+          },
+          {
+            public_id: "img2",
+            url: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800",
+            width: 800,
+            height: 600,
+          },
+        ],
+      },
+      votes_count: {
+        up: 892,
+        down: 12,
+        score: 880,
+      },
+      user_vote: "up",
+      comments_count: 156,
+      created_at: new Date(Date.now() - 1000 * 60 * 60 * 8).toISOString(),
+    };
+
+    // Uncomment below for Poll post example
+    // post = {
+    //   id: params.id,
+    //   author: {
+    //     id: "user3",
+    //     username: "poll_master",
+    //   },
+    //   community: {
+    //     id: "comm3",
+    //     name: "polls"
+    //   },
+    //   title: "Which framework do you prefer for frontend development?",
+    //   type: "poll",
+    //   content: {
+    //     poll: {
+    //       question: "Select your favorite frontend framework:",
+    //       options: [
+    //         { id: "opt1", text: "React", votes: 450, percentage: 45 },
+    //         { id: "opt2", text: "Vue.js", votes: 250, percentage: 25 },
+    //         { id: "opt3", text: "Angular", votes: 150, percentage: 15 },
+    //         { id: "opt4", text: "Svelte", votes: 150, percentage: 15 }
+    //       ],
+    //       total_votes: 1000,
+    //       allow_multiple: false,
+    //       expires_at: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7).toISOString() // 7 days from now
+    //     }
+    //   },
+    //   votes_count: {
+    //     up: 234,
+    //     down: 8,
+    //     score: 226
+    //   },
+    //   comments_count: 89,
+    //   created_at: new Date(Date.now() - 1000 * 60 * 60 * 12).toISOString(),
+    // };
   });
 
-  function handleVote(optionId: number) {
+  function handleVote(optionId: string) {
     if (!post || hasVoted) return;
 
-    if (post.poll?.multipleChoice) {
+    if (post.content.poll?.allow_multiple) {
       const index = selectedOptions.indexOf(optionId);
       if (index > -1) {
         selectedOptions.splice(index, 1);
@@ -43,13 +149,13 @@
   function submitVote() {
     if (!post || selectedOptions.length === 0) return;
 
-    if (post.poll) {
-      for (const option of post.poll.options) {
+    if (post.content.poll) {
+      for (const option of post.content.poll.options) {
         if (selectedOptions.includes(option.id)) {
           option.votes++;
         }
       }
-      post.poll.totalVotes += selectedOptions.length;
+      post.content.poll.total_votes += selectedOptions.length;
     }
     hasVoted = true;
   }
@@ -85,33 +191,44 @@
     <article class="post-detail-container">
       <div class="post-main">
         <div class="post-header">
-          <span class="community-name">lk/{post.community}</span>
+          <span class="community-name">lk/{post.community.name}</span>
           <span class="meta-divider">•</span>
-          <span class="author">Posted by u/{post.author}</span>
-          <span class="time">{post.time}</span>
+          <span class="author">Posted by u/{post.author.username}</span>
+          <span class="time"
+            >{new Date(post.created_at).toLocaleDateString()}</span
+          >
         </div>
 
         <h1 class="post-title">{post.title}</h1>
 
         <div class="post-content">
-          {#if post.type === "text"}
-            <p class="text-content">{post.content}</p>
-          {:else if post.type === "image" && post.images}
+          {#if post.type === "text" && post.content.text}
+            <p class="text-content">{post.content.text}</p>
+          {:else if post.content.images && post.content.images.length > 0}
             <div class="image-gallery">
-              {#each post.images as src, i}
-                <img {src} alt="Post content {i + 1}" class="post-image" />
+              {#each post.content.images as image, i}
+                <img
+                  src={image.url}
+                  alt="Post content {i + 1}"
+                  class="post-image"
+                />
               {/each}
             </div>
-          {:else if post.type === "video" && post.videoUrl}
-            <video controls poster={post.thumbnailUrl} class="post-video">
-              <source src={post.videoUrl} type="video/mp4" />
+          {:else if post.content.video}
+            <video
+              controls
+              poster={post.content.video.thumbnail}
+              class="post-video"
+            >
+              <source src={post.content.video.url} type="video/mp4" />
+              <track kind="captions" />
               Your browser does not support the video tag.
             </video>
-          {:else if post.type === "poll" && post.poll}
+          {:else if post.type === "poll" && post.content.poll}
             <div class="poll-container">
-              <h3 class="poll-question">{post.poll.question}</h3>
+              <h3 class="poll-question">{post.content.poll.question}</h3>
               <div class="poll-options">
-                {#each post.poll.options as option}
+                {#each post.content.poll.options as option}
                   <button
                     class="poll-option"
                     class:selected={selectedOptions.includes(option.id)}
@@ -121,17 +238,14 @@
                     {#if hasVoted}
                       <div
                         class="poll-result-bar"
-                        style="width: {getVotePercentage(
-                          option.votes,
-                          post.poll.totalVotes
-                        )}%;"
+                        style="width: {option.percentage}%;"
                       ></div>
                       <span class="poll-option-text">{option.text}</span>
                       <span class="poll-option-votes">{option.votes} votes</span
                       >
                     {:else}
                       <div class="radio-check">
-                        {#if post.poll.multipleChoice}
+                        {#if post.content.poll.allow_multiple}
                           <div
                             class="checkbox"
                             class:checked={selectedOptions.includes(option.id)}
@@ -158,7 +272,8 @@
                 </button>
               {/if}
               <p class="poll-footer">
-                {post.poll.totalVotes} votes • {post.poll.multipleChoice
+                {post.content.poll.total_votes} votes • {post.content.poll
+                  .allow_multiple
                   ? "Multiple choices allowed"
                   : "Single choice"}
               </p>
@@ -169,12 +284,14 @@
         <div class="post-footer">
           <div class="vote-actions">
             <button class="footer-btn vote-btn" aria-label="Upvote">▲</button>
-            <span class="vote-count">{post.upvotes - post.downvotes}</span>
+            <span class="vote-count"
+              >{post.votes_count ? post.votes_count.score : 0}</span
+            >
             <button class="footer-btn vote-btn" aria-label="Downvote">▼</button>
           </div>
           <button class="footer-btn">
             <img src="/CommentIcon.svg" alt="Comments" width="20" height="20" />
-            <span>{post.commentsCount} Comments</span>
+            <span>{post.comments_count} Comments</span>
           </button>
           <button class="footer-btn">
             <svg

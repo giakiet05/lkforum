@@ -27,10 +27,13 @@ export async function handleApiResponse(res: Response): Promise<any> {
         if (error instanceof ApiError) {
             throw error; // Re-throw ApiError
         }
-        // JSON parse error
+        // JSON parse error - likely 500 error with empty body
         console.error("Failed to parse API response:", error);
+        const statusMessage = res.status === 500 
+            ? "Server error occurred. Please try with smaller images or contact support."
+            : "Phản hồi từ server không hợp lệ.";
         throw new ApiError(
-            "Phản hồi từ server không hợp lệ.",
+            statusMessage,
             ApiErrorCode.INTERNAL_ERROR
         );
     }

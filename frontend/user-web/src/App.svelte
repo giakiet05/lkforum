@@ -70,8 +70,8 @@
     if (state.user) {
       topbarUser = {
         name: state.user.username || state.user.email || "User",
-        avatar: "../avatar.jpg",
-        karma: 20,
+        avatar: state.user.profile?.avatar?.url, // Lấy avatar từ profile
+        karma: state.user.reputation, // Lấy reputation (karma) từ user
       };
     } else {
       topbarUser = undefined;
@@ -134,8 +134,12 @@
   }
 
   @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+    0% {
+      transform: rotate(0deg);
+    }
+    100% {
+      transform: rotate(360deg);
+    }
   }
 
   .loading-screen p {
