@@ -18,7 +18,7 @@ type CommunityRepo interface {
 	Create(ctx context.Context, community *model.Community) (*model.Community, error)
 	GetByID(ctx context.Context, id string) (*model.Community, error)
 	GetByIDs(ctx context.Context, ids []string) ([]*model.Community, error)
-	GetFilter(ctx context.Context, name string, description string, createFrom time.Time, page int, pageSize int) ([]model.Community, int64, error)
+	GetFilter(ctx context.Context, name string, description string, is18Plus bool, createFrom time.Time, page int, pageSize int) ([]model.Community, int64, error)
 	GetByModeratorIDPaginated(ctx context.Context, moderatorID string, page int, pageSize int) ([]model.Community, int64, error)
 	GetAllPaginated(ctx context.Context, page int, pageSize int) ([]model.Community, int64, error)
 	Update(ctx context.Context, communityID string, updates bson.M) (*model.Community, error)
@@ -98,6 +98,7 @@ func (c *communityRepo) GetFilter(
 	ctx context.Context,
 	name string,
 	description string,
+	is18Plus bool,
 	createFrom time.Time,
 	page int,
 	pageSize int,
@@ -108,6 +109,9 @@ func (c *communityRepo) GetFilter(
 	}
 	if description != "" {
 		filter["description"] = bson.M{"$regex": description, "$options": "i"}
+	}
+	if is18Plus {
+		filter["is18_plus"] = true
 	}
 	if !createFrom.IsZero() {
 		filter["createdAt"] = bson.M{"$gte": createFrom}

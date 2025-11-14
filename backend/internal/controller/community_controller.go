@@ -61,9 +61,15 @@ func (c *CommunityController) GetCommunityByID(ctx *gin.Context) {
 func (c *CommunityController) GetCommunitiesFilter(ctx *gin.Context) {
 	name := ctx.Query("name")
 	description := ctx.Query("description")
+	is18PlusStr := ctx.Query("is_18_plus")
 	createFromStr := ctx.Query("create_from")
 	pageStr := ctx.DefaultQuery("page", "1")
 	pageSizeStr := ctx.DefaultQuery("page_size", "10")
+
+	is18Plus, err := strconv.ParseBool(is18PlusStr)
+	if err != nil {
+		is18Plus = false
+	}
 
 	page, err := strconv.Atoi(pageStr)
 	if err != nil || page < 1 {
@@ -85,7 +91,7 @@ func (c *CommunityController) GetCommunitiesFilter(ctx *gin.Context) {
 		createFrom = t
 	}
 
-	response, err := c.communityService.GetCommunitiesFilter(name, description, createFrom, page, pageSize)
+	response, err := c.communityService.GetCommunitiesFilter(name, description, is18Plus, createFrom, page, pageSize)
 	if err != nil {
 		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
