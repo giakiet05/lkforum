@@ -164,7 +164,7 @@ func Init() (*gin.Engine, error) {
 	emailSender := email.NewSMTPSender()
 
 	repos := initRepos(client, db)
-	services := initServices(repos, redisClient, emailSender, eventBus)
+	services := initServices(repos, redisClient, emailSender, &eventBus)
 	controllers := initControllers(services, wsHub)
 
 	// Inject userRepo into middleware for settings caching

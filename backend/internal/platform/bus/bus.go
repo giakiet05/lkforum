@@ -13,21 +13,27 @@ type Event interface {
 // EventListener is a channel that receives events.
 type EventListener chan Event
 
+// EventBus interface
+type EventBus interface {
+	Subscribe(topic string, ch EventListener)
+	Publish(event Event)
+}
+
 // EventBus stores the information about subscribers, listeners and events.
-type EventBus struct {
+type eventBus struct {
 	listeners map[string][]EventListener
 	lock      sync.RWMutex
 }
 
 // NewEventBus creates a new EventBus.
-func NewEventBus() *EventBus {
-	return &EventBus{
+func NewEventBus() EventBus {
+	return &eventBus{
 		listeners: make(map[string][]EventListener),
 	}
 }
 
 // Subscribe adds a new listener for a given topic.
-func (b *EventBus) Subscribe(topic string, ch EventListener) {
+func (b *eventBus) Subscribe(topic string, ch EventListener) {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
@@ -39,7 +45,7 @@ func (b *EventBus) Subscribe(topic string, ch EventListener) {
 
 // Publish sends an event to all subscribed listeners of a topic.
 // This is done asynchronously to prevent blocking the publisher.
-func (b *EventBus) Publish(event Event) {
+func (b *eventBus) Publish(event Event) {
 	b.lock.RLock()
 	defer b.lock.RUnlock()
 

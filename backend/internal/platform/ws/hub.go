@@ -16,10 +16,10 @@ type Hub struct {
 	register    chan *Client
 	unregister  chan *Client
 	incoming    chan []byte
-	eventBus    *bus.EventBus
+	eventBus    bus.EventBus
 }
 
-func NewHub(bus *bus.EventBus) *Hub {
+func NewHub(bus bus.EventBus) *Hub {
 	return &Hub{
 		incoming:    make(chan []byte),
 		register:    make(chan *Client),

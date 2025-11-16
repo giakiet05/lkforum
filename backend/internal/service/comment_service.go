@@ -23,11 +23,11 @@ type CommentService interface {
 
 type commentService struct {
 	commentRepo repo.CommentRepo
-	bus         *bus.EventBus
+	bus         bus.EventBus
 }
 
 func NewCommentService(commentRepo repo.CommentRepo, bus *bus.EventBus) CommentService {
-	return &commentService{commentRepo: commentRepo, bus: bus}
+	return &commentService{commentRepo: commentRepo, bus: *bus}
 }
 
 func (s *commentService) CreateComment(request *dto.CreateCommentRequest, userID string) (*model.Comment, error) {

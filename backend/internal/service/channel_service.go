@@ -25,13 +25,13 @@ type ChannelService interface {
 
 type channelService struct {
 	channelRepository repo.ChannelRepo
-	eventBus          *bus.EventBus
+	eventBus          bus.EventBus
 }
 
 func NewChannelService(channelRepo repo.ChannelRepo, bus *bus.EventBus) ChannelService {
 	return &channelService{
 		channelRepository: channelRepo,
-		eventBus:          bus,
+		eventBus:          *bus,
 	}
 }
 

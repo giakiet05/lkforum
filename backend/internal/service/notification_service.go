@@ -26,7 +26,7 @@ type notificationService struct {
 	userRepo         repo.UserRepo
 	postRepo         repo.PostRepo
 	commentRepo      repo.CommentRepo
-	eventBus         *bus.EventBus
+	eventBus         bus.EventBus
 	redisClient      *redis.Client
 }
 
@@ -36,7 +36,7 @@ func NewNotificationService(notificationRepo repo.NotificationRepo, userRepo rep
 		userRepo:         userRepo,
 		postRepo:         postRepo,
 		commentRepo:      commentRepo,
-		eventBus:         bus,
+		eventBus:         *bus,
 		redisClient:      redis,
 	}
 }
