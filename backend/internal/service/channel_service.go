@@ -28,10 +28,10 @@ type channelService struct {
 	eventBus          bus.EventBus
 }
 
-func NewChannelService(channelRepo repo.ChannelRepo, bus *bus.EventBus) ChannelService {
+func NewChannelService(channelRepo repo.ChannelRepo, bus bus.EventBus) ChannelService {
 	return &channelService{
 		channelRepository: channelRepo,
-		eventBus:          *bus,
+		eventBus:          bus,
 	}
 }
 

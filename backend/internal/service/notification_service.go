@@ -30,13 +30,20 @@ type notificationService struct {
 	redisClient      *redis.Client
 }
 
-func NewNotificationService(notificationRepo repo.NotificationRepo, userRepo repo.UserRepo, postRepo repo.PostRepo, commentRepo repo.CommentRepo, bus *bus.EventBus, redis *redis.Client) NotificationService {
+func NewNotificationService(
+	notificationRepo repo.NotificationRepo,
+	userRepo repo.UserRepo,
+	postRepo repo.PostRepo,
+	commentRepo repo.CommentRepo,
+	bus bus.EventBus,
+	redis *redis.Client,
+) NotificationService {
 	return &notificationService{
 		notificationRepo: notificationRepo,
 		userRepo:         userRepo,
 		postRepo:         postRepo,
 		commentRepo:      commentRepo,
-		eventBus:         *bus,
+		eventBus:         bus,
 		redisClient:      redis,
 	}
 }

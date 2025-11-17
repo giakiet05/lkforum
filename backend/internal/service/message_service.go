@@ -32,11 +32,11 @@ type messageService struct {
 	redisClient       *redis.Client
 }
 
-func NewMessageService(messageRepo repo.MessageRepo, channelRepo repo.ChannelRepo, bus *bus.EventBus, redis *redis.Client) MessageService {
+func NewMessageService(messageRepo repo.MessageRepo, channelRepo repo.ChannelRepo, bus bus.EventBus, redis *redis.Client) MessageService {
 	return &messageService{
 		messageRepository: messageRepo,
 		channelRepository: channelRepo,
-		eventBus:          *bus,
+		eventBus:          bus,
 		redisClient:       redis,
 	}
 }

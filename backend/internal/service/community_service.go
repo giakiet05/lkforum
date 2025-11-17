@@ -35,8 +35,8 @@ type communityService struct {
 	eventBus      bus.EventBus
 }
 
-func NewCommunityService(communityRepo repo.CommunityRepo, bus *bus.EventBus) CommunityService {
-	return &communityService{communityRepo: communityRepo, eventBus: *bus}
+func NewCommunityService(communityRepo repo.CommunityRepo, bus bus.EventBus) CommunityService {
+	return &communityService{communityRepo: communityRepo, eventBus: bus}
 }
 
 func (c *communityService) Start() {

@@ -1,7 +1,7 @@
-// Package test internal/test/mocks/mock_gen.go
-package test
+// Package mocks internal/test/mocks/mock_gen.go
+package mocks
 
-//go:generate mockgen -source=../../platform/bus/bus.go -destination=../../test/mocks/mock_bus.go -package=mocks
+//go:generate mockgen -source=../../platform/bus/bus.go -destination=../../platform/bus/mock_bus.go -package=bus
 
 // --------------------
 // Repo Mocks

@@ -28,8 +28,8 @@ type reputationService struct {
 	eventBus bus.EventBus
 }
 
-func NewReputationService(userRepo repo.UserRepo, bus *bus.EventBus) ReputationService {
-	return &reputationService{userRepo: userRepo, eventBus: *bus}
+func NewReputationService(userRepo repo.UserRepo, bus bus.EventBus) ReputationService {
+	return &reputationService{userRepo: userRepo, eventBus: bus}
 }
 
 // Start subscribes to relevant events and starts the reputation processing goroutine.

@@ -41,6 +41,7 @@ type UserProfileResponse struct {
 	Cover       *model.Image           `json:"cover,omitempty"`
 	Bio         *string                `json:"bio,omitempty"`
 	Gender      *string                `json:"gender,omitempty"`
+	DateOfBirth *time.Time             `json:"date_of_birth,omitempty"`
 	Age         *int                   `json:"age,omitempty"`
 	Location    *string                `json:"location,omitempty"`
 	Interests   []string               `json:"interests,omitempty"`
