@@ -43,7 +43,7 @@ type postService struct {
 	pollVoteRepo  repo.PollVoteRepo
 	userRepo      repo.UserRepo
 	communityRepo repo.CommunityRepo
-	bus           *bus.EventBus
+	bus           bus.EventBus
 }
 
 // NewPostService creates a new instance of PostService.
@@ -53,7 +53,7 @@ func NewPostService(
 	pollVoteRepo repo.PollVoteRepo,
 	userRepo repo.UserRepo,
 	communityRepo repo.CommunityRepo,
-	bus *bus.EventBus,
+	bus bus.EventBus,
 ) PostService {
 	return &postService{
 		postRepo:      postRepo,

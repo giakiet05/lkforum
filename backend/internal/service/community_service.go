@@ -32,10 +32,10 @@ type CommunityService interface {
 
 type communityService struct {
 	communityRepo repo.CommunityRepo
-	eventBus      *bus.EventBus
+	eventBus      bus.EventBus
 }
 
-func NewCommunityService(communityRepo repo.CommunityRepo, bus *bus.EventBus) CommunityService {
+func NewCommunityService(communityRepo repo.CommunityRepo, bus bus.EventBus) CommunityService {
 	return &communityService{communityRepo: communityRepo, eventBus: bus}
 }
 

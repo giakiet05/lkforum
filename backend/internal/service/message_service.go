@@ -28,11 +28,11 @@ type MessageService interface {
 type messageService struct {
 	messageRepository repo.MessageRepo
 	channelRepository repo.ChannelRepo
-	eventBus          *bus.EventBus
+	eventBus          bus.EventBus
 	redisClient       *redis.Client
 }
 
-func NewMessageService(messageRepo repo.MessageRepo, channelRepo repo.ChannelRepo, bus *bus.EventBus, redis *redis.Client) MessageService {
+func NewMessageService(messageRepo repo.MessageRepo, channelRepo repo.ChannelRepo, bus bus.EventBus, redis *redis.Client) MessageService {
 	return &messageService{
 		messageRepository: messageRepo,
 		channelRepository: channelRepo,
