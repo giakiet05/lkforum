@@ -11,16 +11,15 @@
   interface Props {
     show: boolean;
     onClose: () => void;
-    onCommunityCreated?: (community: CommunityResponse) => void;
   }
 
-  let { show = false, onClose, onCommunityCreated }: Props = $props();
+  let { show = false, onClose }: Props = $props();
 
   let currentStep = $state(1); // 1: form, 2: style (removed topics step)
   let communityName = $state("");
   let description = $state("");
   let communityType = $state<"public" | "restricted" | "private">("public");
-  // Removed: isAdultContent, selectedTopics, topicSearchQuery (backend doesn't support)
+  let isAdultContent = $state(false);
   let bannerImage = $state<string>("");
   let iconImage = $state<string>("");
   let isLoading = $state(false);
@@ -178,14 +177,10 @@
         setting: getCommunitySettings(),
         creator_name: user?.username,
         creator_avatar: user?.profile?.avatar?.url,
+        is_18_plus: isAdultContent,
       };
 
       const result = await createCommunity(requestData);
-
-      // Notify parent component about the new community
-      if (onCommunityCreated) {
-        onCommunityCreated(result);
-      }
 
       alert(`Community "lk/${result.name}" created successfully!`);
       handleClose();
@@ -331,6 +326,31 @@
                 </div>
                 <p class="radio-description">
                   Only approved users can view and submit to this community
+                </p>
+              </div>
+            </label>
+          </div>
+
+          <!-- Adult Content -->
+          <div class="form-section">
+            <label class="checkbox-option">
+              <input
+                type="checkbox"
+                bind:checked={isAdultContent}
+                disabled={isLoading}
+              />
+              <div class="checkbox-content">
+                <div class="checkbox-header">
+                  <img
+                    src="/stash_sensitive.svg"
+                    alt="18+"
+                    width="20"
+                    height="20"
+                  />
+                  <span class="checkbox-title">18+ year old community</span>
+                </div>
+                <p class="checkbox-description">
+                  Must be over 18 to view and contribute
                 </p>
               </div>
             </label>
@@ -669,6 +689,13 @@
 
   .radio-header svg {
     color: #878a8c;
+  }
+
+  .checkbox-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
   }
 
   .checkbox-header {

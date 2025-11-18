@@ -13,8 +13,6 @@
 
   let { compact = false }: Props = $props();
 
-  const STORAGE_KEY = "user_communities";
-
   let userCommunities = $state<CommunityResponse[]>([]);
   let isLoadingCommunities = $state(false);
   let user = $state<UserResponse | null>(null);
@@ -25,41 +23,45 @@
   authStore.subscribe((state) => {
     user = state.user;
     if (user) {
-      loadCommunitiesFromStorage();
+      loadUserCommunities();
     }
   });
 
   onMount(() => {
     if (user) {
-      loadCommunitiesFromStorage();
+      loadUserCommunities();
     }
   });
 
-  function loadCommunitiesFromStorage() {
+  async function loadUserCommunities() {
+    if (!user?.id) return;
+
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        userCommunities = JSON.parse(stored);
-      }
+      isLoadingCommunities = true;
+      const response = await getCommunities({ page: 1, limit: 100 });
+
+      console.log("All communities response:", response);
+      console.log("Current user ID:", user?.id);
+
+      // Backend returns {communities: [], pagination: {}}
+      const allCommunities = response.communities || [];
+
+      userCommunities = allCommunities.filter((community: any) => {
+        console.log(
+          `Community ${community.name} create_by_id:`,
+          community.create_by_id
+        );
+        return community.create_by_id === user?.id;
+      });
+
+      console.log("Filtered user communities:", userCommunities);
     } catch (error) {
-      console.error("Failed to load communities from storage:", error);
+      console.error("Failed to load user communities:", error);
       userCommunities = [];
+    } finally {
+      isLoadingCommunities = false;
     }
   }
-
-  function saveCommunitiesToStorage(communities: CommunityResponse[]) {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(communities));
-    } catch (error) {
-      console.error("Failed to save communities to storage:", error);
-    }
-  }
-
-  function addCommunity(community: CommunityResponse) {
-    userCommunities = [community, ...userCommunities];
-    saveCommunitiesToStorage(userCommunities);
-  }
-
   function toggleExpand() {
     isExpanded = !isExpanded;
   }
@@ -74,10 +76,10 @@
 
   function handleCloseModal() {
     showCreateModal = false;
-  }
-
-  function handleCommunityCreated(community: CommunityResponse) {
-    addCommunity(community);
+    // Reload communities after creating a new one
+    if (user) {
+      loadUserCommunities();
+    }
   }
 
   function handleManageCommunities() {
@@ -161,11 +163,7 @@
   {/if}
 </div>
 
-<CreateCommunityModal
-  show={showCreateModal}
-  onClose={handleCloseModal}
-  onCommunityCreated={handleCommunityCreated}
-/>
+<CreateCommunityModal show={showCreateModal} onClose={handleCloseModal} />
 
 <style>
   .communities-section {

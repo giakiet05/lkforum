@@ -22,6 +22,7 @@ export interface CreateCommunityRequest {
     moderators?: Moderator[];
     creator_name?: string;
     creator_avatar?: string;
+    is_18_plus?: boolean;
 }
 
 export interface UpdateCommunityRequest {
@@ -49,6 +50,18 @@ export interface RemoveModeratorRequest {
 
 // --- Response DTOs ---
 
+export interface PaginationInfo {
+    current_page: number;
+    total_pages: number;
+    total_items: number;
+    page_size: number;
+}
+
+export interface PaginatedCommunitiesResponse {
+    communities: CommunityResponse[];
+    pagination: PaginationInfo;
+}
+
 export interface CommunityResponse {
     id: string;
     name: string;
@@ -62,4 +75,5 @@ export interface CommunityResponse {
     create_by_id?: string;
     create_by_name?: string;
     create_by_avatar?: string;
+    is_18_plus?: boolean;
 }

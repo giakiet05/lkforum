@@ -3,6 +3,7 @@ import type {
     CreateCommunityRequest, 
     UpdateCommunityRequest,
     CommunityResponse,
+    PaginatedCommunitiesResponse,
     AddModeratorRequest,
     RemoveModeratorRequest
 } from "../dtos/community-dto";
@@ -16,7 +17,7 @@ export async function getCommunities(params?: {
     create_from?: string;
     page?: number;
     limit?: number;
-}): Promise<CommunityResponse[]> {
+}): Promise<PaginatedCommunitiesResponse> {
     const queryParams = new URLSearchParams();
     if (params) {
         Object.entries(params).forEach(([key, value]) => {
