@@ -1,7 +1,27 @@
 <script lang="ts">
+  import { onMount, onDestroy } from "svelte";
   import { push } from "svelte-spa-router";
-  import { mockConversations } from "../mocks/conversations.mock";
-  import type { Conversation, Message } from "../mocks/conversations.mock";
+  import { authStore } from "../stores/auth-store";
+  import {
+    chatStore,
+    activeChannel,
+    activeChannelMessages,
+    setChannels,
+    setActiveChannel,
+    setMessages,
+    addMessage,
+    markChannelAsRead,
+    setLoadingChannels,
+    setLoadingMessages,
+  } from "../stores/chat-store";
+  import {
+    getChannelsByUser,
+    updateChannel,
+  } from "../services/channel-service";
+  import { getMessages } from "../services/message-service";
+  import { websocketService } from "../services/websocket-service";
+  import type { ChannelResponse } from "../dtos/channel-dto";
+  import type { MessageResponse } from "../dtos/message-dto";
 
   type ChatPopupProps = {
     show: boolean;
@@ -10,52 +30,183 @@
 
   let { show, onClose }: ChatPopupProps = $props();
 
-  let conversations = $state(mockConversations);
-  let selectedConversation = $state<Conversation | null>(conversations[0]);
   let messageInput = $state("");
   let showChatMenu = $state(false);
 
-  function handleSelectConversation(conversation: Conversation) {
-    selectedConversation = conversation;
-    if (selectedConversation) {
-      selectedConversation.unreadCount = 0;
+  // Get current user
+  const currentUser = $derived($authStore.user);
+  const channels = $derived($chatStore.channels);
+  const activeChannelData = $derived($activeChannel);
+  const messages = $derived($activeChannelMessages);
+  const isLoadingChannels = $derived($chatStore.isLoadingChannels);
+  const isLoadingMessages = $derived($chatStore.isLoadingMessages);
+
+  // Get other member info from active channel
+  const otherMember = $derived(() => {
+    if (!activeChannelData || !currentUser) return null;
+    return (
+      activeChannelData.members.find((m) => m.user_id !== currentUser.id) ||
+      null
+    );
+  });
+
+  // Get channel settings for current user
+  const channelSettings = $derived(() => {
+    if (!activeChannelData || !currentUser) return null;
+    return (
+      activeChannelData.settings.find((s) => s.user_id === currentUser.id) ||
+      null
+    );
+  });
+
+  // Format timestamp
+  function formatTime(isoString: string): string {
+    const date = new Date(isoString);
+    return date.toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+
+  // Format relative time
+  function formatRelativeTime(isoString: string): string {
+    const now = new Date();
+    const date = new Date(isoString);
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+
+    if (diffMins < 1) return "Just now";
+    if (diffMins < 60) return `${diffMins}m`;
+
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours}h`;
+
+    const diffDays = Math.floor(diffHours / 24);
+    return `${diffDays}d`;
+  }
+
+  // Get last message for a channel
+  function getLastMessage(channelId: string): string {
+    const channelMessages = $chatStore.messagesByChannel.get(channelId) || [];
+    if (channelMessages.length === 0) return "No messages yet";
+
+    const lastMsg = channelMessages[channelMessages.length - 1];
+    const isCurrentUser = lastMsg.sender_id === currentUser?.id;
+    const prefix = isCurrentUser ? "You: " : `${lastMsg.sender_username}: `;
+
+    return prefix + lastMsg.content;
+  }
+
+  // Get last message time for a channel
+  function getLastMessageTime(channelId: string): string {
+    const channelMessages = $chatStore.messagesByChannel.get(channelId) || [];
+    if (channelMessages.length === 0) return "";
+
+    const lastMsg = channelMessages[channelMessages.length - 1];
+    return formatRelativeTime(lastMsg.created_at);
+  }
+
+  // Get unread count for a channel
+  function getUnreadCount(channelId: string): number {
+    const channelMessages = $chatStore.messagesByChannel.get(channelId) || [];
+    return channelMessages.filter(
+      (m) => !m.is_read && m.sender_id !== currentUser?.id
+    ).length;
+  }
+
+  // Load channels
+  async function loadChannels() {
+    if (!currentUser) return;
+
+    try {
+      setLoadingChannels(true);
+      const userChannels = await getChannelsByUser(currentUser.id);
+      setChannels(userChannels);
+
+      // Auto-select first channel
+      if (userChannels.length > 0 && !$chatStore.activeChannelId) {
+        await handleSelectChannel(userChannels[0]);
+      }
+    } catch (error) {
+      console.error("Failed to load channels:", error);
     }
   }
 
-  function handleSendMessage() {
-    if (!messageInput.trim() || !selectedConversation) return;
+  // Load messages for a channel
+  async function loadMessagesForChannel(channelId: string) {
+    try {
+      setLoadingMessages(true);
+      const channelMessages = await getMessages({ channel_id: channelId });
+      setMessages(channelId, channelMessages);
 
-    const newMessage: Message = {
-      id: `m${Date.now()}`,
-      senderId: "me",
-      senderName: "You",
-      senderAvatar: "/avatar.jpg",
-      content: messageInput,
-      timestamp: new Date().toLocaleTimeString("en-US", {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-      isRead: false,
-      isSent: true,
-    };
+      // Mark as read
+      markChannelAsRead(channelId);
 
-    selectedConversation.messages.push(newMessage);
-    selectedConversation.lastMessage = `You: ${messageInput}`;
-    selectedConversation.lastMessageTime = "Just now";
-
-    messageInput = "";
-
-    setTimeout(() => {
-      const messagesArea = document.querySelector(".popup-messages-area");
-      if (messagesArea) {
-        messagesArea.scrollTop = messagesArea.scrollHeight;
-      }
-    }, 0);
+      // Scroll to bottom
+      setTimeout(scrollToBottom, 100);
+    } catch (error) {
+      console.error("Failed to load messages:", error);
+      setLoadingMessages(false);
+    }
   }
 
-  function toggleMute() {
-    if (selectedConversation) {
-      selectedConversation.isMuted = !selectedConversation.isMuted;
+  // Handle channel selection
+  async function handleSelectChannel(channel: ChannelResponse) {
+    setActiveChannel(channel.id);
+    await loadMessagesForChannel(channel.id);
+  }
+
+  // Handle send message
+  async function handleSendMessage() {
+    if (!messageInput.trim() || !$chatStore.activeChannelId) return;
+
+    try {
+      websocketService.sendMessage(
+        $chatStore.activeChannelId,
+        messageInput.trim(),
+        "text"
+      );
+      messageInput = "";
+
+      setTimeout(scrollToBottom, 100);
+    } catch (error) {
+      console.error("Failed to send message:", error);
+    }
+  }
+
+  // Handle incoming WebSocket messages
+  function handleIncomingMessage(message: MessageResponse) {
+    addMessage(message.channel_id, message);
+
+    if (message.channel_id === $chatStore.activeChannelId) {
+      setTimeout(scrollToBottom, 100);
+    }
+  }
+
+  // Scroll to bottom
+  function scrollToBottom() {
+    const messagesArea = document.querySelector(".popup-messages-area");
+    if (messagesArea) {
+      messagesArea.scrollTop = messagesArea.scrollHeight;
+    }
+  }
+
+  // Toggle mute
+  async function toggleMute() {
+    if (!activeChannelData || !currentUser) return;
+
+    const currentSettings = channelSettings();
+    const newNotificationState = !(currentSettings?.notification ?? true);
+
+    try {
+      await updateChannel({
+        channel_id: activeChannelData.id,
+        notification: newNotificationState,
+      });
+
+      await loadChannels();
+    } catch (error) {
+      console.error("Failed to toggle mute:", error);
     }
   }
 
@@ -67,6 +218,32 @@
     push("/messages");
     onClose();
   }
+
+  // Initialize when popup shows
+  $effect(() => {
+    if (show && currentUser && channels.length === 0) {
+      loadChannels();
+
+      // Connect WebSocket if not connected
+      if (!websocketService.isConnected()) {
+        websocketService
+          .connect()
+          .then(() => {
+            websocketService.onMessage(handleIncomingMessage);
+          })
+          .catch((error) => {
+            console.error("Failed to connect WebSocket:", error);
+          });
+      } else {
+        websocketService.onMessage(handleIncomingMessage);
+      }
+    }
+  });
+
+  // Cleanup
+  onDestroy(() => {
+    websocketService.offMessage(handleIncomingMessage);
+  });
 </script>
 
 {#if show}
@@ -103,64 +280,68 @@
       <!-- Left Side - Conversations List -->
       <div class="popup-conversations">
         <div class="popup-conversations-list">
-          {#each conversations as conversation}
-            <button
-              class="popup-conversation-item"
-              class:active={selectedConversation?.id === conversation.id}
-              class:unread={conversation.unreadCount > 0}
-              onclick={() => handleSelectConversation(conversation)}
-            >
-              <div class="popup-avatar-wrapper">
-                <img
-                  src={conversation.userAvatar}
-                  alt={conversation.userName}
-                  class="popup-avatar"
-                />
-                {#if conversation.isOnline}
-                  <span class="popup-online-indicator"></span>
-                {/if}
-              </div>
-              <div class="popup-conversation-info">
-                <div class="popup-conversation-top">
-                  <span class="popup-conversation-name"
-                    >{conversation.userName}</span
-                  >
-                  <span class="popup-conversation-time"
-                    >{conversation.lastMessageTime}</span
-                  >
-                </div>
-                <div class="popup-conversation-bottom">
-                  <p class="popup-conversation-preview">
-                    {conversation.lastMessage}
-                  </p>
-                  {#if conversation.unreadCount > 0}
-                    <span class="popup-unread-badge"
-                      >{conversation.unreadCount}</span
-                    >
-                  {/if}
-                </div>
-              </div>
-            </button>
-          {/each}
+          {#if isLoadingChannels}
+            <div class="popup-loading">Loading...</div>
+          {:else if channels.length === 0}
+            <div class="popup-empty">No conversations</div>
+          {:else}
+            {#each channels as channel (channel.id)}
+              {@const member = channel.members.find(
+                (m) => m.user_id !== currentUser?.id
+              )}
+              {@const unreadCount = getUnreadCount(channel.id)}
+              {#if member}
+                <button
+                  class="popup-conversation-item"
+                  class:active={$chatStore.activeChannelId === channel.id}
+                  class:unread={unreadCount > 0}
+                  onclick={() => handleSelectChannel(channel)}
+                >
+                  <div class="popup-avatar-wrapper">
+                    <img
+                      src={member.avatar || "/avatar.jpg"}
+                      alt={member.username}
+                      class="popup-avatar"
+                    />
+                  </div>
+                  <div class="popup-conversation-info">
+                    <div class="popup-conversation-top">
+                      <span class="popup-conversation-name"
+                        >{member.username}</span
+                      >
+                      <span class="popup-conversation-time"
+                        >{getLastMessageTime(channel.id)}</span
+                      >
+                    </div>
+                    <div class="popup-conversation-bottom">
+                      <p class="popup-conversation-preview">
+                        {getLastMessage(channel.id)}
+                      </p>
+                      {#if unreadCount > 0}
+                        <span class="popup-unread-badge">{unreadCount}</span>
+                      {/if}
+                    </div>
+                  </div>
+                </button>
+              {/if}
+            {/each}
+          {/if}
         </div>
       </div>
 
       <!-- Right Side - Chat Detail -->
       <div class="popup-chat-detail">
-        {#if selectedConversation}
+        {#if activeChannelData && otherMember()}
           <!-- Chat Header -->
           <div class="popup-chat-header">
             <div class="popup-chat-user-info">
               <img
-                src={selectedConversation.userAvatar}
-                alt={selectedConversation.userName}
+                src={otherMember()?.avatar || "/avatar.jpg"}
+                alt={otherMember()?.username || "User"}
                 class="popup-chat-avatar"
               />
               <div class="popup-chat-user-details">
-                <h3>{selectedConversation.userName}</h3>
-                {#if selectedConversation.isOnline}
-                  <span class="popup-status-online">Active</span>
-                {/if}
+                <h3>{otherMember()?.username || "Unknown"}</h3>
               </div>
             </div>
             <div class="popup-chat-actions">
@@ -185,7 +366,7 @@
                   <div class="popup-chat-dropdown">
                     <button
                       class="popup-dropdown-item"
-                      class:muted={selectedConversation.isMuted}
+                      class:muted={!(channelSettings()?.notification ?? true)}
                       onclick={() => {
                         toggleMute();
                         showChatMenu = false;
@@ -198,24 +379,10 @@
                         height="18"
                       />
                       <span
-                        >{selectedConversation.isMuted
-                          ? "Unmute"
-                          : "Mute"}</span
+                        >{(channelSettings()?.notification ?? true)
+                          ? "Mute"
+                          : "Unmute"}</span
                       >
-                    </button>
-                    <button
-                      class="popup-dropdown-item"
-                      onclick={() => {
-                        showChatMenu = false;
-                      }}
-                    >
-                      <img
-                        src="/notification_icon.svg"
-                        alt="Notification"
-                        width="18"
-                        height="18"
-                      />
-                      <span>Notifications</span>
                     </button>
                   </div>
                 {/if}
@@ -225,23 +392,30 @@
 
           <!-- Messages Area -->
           <div class="popup-messages-area">
-            <div class="popup-messages-wrapper">
-              {#each selectedConversation.messages as message}
-                <div class="popup-message-row" class:sent={message.isSent}>
-                  {#if !message.isSent}
-                    <img
-                      src={message.senderAvatar}
-                      alt={message.senderName}
-                      class="popup-message-avatar"
-                    />
-                  {/if}
-                  <div class="popup-message-bubble" class:sent={message.isSent}>
-                    <p>{message.content}</p>
-                    <span class="popup-message-time">{message.timestamp}</span>
+            {#if isLoadingMessages}
+              <div class="popup-loading">Loading messages...</div>
+            {:else}
+              <div class="popup-messages-wrapper">
+                {#each messages as message (message.id)}
+                  {@const isSent = message.sender_id === currentUser?.id}
+                  <div class="popup-message-row" class:sent={isSent}>
+                    {#if !isSent}
+                      <img
+                        src={otherMember()?.avatar || "/avatar.jpg"}
+                        alt={message.sender_username}
+                        class="popup-message-avatar"
+                      />
+                    {/if}
+                    <div class="popup-message-bubble" class:sent={isSent}>
+                      <p>{message.content}</p>
+                      <span class="popup-message-time"
+                        >{formatTime(message.created_at)}</span
+                      >
+                    </div>
                   </div>
-                </div>
-              {/each}
-            </div>
+                {/each}
+              </div>
+            {/if}
           </div>
 
           <!-- Message Input -->
@@ -269,6 +443,7 @@
               type="text"
               placeholder="Nhắn tin..."
               bind:value={messageInput}
+              disabled={!websocketService.isConnected()}
               onkeydown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
@@ -279,7 +454,7 @@
             <button
               class="popup-send-btn"
               onclick={handleSendMessage}
-              disabled={!messageInput.trim()}
+              disabled={!messageInput.trim() || !websocketService.isConnected()}
               title="Send"
             >
               <img src="/send_icon.svg" alt="Send" width="20" height="20" />
@@ -403,17 +578,6 @@
     object-fit: cover;
   }
 
-  .popup-online-indicator {
-    position: absolute;
-    bottom: 2px;
-    right: 2px;
-    width: 12px;
-    height: 12px;
-    background: #31a24c;
-    border: 2px solid white;
-    border-radius: 50%;
-  }
-
   .popup-conversation-info {
     flex: 1;
     min-width: 0;
@@ -511,11 +675,6 @@
     font-size: 14px;
     font-weight: 600;
     color: #1c1c1c;
-  }
-
-  .popup-status-online {
-    font-size: 11px;
-    color: #31a24c;
   }
 
   .popup-chat-actions {
@@ -713,5 +872,16 @@
   .popup-send-btn:disabled {
     opacity: 0.4;
     cursor: not-allowed;
+  }
+
+  /* Loading & Empty States */
+  .popup-loading,
+  .popup-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    color: #7c7c7c;
+    font-size: 13px;
   }
 </style>

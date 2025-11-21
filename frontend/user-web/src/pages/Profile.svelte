@@ -1,179 +1,331 @@
 <script lang="ts">
+  import { onMount } from "svelte";
+  import { push } from "svelte-spa-router";
   import Post from "../components/Post.svelte";
-  import type {PostResponse} from "../dtos/post-dto";
+  import type { PostResponse } from "../dtos/post-dto";
+  import type { UserResponse } from "../dtos/user-dto";
+  import {
+    getMyProfile,
+    uploadAvatar,
+    uploadCover,
+  } from "../services/user-service";
+  import { ApiError } from "../errors/api-error";
 
+  let user = $state<UserResponse | null>(null);
+  let isLoadingUser = $state(true);
+  let errorMessage = $state<string | null>(null);
 
-  const user = {
-    name: "Long",
-    avatar: "/avatar.jpg",
-    karma: 12345,
-    cakeDay: "October 18, 2025",
-    coverImage: "/banner_sample1.jpg",
-  };
+  // TODO: Replace with API call for posts
+  let posts = $state<PostResponse[]>([]);
+  let isLoadingPosts = $state(false);
 
-  // TODO: Replace with API call
-  const posts: PostResponse[] = [];
+  let activeTab = $state<"posts" | "comments" | "upvoted" | "downvoted">(
+    "posts"
+  );
+  let sortBy = $state<"hot" | "newest" | "oldest">("hot");
 
-  /* Old mock data
-  const posts: PostResponse[] = [
-    {
-      id: "1",
-      type: "text",
-      community: "sveltejs",
-      author: "Long",
-      time: "4 hours ago",
-      title: "Svelte 5 is amazing!",
-      upvotes: 123,
-      downvotes: 5,
-      commentsCount: 42,
-      content:
-        "I just tried out the new Svelte 5 features and they are mind-blowing. The new runes system is so intuitive!",
-    },
-    {
-      id: "2",
-      type: "image",
-      community: "pics",
-      author: "Long",
-      time: "8 hours ago",
-      title: "A picture I took",
-      upvotes: 456,
-      downvotes: 12,
-      commentsCount: 89,
-      images: ["/discuss.jpg"],
-    },
-  ];
-  */
+  let avatarFileInput: HTMLInputElement;
+  let coverFileInput: HTMLInputElement;
+  let isUploadingAvatar = $state(false);
+  let isUploadingCover = $state(false);
 
-  let activeTab: "posts" | "comments" | "upvoted" | "downvoted" = "posts";
-  let sortBy: "hot" | "newest" | "oldest" = "hot";
-  let followers = 123;
-  let following = 45;
+  onMount(() => {
+    loadUserProfile();
+  });
+
+  async function loadUserProfile() {
+    try {
+      isLoadingUser = true;
+      errorMessage = null;
+      user = await getMyProfile();
+    } catch (error) {
+      console.error("Failed to load profile:", error);
+      if (error instanceof ApiError) {
+        errorMessage = error.message;
+      } else {
+        errorMessage = "Failed to load profile. Please try again.";
+      }
+    } finally {
+      isLoadingUser = false;
+    }
+  }
+
+  async function handleAvatarChange(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith("image/")) {
+      alert("Please select an image file");
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Image size must be less than 5MB");
+      return;
+    }
+
+    try {
+      isUploadingAvatar = true;
+      user = await uploadAvatar(file);
+    } catch (error) {
+      console.error("Failed to upload avatar:", error);
+      if (error instanceof ApiError) {
+        alert(error.message);
+      } else {
+        alert("Failed to upload avatar. Please try again.");
+      }
+    } finally {
+      isUploadingAvatar = false;
+      input.value = ""; // Reset input
+    }
+  }
+
+  async function handleCoverChange(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith("image/")) {
+      alert("Please select an image file");
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Image size must be less than 5MB");
+      return;
+    }
+
+    try {
+      isUploadingCover = true;
+      user = await uploadCover(file);
+    } catch (error) {
+      console.error("Failed to upload cover:", error);
+      if (error instanceof ApiError) {
+        alert(error.message);
+      } else {
+        alert("Failed to upload cover. Please try again.");
+      }
+    } finally {
+      isUploadingCover = false;
+      input.value = ""; // Reset input
+    }
+  }
 
   function handleCreatePost() {
-    // TODO: Implement create post functionality
+    push("/submit");
+  }
+
+  function handleEditProfile() {
+    push("/settings");
   }
 
   function handleSettings() {
-    // TODO: Implement settings functionality
+    push("/settings");
+  }
+
+  function formatDate(dateString?: string): string {
+    if (!dateString) return "Unknown";
+    const date = new Date(dateString);
+    return date.toLocaleDateString("en-US", {
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+    });
   }
 </script>
 
-<div class="profile-page">
-  <div class="profile-header">
-    <div class="cover-image-wrapper">
-      <img src={user.coverImage} alt="Cover" class="cover-image" />
-      <button class="change-cover-btn" on:click={() => {}}>
-        <img src="/change_profile_image.png" alt="Change cover" />
-      </button>
-    </div>
-    <div class="profile-info-bar">
-      <div class="profile-details">
-        <div class="avatar-wrapper">
-          <img src={user.avatar} alt={user.name} class="profile-avatar" />
-          <button class="change-avatar-btn" on:click={() => {}}>
-            <img src="/change_profile_image.png" alt="Change avatar" />
+{#if isLoadingUser}
+  <div class="loading-state">
+    <div class="spinner"></div>
+    <p>Loading profile...</p>
+  </div>
+{:else if errorMessage}
+  <div class="error-state">
+    <p>{errorMessage}</p>
+    <button class="retry-btn" onclick={loadUserProfile}>Retry</button>
+  </div>
+{:else if user}
+  <div class="profile-page">
+    <input
+      type="file"
+      accept="image/*"
+      bind:this={avatarFileInput}
+      onchange={handleAvatarChange}
+      style="display: none;"
+    />
+    <input
+      type="file"
+      accept="image/*"
+      bind:this={coverFileInput}
+      onchange={handleCoverChange}
+      style="display: none;"
+    />
+
+    <div class="profile-header">
+      <div class="cover-image-wrapper">
+        {#if user.profile.cover?.url}
+          <img src={user.profile.cover.url} alt="Cover" class="cover-image" />
+        {:else}
+          <div class="cover-placeholder"></div>
+        {/if}
+        <button
+          class="change-cover-btn"
+          onclick={() => coverFileInput.click()}
+          disabled={isUploadingCover}
+        >
+          {#if isUploadingCover}
+            <div class="mini-spinner"></div>
+          {:else}
+            <img src="/change_profile_image.png" alt="Change cover" />
+          {/if}
+        </button>
+      </div>
+      <div class="profile-info-bar">
+        <div class="profile-details">
+          <div class="avatar-wrapper">
+            {#if user.profile.avatar?.url}
+              <img
+                src={user.profile.avatar.url}
+                alt={user.username}
+                class="profile-avatar"
+              />
+            {:else}
+              <div class="avatar-placeholder">
+                {user.username[0].toUpperCase()}
+              </div>
+            {/if}
+            <button
+              class="change-avatar-btn"
+              onclick={() => avatarFileInput.click()}
+              disabled={isUploadingAvatar}
+            >
+              {#if isUploadingAvatar}
+                <div class="mini-spinner"></div>
+              {:else}
+                <img src="/change_profile_image.png" alt="Change avatar" />
+              {/if}
+            </button>
+          </div>
+          <div class="profile-text">
+            <h1 class="username">{user.username}</h1>
+            <p class="user-handle">u/{user.username}</p>
+          </div>
+        </div>
+        <div class="profile-actions">
+          <button class="action-btn primary" onclick={handleCreatePost}>
+            <i class="fas fa-plus"></i>
+            + Create Post
+          </button>
+          <button class="action-btn secondary" onclick={handleEditProfile}>
+            Edit Profile
+          </button>
+          <button class="action-btn tertiary" onclick={handleSettings}>
+            <img src="/dot.png" alt="Settings" class="settings-icon" />
           </button>
         </div>
-        <div class="profile-text">
-          <h1 class="username">{user.name}</h1>
-          <p class="user-handle">u/{user.name}</p>
-        </div>
-      </div>
-      <div class="profile-actions">
-        <button class="action-btn primary" on:click={handleCreatePost}>
-          <i class="fas fa-plus"></i>
-          + Create Post
-        </button>
-        <button class="action-btn secondary" on:click={() => {}}>
-          Edit Profile
-        </button>
-        <button class="action-btn tertiary" on:click={handleSettings}>
-          <img src="/dot.png" alt="Settings" class="settings-icon" />
-        </button>
       </div>
     </div>
-  </div>
 
-  <div class="profile-content">
-    <div class="profile-main-content">
-      <div class="profile-tabs">
-        <button
-          class="tab-btn"
-          class:active={activeTab === "posts"}
-          on:click={() => (activeTab = "posts")}>Posts</button
-        >
-        <button
-          class="tab-btn"
-          class:active={activeTab === "comments"}
-          on:click={() => (activeTab = "comments")}>Comments</button
-        >
-        <button
-          class="tab-btn"
-          class:active={activeTab === "upvoted"}
-          on:click={() => (activeTab = "upvoted")}>Upvoted</button
-        >
-        <button
-          class="tab-btn"
-          class:active={activeTab === "downvoted"}
-          on:click={() => (activeTab = "downvoted")}>Downvoted</button
-        >
+    <div class="profile-content">
+      <div class="profile-main-content">
+        <div class="profile-tabs">
+          <button
+            class="tab-btn"
+            class:active={activeTab === "posts"}
+            onclick={() => (activeTab = "posts")}>Posts</button
+          >
+          <button
+            class="tab-btn"
+            class:active={activeTab === "comments"}
+            onclick={() => (activeTab = "comments")}>Comments</button
+          >
+          <button
+            class="tab-btn"
+            class:active={activeTab === "upvoted"}
+            onclick={() => (activeTab = "upvoted")}>Upvoted</button
+          >
+          <button
+            class="tab-btn"
+            class:active={activeTab === "downvoted"}
+            onclick={() => (activeTab = "downvoted")}>Downvoted</button
+          >
 
-        <div class="sort-options">
-          <select bind:value={sortBy}>
-            <option value="hot">Hot</option>
-            <option value="newest">Newest</option>
-            <option value="oldest">Oldest</option>
-          </select>
+          <div class="sort-options">
+            <select bind:value={sortBy}>
+              <option value="hot">Hot</option>
+              <option value="newest">Newest</option>
+              <option value="oldest">Oldest</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="tab-content">
+          {#if activeTab === "posts"}
+            {#if isLoadingPosts}
+              <div class="loading-posts">
+                <div class="spinner"></div>
+                <p>Loading posts...</p>
+              </div>
+            {:else if posts.length === 0}
+              <div class="empty-state">
+                <p>No posts yet</p>
+              </div>
+            {:else}
+              <div class="post-list">
+                {#each posts as post}
+                  <Post {post} />
+                {/each}
+              </div>
+            {/if}
+          {:else if activeTab === "comments"}
+            <p>Comments will be shown here.</p>
+          {:else if activeTab === "upvoted"}
+            <p>Upvoted posts will be shown here.</p>
+          {:else if activeTab === "downvoted"}
+            <p>Downvoted posts will be shown here.</p>
+          {/if}
         </div>
       </div>
-
-      <div class="tab-content">
-        {#if activeTab === "posts"}
-          <div class="post-list">
-            {#each posts as post}
-              <Post {post} />
-            {/each}
-          </div>
-        {:else if activeTab === "comments"}
-          <p>Comments will be shown here.</p>
-        {:else if activeTab === "upvoted"}
-          <p>Upvoted posts will be shown here.</p>
-        {:else if activeTab === "downvoted"}
-          <p>Downvoted posts will be shown here.</p>
-        {/if}
-      </div>
-    </div>
-    <div class="profile-sidebar">
-      <div class="user-card">
-        <div class="user-card-body">
-          <h3>About</h3>
-          <p class="bio">
-            A passionate developer sharing thoughts and ideas about technology,
-            coding, and life.
-          </p>
-          <div class="user-stats">
-            <div class="stat">
-              <span class="stat-value">{followers}</span>
-              <span class="stat-label">Followers</span>
+      <div class="profile-sidebar">
+        <div class="user-card">
+          <div class="user-card-body">
+            <h3>About</h3>
+            <p class="bio">
+              {user.profile.bio || "No bio yet."}
+            </p>
+            <div class="user-stats">
+              <div class="stat">
+                <span class="stat-value"
+                  >{user.profile.stats?.post_count ?? 0}</span
+                >
+                <span class="stat-label">Posts</span>
+              </div>
+              <div class="stat">
+                <span class="stat-value"
+                  >{user.profile.stats?.comment_count ?? 0}</span
+                >
+                <span class="stat-label">Comments</span>
+              </div>
+              <div class="stat">
+                <span class="stat-value">{user.reputation ?? 0}</span>
+                <span class="stat-label">Reputation</span>
+              </div>
             </div>
-            <div class="stat">
-              <span class="stat-value">{following}</span>
-              <span class="stat-label">Following</span>
+            <div class="cake-day">
+              <i class="fas fa-birthday-cake"></i>
+              Member since: {formatDate(user.profile.stats?.member_since)}
             </div>
-            <div class="stat">
-              <span class="stat-value">{user.karma}</span>
-              <span class="stat-label">Karma</span>
-            </div>
-          </div>
-          <div class="cake-day">
-            <i class="fas fa-birthday-cake"></i>
-            Cake day: {user.cakeDay}
           </div>
         </div>
       </div>
     </div>
   </div>
-</div>
+{/if}
 
 <style>
   .profile-page {
@@ -580,5 +732,106 @@
   .settings-icon {
     width: 20px;
     height: 20px;
+  }
+
+  /* Loading States */
+  .loading-state,
+  .error-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 400px;
+    padding: 2rem;
+  }
+
+  .loading-state p,
+  .error-state p {
+    margin-top: 1rem;
+    color: #7c7c7c;
+  }
+
+  .spinner {
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid #153060;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+  }
+
+  .mini-spinner {
+    border: 2px solid #f3f3f3;
+    border-top: 2px solid #153060;
+    border-radius: 50%;
+    width: 16px;
+    height: 16px;
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    0% {
+      transform: rotate(0deg);
+    }
+    100% {
+      transform: rotate(360deg);
+    }
+  }
+
+  .retry-btn {
+    margin-top: 1rem;
+    padding: 0.75rem 1.5rem;
+    background-color: #153060;
+    color: white;
+    border: none;
+    border-radius: 24px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .retry-btn:hover {
+    background-color: #0d2144;
+  }
+
+  .loading-posts {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 3rem;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 3rem;
+    color: #7c7c7c;
+  }
+
+  /* Placeholder styles */
+  .cover-placeholder {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  }
+
+  .avatar-placeholder {
+    width: 150px;
+    height: 150px;
+    border-radius: 50%;
+    border: 4px solid white;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    background-color: #153060;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 3rem;
+    font-weight: bold;
+  }
+
+  /* Disabled button state */
+  .change-avatar-btn:disabled,
+  .change-cover-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.7;
   }
 </style>

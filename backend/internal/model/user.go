@@ -50,11 +50,11 @@ type UserRoleContent struct {
 	Cover  *Image `bson:"cover,omitempty" json:"cover,omitempty"`
 
 	// Personal Info
-	Bio         *string    `bson:"bio,omitempty" json:"bio,omitempty"`
-	Gender      *Gender    `bson:"gender,omitempty" json:"gender,omitempty"`
-	DateOfBirth *time.Time `bson:"date_of_birth,omitempty" json:"date_of_birth,omitempty"`
+	Bio         *string     `bson:"bio,omitempty" json:"bio,omitempty"`
+	Gender      *Gender     `bson:"gender,omitempty" json:"gender,omitempty"`
+	DateOfBirth *time.Time  `bson:"date_of_birth,omitempty" json:"date_of_birth,omitempty"`
 	Location    *VNProvince `bson:"location,omitempty" json:"location,omitempty"`
-	Interests   []Interest `bson:"interests,omitempty" json:"interests,omitempty"`
+	Interests   []Interest  `bson:"interests,omitempty" json:"interests,omitempty"`
 
 	// Social Links
 	SocialLinks *SocialLinks `bson:"social_links,omitempty" json:"social_links,omitempty"`
@@ -77,14 +77,162 @@ type SocialLinks struct {
 
 // ActivityStats tracks user's activity statistics.
 type ActivityStats struct {
-	PostCount     int       `bson:"post_count" json:"post_count"`
-	CommentCount  int       `bson:"comment_count" json:"comment_count"`
-	TotalUpvotes  int       `bson:"total_upvotes" json:"total_upvotes"`
-	JoinedAt      time.Time `bson:"joined_at" json:"joined_at"`
-	LastActiveAt  time.Time `bson:"last_active_at" json:"last_active_at"`
+	PostCount    int       `bson:"post_count" json:"post_count"`
+	CommentCount int       `bson:"comment_count" json:"comment_count"`
+	TotalUpvotes int       `bson:"total_upvotes" json:"total_upvotes"`
+	JoinedAt     time.Time `bson:"joined_at" json:"joined_at"`
+	LastActiveAt time.Time `bson:"last_active_at" json:"last_active_at"`
 }
 
 // AdminRoleContent contains data specific to an admin user.
 type AdminRoleContent struct {
 	Permissions []string `bson:"permissions,omitempty" json:"permissions,omitempty"`
+}
+
+func CloneUser(u *User) *User {
+	if u == nil {
+		return nil
+	}
+
+	clone := *u // shallow copy
+
+	// Deep copy DeletedAt
+	if u.DeletedAt != nil {
+		t := *u.DeletedAt
+		clone.DeletedAt = &t
+	}
+
+	// Deep copy Settings
+	if u.Settings != nil {
+		s := *u.Settings
+		clone.Settings = &s
+	}
+
+	// Deep copy RoleContent
+	clone.RoleContent = CloneRoleContent(u.RoleContent)
+
+	return &clone
+}
+
+func CloneRoleContent(rc RoleContent) RoleContent {
+	newRC := RoleContent{}
+
+	if rc.AsUser != nil {
+		newRC.AsUser = CloneUserRoleContent(rc.AsUser)
+	}
+
+	if rc.AsAdmin != nil {
+		newRC.AsAdmin = CloneAdminRoleContent(rc.AsAdmin)
+	}
+
+	return newRC
+}
+
+func CloneUserRoleContent(u *UserRoleContent) *UserRoleContent {
+	if u == nil {
+		return nil
+	}
+
+	clone := *u
+
+	// Avatar
+	if u.Avatar != nil {
+		img := *u.Avatar
+		clone.Avatar = &img
+	}
+
+	// Cover
+	if u.Cover != nil {
+		img := *u.Cover
+		clone.Cover = &img
+	}
+
+	// Bio
+	if u.Bio != nil {
+		v := *u.Bio
+		clone.Bio = &v
+	}
+
+	// Gender
+	if u.Gender != nil {
+		v := *u.Gender
+		clone.Gender = &v
+	}
+
+	// DateOfBirth
+	if u.DateOfBirth != nil {
+		t := *u.DateOfBirth
+		clone.DateOfBirth = &t
+	}
+
+	// Location
+	if u.Location != nil {
+		v := *u.Location
+		clone.Location = &v
+	}
+
+	// Interests (slice copy)
+	if len(u.Interests) > 0 {
+		clone.Interests = append([]Interest(nil), u.Interests...)
+	}
+
+	// SocialLinks
+	if u.SocialLinks != nil {
+		sl := *u.SocialLinks
+
+		// Deep copy all string pointers
+		if u.SocialLinks.Website != nil {
+			s := *u.SocialLinks.Website
+			sl.Website = &s
+		}
+		if u.SocialLinks.Facebook != nil {
+			s := *u.SocialLinks.Facebook
+			sl.Facebook = &s
+		}
+		if u.SocialLinks.YouTube != nil {
+			s := *u.SocialLinks.YouTube
+			sl.YouTube = &s
+		}
+		if u.SocialLinks.GitHub != nil {
+			s := *u.SocialLinks.GitHub
+			sl.GitHub = &s
+		}
+
+		clone.SocialLinks = &sl
+	}
+
+	// Activity Stats
+	if u.Stats != nil {
+		stats := *u.Stats
+		clone.Stats = &stats
+	}
+
+	// BanStart
+	if u.BanStart != nil {
+		t := *u.BanStart
+		clone.BanStart = &t
+	}
+
+	// BanEnd
+	if u.BanEnd != nil {
+		t := *u.BanEnd
+		clone.BanEnd = &t
+	}
+
+	return &clone
+}
+
+func CloneAdminRoleContent(a *AdminRoleContent) *AdminRoleContent {
+	if a == nil {
+		return nil
+	}
+
+	clone := *a
+
+	// deep copy slice
+	if len(a.Permissions) > 0 {
+		clone.Permissions = append([]string(nil), a.Permissions...)
+	}
+
+	return &clone
 }

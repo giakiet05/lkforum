@@ -42,11 +42,11 @@ type UserService interface {
 
 type userService struct {
 	userRepo    repo.UserRepo
-	eventBus    *bus.EventBus
+	eventBus    bus.EventBus
 	redisClient *redis.Client
 }
 
-func NewUserService(userRepo repo.UserRepo, bus *bus.EventBus, redisClient *redis.Client) UserService {
+func NewUserService(userRepo repo.UserRepo, bus bus.EventBus, redisClient *redis.Client) UserService {
 	return &userService{
 		userRepo:    userRepo,
 		eventBus:    bus,

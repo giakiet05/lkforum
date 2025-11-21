@@ -20,7 +20,7 @@ type CommunityService interface {
 	Start()
 	CreateCommunity(req *dto.CreateCommunityRequest, userID string) (*model.Community, error)
 	GetCommunityByID(id string) (*model.Community, error)
-	GetCommunitiesFilter(name string, description string, createFrom time.Time, page int, pageSize int) (*dto.PaginatedCommunitiesResponse, error)
+	GetCommunitiesFilter(name string, description string, is18Plus bool, createFrom time.Time, page int, pageSize int) (*dto.PaginatedCommunitiesResponse, error)
 	GetCommunitiesByModeratorIDPaginated(moderatorID string, page int, pageSize int) (*dto.PaginatedCommunitiesResponse, error)
 	GetAllCommunitiesPaginated(page int, pageSize int) (*dto.PaginatedCommunitiesResponse, error)
 	UpdateCommunity(req *dto.UpdateCommunityRequest, userID string) (*model.Community, error)
@@ -32,10 +32,10 @@ type CommunityService interface {
 
 type communityService struct {
 	communityRepo repo.CommunityRepo
-	eventBus      *bus.EventBus
+	eventBus      bus.EventBus
 }
 
-func NewCommunityService(communityRepo repo.CommunityRepo, bus *bus.EventBus) CommunityService {
+func NewCommunityService(communityRepo repo.CommunityRepo, bus bus.EventBus) CommunityService {
 	return &communityService{communityRepo: communityRepo, eventBus: bus}
 }
 
@@ -130,6 +130,7 @@ func (c *communityService) GetCommunityByID(id string) (*model.Community, error)
 func (c *communityService) GetCommunitiesFilter(
 	name string,
 	description string,
+	is18Plus bool,
 	createFrom time.Time,
 	page int,
 	pageSize int,
@@ -137,7 +138,7 @@ func (c *communityService) GetCommunitiesFilter(
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
 
-	communities, total, err := c.communityRepo.GetFilter(ctx, name, description, createFrom, page, pageSize)
+	communities, total, err := c.communityRepo.GetFilter(ctx, name, description, is18Plus, createFrom, page, pageSize)
 	if err != nil {
 		return nil, err
 	}

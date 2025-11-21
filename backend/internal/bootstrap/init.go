@@ -78,7 +78,7 @@ func initRepos(client *mongo.Client, db *mongo.Database) *Repos {
 	}
 }
 
-func initServices(repos *Repos, redisClient *redis.Client, emailSender email.Sender, eventBus *bus.EventBus) *Services {
+func initServices(repos *Repos, redisClient *redis.Client, emailSender email.Sender, eventBus bus.EventBus) *Services {
 	return &Services{
 		AuthService:         service.NewAuthService(repos.UserRepo, repos.EmailVerificationRepo, emailSender, redisClient),
 		UserService:         service.NewUserService(repos.UserRepo, eventBus, redisClient),

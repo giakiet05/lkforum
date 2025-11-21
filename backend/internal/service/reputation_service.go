@@ -25,10 +25,10 @@ type ReputationService interface {
 
 type reputationService struct {
 	userRepo repo.UserRepo
-	eventBus *bus.EventBus
+	eventBus bus.EventBus
 }
 
-func NewReputationService(userRepo repo.UserRepo, bus *bus.EventBus) ReputationService {
+func NewReputationService(userRepo repo.UserRepo, bus bus.EventBus) ReputationService {
 	return &reputationService{userRepo: userRepo, eventBus: bus}
 }
 

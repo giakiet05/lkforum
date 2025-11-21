@@ -1,61 +1,214 @@
 <script lang="ts">
+  import { onMount, onDestroy } from "svelte";
   import { push } from "svelte-spa-router";
-  import { mockConversations } from "../mocks/conversations.mock";
-  import type { Conversation, Message } from "../mocks/conversations.mock";
+  import { authStore } from "../stores/auth-store";
+  import {
+    chatStore,
+    activeChannel,
+    activeChannelMessages,
+    setChannels,
+    setActiveChannel,
+    setMessages,
+    addMessage,
+    markChannelAsRead,
+    setLoadingChannels,
+    setLoadingMessages,
+    clearChatStore,
+  } from "../stores/chat-store";
+  import {
+    getChannelsByUser,
+    updateChannel,
+  } from "../services/channel-service";
+  import { getMessages } from "../services/message-service";
+  import { websocketService } from "../services/websocket-service";
+  import type { ChannelResponse } from "../dtos/channel-dto";
+  import type { MessageResponse } from "../dtos/message-dto";
 
-  let conversations = $state(mockConversations);
-  let selectedConversation = $state<Conversation | null>(conversations[0]);
   let messageInput = $state("");
-  let isTyping = $state(false);
   let showChatMenu = $state(false);
+  let searchQuery = $state("");
 
-  function handleSelectConversation(conversation: Conversation) {
-    selectedConversation = conversation;
-    // Mark as read
-    if (selectedConversation) {
-      selectedConversation.unreadCount = 0;
+  // Get current user
+  const currentUser = $derived($authStore.user);
+  const channels = $derived($chatStore.channels);
+  const activeChannelData = $derived($activeChannel);
+  const messages = $derived($activeChannelMessages);
+  const isLoadingChannels = $derived($chatStore.isLoadingChannels);
+  const isLoadingMessages = $derived($chatStore.isLoadingMessages);
+
+  // Get other member info from active channel
+  const otherMember = $derived(() => {
+    if (!activeChannelData || !currentUser) return null;
+    return (
+      activeChannelData.members.find((m) => m.user_id !== currentUser.id) ||
+      null
+    );
+  });
+
+  // Check if other member is online (mock for now - needs backend support)
+  const isOtherMemberOnline = $derived(false);
+
+  // Get channel settings for current user
+  const channelSettings = $derived(() => {
+    if (!activeChannelData || !currentUser) return null;
+    return (
+      activeChannelData.settings.find((s) => s.user_id === currentUser.id) ||
+      null
+    );
+  });
+
+  // Format timestamp
+  function formatTime(isoString: string): string {
+    const date = new Date(isoString);
+    return date.toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+
+  // Format relative time for last message
+  function formatRelativeTime(isoString: string): string {
+    const now = new Date();
+    const date = new Date(isoString);
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+
+    if (diffMins < 1) return "Just now";
+    if (diffMins < 60) return `${diffMins}m`;
+
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours}h`;
+
+    const diffDays = Math.floor(diffHours / 24);
+    return `${diffDays}d`;
+  }
+
+  // Get last message for a channel
+  function getLastMessage(channelId: string): string {
+    const channelMessages = $chatStore.messagesByChannel.get(channelId) || [];
+    if (channelMessages.length === 0) return "No messages yet";
+
+    const lastMsg = channelMessages[channelMessages.length - 1];
+    const isCurrentUser = lastMsg.sender_id === currentUser?.id;
+    const prefix = isCurrentUser ? "You: " : `${lastMsg.sender_username}: `;
+
+    return prefix + lastMsg.content;
+  }
+
+  // Get last message time for a channel
+  function getLastMessageTime(channelId: string): string {
+    const channelMessages = $chatStore.messagesByChannel.get(channelId) || [];
+    if (channelMessages.length === 0) return "";
+
+    const lastMsg = channelMessages[channelMessages.length - 1];
+    return formatRelativeTime(lastMsg.created_at);
+  }
+
+  // Get unread count for a channel
+  function getUnreadCount(channelId: string): number {
+    const channelMessages = $chatStore.messagesByChannel.get(channelId) || [];
+    return channelMessages.filter(
+      (m) => !m.is_read && m.sender_id !== currentUser?.id
+    ).length;
+  }
+
+  // Load channels on mount
+  async function loadChannels() {
+    if (!currentUser) return;
+
+    try {
+      setLoadingChannels(true);
+      const userChannels = await getChannelsByUser(currentUser.id);
+      setChannels(userChannels);
+
+      // Auto-select first channel
+      if (userChannels.length > 0 && !$chatStore.activeChannelId) {
+        await handleSelectChannel(userChannels[0]);
+      }
+    } catch (error) {
+      console.error("Failed to load channels:", error);
     }
   }
 
-  function handleSendMessage() {
-    if (!messageInput.trim() || !selectedConversation) return;
+  // Load messages for a channel
+  async function loadMessagesForChannel(channelId: string) {
+    try {
+      setLoadingMessages(true);
+      const channelMessages = await getMessages({ channel_id: channelId });
+      setMessages(channelId, channelMessages);
 
-    const newMessage: Message = {
-      id: `m${Date.now()}`,
-      senderId: "me",
-      senderName: "You",
-      senderAvatar: "/avatar.jpg",
-      content: messageInput,
-      timestamp: new Date().toLocaleTimeString("en-US", {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-      isRead: false,
-      isSent: true,
-    };
+      // Mark as read
+      markChannelAsRead(channelId);
 
-    selectedConversation.messages.push(newMessage);
-    selectedConversation.lastMessage = `You: ${messageInput}`;
-    selectedConversation.lastMessageTime = "Just now";
-
-    messageInput = "";
-
-    // Scroll to bottom
-    setTimeout(() => {
-      const messagesArea = document.querySelector(".messages-area");
-      if (messagesArea) {
-        messagesArea.scrollTop = messagesArea.scrollHeight;
-      }
-    }, 0);
+      // Scroll to bottom
+      setTimeout(scrollToBottom, 100);
+    } catch (error) {
+      console.error("Failed to load messages:", error);
+      setLoadingMessages(false);
+    }
   }
 
-  function handleBack() {
-    push("/");
+  // Handle channel selection
+  async function handleSelectChannel(channel: ChannelResponse) {
+    setActiveChannel(channel.id);
+    await loadMessagesForChannel(channel.id);
   }
 
-  function toggleMute() {
-    if (selectedConversation) {
-      selectedConversation.isMuted = !selectedConversation.isMuted;
+  // Handle send message
+  async function handleSendMessage() {
+    if (!messageInput.trim() || !$chatStore.activeChannelId) return;
+
+    try {
+      websocketService.sendMessage(
+        $chatStore.activeChannelId,
+        messageInput.trim(),
+        "text"
+      );
+      messageInput = "";
+
+      // Scroll to bottom after sending
+      setTimeout(scrollToBottom, 100);
+    } catch (error) {
+      console.error("Failed to send message:", error);
+      alert("Failed to send message. Please try again.");
+    }
+  }
+
+  // Handle incoming WebSocket messages
+  function handleIncomingMessage(message: MessageResponse) {
+    addMessage(message.channel_id, message);
+
+    // Scroll to bottom if message is in active channel
+    if (message.channel_id === $chatStore.activeChannelId) {
+      setTimeout(scrollToBottom, 100);
+    }
+  }
+
+  // Scroll to bottom of messages
+  function scrollToBottom() {
+    const messagesArea = document.querySelector(".messages-area");
+    if (messagesArea) {
+      messagesArea.scrollTop = messagesArea.scrollHeight;
+    }
+  }
+
+  // Toggle mute
+  async function toggleMute() {
+    if (!activeChannelData || !currentUser) return;
+
+    const currentSettings = channelSettings();
+    const newNotificationState = !(currentSettings?.notification ?? true);
+
+    try {
+      await updateChannel({
+        channel_id: activeChannelData.id,
+        notification: newNotificationState,
+      });
+
+      // Reload channels to reflect changes
+      await loadChannels();
+    } catch (error) {
+      console.error("Failed to toggle mute:", error);
     }
   }
 
@@ -63,9 +216,34 @@
     showChatMenu = !showChatMenu;
   }
 
-  function formatTime(time: string): string {
-    return time;
+  function handleBack() {
+    push("/");
   }
+
+  // Initialize on mount
+  onMount(async () => {
+    if (!currentUser) {
+      push("/login");
+      return;
+    }
+
+    // Load channels
+    await loadChannels();
+
+    // Connect WebSocket
+    try {
+      await websocketService.connect();
+      websocketService.onMessage(handleIncomingMessage);
+    } catch (error) {
+      console.error("Failed to connect WebSocket:", error);
+    }
+  });
+
+  // Cleanup on destroy
+  onDestroy(() => {
+    websocketService.offMessage(handleIncomingMessage);
+    // Don't disconnect WebSocket here - might be used in other pages
+  });
 </script>
 
 <div class="messages-page">
@@ -103,60 +281,76 @@
           width="20"
           height="20"
         />
-        <input type="text" placeholder="Search messages..." />
+        <input
+          type="text"
+          placeholder="Search messages..."
+          bind:value={searchQuery}
+        />
       </div>
 
       <div class="conversations-list">
-        {#each conversations as conversation}
-          <button
-            class="conversation-item"
-            class:active={selectedConversation?.id === conversation.id}
-            class:unread={conversation.unreadCount > 0}
-            onclick={() => handleSelectConversation(conversation)}
-          >
-            <div class="conversation-avatar-wrapper">
-              <img
-                src={conversation.userAvatar}
-                alt={conversation.userName}
-                class="conversation-avatar"
-              />
-              {#if conversation.isOnline}
-                <span class="online-indicator"></span>
-              {/if}
-            </div>
-            <div class="conversation-info">
-              <div class="conversation-top">
-                <span class="conversation-name">{conversation.userName}</span>
-                <span class="conversation-time"
-                  >{conversation.lastMessageTime}</span
-                >
-              </div>
-              <div class="conversation-bottom">
-                <p class="conversation-preview">{conversation.lastMessage}</p>
-                {#if conversation.unreadCount > 0}
-                  <span class="unread-badge">{conversation.unreadCount}</span>
-                {/if}
-              </div>
-            </div>
-          </button>
-        {/each}
+        {#if isLoadingChannels}
+          <div class="loading-state">Loading channels...</div>
+        {:else if channels.length === 0}
+          <div class="empty-state">No conversations yet</div>
+        {:else}
+          {#each channels as channel (channel.id)}
+            {@const member = channel.members.find(
+              (m) => m.user_id !== currentUser?.id
+            )}
+            {@const unreadCount = getUnreadCount(channel.id)}
+            {#if member}
+              <button
+                class="conversation-item"
+                class:active={$chatStore.activeChannelId === channel.id}
+                class:unread={unreadCount > 0}
+                onclick={() => handleSelectChannel(channel)}
+              >
+                <div class="conversation-avatar-wrapper">
+                  <img
+                    src={member.avatar || "/avatar.jpg"}
+                    alt={member.username}
+                    class="conversation-avatar"
+                  />
+                  <!-- TODO: Online status needs backend support -->
+                </div>
+                <div class="conversation-info">
+                  <div class="conversation-top">
+                    <span class="conversation-name">{member.username}</span>
+                    <span class="conversation-time"
+                      >{getLastMessageTime(channel.id)}</span
+                    >
+                  </div>
+                  <div class="conversation-bottom">
+                    <p class="conversation-preview">
+                      {getLastMessage(channel.id)}
+                    </p>
+                    {#if unreadCount > 0}
+                      <span class="unread-badge">{unreadCount}</span>
+                    {/if}
+                  </div>
+                </div>
+              </button>
+            {/if}
+          {/each}
+        {/if}
       </div>
     </div>
 
     <!-- Right Side - Chat Detail -->
     <div class="chat-detail">
-      {#if selectedConversation}
+      {#if activeChannelData && otherMember()}
         <!-- Chat Header -->
         <div class="chat-header">
           <div class="chat-user-info">
             <img
-              src={selectedConversation.userAvatar}
-              alt={selectedConversation.userName}
+              src={otherMember()?.avatar || "/avatar.jpg"}
+              alt={otherMember()?.username || "User"}
               class="chat-avatar"
             />
             <div class="chat-user-details">
-              <h3>{selectedConversation.userName}</h3>
-              {#if selectedConversation.isOnline}
+              <h3>{otherMember()?.username || "Unknown"}</h3>
+              {#if isOtherMemberOnline}
                 <span class="status-online">Active now</span>
               {:else}
                 <span class="status-offline">Offline</span>
@@ -185,7 +379,7 @@
                 <div class="chat-dropdown">
                   <button
                     class="dropdown-item"
-                    class:muted={selectedConversation.isMuted}
+                    class:muted={!(channelSettings()?.notification ?? true)}
                     onclick={() => {
                       toggleMute();
                       showChatMenu = false;
@@ -198,22 +392,10 @@
                       height="20"
                     />
                     <span
-                      >{selectedConversation.isMuted ? "Unmute" : "Mute"}</span
+                      >{(channelSettings()?.notification ?? true)
+                        ? "Mute"
+                        : "Unmute"}</span
                     >
-                  </button>
-                  <button
-                    class="dropdown-item"
-                    onclick={() => {
-                      showChatMenu = false;
-                    }}
-                  >
-                    <img
-                      src="/notification_icon.svg"
-                      alt="Notification"
-                      width="20"
-                      height="20"
-                    />
-                    <span>Notifications</span>
                   </button>
                 </div>
               {/if}
@@ -223,37 +405,31 @@
 
         <!-- Messages Area -->
         <div class="messages-area">
-          <div class="messages-wrapper">
-            {#each selectedConversation.messages as message}
-              <div class="message-row" class:sent={message.isSent}>
-                {#if !message.isSent}
-                  <img
-                    src={message.senderAvatar}
-                    alt={message.senderName}
-                    class="message-avatar"
-                  />
-                {/if}
-                <div class="message-bubble" class:sent={message.isSent}>
-                  <p>{message.content}</p>
-                  <span class="message-time">{message.timestamp}</span>
+          {#if isLoadingMessages}
+            <div class="loading-messages">Loading messages...</div>
+          {:else}
+            <div class="messages-wrapper">
+              {#each messages as message (message.id)}
+                {@const isSent = message.sender_id === currentUser?.id}
+                <div class="message-row" class:sent={isSent}>
+                  {#if !isSent}
+                    <img
+                      src={otherMember()?.avatar || "/avatar.jpg"}
+                      alt={message.sender_username}
+                      class="message-avatar"
+                    />
+                  {/if}
+                  <div class="message-bubble" class:sent={isSent}>
+                    <p>{message.content}</p>
+                    <span class="message-time"
+                      >{formatTime(message.created_at)}</span
+                    >
+                  </div>
                 </div>
-              </div>
-            {/each}
-            {#if isTyping}
-              <div class="message-row">
-                <img
-                  src={selectedConversation.userAvatar}
-                  alt={selectedConversation.userName}
-                  class="message-avatar"
-                />
-                <div class="typing-indicator">
-                  <span></span>
-                  <span></span>
-                  <span></span>
-                </div>
-              </div>
-            {/if}
-          </div>
+              {/each}
+              <!-- TODO: Typing indicator needs backend support -->
+            </div>
+          {/if}
         </div>
 
         <!-- Message Input -->
@@ -281,6 +457,7 @@
             type="text"
             placeholder="Nhắn tin..."
             bind:value={messageInput}
+            disabled={!websocketService.isConnected()}
             onkeydown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
@@ -291,7 +468,7 @@
           <button
             class="send-btn"
             onclick={handleSendMessage}
-            disabled={!messageInput.trim()}
+            disabled={!messageInput.trim() || !websocketService.isConnected()}
             title="Send"
           >
             <img src="/send_icon.svg" alt="Send" width="24" height="24" />
@@ -475,17 +652,6 @@
     height: 56px;
     border-radius: 50%;
     object-fit: cover;
-  }
-
-  .online-indicator {
-    position: absolute;
-    bottom: 2px;
-    right: 2px;
-    width: 14px;
-    height: 14px;
-    background: #31a24c;
-    border: 2px solid white;
-    border-radius: 50%;
   }
 
   .conversation-info {
@@ -730,46 +896,6 @@
     opacity: 0.7;
   }
 
-  /* Typing Indicator */
-  .typing-indicator {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    padding: 12px 16px;
-    background: white;
-    border-radius: 18px;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-  }
-
-  .typing-indicator span {
-    width: 8px;
-    height: 8px;
-    background: #7c7c7c;
-    border-radius: 50%;
-    animation: typing 1.4s infinite;
-  }
-
-  .typing-indicator span:nth-child(2) {
-    animation-delay: 0.2s;
-  }
-
-  .typing-indicator span:nth-child(3) {
-    animation-delay: 0.4s;
-  }
-
-  @keyframes typing {
-    0%,
-    60%,
-    100% {
-      transform: translateY(0);
-      opacity: 0.7;
-    }
-    30% {
-      transform: translateY(-10px);
-      opacity: 1;
-    }
-  }
-
   /* Message Input */
   .message-input-container {
     display: flex;
@@ -858,5 +984,21 @@
     margin: 0;
     font-size: 14px;
     color: #7c7c7c;
+  }
+
+  /* Loading States */
+  .loading-state,
+  .empty-state,
+  .loading-messages {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+    color: #7c7c7c;
+    font-size: 14px;
+  }
+
+  .loading-messages {
+    height: 100%;
   }
 </style>
