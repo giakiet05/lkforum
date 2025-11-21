@@ -41,7 +41,7 @@ func NewMongoClient() *mongo.Client {
 		log.Fatal("MONGO_URI environment variable is not set")
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	client, err := mongo.Connect(ctx, options.Client().ApplyURI(uri))

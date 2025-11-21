@@ -10,6 +10,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 // PostRepo defines the data access layer for posts, independent of the database implementation.
@@ -60,71 +61,67 @@ func (r *postRepo) GetByID(ctx context.Context, id string) (*model.Post, error) 
 	return &post, nil
 }
 
-// Find uses an aggregation pipeline to fetch paginated data and total count in a single query.
+// Find fetches paginated data and total count using two separate queries for simplicity and robustness.
 func (r *postRepo) Find(ctx context.Context, filter Filter, opts *FindOptions) ([]*model.Post, int64, error) {
-	pipeline := mongo.Pipeline{}
+	// 1. Get total count using an aggregation pipeline to avoid potential bugs in CountDocuments.
+	countPipeline := mongo.Pipeline{
+		{{"$match", bson.M(filter)}},
+		{{"$count", "total"}},
+	}
+	cursor, err := r.collection.Aggregate(ctx, countPipeline)
+	if err != nil {
+		return nil, 0, err
+	}
 
-	// Match stage for filtering
-	pipeline = append(pipeline, bson.D{{Key: "$match", Value: bson.M(filter)}})
+	var countResult []struct {
+		Total int64 `bson:"total"`
+	}
+	if err = cursor.All(ctx, &countResult); err != nil {
+		return nil, 0, err
+	}
 
-	// Facet stage for getting both metadata (total count) and paginated data
-	facetStage := bson.D{{
-		Key: "$facet",
-		Value: bson.D{
-			{"metadata", bson.A{bson.D{{Key: "$count", Value: "total"}}}},
-			{"data", bson.A{}},
-		},
-	}}
+	var total int64
+	if len(countResult) > 0 {
+		total = countResult[0].Total
+	}
 
-	// Build the data pipeline inside the facet
-	dataPipeline := bson.A{}
+	// If there are no documents, return early
+	if total == 0 {
+		return []*model.Post{}, 0, nil
+	}
+
+	// 2. Get the paginated data
+	findOptions := options.Find()
 	if opts != nil {
 		if opts.Sort != nil {
 			sortDoc := bson.D{}
 			for key, value := range opts.Sort {
 				sortDoc = append(sortDoc, bson.E{Key: key, Value: value})
 			}
-			dataPipeline = append(dataPipeline, bson.D{{Key: "$sort", Value: sortDoc}})
+			findOptions.SetSort(sortDoc)
 		}
 		if opts.Skip > 0 {
-			dataPipeline = append(dataPipeline, bson.D{{Key: "$skip", Value: opts.Skip}})
+			findOptions.SetSkip(opts.Skip)
 		}
 		if opts.Limit > 0 {
-			dataPipeline = append(dataPipeline, bson.D{{Key: "$limit", Value: opts.Limit}})
+			findOptions.SetLimit(opts.Limit)
 		}
 	}
-	facetStage[0].Value.(bson.D)[1].Value.(bson.A)[0] = dataPipeline[0]
 
-	pipeline = append(pipeline, facetStage)
-
-	cursor, err := r.collection.Aggregate(ctx, pipeline)
+	cursor, err = r.collection.Find(ctx, bson.M(filter), findOptions)
 	if err != nil {
-		return nil, 0, err
+		// If the find operation fails, we already have the count, but we should return the error.
+		return nil, total, err
 	}
 	defer cursor.Close(ctx)
 
-	var result []struct {
-		Metadata []struct {
-			Total int64 `bson:"total"`
-		} `bson:"metadata"`
-		Data []*model.Post `bson:"data"`
-	}
-
-	if !cursor.Next(ctx) {
-		// No documents found, return empty slice and 0 count
-		return []*model.Post{}, 0, nil
-	}
-	if err := cursor.Decode(&result); err != nil {
+	var posts []*model.Post
+	if err := cursor.All(ctx, &posts); err != nil {
 		return nil, 0, err
 	}
 
-	if len(result) == 0 || len(result[0].Metadata) == 0 {
-		return []*model.Post{}, 0, nil
-	}
-
-	return result[0].Data, result[0].Metadata[0].Total, nil
+	return posts, total, nil
 }
-
 func (r *postRepo) UpdateByID(ctx context.Context, id string, update UpdateDocument) error {
 	objectID, err := primitive.ObjectIDFromHex(id)
 	if err != nil {

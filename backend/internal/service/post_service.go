@@ -504,7 +504,7 @@ func (s *postService) publishVoteEvents(authorID, voterID, postID string, prevVo
 // --- Helper methods ---
 
 func (s *postService) buildFilter(query *dto.GetPostsQuery) repo.Filter {
-	filter := repo.Filter{"is_deleted": false}
+	filter := repo.Filter{}
 	if query.CommunityID != "" {
 		if id, err := primitive.ObjectIDFromHex(query.CommunityID); err == nil {
 			filter["community_id"] = id
