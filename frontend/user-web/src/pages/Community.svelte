@@ -3,8 +3,12 @@
   import { push } from "svelte-spa-router";
   import Post from "../components/Post.svelte";
   import CreatePostModal from "../components/CreatePostModal.svelte";
-  import type { PostResponse } from "../dtos/post-dto"
+  import type { PostResponse } from "../dtos/post-dto";
+  import type { CommunityResponse } from "../dtos/community-dto";
+  import { getCommunityById } from "../services/community-service";
+  import { getPosts } from "../services/post-service";
   import { mockCommunityRules } from "../mocks/community-rules.mock";
+  import { authStore } from "../stores/auth-store";
 
   type CommunityProps = {
     params?: { name: string };
@@ -12,7 +16,10 @@
 
   let { params = { name: "sveltejs" } }: CommunityProps = $props();
 
-  let activeSort = $state("hot");
+  let activeSort = $state<"hot" | "new" | "top">("hot");
+  let activeTimeFrame = $state<
+    "hour" | "day" | "week" | "month" | "year" | "all"
+  >("day");
   let isJoined = $state(false);
   let expandedRules = $state(new Set<number>());
   let showCreatePostModal = $state(false);
@@ -21,21 +28,95 @@
   let invitePermission = $state("Everything");
   let inviteCanEdit = $state(true);
 
-  // Mock community data
-  const community = {
-    name: params.name,
-    displayName: `lk/${params.name}`,
-    description: "A community for all things related to " + params.name,
-    members: 125000,
-    online: 3200,
-    createdAt: "Jan 1, 2020",
-    banner: "/banner_sample1.jpg",
-    icon: "/community_logo.jpg",
-  };
+  // API data
+  let community = $state<CommunityResponse | null>(null);
+  let posts = $state<PostResponse[]>([]);
+  let isLoadingCommunity = $state(true);
+  let isLoadingPosts = $state(true);
+  let communityError = $state<string | null>(null);
+  let postsError = $state<string | null>(null);
+  let currentPage = $state(1);
+  const postsPerPage = 10;
 
-  // Mock posts for this community
-  // TODO: Replace with API call
-  const posts: PostResponse[] = [];
+  // Load community data
+  async function loadCommunity() {
+    try {
+      isLoadingCommunity = true;
+      communityError = null;
+
+      // TODO: Backend needs endpoint to get community by name, not just by ID
+      // For now, we need to fetch all communities and find by name
+      // Or backend should add GET /api/communities/by-name/:name
+      const communities = await import("../services/community-service").then(
+        (m) => m.getCommunities({ limit: 100 })
+      );
+      const found = communities.communities.find((c) => c.name === params.name);
+
+      if (!found) {
+        communityError = "Community not found";
+        community = null;
+      } else {
+        community = found;
+      }
+    } catch (error) {
+      console.error("Failed to load community:", error);
+      communityError =
+        error instanceof Error ? error.message : "Failed to load community";
+      community = null;
+    } finally {
+      isLoadingCommunity = false;
+    }
+  }
+
+  // Load posts for this community
+  async function loadPosts() {
+    if (!community) return;
+
+    try {
+      isLoadingPosts = true;
+      postsError = null;
+
+      const fetchedPosts = await getPosts({
+        community_id: community.id,
+        sort: activeSort,
+        time: activeSort === "top" ? activeTimeFrame : undefined,
+        page: currentPage,
+        limit: postsPerPage,
+      });
+
+      posts = fetchedPosts;
+    } catch (error) {
+      console.error("Failed to load posts:", error);
+      postsError =
+        error instanceof Error ? error.message : "Failed to load posts";
+      posts = [];
+    } finally {
+      isLoadingPosts = false;
+    }
+  }
+
+  // Check if user is member of this community
+  // TODO: Backend doesn't have endpoint to check membership status yet
+  // Need: GET /api/memberships/check?user_id=xxx&community_id=xxx
+  // Or: GET /api/memberships/my-communities to get user's communities
+  async function checkMembership() {
+    // Placeholder - implement when backend API is available
+    isJoined = false;
+  }
+
+  // Reload posts when sort or time frame changes
+  $effect(() => {
+    if (community && !isLoadingCommunity) {
+      loadPosts();
+    }
+  });
+
+  // Reload community when params.name changes (user navigates to different community)
+  $effect(() => {
+    if (params.name) {
+      loadCommunity();
+    }
+  });
 
   /* Old mock data
   const posts: PostResponse[] = [
@@ -68,6 +149,9 @@
   */
 
   function toggleJoin() {
+    // TODO: Implement join/leave API when backend provides endpoint
+    // Need: POST /api/memberships (create membership)
+    // Need: DELETE /api/memberships/:id (leave community)
     isJoined = !isJoined;
   }
 
@@ -114,213 +198,277 @@
 
   onMount(() => {
     window.scrollTo(0, 0);
+    // Don't call loadCommunity here - let $effect handle it
   });
 </script>
 
 <div class="community-page">
-  <!-- Banner -->
-  <div class="community-banner">
-    <img src={community.banner} alt="Community banner" />
-  </div>
-
-  <!-- Community Header -->
-  <div class="community-header">
-    <div class="community-header-content">
-      <div class="community-info">
-        <img src={community.icon} alt="Community icon" class="community-icon" />
-        <div class="community-title">
-          <h1>{community.displayName}</h1>
-          <p class="community-name">lk/{community.name}</p>
-        </div>
-      </div>
-
-      <div class="community-actions">
-        <!-- Create Post Button -->
-        <button
-          class="create-post-action-btn"
-          title="Create post"
-          onclick={() => (showCreatePostModal = true)}
-        >
-          <svg viewBox="0 0 20 20" fill="currentColor">
-            <path
-              d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
-            />
-          </svg>
-          Create post
-        </button>
-
-        <!-- Notification Bell Button -->
-        <button class="action-btn" title="Notifications">
-          <svg viewBox="0 0 20 20" fill="currentColor">
-            <path
-              d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"
-            />
-          </svg>
-        </button>
-
-        <!-- Mod Tools Button -->
-        <button
-          class="mod-tools-btn"
-          title="Moderator tools"
-          onclick={handleModTools}
-        >
-          <svg viewBox="0 0 20 20" fill="currentColor">
-            <path
-              fill-rule="evenodd"
-              d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z"
-              clip-rule="evenodd"
-            />
-          </svg>
-          Mod tools
-        </button>
-
-        <!-- More Options Button -->
-        <button class="action-btn" title="More options">
-          <svg viewBox="0 0 20 20" fill="currentColor">
-            <path
-              d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"
-            />
-          </svg>
-        </button>
-      </div>
+  {#if isLoadingCommunity}
+    <div class="loading-container">
+      <p>Loading community...</p>
     </div>
-  </div>
-
-  <div class="community-container">
-    <!-- Main Content -->
-    <div class="community-main">
-      <!-- Sort Bar -->
-      <div class="sorting-bar">
-        <button
-          class="sort-btn"
-          class:active={activeSort === "hot"}
-          onclick={() => (activeSort = "hot")}
-        >
-          Hot
-        </button>
-        <button
-          class="sort-btn"
-          class:active={activeSort === "new"}
-          onclick={() => (activeSort = "new")}
-        >
-          New
-        </button>
-        <button
-          class="sort-btn"
-          class:active={activeSort === "top"}
-          onclick={() => (activeSort = "top")}
-        >
-          Top
-        </button>
-      </div>
-
-      <!-- Posts -->
-      <div class="post-list">
-        {#each posts as post}
-          <Post {post} />
-        {/each}
-      </div>
+  {:else if communityError || !community}
+    <div class="error-container">
+      <p>{communityError || "Community not found"}</p>
+      <button onclick={() => push("/")}>Go back home</button>
+    </div>
+  {:else}
+    <!-- Banner -->
+    <div class="community-banner">
+      {#if community.banner}
+        <img src={community.banner} alt="Community banner" />
+      {:else}
+        <div class="banner-placeholder"></div>
+      {/if}
     </div>
 
-    <!-- Sidebar -->
-    <div class="community-sidebar">
-      <div class="about-card">
-        <h3>About Community</h3>
-        <p class="about-description">{community.description}</p>
-
-        <div class="community-stats">
-          <div class="stat">
-            <div class="stat-value">{community.members.toLocaleString()}</div>
-            <div class="stat-label">Members</div>
-          </div>
-          <div class="stat">
-            <div class="stat-value">{community.online.toLocaleString()}</div>
-            <div class="stat-label">Online</div>
+    <!-- Community Header -->
+    <div class="community-header">
+      <div class="community-header-content">
+        <div class="community-info">
+          <img
+            src={community.avatar || "/community_logo.jpg"}
+            alt="Community icon"
+            class="community-icon"
+          />
+          <div class="community-title">
+            <h1>lk/{community.name}</h1>
+            <p class="community-name">{community.name}</p>
           </div>
         </div>
 
-        <div class="community-created">
-          <img src="/Calendar_duotone.svg" alt="Calendar" />
-          <span>Created {community.createdAt}</span>
-        </div>
-      </div>
-
-      <!-- Rules Card -->
-      <div class="rules-card">
-        <h3>Community Rules</h3>
-        {#if mockCommunityRules.length > 0}
-          <div class="rules-accordion">
-            {#each mockCommunityRules as rule, index}
-              <div class="rule-item">
-                <button
-                  class="rule-header"
-                  onclick={() => toggleRule(index)}
-                  aria-expanded={expandedRules.has(index)}
-                >
-                  <span class="rule-number">{index + 1}.</span>
-                  <span class="rule-title">{rule.name}</span>
-                  <span
-                    class="rule-toggle"
-                    class:expanded={expandedRules.has(index)}
-                  >
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                      <path
-                        d="M4 6L8 10L12 6"
-                        stroke="currentColor"
-                        stroke-width="2"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                      />
-                    </svg>
-                  </span>
-                </button>
-                {#if expandedRules.has(index)}
-                  <div class="rule-content">
-                    <p>{rule.description}</p>
-                  </div>
-                {/if}
-              </div>
-            {/each}
-          </div>
-        {:else}
-          <p class="no-rules">No rules available</p>
-        {/if}
-      </div>
-
-      <!-- Moderators Card -->
-      <div class="moderators-card">
-        <div class="moderators-header">
-          <h3>Moderators</h3>
+        <div class="community-actions">
+          <!-- Create Post Button -->
           <button
-            class="invite-mod-btn"
-            title="Invite moderator"
-            onclick={handleOpenInviteModModal}
+            class="create-post-action-btn"
+            title="Create post"
+            onclick={() => (showCreatePostModal = true)}
           >
-            <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
+            <svg viewBox="0 0 20 20" fill="currentColor">
               <path
-                d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 016 6H2a6 6 0 016-6zm10-5a1 1 0 10-2 0v1h-1a1 1 0 100 2h1v1a1 1 0 102 0v-1h1a1 1 0 100-2h-1V6z"
+                d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
               />
             </svg>
-            Invite Mod
+            Create post
+          </button>
+
+          <!-- Notification Bell Button -->
+          <button class="action-btn" title="Notifications">
+            <svg viewBox="0 0 20 20" fill="currentColor">
+              <path
+                d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"
+              />
+            </svg>
+          </button>
+
+          <!-- Mod Tools Button -->
+          <button
+            class="mod-tools-btn"
+            title="Moderator tools"
+            onclick={handleModTools}
+          >
+            <svg viewBox="0 0 20 20" fill="currentColor">
+              <path
+                fill-rule="evenodd"
+                d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z"
+                clip-rule="evenodd"
+              />
+            </svg>
+            Mod tools
+          </button>
+
+          <!-- More Options Button -->
+          <button class="action-btn" title="More options">
+            <svg viewBox="0 0 20 20" fill="currentColor">
+              <path
+                d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"
+              />
+            </svg>
           </button>
         </div>
-        <div class="moderator-list">
-          <div class="moderator">
-            <img src="/avatar.jpg" alt="Moderator" class="mod-avatar" />
-            <span class="mod-name">u/BlueItsSelf</span>
-          </div>
-        </div>
-        <button class="view-all-mods-btn">View all moderators</button>
       </div>
     </div>
-  </div>
+
+    <div class="community-container">
+      <!-- Main Content -->
+      <div class="community-main">
+        <!-- Sort Bar -->
+        <div class="sorting-bar">
+          <button
+            class="sort-btn"
+            class:active={activeSort === "hot"}
+            onclick={() => (activeSort = "hot")}
+          >
+            Hot
+          </button>
+          <button
+            class="sort-btn"
+            class:active={activeSort === "new"}
+            onclick={() => (activeSort = "new")}
+          >
+            New
+          </button>
+          <button
+            class="sort-btn"
+            class:active={activeSort === "top"}
+            onclick={() => (activeSort = "top")}
+          >
+            Top
+          </button>
+        </div>
+
+        <!-- Posts -->
+        <div class="post-list">
+          {#if isLoadingPosts}
+            <div class="loading-posts">
+              <p>Loading posts...</p>
+            </div>
+          {:else if postsError}
+            <div class="error-posts">
+              <p>{postsError}</p>
+            </div>
+          {:else if posts.length === 0}
+            <div class="no-posts">
+              <p>No posts yet. Be the first to post!</p>
+            </div>
+          {:else}
+            {#each posts as post}
+              <Post {post} />
+            {/each}
+          {/if}
+        </div>
+      </div>
+
+      <!-- Sidebar -->
+      <div class="community-sidebar">
+        <div class="about-card">
+          <h3>About Community</h3>
+          <p class="about-description">
+            {community.description || "No description available"}
+          </p>
+
+          <div class="community-stats">
+            <div class="stat">
+              <div class="stat-value">
+                {community.member_count?.toLocaleString() || "0"}
+              </div>
+              <div class="stat-label">Members</div>
+            </div>
+            <div class="stat">
+              <!-- TODO: Backend doesn't track online count yet -->
+              <div class="stat-value">-</div>
+              <div class="stat-label">Online</div>
+            </div>
+          </div>
+
+          <!-- TODO: Backend doesn't have created_at field in CommunityResponse -->
+        </div>
+
+        <!-- Rules Card -->
+        <!-- TODO: Backend doesn't have Community Rules API yet -->
+        <div class="rules-card">
+          <h3>Community Rules</h3>
+          {#if mockCommunityRules.length > 0}
+            <div class="rules-accordion">
+              {#each mockCommunityRules as rule, index}
+                <div class="rule-item">
+                  <button
+                    class="rule-header"
+                    onclick={() => toggleRule(index)}
+                    aria-expanded={expandedRules.has(index)}
+                  >
+                    <span class="rule-number">{index + 1}.</span>
+                    <span class="rule-title">{rule.name}</span>
+                    <span
+                      class="rule-toggle"
+                      class:expanded={expandedRules.has(index)}
+                    >
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 16 16"
+                        fill="none"
+                      >
+                        <path
+                          d="M4 6L8 10L12 6"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                        />
+                      </svg>
+                    </span>
+                  </button>
+                  {#if expandedRules.has(index)}
+                    <div class="rule-content">
+                      <p>{rule.description}</p>
+                    </div>
+                  {/if}
+                </div>
+              {/each}
+            </div>
+          {:else}
+            <p class="no-rules">No rules available</p>
+          {/if}
+        </div>
+
+        <!-- Moderators Card -->
+        <div class="moderators-card">
+          <div class="moderators-header">
+            <h3>Moderators</h3>
+            <button
+              class="invite-mod-btn"
+              title="Invite moderator"
+              onclick={handleOpenInviteModModal}
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path
+                  d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 016 6H2a6 6 0 016-6zm10-5a1 1 0 10-2 0v1h-1a1 1 0 100 2h1v1a1 1 0 102 0v-1h1a1 1 0 100-2h-1V6z"
+                />
+              </svg>
+              Invite Mod
+            </button>
+          </div>
+          <div class="moderator-list">
+            {#if community.moderators && community.moderators.length > 0}
+              {#each community.moderators as moderator}
+                <div class="moderator">
+                  <img
+                    src={moderator.avatar || "/avatar.jpg"}
+                    alt="Moderator"
+                    class="mod-avatar"
+                  />
+                  <span class="mod-name">u/{moderator.username}</span>
+                </div>
+              {/each}
+            {:else}
+              <p class="no-moderators">No moderators yet</p>
+            {/if}
+          </div>
+          {#if community.moderators && community.moderators.length > 3}
+            <button class="view-all-mods-btn">View all moderators</button>
+          {/if}
+        </div>
+      </div>
+    </div>
+  {/if}
 </div>
 
-<CreatePostModal
-  show={showCreatePostModal}
-  onClose={() => (showCreatePostModal = false)}
-  communityName={community.name}
-/>
+{#if community}
+  <CreatePostModal
+    show={showCreatePostModal}
+    onClose={() => {
+      showCreatePostModal = false;
+      loadPosts(); // Reload posts after creating new post
+    }}
+    communityName={community.name}
+  />
+{/if}
 
 {#if showInviteModModal}
   <div class="modal-overlay" onclick={handleCloseInviteModModal}>
@@ -383,6 +531,64 @@
     background-color: white;
   }
 
+  /* Loading and Error States */
+  .loading-container,
+  .error-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 400px;
+    padding: 40px;
+    text-align: center;
+  }
+
+  .error-container p {
+    color: #ff4500;
+    margin-bottom: 16px;
+    font-size: 16px;
+  }
+
+  .error-container button {
+    padding: 8px 16px;
+    background-color: #0079d3;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 600;
+  }
+
+  .error-container button:hover {
+    background-color: #0060a8;
+  }
+
+  .loading-posts,
+  .error-posts,
+  .no-posts {
+    padding: 40px;
+    text-align: center;
+    background-color: white;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+  }
+
+  .error-posts p {
+    color: #ff4500;
+  }
+
+  .no-posts p {
+    color: #7c7c7c;
+    font-size: 14px;
+  }
+
+  .no-moderators {
+    padding: 12px;
+    color: #7c7c7c;
+    font-size: 13px;
+    text-align: center;
+  }
+
   /* Banner */
   .community-banner {
     width: calc(100% - 48px);
@@ -397,6 +603,12 @@
     width: 100%;
     height: 100%;
     object-fit: cover;
+  }
+
+  .banner-placeholder {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   }
 
   /* Community Header */
