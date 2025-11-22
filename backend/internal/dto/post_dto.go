@@ -71,7 +71,7 @@ type RemoveImagesRequest struct {
 // GetPostsQuery defines the query parameters for fetching posts.
 type GetPostsQuery struct {
 	CommunityID string `form:"community_id"`
-	AuthorID    string `form:"author_id"`	
+	AuthorID    string `form:"author_id"`
 	Type        string `form:"type"`
 	Sort        string `form:"sort"`
 	TimeFrame   string `form:"time"`
@@ -84,7 +84,7 @@ type GetPostsQuery struct {
 // PostResponse is the detailed post object returned to the client.
 type PostResponse struct {
 	ID            string                 `json:"id"`
-	Author        AuthorResponse         `json:"author"`	
+	Author        AuthorResponse         `json:"author"`
 	Community     CommunityShortResponse `json:"community"`
 	Title         string                 `json:"title"`
 	Type          model.PostType         `json:"type"`
@@ -157,9 +157,15 @@ func FromPost(post *model.Post, author *model.User, community *model.Community, 
 		community = &model.Community{Name: "[deleted]"} // Graceful handling of deleted community
 	}
 
+	// Safely access the nested avatar to prevent nil pointer dereference
+	var authorAvatar *model.Image
+	if author.RoleContent.AsUser != nil {
+		authorAvatar = author.RoleContent.AsUser.Avatar
+	}
+
 	resp := &PostResponse{
 		ID:            post.ID.Hex(),
-		Author:        AuthorResponse{ID: author.ID.Hex(), Username: author.Username, Avatar: author.RoleContent.AsUser.Avatar},
+		Author:        AuthorResponse{ID: author.ID.Hex(), Username: author.Username, Avatar: authorAvatar},
 		Community:     CommunityShortResponse{ID: community.ID.Hex(), Name: community.Name},
 		Title:         post.Title,
 		Type:          post.Type,

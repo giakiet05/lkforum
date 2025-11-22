@@ -207,6 +207,11 @@ func (s *authService) CompleteRegistration(verificationToken, username, password
 		Settings:   model.NewDefaultSettings(),
 		IsVerified: true, // Always true since we verified email first
 		CreatedAt:  time.Now(),
+		RoleContent: model.RoleContent{
+			AsUser: &model.UserRoleContent{
+				Avatar: &model.Image{}, // Initialize with an empty Image struct
+			},
+		},
 	}
 
 	createdUser, err := s.userRepo.Create(ctx, user)

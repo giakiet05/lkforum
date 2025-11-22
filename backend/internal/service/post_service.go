@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/giakiet05/lkforum/internal/apperror"
+	"github.com/giakiet05/lkforum/internal/constant"
 	"github.com/giakiet05/lkforum/internal/dto"
 	"github.com/giakiet05/lkforum/internal/model"
 	"github.com/giakiet05/lkforum/internal/platform/bus"
@@ -248,7 +249,7 @@ func (s *postService) DeletePost(postID string, userID string) error {
 	if post.AuthorID.Hex() != userID {
 		return apperror.ErrForbidden
 	}
-	return s.postRepo.SoftDelete(ctx, postID)
+	return s.postRepo.Delete(ctx, postID)
 }
 
 func (s *postService) AddImagesToPost(userID, postID string, form *multipart.Form) ([]*model.Image, error) {
@@ -268,23 +269,11 @@ func (s *postService) AddImagesToPost(userID, postID string, form *multipart.For
 		return nil, apperror.ErrBadRequest
 	}
 
-	var uploadedImages []*model.Image
-	for _, fileHeader := range files {
-		file, err := fileHeader.Open()
-		if err != nil {
-			continue
-		}
-		defer file.Close()
+	//Use upload images function to handle both single and multiple image uploads
+	uploadedImages, err := cloudinary.UploadImages(files)
 
-		result, err := cloudinary.Upload(file)
-		if err != nil {
-			continue
-		}
-		uploadedImages = append(uploadedImages, &model.Image{
-			URL:        result.SecureURL,
-			PublicID:   result.PublicID,
-			UploadedAt: time.Now(),
-		})
+	if err != nil {
+		return nil, err
 	}
 
 	if len(uploadedImages) == 0 {
@@ -504,7 +493,7 @@ func (s *postService) publishVoteEvents(authorID, voterID, postID string, prevVo
 // --- Helper methods ---
 
 func (s *postService) buildFilter(query *dto.GetPostsQuery) repo.Filter {
-	filter := repo.Filter{"is_deleted": false}
+	filter := repo.Filter{}
 	if query.CommunityID != "" {
 		if id, err := primitive.ObjectIDFromHex(query.CommunityID); err == nil {
 			filter["community_id"] = id
@@ -540,10 +529,12 @@ func (s *postService) buildFindOptions(query *dto.GetPostsQuery) *repo.FindOptio
 		Sort:  map[string]int{"created_at": -1},
 	}
 
-	switch query.Sort {
-	case "top":
+	switch constant.SortType(query.Sort) {
+	case constant.SortTypeTop:
 		opts.Sort = map[string]int{"votes_count.up": -1}
-	case "hot":
+	case constant.SortTypeNew:
+		opts.Sort = map[string]int{"created_at": -1}
+	case constant.SortTypeHot:
 		opts.Sort = map[string]int{"created_at": -1} // Simplified hot sort
 	}
 

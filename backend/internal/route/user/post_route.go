@@ -35,7 +35,6 @@ func RegisterPostRoutes(rg *gin.RouterGroup, c *controller.PostController) {
 
 		// Voting
 		private.POST("/:id/vote", c.VoteOnPost)
-		// DELETE /:id/vote is removed because POST /:id/vote handles un-voting
 		private.POST("/:id/poll/vote", c.VoteOnPoll)
 		private.DELETE("/:id/poll/vote", c.RemovePollVote)
 	}
