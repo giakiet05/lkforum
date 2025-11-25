@@ -167,6 +167,53 @@ func (c *PostController) RemoveImagesFromPost(ctx *gin.Context) {
 	dto.SendSuccess(ctx, http.StatusOK, "Images removed successfully", nil)
 }
 
+func (c *PostController) AddVideosToPost(ctx *gin.Context) {
+	authUser, exists := ctx.Get("authUser")
+	if !exists {
+		dto.SendError(ctx, http.StatusUnauthorized, apperror.ErrForbidden.Message, apperror.ErrForbidden.Code)
+		return
+	}
+
+	postID := ctx.Param("id")
+
+	form, err := ctx.MultipartForm()
+	if err != nil {
+		dto.SendError(ctx, http.StatusBadRequest, "Invalid form data", apperror.ErrBadRequest.Code)
+		return
+	}
+
+	videos, err := c.service.AddVideosToPost(authUser.(auth.AuthUser).ID, postID, form)
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
+		return
+	}
+
+	dto.SendSuccess(ctx, http.StatusOK, "Videos added successfully", videos)
+}
+
+func (c *PostController) RemoveVideosFromPost(ctx *gin.Context) {
+	authUser, exists := ctx.Get("authUser")
+	if !exists {
+		dto.SendError(ctx, http.StatusUnauthorized, apperror.ErrForbidden.Message, apperror.ErrForbidden.Code)
+		return
+	}
+
+	postID := ctx.Param("id")
+
+	var req dto.RemoveImagesRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		dto.SendError(ctx, http.StatusBadRequest, "Invalid request: 'public_ids' are required", apperror.ErrBadRequest.Code)
+		return
+	}
+
+	if err := c.service.RemoveVideosFromPost(authUser.(auth.AuthUser).ID, postID, req.PublicIDs); err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
+		return
+	}
+
+	dto.SendSuccess(ctx, http.StatusOK, "Videos removed successfully", nil)
+}
+
 func (c *PostController) VoteOnPost(ctx *gin.Context) {
 	authUser, exists := ctx.Get("authUser")
 	if !exists {
@@ -189,6 +236,106 @@ func (c *PostController) VoteOnPost(ctx *gin.Context) {
 	}
 
 	dto.SendSuccess(ctx, http.StatusOK, "Vote cast successfully", votesCount)
+}
+
+func (c *PostController) SavePost(ctx *gin.Context) {
+	authUser, exists := ctx.Get("authUser")
+	if !exists {
+		dto.SendError(ctx, http.StatusUnauthorized, apperror.ErrForbidden.Message, apperror.ErrForbidden.Code)
+		return
+	}
+
+	postID := ctx.Param("id")
+
+	err := c.service.SavePost(authUser.(auth.AuthUser).ID, postID)
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
+		return
+	}
+
+	dto.SendSuccess(ctx, http.StatusOK, "Post saved successfully", nil)
+}
+
+func (c *PostController) UnsavePost(ctx *gin.Context) {
+	authUser, exists := ctx.Get("authUser")
+	if !exists {
+		dto.SendError(ctx, http.StatusUnauthorized, apperror.ErrForbidden.Message, apperror.ErrForbidden.Code)
+		return
+	}
+
+	postID := ctx.Param("id")
+
+	err := c.service.UnsavePost(authUser.(auth.AuthUser).ID, postID)
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
+		return
+	}
+
+	dto.SendSuccess(ctx, http.StatusOK, "Post unsaved successfully", nil)
+}
+
+func (c *PostController) GetSavedPosts(ctx *gin.Context) {
+	authUser, exists := ctx.Get("authUser")
+	if !exists {
+		dto.SendError(ctx, http.StatusUnauthorized, apperror.ErrForbidden.Message, apperror.ErrForbidden.Code)
+		return
+	}
+
+	var query dto.GetPostsQuery
+	if err := ctx.ShouldBindQuery(&query); err != nil {
+		dto.SendError(ctx, http.StatusBadRequest, "Invalid query parameters", apperror.ErrBadRequest.Code)
+		return
+	}
+
+	posts, err := c.service.GetSavedPosts(authUser.(auth.AuthUser).ID, &query)
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
+		return
+	}
+
+	dto.SendSuccess(ctx, http.StatusOK, "Saved posts retrieved successfully", posts)
+}
+
+func (c *PostController) ReportPost(ctx *gin.Context) {
+	authUser, exists := ctx.Get("authUser")
+	if !exists {
+		dto.SendError(ctx, http.StatusUnauthorized, apperror.ErrForbidden.Message, apperror.ErrForbidden.Code)
+		return
+	}
+
+	postID := ctx.Param("id")
+
+	var req dto.ReportPostRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		dto.SendError(ctx, http.StatusBadRequest, "Invalid request payload", apperror.ErrBadRequest.Code)
+		return
+	}
+
+	err := c.service.ReportPost(authUser.(auth.AuthUser).ID, postID, req.Reason, req.Description)
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
+		return
+	}
+
+	dto.SendSuccess(ctx, http.StatusOK, "Post reported successfully", nil)
+}
+
+func (c *PostController) HidePost(ctx *gin.Context) {
+	authUser, exists := ctx.Get("authUser")
+	if !exists {
+		dto.SendError(ctx, http.StatusUnauthorized, apperror.ErrForbidden.Message, apperror.ErrForbidden.Code)
+		return
+	}
+
+	postID := ctx.Param("id")
+
+	err := c.service.HidePost(authUser.(auth.AuthUser).ID, postID)
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
+		return
+	}
+
+	dto.SendSuccess(ctx, http.StatusOK, "Post hidden successfully", nil)
 }
 
 func (c *PostController) VoteOnPoll(ctx *gin.Context) {

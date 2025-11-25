@@ -4,10 +4,10 @@ import "github.com/giakiet05/lkforum/internal/model"
 
 // UpdateSettingsRequest allows updating all or partial settings
 type UpdateSettingsRequest struct {
-	Appearance    *AppearanceSettingsInput    `json:"appearance,omitempty"`
-	Notifications *NotificationSettingsInput  `json:"notifications,omitempty"`
-	Privacy       *PrivacySettingsInput       `json:"privacy,omitempty"`
-	Content       *ContentSettingsInput       `json:"content,omitempty"`
+	Appearance    *AppearanceSettingsInput   `json:"appearance,omitempty"`
+	Notifications *NotificationSettingsInput `json:"notifications,omitempty"`
+	Privacy       *PrivacySettingsInput      `json:"privacy,omitempty"`
+	Content       *ContentSettingsInput      `json:"content,omitempty"`
 }
 
 type AppearanceSettingsInput struct {

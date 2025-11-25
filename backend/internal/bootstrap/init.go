@@ -31,6 +31,9 @@ type Repos struct {
 	repo.MessageRepo
 	repo.PostHistoryRepo
 	repo.EmailVerificationRepo
+	repo.SavedPostRepo
+	repo.ReportRepo
+	repo.HiddenPostRepo
 }
 
 type Services struct {
@@ -75,6 +78,9 @@ func initRepos(client *mongo.Client, db *mongo.Database) *Repos {
 		MessageRepo:           repo.NewMessageRepo(db),
 		PostHistoryRepo:       repo.NewPostHistoryRepo(db),
 		EmailVerificationRepo: repo.NewEmailVerificationRepo(db),
+		SavedPostRepo:         repo.NewSavedPostRepo(db),
+		ReportRepo:            repo.NewReportRepo(db),
+		HiddenPostRepo:        repo.NewHiddenPostRepo(db),
 	}
 }
 
@@ -84,7 +90,7 @@ func initServices(repos *Repos, redisClient *redis.Client, emailSender email.Sen
 		UserService:         service.NewUserService(repos.UserRepo, eventBus, redisClient),
 		CommunityService:    service.NewCommunityService(repos.CommunityRepo, eventBus),
 		MembershipService:   service.NewMembershipService(repos.MembershipRepo, redisClient),
-		PostService:         service.NewPostService(repos.PostRepo, repos.PostVoteRepo, repos.PollVoteRepo, repos.UserRepo, repos.CommunityRepo, eventBus),
+		PostService:         service.NewPostService(repos.PostRepo, repos.PostVoteRepo, repos.PollVoteRepo, repos.UserRepo, repos.CommunityRepo, repos.SavedPostRepo, repos.ReportRepo, repos.HiddenPostRepo, eventBus),
 		CommentService:      service.NewCommentService(repos.CommentRepo, eventBus),
 		ReputationService:   service.NewReputationService(repos.UserRepo, eventBus),
 		NotificationService: service.NewNotificationService(repos.NotificationRepo, repos.UserRepo, repos.PostRepo, repos.CommentRepo, eventBus, redisClient),

@@ -23,9 +23,20 @@ func RegisterPostRoutes(rg *gin.RouterGroup, c *controller.PostController) {
 		private.PUT("/:id", c.UpdatePost)
 		private.DELETE("/:id", c.DeletePost)
 
+		// Save, Hide & Report
+		private.GET("/saved", c.GetSavedPosts)
+		private.POST("/:id/save", c.SavePost)
+		private.DELETE("/:id/save", c.UnsavePost)
+		private.POST("/:id/report", c.ReportPost)
+		private.POST("/:id/hide", c.HidePost)
+
 		// Image Management
 		private.POST("/:id/images", c.AddImagesToPost)
 		private.DELETE("/:id/images", c.RemoveImagesFromPost) // Body: { "public_ids": [...] }
+
+		// Video Management
+		private.POST("/:id/videos", c.AddVideosToPost)
+		private.DELETE("/:id/videos", c.RemoveVideosFromPost) // Body: { "public_ids": [...] }
 
 		// Poll Management
 		private.PUT("/:id/poll", c.UpdatePoll)

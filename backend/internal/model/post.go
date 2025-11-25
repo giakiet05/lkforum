@@ -32,10 +32,10 @@ const (
 
 // PostContent holds the actual content of the post, varying by type.
 type PostContent struct {
-	Text   string  `bson:"text,omitempty" json:"text,omitempty"`
-	Images []Image `bson:"images,omitempty" json:"images,omitempty"` // Uses model.Image from common.go
-	Video  *Video  `bson:"video,omitempty" json:"video,omitempty"`   // Uses model.Video from common.go
-	Poll   *Poll   `bson:"poll,omitempty" json:"poll,omitempty"`
+	Text   string   `bson:"text,omitempty" json:"text,omitempty"`
+	Images []Image  `bson:"images,omitempty" json:"images,omitempty"` // Uses model.Image from common.go
+	Videos []*Video `bson:"videos,omitempty" json:"videos,omitempty"` // Uses model.Video from common.go
+	Poll   *Poll    `bson:"poll,omitempty" json:"poll,omitempty"`
 }
 
 // Poll represents a poll within a post.

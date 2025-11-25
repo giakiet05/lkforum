@@ -12,7 +12,7 @@ import (
 type CreatePostRequest struct {
 	CommunityID string             `json:"community_id" binding:"required"`
 	Title       string             `json:"title" binding:"required,min=3,max=300"`
-	Type        model.PostType     `json:"type" binding:"required,oneof=text poll"`
+	Type        model.PostType     `json:"type" binding:"required,oneof=text poll image video"`
 	Text        string             `json:"text,omitempty"`
 	Poll        *CreatePollRequest `json:"poll,omitempty"`
 }
@@ -68,6 +68,12 @@ type RemoveImagesRequest struct {
 	PublicIDs []string `json:"public_ids" binding:"required,min=1"`
 }
 
+// ReportPostRequest defines the structure for reporting a post.
+type ReportPostRequest struct {
+	Reason      string `json:"reason" binding:"required"`
+	Description string `json:"description,omitempty"`
+}
+
 // GetPostsQuery defines the query parameters for fetching posts.
 type GetPostsQuery struct {
 	CommunityID string `form:"community_id"`
@@ -111,10 +117,10 @@ type CommunityShortResponse struct {
 
 // PostContentResponse holds the actual content of the post.
 type PostContentResponse struct {
-	Text   string        `json:"text,omitempty"`
-	Images []model.Image `json:"images,omitempty"`
-	Video  *model.Video  `json:"video,omitempty"`
-	Poll   *PollResponse `json:"poll,omitempty"`
+	Text   string         `json:"text,omitempty"`
+	Images []model.Image  `json:"images,omitempty"`
+	Videos []*model.Video `json:"videos,omitempty"`
+	Poll   *PollResponse  `json:"poll,omitempty"`
 }
 
 // PollResponse is the detailed poll object for responses.
@@ -183,7 +189,7 @@ func FromPost(post *model.Post, author *model.User, community *model.Community, 
 		resp.Content = PostContentResponse{
 			Text:   post.Content.Text,
 			Images: post.Content.Images,
-			Video:  post.Content.Video,
+			Videos: post.Content.Videos,
 		}
 		if post.Content.Poll != nil {
 			resp.Content.Poll = FromPoll(post.Content.Poll, userPollVoteIDs)
