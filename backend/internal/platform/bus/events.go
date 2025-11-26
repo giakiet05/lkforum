@@ -11,19 +11,19 @@ const (
 
 	TopicUserChangeAvatar = "user.avatar"
 
-	TopicPostCreated           = "post.created"
-	TopicPostUpvoted           = "post.upvoted"
-	TopicPostDownvoted         = "post.downvoted"
-	TopicPostUpvoteRemoved     = "post.upvote_removed"
-	TopicPostDownvoteRemoved   = "post.downvote_removed"
+	TopicPostCreated         = "post.created"
+	TopicPostUpvoted         = "post.upvoted"
+	TopicPostDownvoted       = "post.downvoted"
+	TopicPostUpvoteRemoved   = "post.upvote_removed"
+	TopicPostDownvoteRemoved = "post.downvote_removed"
 
-	TopicCommentCreated        = "comment.created"
-	TopicCommentUpvoted        = "comment.upvoted"
-	TopicCommentDownvoted      = "comment.downvoted"
-	TopicCommentUpvoteRemoved  = "comment.upvote_removed"
-	TopicCommentDownvoteRemoved= "comment.downvote_removed"
+	TopicCommentCreated         = "comment.created"
+	TopicCommentUpvoted         = "comment.upvoted"
+	TopicCommentDownvoted       = "comment.downvoted"
+	TopicCommentUpvoteRemoved   = "comment.upvote_removed"
+	TopicCommentDownvoteRemoved = "comment.downvote_removed"
 
-	TopicNotificationCreated   = "notification.created"
+	TopicNotificationCreated = "notification.created"
 
 	TopicNewMessage    = "message.new"
 	TopicMessageError  = "message.error"

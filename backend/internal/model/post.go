@@ -19,6 +19,9 @@ type Post struct {
 	CreatedAt     time.Time          `bson:"created_at,omitempty" json:"created_at,omitempty"`
 	UpdatedAt     *time.Time         `bson:"updated_at,omitempty" json:"updated_at,omitempty"`
 	IsDeleted     bool               `bson:"is_deleted,omitempty" json:"is_deleted"`
+	IsHidden      bool               `bson:"is_hidden,omitempty" json:"is_hidden,omitempty"`
+	Tags          []string           `bson:"tags,omitempty" json:"tags,omitempty"`
+	IsDraft       bool               `bson:"is_draft,omitempty" json:"is_draft,omitempty"`
 }
 
 type PostType string
@@ -32,10 +35,10 @@ const (
 
 // PostContent holds the actual content of the post, varying by type.
 type PostContent struct {
-	Text   string  `bson:"text,omitempty" json:"text,omitempty"`
-	Images []Image `bson:"images,omitempty" json:"images,omitempty"` // Uses model.Image from common.go
-	Video  *Video  `bson:"video,omitempty" json:"video,omitempty"`   // Uses model.Video from common.go
-	Poll   *Poll   `bson:"poll,omitempty" json:"poll,omitempty"`
+	Text   string   `bson:"text,omitempty" json:"text,omitempty"`
+	Images []Image  `bson:"images,omitempty" json:"images,omitempty"` // Uses model.Image from common.go
+	Videos []*Video `bson:"videos,omitempty" json:"videos,omitempty"` // Uses model.Video from common.go
+	Poll   *Poll    `bson:"poll,omitempty" json:"poll,omitempty"`
 }
 
 // Poll represents a poll within a post.
