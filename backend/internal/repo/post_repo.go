@@ -88,7 +88,6 @@ func (r *postRepo) GetByIDs(ctx context.Context, ids []string) ([]*model.Post, e
 	return posts, nil
 }
 
-
 // Find fetches paginated data and total count using two separate queries for simplicity and robustness.
 func (r *postRepo) Find(ctx context.Context, filter Filter, opts *FindOptions) ([]*model.Post, int64, error) {
 	// 1. Get total count using an aggregation pipeline to avoid potential bugs in CountDocuments.

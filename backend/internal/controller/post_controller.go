@@ -338,6 +338,46 @@ func (c *PostController) HidePost(ctx *gin.Context) {
 	dto.SendSuccess(ctx, http.StatusOK, "Post hidden successfully", nil)
 }
 
+func (c *PostController) UnhidePost(ctx *gin.Context) {
+	authUser, exists := ctx.Get("authUser")
+	if !exists {
+		dto.SendError(ctx, http.StatusUnauthorized, apperror.ErrForbidden.Message, apperror.ErrForbidden.Code)
+		return
+	}
+
+	postID := ctx.Param("id")
+
+	err := c.service.UnhidePost(authUser.(auth.AuthUser).ID, postID)
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
+		return
+	}
+
+	dto.SendSuccess(ctx, http.StatusOK, "Post unhidden successfully", nil)
+}
+
+func (c *PostController) GetHiddenPosts(ctx *gin.Context) {
+	authUser, exists := ctx.Get("authUser")
+	if !exists {
+		dto.SendError(ctx, http.StatusUnauthorized, apperror.ErrForbidden.Message, apperror.ErrForbidden.Code)
+		return
+	}
+
+	var query dto.GetPostsQuery
+	if err := ctx.ShouldBindQuery(&query); err != nil {
+		dto.SendError(ctx, http.StatusBadRequest, "Invalid query parameters", apperror.ErrBadRequest.Code)
+		return
+	}
+
+	posts, err := c.service.GetHiddenPosts(authUser.(auth.AuthUser).ID, &query)
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
+		return
+	}
+
+	dto.SendSuccess(ctx, http.StatusOK, "Hidden posts retrieved successfully", posts)
+}
+
 func (c *PostController) VoteOnPoll(ctx *gin.Context) {
 	authUser, exists := ctx.Get("authUser")
 	if !exists {

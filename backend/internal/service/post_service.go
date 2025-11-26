@@ -41,6 +41,8 @@ type PostService interface {
 	ReportPost(reporterID, postID, reason, description string) error
 
 	HidePost(userID, postID string) error
+	UnhidePost(userID, postID string) error
+	GetHiddenPosts(userID string, query *dto.GetPostsQuery) (*dto.PaginatedPostsResponse, error)
 
 	VoteOnPoll(userID, postID, optionID string) (*dto.PollResponse, error)
 	RemovePollVote(userID, postID string) (*dto.PollResponse, error)
@@ -51,15 +53,14 @@ type PostService interface {
 }
 
 type postService struct {
-	postRepo       repo.PostRepo
-	postVoteRepo   repo.PostVoteRepo
-	pollVoteRepo   repo.PollVoteRepo
-	userRepo       repo.UserRepo
-	communityRepo  repo.CommunityRepo
-	savedPostRepo  repo.SavedPostRepo
-	reportRepo     repo.ReportRepo
-	hiddenPostRepo repo.HiddenPostRepo
-	bus            bus.EventBus
+	postRepo      repo.PostRepo
+	postVoteRepo  repo.PostVoteRepo
+	pollVoteRepo  repo.PollVoteRepo
+	userRepo      repo.UserRepo
+	communityRepo repo.CommunityRepo
+	savedPostRepo repo.SavedPostRepo
+	reportRepo    repo.ReportRepo
+	bus           bus.EventBus
 }
 
 // NewPostService creates a new instance of PostService.
@@ -71,19 +72,17 @@ func NewPostService(
 	communityRepo repo.CommunityRepo,
 	savedPostRepo repo.SavedPostRepo,
 	reportRepo repo.ReportRepo,
-	hiddenPostRepo repo.HiddenPostRepo,
 	bus bus.EventBus,
 ) PostService {
 	return &postService{
-		postRepo:       postRepo,
-		postVoteRepo:   postVoteRepo,
-		pollVoteRepo:   pollVoteRepo,
-		userRepo:       userRepo,
-		communityRepo:  communityRepo,
-		savedPostRepo:  savedPostRepo,
-		reportRepo:     reportRepo,
-		hiddenPostRepo: hiddenPostRepo,
-		bus:            bus,
+		postRepo:      postRepo,
+		postVoteRepo:  postVoteRepo,
+		pollVoteRepo:  pollVoteRepo,
+		userRepo:      userRepo,
+		communityRepo: communityRepo,
+		savedPostRepo: savedPostRepo,
+		reportRepo:    reportRepo,
+		bus:           bus,
 	}
 }
 
@@ -110,6 +109,7 @@ func (s *postService) CreatePost(userID string, req *dto.CreatePostRequest) (*dt
 		CommentsCount: 0,
 		IsDeleted:     false,
 		CreatedAt:     time.Now(),
+		Tags:          req.Tags,
 	}
 
 	if req.Type == model.PostTypePoll && req.Poll != nil {
@@ -149,6 +149,11 @@ func (s *postService) GetPostByID(postID string, userID string) (*dto.PostRespon
 		return nil, err
 	}
 
+	// Prevent non-authors from seeing hidden posts
+	if post.IsHidden && post.AuthorID.Hex() != userID {
+		return nil, apperror.ErrPostNotFound
+	}
+
 	author, _ := s.userRepo.GetByID(ctx, post.AuthorID.Hex())
 	community, _ := s.communityRepo.GetByID(ctx, post.CommunityID.Hex())
 
@@ -176,15 +181,7 @@ func (s *postService) GetPosts(userID string, query *dto.GetPostsQuery) (*dto.Pa
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
 
-	var hiddenPostIDs []primitive.ObjectID
-	if userID != "" {
-		userObjID, err := primitive.ObjectIDFromHex(userID)
-		if err == nil {
-			hiddenPostIDs, _ = s.hiddenPostRepo.GetHiddenPostIDs(ctx, userObjID)
-		}
-	}
-
-	filter := s.buildFilter(query, hiddenPostIDs)
+	filter := s.buildFilter(query)
 	findOptions := s.buildFindOptions(query)
 
 	posts, totalPosts, err := s.postRepo.Find(ctx, filter, findOptions)
@@ -252,6 +249,10 @@ func (s *postService) UpdatePost(postID string, userID string, req *dto.UpdatePo
 	}
 	if req.Text != nil {
 		update["$set"].(bson.M)["content.text"] = *req.Text
+		changed = true
+	}
+	if req.Tags != nil { // Check if tags are provided in the request
+		update["$set"].(bson.M)["tags"] = req.Tags
 		changed = true
 	}
 
@@ -389,13 +390,31 @@ func (s *postService) RemoveVideosFromPost(userID, postID string, publicIDs []st
 	if post.AuthorID.Hex() != userID {
 		return apperror.ErrForbidden
 	}
+	if post.Content == nil || len(post.Content.Videos) == 0 {
+		return apperror.NewError(nil, apperror.ErrBadRequest.Code, "post does not contain any videos")
+	}
 
-	update := repo.UpdateDocument{"$pull": bson.M{"content.videos": bson.M{"public_id": bson.M{"$in": publicIDs}}}}
+	// Verify that the publicIDs exist in the post's videos
+	var foundPublicIDs []string
+	for _, reqID := range publicIDs {
+		for _, postVideo := range post.Content.Videos {
+			if postVideo.PublicID == reqID {
+				foundPublicIDs = append(foundPublicIDs, reqID)
+				break
+			}
+		}
+	}
+
+	if len(foundPublicIDs) == 0 {
+		return apperror.NewError(nil, apperror.ErrBadRequest.Code, "no matching videos found in post to remove")
+	}
+
+	update := repo.UpdateDocument{"$pull": bson.M{"content.videos": bson.M{"public_id": bson.M{"$in": foundPublicIDs}}}}
 	if err := s.postRepo.UpdateByID(ctx, postID, update); err != nil {
 		return err
 	}
 
-	for _, pid := range publicIDs {
+	for _, pid := range foundPublicIDs {
 		go cloudinary.Delete(pid)
 	}
 
@@ -550,9 +569,23 @@ func (s *postService) ReportPost(reporterID, postID, reason, description string)
 	}
 
 	// Check if post exists
-	_, err = s.postRepo.GetByID(ctx, postID)
+	post, err := s.postRepo.GetByID(ctx, postID)
 	if err != nil {
 		return err
+	}
+
+	// Check if the reporter is the author of the post
+	if post.AuthorID == reporterObjID {
+		return apperror.NewError(nil, apperror.ErrForbidden.Code, "You cannot report your own post")
+	}
+
+	// Check if user has already reported this post
+	alreadyReported, err := s.reportRepo.GetByReporterAndTarget(ctx, reporterObjID, postObjID, model.ReportTypePost)
+	if err != nil {
+		return err
+	}
+	if alreadyReported {
+		return apperror.ErrAlreadyReported
 	}
 
 	report := &model.Report{
@@ -571,22 +604,87 @@ func (s *postService) HidePost(userID, postID string) error {
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
 
-	userObjID, err := primitive.ObjectIDFromHex(userID)
-	if err != nil {
-		return apperror.ErrInvalidID
-	}
-	postObjID, err := primitive.ObjectIDFromHex(postID)
-	if err != nil {
-		return apperror.ErrInvalidID
-	}
-
-	// Check if post exists
-	_, err = s.postRepo.GetByID(ctx, postID)
+	post, err := s.postRepo.GetByID(ctx, postID)
 	if err != nil {
 		return err
 	}
 
-	return s.hiddenPostRepo.Hide(ctx, userObjID, postObjID)
+	if post.AuthorID.Hex() != userID {
+		return apperror.ErrForbidden
+	}
+
+	update := repo.UpdateDocument{"$set": bson.M{"is_hidden": true}}
+	return s.postRepo.UpdateByID(ctx, postID, update)
+}
+
+func (s *postService) UnhidePost(userID, postID string) error {
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
+
+	post, err := s.postRepo.GetByID(ctx, postID)
+	if err != nil {
+		return err
+	}
+
+	if post.AuthorID.Hex() != userID {
+		return apperror.ErrForbidden
+	}
+
+	update := repo.UpdateDocument{"$set": bson.M{"is_hidden": false}}
+	return s.postRepo.UpdateByID(ctx, postID, update)
+}
+
+func (s *postService) GetHiddenPosts(userID string, query *dto.GetPostsQuery) (*dto.PaginatedPostsResponse, error) {
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
+
+	userObjID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return nil, apperror.ErrInvalidID
+	}
+
+	filter := repo.Filter{
+		"author_id": userObjID,
+		"is_hidden": true,
+	}
+	findOptions := s.buildFindOptions(query)
+
+	posts, total, err := s.postRepo.Find(ctx, filter, findOptions)
+	if err != nil {
+		return nil, err
+	}
+	if total == 0 {
+		return &dto.PaginatedPostsResponse{Posts: []*dto.PostResponse{}}, nil
+	}
+
+	// Since the author is the user, we can fetch their details once
+	author, _ := s.userRepo.GetByID(ctx, userID)
+	authorsMap := map[string]*model.User{userID: author}
+
+	// Fetch communities
+	_, communityIDs := s.extractIDs(posts)
+	communities, _ := s.communityRepo.GetByIDs(ctx, communityIDs)
+	communitiesMap := s.mapCommunities(communities)
+
+	// No need to check for votes on one's own hidden posts
+	userVotes := make(map[string]string)
+	userPollVotes := make(map[string][]string)
+
+	responses := dto.FromPosts(posts, authorsMap, communitiesMap, userVotes, userPollVotes)
+
+	limit := query.Limit
+	if limit <= 0 {
+		limit = 10
+	}
+
+	return &dto.PaginatedPostsResponse{
+		Posts: responses,
+		Pagination: dto.Pagination{
+			Page:     query.Page,
+			PageSize: limit,
+			Total:    total,
+		},
+	}, nil
 }
 
 func (s *postService) VoteOnPoll(userID, postID, optionID string) (*dto.PollResponse, error) {
@@ -742,8 +840,11 @@ func (s *postService) publishVoteEvents(authorID, voterID, postID string, prevVo
 
 // --- Helper methods ---
 
-func (s *postService) buildFilter(query *dto.GetPostsQuery, hiddenPostIDs []primitive.ObjectID) repo.Filter {
-	filter := repo.Filter{}
+func (s *postService) buildFilter(query *dto.GetPostsQuery) repo.Filter {
+	filter := repo.Filter{
+		"is_hidden": bson.M{"$ne": true},
+		"is_draft":  bson.M{"$ne": true},
+	}
 	if query.CommunityID != "" {
 		if id, err := primitive.ObjectIDFromHex(query.CommunityID); err == nil {
 			filter["community_id"] = id
@@ -756,10 +857,6 @@ func (s *postService) buildFilter(query *dto.GetPostsQuery, hiddenPostIDs []prim
 	}
 	if query.Type != "" {
 		filter["type"] = query.Type
-	}
-
-	if len(hiddenPostIDs) > 0 {
-		filter["_id"] = bson.M{"$nin": hiddenPostIDs}
 	}
 
 	return filter

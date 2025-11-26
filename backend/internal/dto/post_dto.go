@@ -14,6 +14,7 @@ type CreatePostRequest struct {
 	Title       string             `json:"title" binding:"required,min=3,max=300"`
 	Type        model.PostType     `json:"type" binding:"required,oneof=text poll image video"`
 	Text        string             `json:"text,omitempty"`
+	Tags        []string           `json:"tags,omitempty"`
 	Poll        *CreatePollRequest `json:"poll,omitempty"`
 }
 
@@ -27,8 +28,9 @@ type CreatePollRequest struct {
 
 // UpdatePostRequest defines the structure for updating a post's simple fields.
 type UpdatePostRequest struct {
-	Title *string `json:"title,omitempty"`
-	Text  *string `json:"text,omitempty"`
+	Title *string   `json:"title,omitempty"`
+	Text  *string   `json:"text,omitempty"`
+	Tags  *[]string `json:"tags,omitempty"`
 }
 
 // UpdatePollRequest defines the structure for updating a poll's fields.
@@ -100,6 +102,7 @@ type PostResponse struct {
 	CommentsCount int                    `json:"comments_count"`
 	CreatedAt     time.Time              `json:"created_at"`
 	UpdatedAt     *time.Time             `json:"updated_at,omitempty"`
+	Tags          []string               `json:"tags,omitempty"`
 }
 
 // AuthorResponse contains short public information about a user.
@@ -179,6 +182,7 @@ func FromPost(post *model.Post, author *model.User, community *model.Community, 
 		CreatedAt:     post.CreatedAt,
 		UpdatedAt:     post.UpdatedAt,
 		UserVote:      userVote,
+		Tags:          post.Tags,
 	}
 
 	if post.VotesCount != nil {

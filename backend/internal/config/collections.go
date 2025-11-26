@@ -14,8 +14,8 @@ const (
 	EmailVerificationColName = "email_verifications"
 	SavedPostColName         = "saved_posts"
 	ReportColName            = "reports"
-	HiddenPostColName        = "hidden_posts"
 	PollVoteColName          = "poll_votes"
 	LikedPostColName         = "liked_posts"
 	UserPostHistoryColName   = "user_post_history"
+	DraftColName             = "drafts"
 )

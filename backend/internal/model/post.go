@@ -19,6 +19,9 @@ type Post struct {
 	CreatedAt     time.Time          `bson:"created_at,omitempty" json:"created_at,omitempty"`
 	UpdatedAt     *time.Time         `bson:"updated_at,omitempty" json:"updated_at,omitempty"`
 	IsDeleted     bool               `bson:"is_deleted,omitempty" json:"is_deleted"`
+	IsHidden      bool               `bson:"is_hidden,omitempty" json:"is_hidden,omitempty"`
+	Tags          []string           `bson:"tags,omitempty" json:"tags,omitempty"`
+	IsDraft       bool               `bson:"is_draft,omitempty" json:"is_draft,omitempty"`
 }
 
 type PostType string

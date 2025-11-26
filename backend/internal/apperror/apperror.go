@@ -68,10 +68,10 @@ func StatusFromError(err error) int {
 	case isErrorType(err, ErrForbidden, ErrUserInactive, ErrUserNotMember, ErrEmailNotVerified):
 		return http.StatusForbidden
 	// 404 Not Found
-	case isErrorType(err, ErrUserNotFound, ErrCommunityNotFound, ErrCommunityDeleted, ErrMembershipNotFound, ErrPostNotFound, ErrVoteNotFound):
+	case isErrorType(err, ErrUserNotFound, ErrCommunityNotFound, ErrCommunityDeleted, ErrMembershipNotFound, ErrPostNotFound, ErrVoteNotFound, ErrDraftNotFound):
 		return http.StatusNotFound
 	// 409 Conflict
-	case isErrorType(err, ErrUsernameExists, ErrEmailExists, ErrCommunityNameExists, ErrAlreadyMember, ErrEmailAlreadyVerified, ErrLoginMethodMismatch, ErrPollVoted, ErrPollCannotEdit):
+	case isErrorType(err, ErrUsernameExists, ErrEmailExists, ErrCommunityNameExists, ErrAlreadyMember, ErrEmailAlreadyVerified, ErrLoginMethodMismatch, ErrPollVoted, ErrPollCannotEdit, ErrAlreadyReported):
 		return http.StatusConflict
 	// 500 Internal Server Error
 	case isErrorType(err, ErrInternal, ErrNoFieldsToUpdate, ErrMembershipCreateFailed, ErrMembershipDeleteFailed):
@@ -136,6 +136,8 @@ var (
 	ErrVoteNotFound   = AppError{Code: "VOTE_NOT_FOUND", Message: "Không tìm thấy bình chọn"}
 	ErrPollVoted      = AppError{Code: "POLL_ALREADY_VOTED", Message: "Bạn đã bình chọn lựa chọn này rồi"}
 	ErrPollCannotEdit = AppError{Code: "POLL_CANNOT_EDIT", Message: "Không thể chỉnh sửa bình chọn sau khi đã có người bình chọn"}
+	ErrAlreadyReported = AppError{Code: "ALREADY_REPORTED", Message: "Bạn đã báo cáo nội dung này rồi"}
+	ErrDraftNotFound  = AppError{Code: "DRAFT_NOT_FOUND", Message: "Không tìm thấy bản nháp"}
 
 	// Comment-related
 	ErrCommentNotFound = AppError{Code: "COMMENT_NOT_FOUND", Message: "Không tìm thấy bình luận"}

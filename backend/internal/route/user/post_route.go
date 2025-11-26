@@ -25,10 +25,12 @@ func RegisterPostRoutes(rg *gin.RouterGroup, c *controller.PostController) {
 
 		// Save, Hide & Report
 		private.GET("/saved", c.GetSavedPosts)
+		private.GET("/hidden", c.GetHiddenPosts)
 		private.POST("/:id/save", c.SavePost)
 		private.DELETE("/:id/save", c.UnsavePost)
 		private.POST("/:id/report", c.ReportPost)
 		private.POST("/:id/hide", c.HidePost)
+		private.POST("/:id/unhide", c.UnhidePost)
 
 		// Image Management
 		private.POST("/:id/images", c.AddImagesToPost)

@@ -33,7 +33,7 @@ type Repos struct {
 	repo.EmailVerificationRepo
 	repo.SavedPostRepo
 	repo.ReportRepo
-	repo.HiddenPostRepo
+	repo.DraftRepo
 }
 
 type Services struct {
@@ -48,6 +48,7 @@ type Services struct {
 	service.ChannelService
 	service.MessageService
 	service.PostHistoryService
+	service.DraftService
 }
 
 type Controllers struct {
@@ -62,6 +63,7 @@ type Controllers struct {
 	controller.ChannelController
 	controller.MessageController
 	controller.PostHistoryController
+	controller.DraftController
 }
 
 func initRepos(client *mongo.Client, db *mongo.Database) *Repos {
@@ -80,17 +82,16 @@ func initRepos(client *mongo.Client, db *mongo.Database) *Repos {
 		EmailVerificationRepo: repo.NewEmailVerificationRepo(db),
 		SavedPostRepo:         repo.NewSavedPostRepo(db),
 		ReportRepo:            repo.NewReportRepo(db),
-		HiddenPostRepo:        repo.NewHiddenPostRepo(db),
+		DraftRepo:             repo.NewDraftRepo(db),
 	}
 }
 
 func initServices(repos *Repos, redisClient *redis.Client, emailSender email.Sender, eventBus bus.EventBus) *Services {
-	return &Services{
+	services := &Services{
 		AuthService:         service.NewAuthService(repos.UserRepo, repos.EmailVerificationRepo, emailSender, redisClient),
 		UserService:         service.NewUserService(repos.UserRepo, eventBus, redisClient),
 		CommunityService:    service.NewCommunityService(repos.CommunityRepo, eventBus),
 		MembershipService:   service.NewMembershipService(repos.MembershipRepo, redisClient),
-		PostService:         service.NewPostService(repos.PostRepo, repos.PostVoteRepo, repos.PollVoteRepo, repos.UserRepo, repos.CommunityRepo, repos.SavedPostRepo, repos.ReportRepo, repos.HiddenPostRepo, eventBus),
 		CommentService:      service.NewCommentService(repos.CommentRepo, eventBus),
 		ReputationService:   service.NewReputationService(repos.UserRepo, eventBus),
 		NotificationService: service.NewNotificationService(repos.NotificationRepo, repos.UserRepo, repos.PostRepo, repos.CommentRepo, eventBus, redisClient),
@@ -98,6 +99,11 @@ func initServices(repos *Repos, redisClient *redis.Client, emailSender email.Sen
 		MessageService:      service.NewMessageService(repos.MessageRepo, repos.ChannelRepo, eventBus, redisClient),
 		PostHistoryService:  service.NewPostHistoryService(repos.PostHistoryRepo),
 	}
+	// PostService needs to be created before DraftService due to dependency
+	services.PostService = service.NewPostService(repos.PostRepo, repos.PostVoteRepo, repos.PollVoteRepo, repos.UserRepo, repos.CommunityRepo, repos.SavedPostRepo, repos.ReportRepo, eventBus)
+	services.DraftService = service.NewDraftService(repos.DraftRepo, repos.PostRepo, services.PostService)
+
+	return services
 }
 
 func initControllers(services *Services, wsHub *ws.Hub) *Controllers {
@@ -113,6 +119,7 @@ func initControllers(services *Services, wsHub *ws.Hub) *Controllers {
 		ChannelController:      *controller.NewChannelController(services.ChannelService),
 		MessageController:      *controller.NewMessageController(services.MessageService),
 		PostHistoryController:  *controller.NewPostHistoryController(services.PostHistoryService),
+		DraftController:        *controller.NewDraftController(services.DraftService),
 	}
 }
 
@@ -137,6 +144,7 @@ func initRoutes(controllers *Controllers, r *gin.Engine) {
 	userroute.RegisterChannelRoutes(api, &controllers.ChannelController)
 	userroute.RegisterMessageRoutes(api, &controllers.MessageController)
 	userroute.RegisterPostHistoryRoutes(api, &controllers.PostHistoryController)
+	userroute.RegisterDraftRoutes(api, &controllers.DraftController)
 }
 
 func Init() (*gin.Engine, error) {
