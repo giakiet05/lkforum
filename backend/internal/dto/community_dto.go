@@ -1,6 +1,8 @@
 package dto
 
 import (
+	"time"
+
 	"github.com/giakiet05/lkforum/internal/model"
 )
 
@@ -38,6 +40,19 @@ type RemoveModeratorRequest struct {
 	RemovedModerator []string `json:"removed_moderator" binding:"required"`
 }
 
+type BanUserRequest struct {
+	CommunityID string `json:"community_id" binding:"required"`
+	UserID      string `json:"user_id" binding:"required"`
+	Type        string `json:"type" binding:"required"`
+	Reason      string `json:"reason" binding:"max=500"`
+	LengthDays  int    `json:"length_days" binding:"required"`
+}
+
+type UnbanUserRequest struct {
+	CommunityID string `json:"community_id" binding:"required"`
+	UserID      string `json:"user_id" binding:"required"`
+}
+
 type CommunityResponse struct {
 	ID             string                 `json:"id"`
 	Name           string                 `json:"name"`
@@ -52,6 +67,7 @@ type CommunityResponse struct {
 	CreateByID     string                 `json:"create_by_id,omitempty"`
 	CreateByName   string                 `json:"create_by_name,omitempty"`
 	CreateByAvatar string                 `json:"create_by_avatar,omitempty"`
+	CreateAt       time.Time              `json:"create_at,omitempty"`
 }
 
 func FromCommunities(communities []model.Community) []*CommunityResponse {
@@ -77,5 +93,6 @@ func FromCommunity(community *model.Community) *CommunityResponse {
 		CreateByID:     community.CreateByID.Hex(),
 		CreateByName:   community.CreateByName,
 		CreateByAvatar: community.CreateByAvatar,
+		CreateAt:       community.CreateAt,
 	}
 }

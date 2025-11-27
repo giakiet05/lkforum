@@ -8,7 +8,7 @@ import (
 
 	"github.com/giakiet05/lkforum/internal/apperror"
 	"github.com/giakiet05/lkforum/internal/dto"
-	"github.com/giakiet05/lkforum/internal/model"
+	model "github.com/giakiet05/lkforum/internal/model"
 	"github.com/giakiet05/lkforum/internal/platform/bus"
 	"github.com/giakiet05/lkforum/internal/repo"
 	"github.com/giakiet05/lkforum/internal/util"
@@ -28,6 +28,11 @@ type CommunityService interface {
 	RemoveModerator(req *dto.RemoveModeratorRequest, userID string) error
 	IsModerator(community *model.Community, userID string) (bool, error)
 	DeleteCommunityByID(communityID string, userID string) error
+
+	GetBannedUsers(communityID string, banTypeStr string, requesterID string) ([]*model.User, error)
+	BanUser(req *dto.BanUserRequest, requesterID string) error
+	UnmuteUser(userID string, communityID string, requesterID string) error
+	UnbanUser(userID string, communityID string, requesterID string) error
 }
 
 type communityService struct {
@@ -362,4 +367,139 @@ func (c *communityService) IsModerator(community *model.Community, userID string
 		}
 	}
 	return false, nil
+}
+
+func (c *communityService) GetBannedUsers(communityID string, banTypeStr string, requesterID string) ([]*model.User, error) {
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
+
+	community, err := c.communityRepo.GetByID(ctx, communityID)
+	if err != nil {
+		return nil, err
+	}
+
+	ok, err := c.IsModerator(community, requesterID)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, apperror.ErrForbidden
+	}
+
+	if banTypeStr == "" {
+		return nil, apperror.ErrBadRequest
+	}
+
+	banType := model.CommunityBanType(banTypeStr)
+	if banType == model.Banned {
+		return c.communityRepo.GetBannedUsers(ctx, communityID)
+	}
+
+	if banType == model.Muted {
+		return c.communityRepo.GetBannedUsers(ctx, communityID)
+	}
+
+	return nil, apperror.ErrBadRequest
+}
+
+func (c *communityService) BanUser(req *dto.BanUserRequest, requesterID string) error {
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
+
+	community, err := c.communityRepo.GetByID(ctx, req.CommunityID)
+	if err != nil {
+		return err
+	}
+
+	ok, err := c.IsModerator(community, requesterID)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return apperror.ErrForbidden
+	}
+
+	communityObjectID, err := primitive.ObjectIDFromHex(req.CommunityID)
+	if err != nil {
+		return apperror.ErrInternal
+	}
+
+	userObjectID, err := primitive.ObjectIDFromHex(req.UserID)
+	if err != nil {
+		return apperror.ErrInternal
+	}
+
+	requesterObjectID, err := primitive.ObjectIDFromHex(requesterID)
+	if err != nil {
+		return apperror.ErrInternal
+	}
+
+	// Validate ban type
+	banType := model.CommunityBanType(req.Type)
+	if banType != model.Banned && banType != model.Muted {
+		return apperror.ErrBadRequest
+	}
+
+	// Calculate ban expiration
+	expiresAt := time.Now().Add(time.Hour * 24 * time.Duration(req.LengthDays))
+
+	// Create ban record
+	ban := model.CommunityBan{
+		CommunityID: communityObjectID,
+		UserID:      userObjectID,
+		Type:        banType,
+		Reason:      req.Reason,
+		BannedAt:    time.Now(),
+		BannedBy:    requesterObjectID,
+		ExpiresAt:   expiresAt,
+	}
+
+	// Call repo method to save ban
+	err = c.communityRepo.BanUser(ctx, &ban)
+
+	if err != nil {
+		return apperror.ErrInternal
+	}
+
+	return nil
+}
+
+func (c *communityService) UnmuteUser(userID string, communityID string, requesterID string) error {
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
+
+	community, err := c.communityRepo.GetByID(ctx, communityID)
+	if err != nil {
+		return err
+	}
+
+	ok, err := c.IsModerator(community, requesterID)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return apperror.ErrForbidden
+	}
+
+	return c.communityRepo.UnmuteUser(ctx, userID, communityID)
+}
+
+func (c *communityService) UnbanUser(userID string, communityID string, requesterID string) error {
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
+
+	community, err := c.communityRepo.GetByID(ctx, communityID)
+	if err != nil {
+		return err
+	}
+
+	ok, err := c.IsModerator(community, requesterID)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return apperror.ErrForbidden
+	}
+
+	return c.communityRepo.UnbanUser(ctx, userID, communityID)
 }

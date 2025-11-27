@@ -26,17 +26,25 @@ type CommunityRepo interface {
 	Replace(ctx context.Context, community *model.Community) error
 	Delete(ctx context.Context, communityID string) error
 	IsUserExist(ctx context.Context, userID string) (bool, error)
+
+	GetBannedUsers(ctx context.Context, communityID string) ([]*model.User, error)
+	GetMutedUsers(ctx context.Context, communityID string) ([]*model.User, error)
+	BanUser(ctx context.Context, ban *model.CommunityBan) error
+	UnmuteUser(ctx context.Context, userID string, communityID string) error
+	UnbanUser(ctx context.Context, userID string, communityID string) error
 }
 
 type communityRepo struct {
-	communityCollection *mongo.Collection
-	userCollection      *mongo.Collection
+	communityCollection    *mongo.Collection
+	userCollection         *mongo.Collection
+	communityBanCollection *mongo.Collection
 }
 
 func NewCommunityRepo(db *mongo.Database) CommunityRepo {
 	return &communityRepo{
-		communityCollection: db.Collection(config.CommunityColName),
-		userCollection:      db.Collection(config.UserColName),
+		communityCollection:    db.Collection(config.CommunityColName),
+		userCollection:         db.Collection(config.UserColName),
+		communityBanCollection: db.Collection(config.CommunityBanColName),
 	}
 }
 
@@ -319,4 +327,154 @@ func (c *communityRepo) IsUserExist(ctx context.Context, userID string) (bool, e
 	}
 
 	return true, nil
+}
+
+func (c *communityRepo) GetBannedUsers(ctx context.Context, communityID string) ([]*model.User, error) {
+	communityObjectID, err := primitive.ObjectIDFromHex(communityID)
+	if err != nil {
+		return nil, err
+	}
+
+	cursor, err := c.communityBanCollection.Find(ctx, bson.M{
+		"community_id": communityObjectID,
+		"type":         model.Banned,
+	})
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var bans []model.CommunityBan
+	if err := cursor.All(ctx, &bans); err != nil {
+		return nil, err
+	}
+
+	if len(bans) == 0 {
+		return []*model.User{}, nil
+	}
+
+	// 2. Extract user IDs
+	userIDs := make([]primitive.ObjectID, 0, len(bans))
+	for _, b := range bans {
+		userIDs = append(userIDs, b.UserID)
+	}
+
+	// 3. Query users
+	userCursor, err := c.userCollection.Find(ctx, bson.M{
+		"_id": bson.M{"$in": userIDs},
+	})
+	if err != nil {
+		return nil, err
+	}
+	defer userCursor.Close(ctx)
+
+	var users []*model.User
+	if err := userCursor.All(ctx, &users); err != nil {
+		return nil, err
+	}
+
+	return users, nil
+}
+
+func (c *communityRepo) GetMutedUsers(ctx context.Context, communityID string) ([]*model.User, error) {
+	communityObjectID, err := primitive.ObjectIDFromHex(communityID)
+	if err != nil {
+		return nil, err
+	}
+
+	// 1. Find mute records
+	cursor, err := c.communityBanCollection.Find(ctx, bson.M{
+		"community_id": communityObjectID,
+		"type":         model.Muted,
+	})
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var bans []model.CommunityBan
+	if err := cursor.All(ctx, &bans); err != nil {
+		return nil, err
+	}
+
+	if len(bans) == 0 {
+		return []*model.User{}, nil
+	}
+
+	// 2. Extract user IDs
+	userIDs := make([]primitive.ObjectID, 0, len(bans))
+	for _, b := range bans {
+		userIDs = append(userIDs, b.UserID)
+	}
+
+	// 3. Query users
+	userCursor, err := c.userCollection.Find(ctx, bson.M{
+		"_id": bson.M{"$in": userIDs},
+	})
+	if err != nil {
+		return nil, err
+	}
+	defer userCursor.Close(ctx)
+
+	var users []*model.User
+	if err := userCursor.All(ctx, &users); err != nil {
+		return nil, err
+	}
+
+	return users, nil
+}
+
+func (c *communityRepo) BanUser(ctx context.Context, ban *model.CommunityBan) error {
+	_, err := c.communityBanCollection.DeleteMany(ctx, bson.M{
+		"user_id":      ban.UserID,
+		"community_id": ban.CommunityID,
+	})
+	if err != nil {
+		return err
+	}
+
+	_, err = c.communityBanCollection.InsertOne(ctx, ban)
+	return err
+}
+
+func (c *communityRepo) UnmuteUser(ctx context.Context, userID string, communityID string) error {
+	userObjectID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return err
+	}
+
+	communityObjectID, err := primitive.ObjectIDFromHex(communityID)
+	if err != nil {
+		return err
+	}
+
+	// Remove ONLY the mute record
+	_, err = c.communityBanCollection.DeleteOne(ctx, bson.M{
+		"user_id":      userObjectID,
+		"community_id": communityObjectID,
+		"type":         model.Muted,
+	})
+
+	return err
+}
+
+func (c *communityRepo) UnbanUser(ctx context.Context, userID string, communityID string) error {
+	userObjectID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return err
+	}
+
+	communityObjectID, err := primitive.ObjectIDFromHex(communityID)
+	if err != nil {
+		return err
+	}
+
+	// Remove ONLY the ban record
+	_, err = c.communityBanCollection.DeleteOne(ctx, bson.M{
+		"user_id":      userObjectID,
+		"community_id": communityObjectID,
+		"type":         model.Banned,
+	})
+
+	return err
 }
