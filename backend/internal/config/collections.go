@@ -3,6 +3,7 @@ package config
 const (
 	UserColName              = "users"
 	CommunityColName         = "communities"
+	CommunityBanColName      = "communities_bans"
 	MembershipColName        = "memberships"
 	PostColName              = "posts"
 	VoteColName              = "votes"
