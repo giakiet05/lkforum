@@ -1,13 +1,21 @@
 <script lang="ts">
-  import type { Comment } from "../mocks/comments.mock";
+  import type { CommentResponse } from "../dtos/comment-dto";
   import CommentComponent from "./Comment.svelte";
+  import { deleteComment } from "../services/comment-service";
+  import { authStore } from "../stores/auth-store";
 
   type CommentProps = {
-    comment: Comment;
+    comment: CommentResponse;
     depth?: number;
+    onUpdate?: () => void;
   };
 
-  let { comment, depth = 0 }: CommentProps = $props();
+  let { comment, depth = 0, onUpdate }: CommentProps = $props();
+
+  const currentUser = $derived($authStore.user);
+  const isOwnComment = $derived(
+    currentUser && comment.author.id === currentUser.id
+  );
 
   let isCollapsed = $state(false);
   let isEditing = $state(false);
@@ -37,37 +45,21 @@
     editContent = comment.content;
   };
 
-  const handleDelete = () => {
-    if (confirm("Are you sure you want to delete this comment?")) {
-      // Mock delete - in real app, would update parent state
-      console.log("Deleting comment:", comment.id);
+  const handleDelete = async () => {
+    if (!confirm("Are you sure you want to delete this comment?")) return;
+
+    try {
+      await deleteComment(comment.id);
+      if (onUpdate) onUpdate();
+    } catch (error) {
+      console.error("Failed to delete comment:", error);
+      alert("Failed to delete comment. Please try again.");
     }
   };
 
   const handleVote = (voteType: "up" | "down") => {
-    if (userVote === voteType) {
-      // Remove vote
-      if (voteType === "up") {
-        comment.votesCount.up--;
-      } else {
-        comment.votesCount.down--;
-      }
-      userVote = null;
-    } else {
-      // Change or add vote
-      if (userVote === "up") {
-        comment.votesCount.up--;
-      } else if (userVote === "down") {
-        comment.votesCount.down--;
-      }
-
-      if (voteType === "up") {
-        comment.votesCount.up++;
-      } else {
-        comment.votesCount.down++;
-      }
-      userVote = voteType;
-    }
+    // TODO: Implement vote API when backend adds comment voting
+    console.log("Vote not implemented yet");
   };
 
   const submitReply = () => {
@@ -115,16 +107,12 @@
     if (diffHours < 24) return `${diffHours}h ago`;
     return `${diffDays}d ago`;
   };
-
-  const getScore = () => {
-    return comment.votesCount.up - comment.votesCount.down;
-  };
 </script>
 
 <div class="comment" style="margin-left: {depth * 28}px">
   <div class="comment-main">
-    <!-- Vote Section -->
-    <div class="vote-section">
+    <!-- Vote Section - Hidden until backend supports comment voting -->
+    <!-- <div class="vote-section">
       <button
         class="vote-btn"
         class:voted={userVote === "up"}
@@ -152,20 +140,20 @@
           <path d="M8 13L3 6h10l-5 7z" />
         </svg>
       </button>
-    </div>
+    </div> -->
 
     <!-- Comment Content -->
     <div class="comment-content">
       <!-- Header -->
       <div class="comment-header">
         <img
-          src={comment.authorAvatar || "https://i.pravatar.cc/150?img=1"}
-          alt={comment.authorUsername}
+          src={comment.author.avatar || "https://i.pravatar.cc/150?img=1"}
+          alt={comment.author.username}
           class="author-avatar"
         />
-        <span class="author-name">u/{comment.authorUsername}</span>
-        <span class="comment-time">{formatTime(comment.createdAt)}</span>
-        {#if comment.replies.length > 0}
+        <span class="author-name">u/{comment.author.username}</span>
+        <span class="comment-time">{formatTime(comment.created_at)}</span>
+        {#if comment.children && comment.children.length > 0}
           <button class="collapse-btn" onclick={toggleCollapse}>
             {isCollapsed ? "[+]" : "[-]"}
           </button>
@@ -198,10 +186,12 @@
             >
               Reply
             </button>
-            <button class="action-btn" onclick={handleEdit}> Edit </button>
-            <button class="action-btn delete" onclick={handleDelete}>
-              Delete
-            </button>
+            {#if isOwnComment}
+              <button class="action-btn" onclick={handleEdit}> Edit </button>
+              <button class="action-btn delete" onclick={handleDelete}>
+                Delete
+              </button>
+            {/if}
           </div>
         {/if}
 
@@ -294,11 +284,11 @@
           </div>
         {/if}
 
-        <!-- Replies -->
-        {#if comment.replies.length > 0}
+        <!-- Replies/Children -->
+        {#if comment.children && comment.children.length > 0}
           <div class="replies">
-            {#each comment.replies as reply}
-              <CommentComponent comment={reply} depth={depth + 1} />
+            {#each comment.children as reply}
+              <CommentComponent comment={reply} depth={depth + 1} {onUpdate} />
             {/each}
           </div>
         {/if}

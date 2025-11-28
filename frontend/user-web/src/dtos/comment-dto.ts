@@ -33,7 +33,7 @@ export interface GetCommentByPostIDQuery {
 export interface CommentAuthor {
     id: string;
     username: string;
-    avatar?: Image;
+    avatar?: string; // Backend returns avatar as a string URL, not Image object
 }
 
 export interface CommentResponse {

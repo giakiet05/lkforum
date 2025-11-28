@@ -21,9 +21,9 @@
         text: "I just tried out the new Svelte 5 features and they are mind-blowing. The new runes system is so intuitive!",
       },
       votes_count: {
-        up: 123,
-        down: 5,
-        score: 118,
+        up: 0,
+        down: 0,
+        score: 0,
       },
       comments_count: 42,
       created_at: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(), // 4 hours ago
@@ -52,9 +52,9 @@
         ],
       },
       votes_count: {
-        up: 456,
-        down: 12,
-        score: 444,
+        up: 0,
+        down: 0,
+        score: 0,
       },
       comments_count: 89,
       created_at: new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString(), // 8 hours ago
@@ -85,9 +85,9 @@
         },
       },
       votes_count: {
-        up: 789,
-        down: 50,
-        score: 739,
+        up: 0,
+        down: 0,
+        score: 0,
       },
       comments_count: 231,
       created_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(), // 1 day ago
@@ -106,17 +106,19 @@
       title: "Flashback AMV",
       type: "text",
       content: {
-        video: {
-          public_id: "video1",
-          url: "/video.mp4",
-          thumbnail:
-            "https://i1.sndcdn.com/artworks-000307576689-fkq1mv-t500x500.jpg",
-        },
+        videos: [
+          {
+            public_id: "video1",
+            url: "/video.mp4",
+            thumbnail_url:
+              "https://i1.sndcdn.com/artworks-000307576689-fkq1mv-t500x500.jpg",
+          },
+        ],
       },
       votes_count: {
-        up: 250,
-        down: 15,
-        score: 235,
+        up: 0,
+        down: 0,
+        score: 0,
       },
       comments_count: 60,
       created_at: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(), // 3 hours ago

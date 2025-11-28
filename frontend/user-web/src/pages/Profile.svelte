@@ -10,7 +10,7 @@
     uploadAvatar,
     uploadCover,
   } from "../services/user-service";
-  import { getPostsByUserId } from "../services/post-service";
+  import { getPostsByUserId, getSavedPosts } from "../services/post-service";
   import { getCommentsByUserId } from "../services/comment-service";
   import { ApiError } from "../errors/api-error";
   import { setAuth } from "../stores/auth-store";
@@ -230,12 +230,7 @@
     try {
       isLoadingSaved = true;
       savedError = null;
-      // TODO: Replace with actual API when available
-      // savedPosts = await getSavedPosts(1, 20);
-
-      // Mock for now
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      savedPosts = [];
+      savedPosts = await getSavedPosts(1, 20);
     } catch (error) {
       console.error("Failed to load saved posts:", error);
       if (error instanceof ApiError) {
@@ -467,7 +462,7 @@
                   <div class="comment-item">
                     <div class="comment-header">
                       <img
-                        src={comment.author.avatar?.url || "/avatar.jpg"}
+                        src={comment.author.avatar || "/avatar.jpg"}
                         alt={comment.author.username}
                         class="comment-avatar"
                       />

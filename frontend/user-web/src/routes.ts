@@ -4,6 +4,7 @@ import Register from './pages/Register.svelte';
 import Profile from './pages/Profile.svelte';
 import Settings from './pages/Settings.svelte';
 import PostDetail from './pages/PostDetail.svelte';
+import EditPost from './pages/EditPost.svelte';
 import Community from './pages/Community.svelte';
 import ManageCommunities from './pages/ManageCommunities.svelte';
 import ModTools from './pages/ModTools.svelte';
@@ -19,6 +20,7 @@ const routes = {
     '/profile': Profile,
     '/settings': Settings,
     '/post/:id': PostDetail,
+    '/post/:id/edit': EditPost,
     '/lk/:name': Community,
     '/lk/:name/mod': ModTools,
     '/communities/manage': ManageCommunities,
