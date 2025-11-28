@@ -1,7 +1,7 @@
 <script lang="ts">
   import { fade } from "svelte/transition";
   import { push } from "svelte-spa-router";
-  import type { PostResponse } from "../dtos/post-dto"
+  import type { PostResponse } from "../dtos/post-dto";
 
   type PostProps = {
     post: PostResponse;
@@ -11,6 +11,7 @@
 
   let selectedOptions = $state<string[]>([]);
   let hasVoted = $state(false);
+  let currentImageIndex = $state(0);
 
   function handlePostClick() {
     push(`/post/${post.id}`);
@@ -24,6 +25,23 @@
   function handleCommunityClick(e: MouseEvent) {
     e.stopPropagation();
     push(`/lk/${post.community.name}`);
+  }
+
+  function nextImage(e: MouseEvent) {
+    e.stopPropagation();
+    if (
+      post.content.images &&
+      currentImageIndex < post.content.images.length - 1
+    ) {
+      currentImageIndex++;
+    }
+  }
+
+  function prevImage(e: MouseEvent) {
+    e.stopPropagation();
+    if (currentImageIndex > 0) {
+      currentImageIndex--;
+    }
   }
 
   function handleVote(optionId: string) {
@@ -77,13 +95,19 @@
   <div class="post-main">
     <div class="post-header">
       <div class="post-header-left">
-        <img src={post.author.avatar?.url || "/avatar.jpg"} alt="User avatar" class="author-avatar" />
+        <img
+          src={post.author.avatar?.url || "/avatar.jpg"}
+          alt="User avatar"
+          class="author-avatar"
+        />
         <span class="community-name" onclick={handleCommunityClick}
           >lk/{post.community.name}</span
         >
         <span class="meta-divider">•</span>
         <span class="author">Posted by u/{post.author.username}</span>
-        <span class="time">{new Date(post.created_at).toLocaleDateString()}</span>
+        <span class="time"
+          >{new Date(post.created_at).toLocaleDateString()}</span
+        >
       </div>
       <div class="post-header-right">
         <button class="join-btn" onclick={handleButtonClick}>Join</button>
@@ -104,14 +128,42 @@
         <p class="text-content">{post.content.text}</p>
       {/if}
       {#if post.content.images && post.content.images.length > 0}
-        <div class="image-gallery">
-          {#each post.content.images as image, i}
-            <img src={image.url} alt="Post content {i + 1}" class="post-image" />
-          {/each}
+        <div class="image-carousel">
+          <img
+            src={post.content.images[currentImageIndex].url}
+            alt="Post content {currentImageIndex + 1}"
+            class="post-image"
+          />
+
+          {#if post.content.images.length > 1}
+            <button
+              class="carousel-btn prev-btn"
+              onclick={prevImage}
+              disabled={currentImageIndex === 0}
+              aria-label="Previous image"
+            >
+              ‹
+            </button>
+            <button
+              class="carousel-btn next-btn"
+              onclick={nextImage}
+              disabled={currentImageIndex === post.content.images.length - 1}
+              aria-label="Next image"
+            >
+              ›
+            </button>
+            <div class="image-counter">
+              {currentImageIndex + 1} / {post.content.images.length}
+            </div>
+          {/if}
         </div>
       {/if}
       {#if post.content.video}
-        <video controls poster={post.content.video.thumbnail} class="post-video">
+        <video
+          controls
+          poster={post.content.video.thumbnail}
+          class="post-video"
+        >
           <source src={post.content.video.url} type="video/mp4" />
           Your browser does not support the video tag.
         </video>
@@ -163,7 +215,8 @@
             </button>
           {/if}
           <p class="poll-footer">
-            {post.content.poll.total_votes} votes • {post.content.poll.allow_multiple
+            {post.content.poll.total_votes} votes • {post.content.poll
+              .allow_multiple
               ? "Multiple choices allowed"
               : "Single choice"}
           </p>
@@ -362,18 +415,77 @@
     white-space: pre-wrap;
     color: rgba(0, 0, 0, 0.6);
   }
-  .image-gallery {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 5px;
-  }
-  .post-image {
-    max-width: 100%;
+
+  /* Image Carousel */
+  .image-carousel {
+    position: relative;
+    width: 100%;
     max-height: 500px;
     border-radius: 4px;
-    display: block;
-    margin: auto;
+    overflow: hidden;
+    background: #000;
+    margin-top: 8px;
   }
+
+  .post-image {
+    width: 100%;
+    height: 500px;
+    object-fit: contain;
+    display: block;
+    background: #000;
+  }
+
+  .carousel-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(255, 255, 255, 0.9);
+    border: none;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    font-size: 24px;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    color: #000;
+    z-index: 2;
+  }
+
+  .carousel-btn:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 1);
+    transform: translateY(-50%) scale(1.1);
+  }
+
+  .carousel-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
+
+  .prev-btn {
+    left: 12px;
+  }
+
+  .next-btn {
+    right: 12px;
+  }
+
+  .image-counter {
+    position: absolute;
+    bottom: 12px;
+    right: 12px;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+    z-index: 2;
+  }
+
   .post-video {
     width: 100%;
     max-height: 500px;

@@ -9,6 +9,11 @@
   import { getPosts } from "../services/post-service";
   import { mockCommunityRules } from "../mocks/community-rules.mock";
   import { authStore } from "../stores/auth-store";
+  import {
+    checkMembership as checkMembershipAPI,
+    createMembership,
+    deleteMembership,
+  } from "../services/membership-service";
 
   type CommunityProps = {
     params?: { name: string };
@@ -21,12 +26,20 @@
     "hour" | "day" | "week" | "month" | "year" | "all"
   >("day");
   let isJoined = $state(false);
+  let isCheckingMembership = $state(false);
+  let isTogglingMembership = $state(false);
   let expandedRules = $state(new Set<number>());
   let showCreatePostModal = $state(false);
   let showInviteModModal = $state(false);
   let inviteUsername = $state("");
   let invitePermission = $state("Everything");
   let inviteCanEdit = $state(true);
+
+  // Callback when new post is created
+  function handlePostCreated() {
+    console.log("📨 handlePostCreated called - reloading posts...");
+    loadPosts(); // Reload posts to show new post
+  }
 
   // API data
   let community = $state<CommunityResponse | null>(null);
@@ -37,6 +50,13 @@
   let postsError = $state<string | null>(null);
   let currentPage = $state(1);
   const postsPerPage = 10;
+
+  // Check if current user is the creator of this community
+  const isCreator = $derived(() => {
+    const currentUser = $authStore.user;
+    if (!currentUser || !community) return false;
+    return community.create_by_id === currentUser.id;
+  });
 
   // Load community data
   async function loadCommunity() {
@@ -70,9 +90,15 @@
 
   // Load posts for this community
   async function loadPosts() {
-    if (!community) return;
+    if (!community) {
+      console.warn("⚠️ loadPosts called but community is null");
+      return;
+    }
 
     try {
+      console.log(
+        `🔍 Loading posts for community: ${community.name} (${community.id})`
+      );
       isLoadingPosts = true;
       postsError = null;
 
@@ -84,9 +110,10 @@
         limit: postsPerPage,
       });
 
+      console.log(`✅ Loaded ${fetchedPosts.length} posts`);
       posts = fetchedPosts;
     } catch (error) {
-      console.error("Failed to load posts:", error);
+      console.error("❌ Failed to load posts:", error);
       postsError =
         error instanceof Error ? error.message : "Failed to load posts";
       posts = [];
@@ -96,12 +123,32 @@
   }
 
   // Check if user is member of this community
-  // TODO: Backend doesn't have endpoint to check membership status yet
-  // Need: GET /api/memberships/check?user_id=xxx&community_id=xxx
-  // Or: GET /api/memberships/my-communities to get user's communities
   async function checkMembership() {
-    // Placeholder - implement when backend API is available
-    isJoined = false;
+    const currentUser = $authStore.user;
+    if (!currentUser || !community) {
+      isJoined = false;
+      return;
+    }
+
+    // Creators are automatically members
+    if (isCreator()) {
+      isJoined = true;
+      console.log("✅ You are the creator - automatically joined");
+      return;
+    }
+
+    try {
+      isCheckingMembership = true;
+      isJoined = await checkMembershipAPI(currentUser.id, community.id);
+      console.log(
+        `✅ Membership status: ${isJoined ? "Joined" : "Not joined"}`
+      );
+    } catch (error) {
+      console.error("❌ Failed to check membership:", error);
+      isJoined = false;
+    } finally {
+      isCheckingMembership = false;
+    }
   }
 
   // Reload posts when sort or time frame changes
@@ -115,6 +162,13 @@
   $effect(() => {
     if (params.name) {
       loadCommunity();
+    }
+  });
+
+  // Check membership when community loads
+  $effect(() => {
+    if (community && !isLoadingCommunity) {
+      checkMembership();
     }
   });
 
@@ -148,11 +202,47 @@
   ];
   */
 
-  function toggleJoin() {
-    // TODO: Implement join/leave API when backend provides endpoint
-    // Need: POST /api/memberships (create membership)
-    // Need: DELETE /api/memberships/:id (leave community)
-    isJoined = !isJoined;
+  async function toggleJoin() {
+    const currentUser = $authStore.user;
+    if (!currentUser || !community) {
+      alert("Please login to join communities");
+      return;
+    }
+
+    // Prevent creator from leaving their own community
+    if (isCreator()) {
+      alert("You cannot leave a community you created!");
+      return;
+    }
+
+    try {
+      isTogglingMembership = true;
+
+      if (isJoined) {
+        // Leave community
+        await deleteMembership(currentUser.id, community.id);
+        console.log(`✅ Left community: ${community.name}`);
+        isJoined = false;
+        // Decrement member count locally
+        if (community.member_count > 0) {
+          community.member_count--;
+        }
+      } else {
+        // Join community
+        await createMembership(currentUser.id, community.id);
+        console.log(`✅ Joined community: ${community.name}`);
+        isJoined = true;
+        // Increment member count locally
+        community.member_count++;
+      }
+    } catch (error) {
+      console.error("❌ Failed to toggle membership:", error);
+      alert(
+        error instanceof Error ? error.message : "Failed to update membership"
+      );
+    } finally {
+      isTogglingMembership = false;
+    }
   }
 
   function toggleRule(ruleIndex: number) {
@@ -238,6 +328,22 @@
         </div>
 
         <div class="community-actions">
+          <!-- Join/Leave Button -->
+          <button
+            class="join-btn"
+            class:joined={isJoined}
+            disabled={isCheckingMembership || isTogglingMembership}
+            onclick={toggleJoin}
+          >
+            {#if isTogglingMembership}
+              {isJoined ? "Leaving..." : "Joining..."}
+            {:else if isJoined}
+              Joined
+            {:else}
+              Join
+            {/if}
+          </button>
+
           <!-- Create Post Button -->
           <button
             class="create-post-action-btn"
@@ -464,8 +570,8 @@
     show={showCreatePostModal}
     onClose={() => {
       showCreatePostModal = false;
-      loadPosts(); // Reload posts after creating new post
     }}
+    onPostCreated={handlePostCreated}
     communityName={community.name}
   />
 {/if}

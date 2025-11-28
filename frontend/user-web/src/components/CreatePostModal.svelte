@@ -1,15 +1,18 @@
 <script lang="ts">
   import DraftsModal from "./DraftsModal.svelte";
   import { mockDraftsDetails } from "../mocks/drafts.mock";
-  import { mockJoinedCommunities } from "../mocks/joined-communities.mock";
+  import { createPost, uploadPostImages } from "../services/post-service";
+  import { getCommunities } from "../services/community-service";
+  import type { CommunityResponse } from "../dtos/community-dto";
 
   interface Props {
     show: boolean;
     onClose: () => void;
     communityName?: string; // Nếu có thì auto-fill community
+    onPostCreated?: () => void; // Callback khi đăng bài thành công
   }
 
-  let { show, onClose, communityName }: Props = $props();
+  let { show, onClose, communityName, onPostCreated }: Props = $props();
 
   let activeTab = $state<"text" | "images" | "link">("text");
   let selectedCommunity = $state(communityName || "");
@@ -22,6 +25,25 @@
   let showCommunitySearch = $state(false);
   let communitySearchQuery = $state("");
   let showDraftsModal = $state(false);
+  let isSubmitting = $state(false);
+  let errorMessage = $state<string | null>(null);
+  let allCommunities = $state<CommunityResponse[]>([]);
+
+  // Load communities from API
+  $effect(() => {
+    if (show && allCommunities.length === 0) {
+      loadCommunities();
+    }
+  });
+
+  async function loadCommunities() {
+    try {
+      const response = await getCommunities({ limit: 100 });
+      allCommunities = response.communities;
+    } catch (error) {
+      console.error("Failed to load communities:", error);
+    }
+  }
 
   $effect(() => {
     if (communityName) {
@@ -30,9 +52,14 @@
   });
 
   const filteredCommunities = $derived(
-    mockJoinedCommunities.filter((c) =>
+    allCommunities.filter((c) =>
       c.name.toLowerCase().includes(communitySearchQuery.toLowerCase())
     )
+  );
+
+  // Get selected community details
+  const selectedCommunityData = $derived(
+    allCommunities.find((c) => c.name === selectedCommunity)
   );
 
   function handleClose() {
@@ -46,6 +73,8 @@
     mediaFiles = [];
     showCommunitySearch = false;
     communitySearchQuery = "";
+    errorMessage = null;
+    isSubmitting = false;
     onClose();
   }
 
@@ -97,32 +126,82 @@
   }
 
   function handleSaveDraft() {
+    // TODO: Backend doesn't have drafts API yet
     console.log("Save draft:", { title, bodyText, tags, selectedCommunity });
-    alert("Draft saved!");
+    alert("Draft saved locally (backend API not available yet)");
   }
 
-  function handlePost() {
+  async function handlePost() {
+    // Validation
     if (!title.trim()) {
-      alert("Title is required!");
-      return;
-    }
-    if (!selectedCommunity && !communityName) {
-      alert("Please select a community!");
+      errorMessage = "Title is required!";
       return;
     }
 
-    console.log("Creating post:", {
-      community: selectedCommunity || communityName,
-      title,
-      tags,
-      type: activeTab,
-      bodyText: activeTab === "text" ? bodyText : undefined,
-      linkUrl: activeTab === "link" ? linkUrl : undefined,
-      media: activeTab === "images" ? mediaFiles : undefined,
-    });
+    const targetCommunity = selectedCommunity || communityName;
+    if (!targetCommunity) {
+      errorMessage = "Please select a community!";
+      return;
+    }
 
-    alert("Post created successfully!");
-    handleClose();
+    // Backend doesn't support link posts yet
+    if (activeTab === "link") {
+      errorMessage =
+        "Link posts are not supported yet. Please use Text or Images tab.";
+      return;
+    }
+
+    try {
+      isSubmitting = true;
+      errorMessage = null;
+
+      // Get community ID from name
+      let community: CommunityResponse | undefined;
+
+      if (allCommunities.length === 0) {
+        const response = await getCommunities({ limit: 100 });
+        allCommunities = response.communities;
+      }
+
+      community = allCommunities.find((c) => c.name === targetCommunity);
+
+      if (!community) {
+        errorMessage = "Community not found";
+        isSubmitting = false;
+        return;
+      }
+
+      // Create post
+      const post = await createPost({
+        community_id: community.id,
+        title: title.trim(),
+        type: "text", // Backend only accepts text/poll for now
+        text: bodyText.trim() || undefined,
+      });
+
+      // Upload images if any (2-step flow)
+      if (activeTab === "images" && mediaFiles.length > 0) {
+        await uploadPostImages(post.id, mediaFiles);
+      }
+
+      console.log("✅ Post created successfully:", post);
+
+      // Success! Notify parent to reload posts
+      if (onPostCreated) {
+        console.log("🔄 Calling onPostCreated callback to reload posts");
+        onPostCreated();
+      } else {
+        console.warn("⚠️ onPostCreated callback not provided!");
+      }
+
+      handleClose();
+    } catch (error) {
+      console.error("❌ Failed to create post:", error);
+      errorMessage =
+        error instanceof Error ? error.message : "Failed to create post";
+    } finally {
+      isSubmitting = false;
+    }
   }
 
   function handleDragOver(e: DragEvent) {
@@ -169,7 +248,10 @@
           <!-- Button state: Show community name or "Select a community" -->
           <button class="community-display-btn" onclick={toggleCommunitySearch}>
             <div class="community-icon">
-              <img src="/LKlogo.jpg" alt="Community" />
+              <img
+                src={selectedCommunityData?.avatar || "/LKlogo.jpg"}
+                alt={selectedCommunityData?.name || "Community"}
+              />
             </div>
             <span
               >{selectedCommunity
@@ -224,12 +306,15 @@
                   onclick={() => handleCommunitySelect(community.name)}
                 >
                   <div class="community-item-icon">
-                    <img src={community.icon} alt={community.name} />
+                    <img
+                      src={community.avatar || "/default-community.png"}
+                      alt={community.name}
+                    />
                   </div>
                   <div class="community-item-info">
-                    <div class="community-item-name">r/{community.name}</div>
+                    <div class="community-item-name">lk/{community.name}</div>
                     <div class="community-item-meta">
-                      {community.members} · {community.status}
+                      {community.member_count} members
                     </div>
                   </div>
                 </button>
@@ -280,7 +365,10 @@
       </div>
 
       <!-- Add Tags Button -->
-      <button class="add-tags-btn">Add tags</button>
+      <!-- TODO: Backend doesn't support tags yet -->
+      <button class="add-tags-btn" disabled title="Tags not supported yet"
+        >Add tags</button
+      >
 
       <!-- Content Area based on active tab -->
       {#if activeTab === "text"}
@@ -341,12 +429,16 @@
           {/if}
         </div>
       {:else if activeTab === "link"}
+        <div class="warning-message">
+          ⚠️ Link posts are not supported yet. Please use Text or Images tab.
+        </div>
         <div class="input-group input-with-required">
           <input
             type="url"
             placeholder="Link URL"
             bind:value={linkUrl}
             class="link-input"
+            disabled
           />
           {#if !linkUrl}
             <span class="required-mark">*</span>
@@ -354,12 +446,25 @@
         </div>
       {/if}
 
+      <!-- Error Message -->
+      {#if errorMessage}
+        <div class="error-message">
+          {errorMessage}
+        </div>
+      {/if}
+
       <!-- Action Buttons -->
       <div class="modal-actions">
-        <button class="save-draft-btn" onclick={handleSaveDraft}
-          >Save draft</button
+        <button
+          class="save-draft-btn"
+          onclick={handleSaveDraft}
+          disabled={isSubmitting}
         >
-        <button class="post-btn" onclick={handlePost}>Post</button>
+          Save draft
+        </button>
+        <button class="post-btn" onclick={handlePost} disabled={isSubmitting}>
+          {isSubmitting ? "Posting..." : "Post"}
+        </button>
       </div>
     </div>
   </div>
@@ -645,8 +750,13 @@
     transition: background 0.2s;
   }
 
-  .add-tags-btn:hover {
+  .add-tags-btn:hover:not(:disabled) {
     background: #edeff1;
+  }
+
+  .add-tags-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 
   /* Body Text Container */
@@ -749,6 +859,28 @@
     color: #1c1c1c;
   }
 
+  /* Error Message */
+  .error-message {
+    padding: 12px 16px;
+    background: #fee;
+    border: 1px solid #fcc;
+    border-radius: 8px;
+    color: #c00;
+    font-size: 14px;
+    margin-top: 16px;
+  }
+
+  /* Warning Message */
+  .warning-message {
+    padding: 12px 16px;
+    background: #fff3cd;
+    border: 1px solid #ffc107;
+    border-radius: 8px;
+    color: #856404;
+    font-size: 14px;
+    margin-bottom: 12px;
+  }
+
   /* Action Buttons */
   .modal-actions {
     display: flex;
@@ -769,12 +901,18 @@
     border: none;
   }
 
+  .save-draft-btn:disabled,
+  .post-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
   .save-draft-btn {
     background: #f6f7f8;
     color: #1c1c1c;
   }
 
-  .save-draft-btn:hover {
+  .save-draft-btn:hover:not(:disabled) {
     background: #edeff1;
   }
 
@@ -783,7 +921,7 @@
     color: white;
   }
 
-  .post-btn:hover {
+  .post-btn:hover:not(:disabled) {
     background: var(--darkblue--);
   }
 </style>

@@ -3,6 +3,7 @@ import type {
     PostResponse,
     CreatePostRequest,
     PostVoteRequest,
+    PaginatedPostsResponse,
 } from "../dtos/post-dto";
 import { publicFetch, authenticatedFetch, handleApiResponse } from "./api";
 
@@ -27,7 +28,8 @@ export async function getPosts(query?: GetPostsQuery): Promise<PostResponse[]> {
         method: "GET",
     });
 
-    return await handleApiResponse(res);
+    const response: PaginatedPostsResponse = await handleApiResponse(res);
+    return response.posts;
 }
 
 /**
@@ -45,7 +47,7 @@ export async function getPostsByUserId(userId: string, page = 1, limit = 10): Pr
  * Create a new post (text or poll)
  */
 export async function createPost(data: CreatePostRequest): Promise<PostResponse> {
-    const res = await authenticatedFetch("/api/posts", {
+    const res = await authenticatedFetch("/api/posts/", {
         method: "POST",
         body: JSON.stringify(data),
     });

@@ -25,6 +25,11 @@
   let isLoadingPosts = $state(false);
   let isLoadingComments = $state(false);
   let isLoadingSaved = $state(false);
+
+  // Flags to prevent infinite loading when user has no data
+  let hasLoadedPosts = $state(false);
+  let hasLoadedComments = $state(false);
+  let hasLoadedSaved = $state(false);
   let postsError = $state<string | null>(null);
   let commentsError = $state<string | null>(null);
   let savedError = $state<string | null>(null);
@@ -55,19 +60,19 @@
 
   // Watch for tab changes to load data
   $effect(() => {
-    if (user && activeTab === "posts" && posts.length === 0 && !postsError) {
+    if (user && activeTab === "posts" && !hasLoadedPosts && !postsError) {
       loadUserPosts();
     } else if (
       user &&
       activeTab === "comments" &&
-      comments.length === 0 &&
+      !hasLoadedComments &&
       !commentsError
     ) {
       loadUserComments();
     } else if (
       user &&
       activeTab === "saved" &&
-      savedPosts.length === 0 &&
+      !hasLoadedSaved &&
       !savedError
     ) {
       loadSavedPosts();
@@ -194,6 +199,7 @@
       posts = [];
     } finally {
       isLoadingPosts = false;
+      hasLoadedPosts = true;
     }
   }
 
@@ -214,6 +220,7 @@
       comments = [];
     } finally {
       isLoadingComments = false;
+      hasLoadedComments = true;
     }
   }
 
@@ -239,6 +246,7 @@
       savedPosts = [];
     } finally {
       isLoadingSaved = false;
+      hasLoadedSaved = true;
     }
   }
 

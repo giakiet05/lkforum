@@ -129,3 +129,14 @@ export interface PostResponse {
     created_at: string; // ISO 8601 format
     updated_at?: string; // ISO 8601 format
 }
+
+export interface Pagination {
+    page: number;
+    page_size: number;
+    total: number;
+}
+
+export interface PaginatedPostsResponse {
+    posts: PostResponse[];
+    pagination: Pagination;
+}
