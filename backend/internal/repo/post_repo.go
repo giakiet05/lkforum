@@ -17,6 +17,7 @@ import (
 type PostRepo interface {
 	Create(ctx context.Context, post *model.Post) (*model.Post, error)
 	GetByID(ctx context.Context, id string) (*model.Post, error)
+	GetByIDs(ctx context.Context, ids []string) ([]*model.Post, error)
 	Find(ctx context.Context, filter Filter, opts *FindOptions) ([]*model.Post, int64, error)
 	UpdateByID(ctx context.Context, id string, update UpdateDocument) error
 	Update(ctx context.Context, filter Filter, update UpdateDocument) error
@@ -59,6 +60,32 @@ func (r *postRepo) GetByID(ctx context.Context, id string) (*model.Post, error) 
 		return nil, err
 	}
 	return &post, nil
+}
+
+func (r *postRepo) GetByIDs(ctx context.Context, ids []string) ([]*model.Post, error) {
+	if len(ids) == 0 {
+		return []*model.Post{}, nil
+	}
+
+	objIDs := make([]primitive.ObjectID, 0, len(ids))
+	for _, id := range ids {
+		if objID, err := primitive.ObjectIDFromHex(id); err == nil {
+			objIDs = append(objIDs, objID)
+		}
+	}
+
+	filter := bson.M{"_id": bson.M{"$in": objIDs}}
+	cursor, err := r.collection.Find(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var posts []*model.Post
+	if err := cursor.All(ctx, &posts); err != nil {
+		return nil, err
+	}
+	return posts, nil
 }
 
 // Find fetches paginated data and total count using two separate queries for simplicity and robustness.

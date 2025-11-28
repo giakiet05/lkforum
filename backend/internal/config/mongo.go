@@ -16,24 +16,6 @@ var (
 	db     *mongo.Database
 )
 
-const (
-	UserColName              = "users"
-	PostColName              = "posts"
-	CommunityColName         = "communities"
-	CommentColName           = "comments"
-	ChannelColName           = "channels"
-	MessageColName           = "messages"
-	VoteColName              = "votes"
-	PollVoteColName          = "poll_votes"
-	NotificationColName      = "notifications"
-	ReportColName            = "reports"
-	MembershipColName        = "memberships"
-	LikedPostColName         = "liked_posts"
-	SavedPostColName         = "saved_posts"
-	UserPostHistoryColName   = "user_post_history"
-	EmailVerificationColName = "email_verifications"
-)
-
 // NewMongoClient creates and returns a new MongoDB client
 func NewMongoClient() *mongo.Client {
 	uri := os.Getenv("MONGO_URI") // e.g. mongodb://user:pass@localhost:27017
@@ -61,6 +43,7 @@ func NewMongoClient() *mongo.Client {
 		log.Fatal("DB_NAME environment variable is not set")
 	}
 
+	Client = client
 	db = client.Database(dbName)
 
 	// Verify required collections exist
@@ -82,6 +65,7 @@ func verifyCollections(ctx context.Context, db *mongo.Database) error {
 		UserColName,
 		PostColName,
 		CommunityColName,
+		CommunityBanColName,
 		CommentColName,
 		ChannelColName,
 		MessageColName,

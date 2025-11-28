@@ -239,3 +239,89 @@ func (c *CommunityController) DeleteCommunityByID(ctx *gin.Context) {
 
 	dto.SendSuccess(ctx, http.StatusOK, "Community deleted successfully", gin.H{"id": communityID})
 }
+
+func (c *CommunityController) BanUser(ctx *gin.Context) {
+	var req dto.BanUserRequest
+	if err := ctx.ShouldBind(&req); err != nil {
+		dto.SendError(ctx, http.StatusBadRequest, apperror.Message(apperror.ErrBadRequest), apperror.ErrBadRequest.Code)
+		return
+	}
+
+	authUser, exists := ctx.Get("authUser")
+	if !exists {
+		dto.SendError(ctx, http.StatusForbidden, apperror.ErrForbidden.Message, apperror.ErrForbidden.Code)
+		return
+	}
+
+	err := c.communityService.BanUser(&req, authUser.(auth.AuthUser).ID)
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
+		return
+	}
+
+	dto.SendSuccess(ctx, http.StatusOK, "Ban user successfully", gin.H{"id": req.UserID})
+}
+
+func (c *CommunityController) GetBanUsers(ctx *gin.Context) {
+	communityID := ctx.Param("community_id")
+	banType := ctx.Param("ban_type")
+
+	authUser, exists := ctx.Get("authUser")
+	if !exists {
+		dto.SendError(ctx, http.StatusForbidden, apperror.ErrForbidden.Message, apperror.ErrForbidden.Code)
+		return
+	}
+
+	users, err := c.communityService.GetBannedUsers(communityID, banType, authUser.(auth.AuthUser).ID)
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
+		return
+	}
+	userResponses := dto.FromUsers(users)
+
+	dto.SendSuccess(ctx, http.StatusOK, "Banned user retrieved successfully", userResponses)
+}
+
+func (c *CommunityController) UnbanUser(ctx *gin.Context) {
+	var req dto.UnbanUserRequest
+	if err := ctx.ShouldBind(&req); err != nil {
+		dto.SendError(ctx, http.StatusBadRequest, apperror.Message(apperror.ErrBadRequest), apperror.ErrBadRequest.Code)
+		return
+	}
+
+	authUser, exists := ctx.Get("authUser")
+	if !exists {
+		dto.SendError(ctx, http.StatusForbidden, apperror.ErrForbidden.Message, apperror.ErrForbidden.Code)
+		return
+	}
+
+	err := c.communityService.UnbanUser(req.UserID, req.CommunityID, authUser.(auth.AuthUser).ID)
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
+		return
+	}
+
+	dto.SendSuccess(ctx, http.StatusOK, "Unbanned user successfully", gin.H{"id": req.UserID})
+}
+
+func (c *CommunityController) UnmuteUser(ctx *gin.Context) {
+	var req dto.UnbanUserRequest
+	if err := ctx.ShouldBind(&req); err != nil {
+		dto.SendError(ctx, http.StatusBadRequest, apperror.Message(apperror.ErrBadRequest), apperror.ErrBadRequest.Code)
+		return
+	}
+
+	authUser, exists := ctx.Get("authUser")
+	if !exists {
+		dto.SendError(ctx, http.StatusForbidden, apperror.ErrForbidden.Message, apperror.ErrForbidden.Code)
+		return
+	}
+
+	err := c.communityService.UnmuteUser(req.UserID, req.CommunityID, authUser.(auth.AuthUser).ID)
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
+		return
+	}
+
+	dto.SendSuccess(ctx, http.StatusOK, "Unmuted user successfully", gin.H{"id": req.UserID})
+}

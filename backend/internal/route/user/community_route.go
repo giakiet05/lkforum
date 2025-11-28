@@ -17,8 +17,13 @@ func RegisterCommunityRoutes(rg *gin.RouterGroup, c *controller.CommunityControl
 	{
 		communities.POST("", c.CreateCommunity)
 		communities.PUT("", c.UpdateCommunity)
-		communities.PUT("/add_moderator", c.AddModerator)
-		communities.PUT("/remove_moderator", c.RemoveModerator)
-		communities.DELETE("/:community_id", c.DeleteCommunityByID)
+		communities.PUT("add_moderator", c.AddModerator)
+		communities.PUT("remove_moderator", c.RemoveModerator)
+		communities.DELETE(":community_id", c.DeleteCommunityByID)
+
+		communities.POST("ban/user", c.BanUser)
+		communities.GET("banned_user", c.GetBanUsers)
+		communities.POST("unban/user", c.UnbanUser)
+		communities.POST("unmute/user", c.UnbanUser)
 	}
 }
