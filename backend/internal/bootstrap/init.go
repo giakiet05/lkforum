@@ -90,7 +90,7 @@ func initServices(repos *Repos, redisClient *redis.Client, emailSender email.Sen
 	services := &Services{
 		AuthService:         service.NewAuthService(repos.UserRepo, repos.EmailVerificationRepo, emailSender, redisClient),
 		UserService:         service.NewUserService(repos.UserRepo, eventBus, redisClient),
-		CommunityService:    service.NewCommunityService(repos.CommunityRepo, eventBus),
+		CommunityService:    service.NewCommunityService(repos.CommunityRepo, repos.MembershipRepo, eventBus),
 		MembershipService:   service.NewMembershipService(repos.MembershipRepo, redisClient),
 		CommentService:      service.NewCommentService(repos.CommentRepo, eventBus),
 		ReputationService:   service.NewReputationService(repos.UserRepo, eventBus),

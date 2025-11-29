@@ -40,6 +40,7 @@ func (c *WebSocketController) HandleConnections(ctx *gin.Context) {
 	conn, err := upgrader.Upgrade(ctx.Writer, ctx.Request, nil)
 	if err != nil {
 		log.Printf("Failed to upgrade connection for user %s: %v", userID, err)
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Failed to upgrade WebSocket"})
 		return
 	}
 
