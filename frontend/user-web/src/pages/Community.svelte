@@ -7,7 +7,6 @@
   import type { CommunityResponse } from "../dtos/community-dto";
   import { getCommunityById } from "../services/community-service";
   import { getPosts } from "../services/post-service";
-  import { mockCommunityRules } from "../mocks/community-rules.mock";
   import { authStore } from "../stores/auth-store";
   import {
     checkMembership as checkMembershipAPI,
@@ -471,12 +470,11 @@
         </div>
 
         <!-- Rules Card -->
-        <!-- TODO: Backend doesn't have Community Rules API yet -->
         <div class="rules-card">
           <h3>Community Rules</h3>
-          {#if mockCommunityRules.length > 0}
+          {#if community.rules && community.rules.length > 0}
             <div class="rules-accordion">
-              {#each mockCommunityRules as rule, index}
+              {#each community.rules as rule, index}
                 <div class="rule-item">
                   <button
                     class="rule-header"
@@ -484,7 +482,7 @@
                     aria-expanded={expandedRules.has(index)}
                   >
                     <span class="rule-number">{index + 1}.</span>
-                    <span class="rule-title">{rule.name}</span>
+                    <span class="rule-title">{rule.title}</span>
                     <span
                       class="rule-toggle"
                       class:expanded={expandedRules.has(index)}
@@ -507,7 +505,7 @@
                   </button>
                   {#if expandedRules.has(index)}
                     <div class="rule-content">
-                      <p>{rule.description}</p>
+                      <p style="color: #666;">{rule.description}</p>
                     </div>
                   {/if}
                 </div>

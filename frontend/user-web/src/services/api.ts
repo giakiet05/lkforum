@@ -17,6 +17,16 @@ export async function handleApiResponse(res: Response): Promise<any> {
     try {
         const json: ApiResponse = await res.json();
         if (!res.ok || !json.success) {
+            // Log full error response for debugging
+            console.error("❌ API Error Response:", {
+                status: res.status,
+                statusText: res.statusText,
+                success: json.success,
+                message: json.message,
+                error_code: json.error_code,
+                data: json.data,
+                fullResponse: json
+            });
             // Use the message from the API, or a default one
             const message = json.message || `Request failed with status ${res.status}`;
             throw new ApiError(message, json.error_code as ApiErrorCode);

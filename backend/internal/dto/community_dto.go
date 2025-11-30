@@ -20,7 +20,7 @@ type CreateCommunityRequest struct {
 
 type UpdateCommunityRequest struct {
 	CommunityID string                  `json:"id" binding:"required"`
-	Description *string                 `json:"description,omitempty" binding:"max=500"`
+	Description *string                 `json:"description,omitempty"`
 	Avatar      *string                 `json:"avatar,omitempty"`
 	Banner      *string                 `json:"banner,omitempty"`
 	Setting     *model.CommunitySetting `json:"setting,omitempty"`

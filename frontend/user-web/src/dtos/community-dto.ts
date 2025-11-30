@@ -13,12 +13,18 @@ export interface Moderator {
     avatar?: string;
 }
 
+export interface CommunityRule {
+    title: string;
+    description: string;
+}
+
 export interface CreateCommunityRequest {
     name: string;
     description?: string;
     avatar?: string;
     banner?: string;
     setting?: CommunitySetting;
+    rules?: CommunityRule[];
     moderators?: Moderator[];
     creator_name?: string;
     creator_avatar?: string;
@@ -31,6 +37,7 @@ export interface UpdateCommunityRequest {
     avatar?: string;
     banner?: string;
     setting?: CommunitySetting;
+    rules?: CommunityRule[];
 }
 
 export interface ModeratorDTO {
@@ -46,6 +53,29 @@ export interface AddModeratorRequest {
 export interface RemoveModeratorRequest {
     id: string;
     removed_moderator: string[];
+}
+
+export interface BanUserRequest {
+    community_id: string;
+    user_id: string;
+    type: string; // "ban" or "mute"
+    reason: string;
+    length_days: number;
+}
+
+export interface UnbanUserRequest {
+    community_id: string;
+    user_id: string;
+}
+
+export interface UserResponse {
+    id: string;
+    username: string;
+    email?: string;
+    avatar?: string;
+    banner?: string;
+    bio?: string;
+    created_at?: string;
 }
 
 // --- Response DTOs ---
@@ -69,6 +99,7 @@ export interface CommunityResponse {
     avatar: string;
     banner: string;
     setting: CommunitySetting;
+    rules?: CommunityRule[];
     moderators: Moderator[];
     post_count: number;
     member_count: number;

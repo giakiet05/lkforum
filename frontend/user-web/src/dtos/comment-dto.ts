@@ -4,8 +4,6 @@ import type { Image } from './post-dto';
 
 export interface CreateCommentRequest {
     user_id: string;
-    username: string;
-    user_avatar: string;
     post_id: string;
     parent_id?: string;
     content: string;
@@ -33,7 +31,7 @@ export interface GetCommentByPostIDQuery {
 export interface CommentAuthor {
     id: string;
     username: string;
-    avatar?: string; // Backend returns avatar as a string URL, not Image object
+    avatar?: Image;
 }
 
 export interface CommentResponse {

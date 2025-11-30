@@ -5,7 +5,10 @@ import type {
     CommunityResponse,
     PaginatedCommunitiesResponse,
     AddModeratorRequest,
-    RemoveModeratorRequest
+    RemoveModeratorRequest,
+    BanUserRequest,
+    UnbanUserRequest,
+    UserResponse
 } from "../dtos/community-dto";
 
 /**
@@ -114,4 +117,60 @@ export async function deleteCommunity(communityId: string): Promise<void> {
     });
     
     await handleApiResponse(res);
+}
+
+/**
+ * Ban or mute a user from a community (requires authentication)
+ */
+export async function banUser(data: BanUserRequest): Promise<void> {
+    const res = await authenticatedFetch("/api/communities/ban", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+    });
+    
+    await handleApiResponse(res);
+}
+
+/**
+ * Unban a user from a community (requires authentication)
+ */
+export async function unbanUser(data: UnbanUserRequest): Promise<void> {
+    const res = await authenticatedFetch("/api/communities/unban", {
+        method: "PUT",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+    });
+    
+    await handleApiResponse(res);
+}
+
+/**
+ * Unmute a user from a community (requires authentication)
+ */
+export async function unmuteUser(data: UnbanUserRequest): Promise<void> {
+    const res = await authenticatedFetch("/api/communities/unmute", {
+        method: "PUT",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+    });
+    
+    await handleApiResponse(res);
+}
+
+/**
+ * Get banned or muted users in a community (requires authentication)
+ */
+export async function getBannedUsers(communityId: string, banType: "ban" | "mute"): Promise<UserResponse[]> {
+    const res = await authenticatedFetch(`/api/communities/${communityId}/banned/${banType}`, {
+        method: "GET",
+    });
+    
+    return await handleApiResponse(res);
 }
