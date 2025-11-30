@@ -76,4 +76,5 @@ export interface CommunityResponse {
     create_by_name?: string;
     create_by_avatar?: string;
     is_18_plus?: boolean;
+    created_at?: string;
 }

@@ -14,13 +14,20 @@
 
   let { show, onClose, communityName, onPostCreated }: Props = $props();
 
-  let activeTab = $state<"text" | "images" | "link">("text");
+  let activeTab = $state<"text" | "images" | "link" | "poll">("text");
   let selectedCommunity = $state(communityName || "");
   let title = $state("");
   let tags = $state<string[]>([]);
   let bodyText = $state("");
   let linkUrl = $state("");
   let mediaFiles = $state<File[]>([]);
+
+  // Poll state
+  let pollQuestion = $state("");
+  let pollOptions = $state<string[]>(["", ""]);
+  let pollDuration = $state("3"); // days
+  let allowMultiple = $state(false);
+
   let isDragging = $state(false);
   let showCommunitySearch = $state(false);
   let communitySearchQuery = $state("");
@@ -71,6 +78,10 @@
     bodyText = "";
     linkUrl = "";
     mediaFiles = [];
+    pollQuestion = "";
+    pollOptions = ["", ""];
+    pollDuration = "3";
+    allowMultiple = false;
     showCommunitySearch = false;
     communitySearchQuery = "";
     errorMessage = null;
@@ -131,6 +142,23 @@
     alert("Draft saved locally (backend API not available yet)");
   }
 
+  function addPollOption() {
+    if (pollOptions.length < 6) {
+      pollOptions = [...pollOptions, ""];
+    }
+  }
+
+  function removePollOption(index: number) {
+    if (pollOptions.length > 2) {
+      pollOptions = pollOptions.filter((_, i) => i !== index);
+    }
+  }
+
+  function updatePollOption(index: number, value: string) {
+    pollOptions[index] = value;
+    pollOptions = [...pollOptions];
+  }
+
   async function handlePost() {
     // Validation
     if (!title.trim()) {
@@ -142,6 +170,19 @@
     if (!targetCommunity) {
       errorMessage = "Please select a community!";
       return;
+    }
+
+    // Poll validation
+    if (activeTab === "poll") {
+      if (!pollQuestion.trim()) {
+        errorMessage = "Poll question is required!";
+        return;
+      }
+      const filledOptions = pollOptions.filter((opt) => opt.trim() !== "");
+      if (filledOptions.length < 2) {
+        errorMessage = "Poll needs at least 2 options!";
+        return;
+      }
     }
 
     // Backend doesn't support link posts yet
@@ -172,12 +213,31 @@
       }
 
       // Create post
-      const post = await createPost({
+      let postData: any = {
         community_id: community.id,
         title: title.trim(),
-        type: "text", // Backend only accepts text/poll for now
+        type: activeTab === "poll" ? "poll" : "text",
         text: bodyText.trim() || undefined,
-      });
+      };
+
+      // Add poll data if poll type
+      if (activeTab === "poll") {
+        const filledOptions = pollOptions.filter((opt) => opt.trim() !== "");
+
+        // Calculate expires_at based on duration
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + parseInt(pollDuration));
+
+        postData.poll = {
+          question: pollQuestion.trim(),
+          options: filledOptions.map((text) => text.trim()), // Array of strings, not objects
+          expires_at: expiresAt.toISOString(),
+          allow_multiple: allowMultiple,
+        };
+      }
+
+      console.log("📤 Creating post with data:", postData);
+      const post = await createPost(postData);
 
       // Upload images if any (2-step flow)
       if (activeTab === "images" && mediaFiles.length > 0) {
@@ -349,6 +409,13 @@
         >
           Link
         </button>
+        <button
+          class="tab-btn"
+          class:active={activeTab === "poll"}
+          onclick={() => (activeTab = "poll")}
+        >
+          Poll
+        </button>
       </div>
 
       <!-- Title Input -->
@@ -443,6 +510,81 @@
           {#if !linkUrl}
             <span class="required-mark">*</span>
           {/if}
+        </div>
+      {:else if activeTab === "poll"}
+        <div class="poll-container">
+          <!-- Poll Question -->
+          <div class="input-group input-with-required">
+            <input
+              type="text"
+              placeholder="Ask a question..."
+              bind:value={pollQuestion}
+              class="poll-question-input"
+            />
+            {#if !pollQuestion}
+              <span class="required-mark">*</span>
+            {/if}
+          </div>
+
+          <!-- Poll Options -->
+          <div class="poll-options">
+            {#each pollOptions as option, index}
+              <div class="poll-option-row">
+                <input
+                  type="text"
+                  placeholder={`Option ${index + 1}`}
+                  value={option}
+                  oninput={(e) =>
+                    updatePollOption(index, e.currentTarget.value)}
+                  class="poll-option-input"
+                />
+                {#if pollOptions.length > 2}
+                  <button
+                    class="remove-option-btn"
+                    onclick={() => removePollOption(index)}
+                    title="Remove option"
+                  >
+                    ✕
+                  </button>
+                {/if}
+              </div>
+            {/each}
+
+            <!-- Add Option Button -->
+            {#if pollOptions.length < 6}
+              <button class="add-option-btn" onclick={addPollOption}>
+                + Add option
+              </button>
+            {/if}
+          </div>
+
+          <!-- Poll Settings -->
+          <div class="poll-settings">
+            <div class="setting-row">
+              <label for="poll-duration">Poll duration:</label>
+              <select
+                id="poll-duration"
+                bind:value={pollDuration}
+                class="duration-select"
+              >
+                <option value="1">1 day</option>
+                <option value="3">3 days</option>
+                <option value="7">7 days</option>
+                <option value="14">14 days</option>
+              </select>
+            </div>
+
+            <div class="setting-row">
+              <label>
+                <input
+                  type="checkbox"
+                  bind:checked={allowMultiple}
+                  class="checkbox"
+                />
+                Allow multiple choices
+              </label>
+            </div>
+          </div>
         </div>
       {/if}
 
@@ -879,6 +1021,128 @@
     color: #856404;
     font-size: 14px;
     margin-bottom: 12px;
+  }
+
+  /* Poll Container */
+  .poll-container {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+
+  .poll-question-input {
+    width: 100%;
+    padding: 12px 16px;
+    border: 1px solid var(--lightgray--);
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--grayfont);
+  }
+
+  .poll-question-input:focus {
+    outline: none;
+    border-color: var(--blue--);
+  }
+
+  .poll-options {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .poll-option-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .poll-option-input {
+    flex: 1;
+    padding: 10px 14px;
+    border: 1px solid var(--lightgray--);
+    border-radius: 8px;
+    font-size: 14px;
+    color: var(--grayfont);
+  }
+
+  .poll-option-input:focus {
+    outline: none;
+    border-color: var(--blue--);
+  }
+
+  .remove-option-btn {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: 1px solid #edeff1;
+    border-radius: 4px;
+    color: #c00;
+    cursor: pointer;
+    font-size: 16px;
+    transition: all 0.2s;
+  }
+
+  .remove-option-btn:hover {
+    background: #fee;
+    border-color: #fcc;
+  }
+
+  .add-option-btn {
+    padding: 8px 16px;
+    background: transparent;
+    border: 1px dashed var(--blue--);
+    border-radius: 8px;
+    color: var(--blue--);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .add-option-btn:hover {
+    background: rgba(21, 48, 96, 0.05);
+  }
+
+  .poll-settings {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px;
+    background: #f6f7f8;
+    border-radius: 8px;
+  }
+
+  .setting-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 14px;
+  }
+
+  .duration-select {
+    padding: 6px 12px;
+    border: 1px solid var(--lightgray--);
+    border-radius: 6px;
+    background: white;
+    color: var(--grayfont);
+    font-size: 14px;
+    cursor: pointer;
+  }
+
+  .duration-select:focus {
+    outline: none;
+    border-color: var(--blue--);
+  }
+
+  .checkbox {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
   }
 
   /* Action Buttons */

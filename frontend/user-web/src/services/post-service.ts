@@ -8,6 +8,7 @@ import type {
     PollVoteRequest,
     ReportPostRequest,
     RemoveImagesRequest,
+    PollResponse,
 } from "../dtos/post-dto";
 import { publicFetch, authenticatedFetch, handleApiResponse } from "./api";
 
@@ -51,11 +52,13 @@ export async function getPostsByUserId(userId: string, page = 1, limit = 10): Pr
  * Create a new post (text or poll)
  */
 export async function createPost(data: CreatePostRequest): Promise<PostResponse> {
+    console.log("📡 Calling POST /api/posts/ with data:", data);
     const res = await authenticatedFetch("/api/posts/", {
         method: "POST",
         body: JSON.stringify(data),
     });
 
+    console.log("📥 Response status:", res.status);
     return await handleApiResponse(res);
 }
 
@@ -257,24 +260,24 @@ export async function removeVideosFromPost(postId: string, publicIds: string[]):
 /**
  * Vote on a poll
  */
-export async function voteOnPoll(postId: string, optionId: string): Promise<void> {
+export async function voteOnPoll(postId: string, optionId: string): Promise<PollResponse> {
     const res = await authenticatedFetch(`/api/posts/${postId}/poll/vote`, {
         method: "POST",
         body: JSON.stringify({ option_id: optionId }),
     });
 
-    await handleApiResponse(res);
+    return await handleApiResponse(res);
 }
 
 /**
  * Remove poll vote
  */
-export async function removePollVote(postId: string): Promise<void> {
+export async function removePollVote(postId: string): Promise<PollResponse> {
     const res = await authenticatedFetch(`/api/posts/${postId}/poll/vote`, {
         method: "DELETE",
     });
 
-    await handleApiResponse(res);
+    return await handleApiResponse(res);
 }
 
 /**

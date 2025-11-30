@@ -13,6 +13,12 @@
     reportPost,
   } from "../services/post-service";
   import { authStore } from "../stores/auth-store";
+  import {
+    savePollVote,
+    removePollVote as removeLocalPollVote,
+    hasVotedOnPoll,
+    getPollVotedOptions,
+  } from "../utils/poll-vote-storage";
 
   type PostProps = {
     post: PostResponse;
@@ -22,7 +28,9 @@
   let { post, onUpdate }: PostProps = $props();
 
   let selectedOptions = $state<string[]>([]);
-  let hasVoted = $state(false);
+
+  // TEMP FIX: Backend doesn't return user_vote_ids, use localStorage
+  let hasVoted = $state(post.type === "poll" ? hasVotedOnPoll(post.id) : false);
   let currentImageIndex = $state(0);
 
   // Vote state
@@ -78,17 +86,27 @@
   }
 
   function handleVote(optionId: string) {
-    if (hasVoted) return;
+    // TEMP FIX: Check localStorage since backend doesn't return user_vote_ids
+    const votedOptions = getPollVotedOptions(post.id);
+    const alreadyVotedThisOption = votedOptions.includes(optionId);
 
     if (post.content.poll?.allow_multiple) {
+      // Multiple choice: toggle selection (but can't revote same option)
+      if (alreadyVotedThisOption) {
+        return; // Already voted this option, can't vote again
+      }
       const index = selectedOptions.indexOf(optionId);
       if (index > -1) {
         selectedOptions.splice(index, 1);
       } else {
         selectedOptions.push(optionId);
       }
-      selectedOptions = selectedOptions; // Trigger reactivity
+      selectedOptions = selectedOptions;
     } else {
+      // Single choice: can change vote to different option
+      if (alreadyVotedThisOption) {
+        return; // Already voted this option, no need to vote again
+      }
       selectedOptions = [optionId];
     }
   }
@@ -101,28 +119,32 @@
     }
 
     try {
-      // For now, only support single vote (backend limitation)
       const optionId = selectedOptions[0];
-      await voteOnPoll(post.id, optionId);
+      const hasVotedBefore =
+        post.content.poll?.user_vote_ids &&
+        post.content.poll.user_vote_ids.length > 0;
 
-      // Update local state optimistically
-      if (post.content.poll) {
-        for (const option of post.content.poll.options) {
-          if (option.id === optionId) {
-            option.votes++;
-            option.percentage =
-              (option.votes / (post.content.poll.total_votes + 1)) * 100;
-          } else {
-            option.percentage =
-              (option.votes / (post.content.poll.total_votes + 1)) * 100;
-          }
-        }
-        post.content.poll.total_votes++;
-        if (!post.content.poll.user_vote_ids) {
-          post.content.poll.user_vote_ids = [];
-        }
-        post.content.poll.user_vote_ids.push(optionId);
+      // If single choice and already voted, remove old vote first
+      if (!post.content.poll?.allow_multiple && hasVotedBefore) {
+        await removePollVote(post.id);
+        // Backend returns updated poll, but we'll fetch fresh data
       }
+
+      // Submit new vote
+      const updatedPoll = await voteOnPoll(post.id, optionId);
+
+      // Update poll with fresh data from backend
+      if (post.content.poll && updatedPoll) {
+        post.content.poll.options = updatedPoll.options;
+        post.content.poll.total_votes = updatedPoll.total_votes;
+        post.content.poll.user_vote_ids = updatedPoll.user_vote_ids || [];
+      }
+
+      // TEMP FIX: Save to localStorage since backend doesn't return user_vote_ids
+      savePollVote(post.id, optionId);
+
+      // Clear selection
+      selectedOptions = [];
       hasVoted = true;
     } catch (error) {
       console.error("Failed to vote on poll:", error);

@@ -66,7 +66,7 @@
       isLoadingUser = true;
       errorMessage = null;
       user = await getMyProfile();
-      
+
       // Populate form with current data
       editedBio = user.profile.bio || "";
       editedGender = user.profile.gender || "";
@@ -232,7 +232,7 @@
       successMessage = null;
 
       await changePassword(oldPassword, newPassword);
-      
+
       successMessage = "Password changed successfully!";
       showPasswordModal = false;
       oldPassword = "";

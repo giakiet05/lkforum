@@ -79,6 +79,9 @@ export async function publicFetch(path: string, options: RequestInit = {}): Prom
 export async function authenticatedFetch(path: string, options: RequestInit = {}): Promise<Response> {
     const url = path.startsWith("http") ? path : API_BASE_URL + path;
     const accessToken = await getValidAccessToken();
+    
+    console.log("🔑 Access token:", accessToken ? "✅ Found" : "❌ Missing");
+    
     if (!accessToken) {
         // Dispatch event để App.svelte handle logout
         window.dispatchEvent(new CustomEvent('auth:unauthorized'));
@@ -95,6 +98,13 @@ export async function authenticatedFetch(path: string, options: RequestInit = {}
     // Do not set Content-Type for FormData, the browser does it.
     if (!isFormData) {
         headers["Content-Type"] = "application/json";
+    }
+
+    console.log("📤 Request headers:", { ...headers, Authorization: `Bearer ${accessToken.substring(0, 20)}...` });
+    console.log("📤 Request URL:", url);
+    console.log("📤 Request method:", options.method || "GET");
+    if (!isFormData && options.body) {
+        console.log("📤 Request body:", options.body);
     }
 
     try {
