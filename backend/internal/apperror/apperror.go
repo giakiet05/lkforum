@@ -147,4 +147,7 @@ var (
 	// Messaging-related
 	ErrChannelNotFound = AppError{Code: "CHANNEL_NOT_FOUND", Message: "Không tìm thấy kênh"}
 	ErrNoMessageFound  = AppError{Code: "NO_MESSAGE_FOUND", Message: "Không tìm thấy tin nhắn"}
+
+	// Report-related
+	ErrReportNotFound = AppError{Code: "REPORT_NOT_FOUND", Message: "Không tìm thấy report"}
 )

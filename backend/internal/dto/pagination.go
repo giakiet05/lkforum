@@ -47,3 +47,8 @@ type PaginatedPostHistoryResponse struct {
 	PostHistories []*PostHistoryResponse `json:"post_histories"`
 	Pagination    Pagination             `json:"pagination"`
 }
+
+type PaginatedReportResponse struct {
+	Reports    []*ReportResponse `json:"reports"`
+	Pagination Pagination        `json:"pagination"`
+}

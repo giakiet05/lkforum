@@ -580,11 +580,11 @@ func (s *postService) ReportPost(reporterID, postID, reason, description string)
 	}
 
 	// Check if user has already reported this post
-	alreadyReported, err := s.reportRepo.GetByReporterAndTarget(ctx, reporterObjID, postObjID, model.ReportTypePost)
+	reports, _, err := s.reportRepo.GetFilter(ctx, &reporterID, &postID, model.ReportTypePost, nil, nil, nil, 1, 10)
 	if err != nil {
 		return err
 	}
-	if alreadyReported {
+	if len(reports) > 0 {
 		return apperror.ErrAlreadyReported
 	}
 

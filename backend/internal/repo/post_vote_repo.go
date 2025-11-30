@@ -167,7 +167,7 @@ func (r *postVoteRepo) Vote(ctx context.Context, userID, postID string, voteValu
 			}
 		}
 
-		// Apply counter update to the posts collection
+		// Apply counter update to the posts reportCollection
 		postFilter := bson.M{"_id": postObjID}
 		postUpdate := bson.M{"$inc": bson.M{"votes_count.up": upInc, "votes_count.down": downInc}}
 		if _, err := r.postCollection.UpdateOne(sessCtx, postFilter, postUpdate); err != nil {

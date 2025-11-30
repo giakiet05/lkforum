@@ -32,7 +32,7 @@
   const currentUser = $derived($authStore.user);
   const channels = $derived($chatStore.channels);
   const activeChannelData = $derived($activeChannel);
-  const messages = $derived($activeChannelMessages);
+  const reports = $derived($activeChannelMessages);
   const isLoadingChannels = $derived($chatStore.isLoadingChannels);
   const isLoadingMessages = $derived($chatStore.isLoadingMessages);
 
@@ -86,7 +86,7 @@
   // Get last message for a channel
   function getLastMessage(channelId: string): string {
     const channelMessages = $chatStore.messagesByChannel.get(channelId) || [];
-    if (channelMessages.length === 0) return "No messages yet";
+    if (channelMessages.length === 0) return "No reports yet";
 
     const lastMsg = channelMessages[channelMessages.length - 1];
     const isCurrentUser = lastMsg.sender_id === currentUser?.id;
@@ -130,7 +130,7 @@
     }
   }
 
-  // Load messages for a channel
+  // Load reports for a channel
   async function loadMessagesForChannel(channelId: string) {
     try {
       setLoadingMessages(true);
@@ -143,7 +143,7 @@
       // Scroll to bottom
       setTimeout(scrollToBottom, 100);
     } catch (error) {
-      console.error("Failed to load messages:", error);
+      console.error("Failed to load reports:", error);
       setLoadingMessages(false);
     }
   }
@@ -174,7 +174,7 @@
     }
   }
 
-  // Handle incoming WebSocket messages
+  // Handle incoming WebSocket reports
   function handleIncomingMessage(message: MessageResponse) {
     addMessage(message.channel_id, message);
 
@@ -184,9 +184,9 @@
     }
   }
 
-  // Scroll to bottom of messages
+  // Scroll to bottom of reports
   function scrollToBottom() {
-    const messagesArea = document.querySelector(".messages-area");
+    const messagesArea = document.querySelector(".reports-area");
     if (messagesArea) {
       messagesArea.scrollTop = messagesArea.scrollHeight;
     }
@@ -246,9 +246,9 @@
   });
 </script>
 
-<div class="messages-page">
+<div class="reports-page">
   <!-- Header -->
-  <div class="messages-header">
+  <div class="reports-header">
     <button class="back-btn" onclick={handleBack} title="Back to home">
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
         <path
@@ -263,7 +263,7 @@
     <h1>Tin nhắn</h1>
   </div>
 
-  <div class="messages-container">
+  <div class="reports-container">
     <!-- Left Side - Conversations List -->
     <div class="conversations-sidebar">
       <div class="conversations-header">
@@ -283,7 +283,7 @@
         />
         <input
           type="text"
-          placeholder="Search messages..."
+          placeholder="Search reports..."
           bind:value={searchQuery}
         />
       </div>
@@ -404,12 +404,12 @@
         </div>
 
         <!-- Messages Area -->
-        <div class="messages-area">
+        <div class="reports-area">
           {#if isLoadingMessages}
-            <div class="loading-messages">Loading messages...</div>
+            <div class="loading-reports">Loading reports...</div>
           {:else}
-            <div class="messages-wrapper">
-              {#each messages as message (message.id)}
+            <div class="reports-wrapper">
+              {#each reports as message (message.id)}
                 {@const isSent = message.sender_id === currentUser?.id}
                 <div class="message-row" class:sent={isSent}>
                   {#if !isSent}
@@ -499,7 +499,7 @@
 </div>
 
 <style>
-  .messages-page {
+  .reports-page {
     display: flex;
     flex-direction: column;
     height: 100vh;
@@ -507,7 +507,7 @@
   }
 
   /* Header */
-  .messages-header {
+  .reports-header {
     display: flex;
     align-items: center;
     gap: 16px;
@@ -534,7 +534,7 @@
     background: #f6f7f8;
   }
 
-  .messages-header h1 {
+  .reports-header h1 {
     margin: 0;
     font-size: 24px;
     font-weight: 700;
@@ -542,7 +542,7 @@
   }
 
   /* Container */
-  .messages-container {
+  .reports-container {
     display: flex;
     flex: 1;
     overflow: hidden;
@@ -838,14 +838,14 @@
   }
 
   /* Messages Area */
-  .messages-area {
+  .reports-area {
     flex: 1;
     overflow-y: auto;
     padding: 20px;
     background: #f6f7f8;
   }
 
-  .messages-wrapper {
+  .reports-wrapper {
     display: flex;
     flex-direction: column;
     gap: 12px;
@@ -989,7 +989,7 @@
   /* Loading States */
   .loading-state,
   .empty-state,
-  .loading-messages {
+  .loading-reports {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -998,7 +998,7 @@
     font-size: 14px;
   }
 
-  .loading-messages {
+  .loading-reports {
     height: 100%;
   }
 </style>

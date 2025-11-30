@@ -206,7 +206,7 @@
   function handleSubmit() {
     isLoading = true;
 
-    // Mock create community
+    // Mock create report
     setTimeout(() => {
       isLoading = false;
       alert(`Community "lk/${communityName}" created successfully!`);
@@ -222,7 +222,7 @@
       <!-- Step 1: Create Community Form -->
       {#if currentStep === 1}
         <div class="modal-header">
-          <h2>Create a community</h2>
+          <h2>Create a report</h2>
           <button class="modal-close-btn" onclick={handleClose}>×</button>
         </div>
 
@@ -253,7 +253,7 @@
             <textarea
               id="description"
               bind:value={description}
-              placeholder="What is your community about?"
+              placeholder="What is your report about?"
               rows="4"
               maxlength="500"
             ></textarea>
@@ -282,7 +282,7 @@
                   <span class="radio-title">Public</span>
                 </div>
                 <p class="radio-description">
-                  Anyone can view, post, and comment to this community
+                  Anyone can view, post, and comment to this report
                 </p>
               </div>
             </label>
@@ -305,7 +305,7 @@
                   <span class="radio-title">Restricted</span>
                 </div>
                 <p class="radio-description">
-                  Anyone can view this community, but only approved users can
+                  Anyone can view this report, but only approved users can
                   post
                 </p>
               </div>
@@ -329,7 +329,7 @@
                   <span class="radio-title">Private</span>
                 </div>
                 <p class="radio-description">
-                  Only approved users can view and submit to this community
+                  Only approved users can view and submit to this report
                 </p>
               </div>
             </label>
@@ -347,7 +347,7 @@
                     width="20"
                     height="20"
                   />
-                  <span class="checkbox-title">18+ year old community</span>
+                  <span class="checkbox-title">18+ year old report</span>
                 </div>
                 <p class="checkbox-description">
                   Must be over 18 to view and contribute
@@ -390,7 +390,7 @@
         </div>
 
         <p class="modal-subtitle">
-          Add up to 3 topics to help interested redditors find your community.
+          Add up to 3 topics to help interested redditors find your report.
         </p>
 
         <div class="search-wrapper">
@@ -481,13 +481,13 @@
       <!-- Step 3: Style -->
       {#if currentStep === 3}
         <div class="modal-header">
-          <h2>Style your community</h2>
+          <h2>Style your report</h2>
           <button class="modal-close-btn" onclick={handleClose}>×</button>
         </div>
 
         <p class="modal-subtitle">
           Adding visual flair will catch new members attention and help
-          establish your community's culture! You can update this at any time.
+          establish your report's culture! You can update this at any time.
         </p>
 
         <div class="style-content">
@@ -565,7 +565,7 @@
                 {/if}
               </div>
               <div class="preview-info">
-                <h3>lk/{communityName || "community"}</h3>
+                <h3>lk/{communityName || "report"}</h3>
                 <p>1 member · 1 online</p>
               </div>
             </div>

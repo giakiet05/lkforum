@@ -85,7 +85,7 @@
     <article class="post-detail-container">
       <div class="post-main">
         <div class="post-header">
-          <span class="community-name">lk/{post.community}</span>
+          <span class="report-name">lk/{post.report}</span>
           <span class="meta-divider">•</span>
           <span class="author">Posted by u/{post.author}</span>
           <span class="time">{post.time}</span>
@@ -282,7 +282,7 @@
     margin-bottom: 12px;
   }
 
-  .community-name {
+  .report-name {
     font-weight: bold;
     color: #000000;
   }

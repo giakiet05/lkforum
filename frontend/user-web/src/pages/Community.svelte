@@ -4,7 +4,7 @@
   import Post from "../components/Post.svelte";
   import CreatePostModal from "../components/CreatePostModal.svelte";
   import type { PostResponse } from "../dtos/post-dto"
-  import { mockCommunityRules } from "../mocks/community-rules.mock";
+  import { mockCommunityRules } from "../mocks/report-rules.mock";
 
   type CommunityProps = {
     params?: { name: string };
@@ -21,11 +21,11 @@
   let invitePermission = $state("Everything");
   let inviteCanEdit = $state(true);
 
-  // Mock community data
-  const community = {
+  // Mock report data
+  const report = {
     name: params.name,
     displayName: `lk/${params.name}`,
-    description: "A community for all things related to " + params.name,
+    description: "A report for all things related to " + params.name,
     members: 125000,
     online: 3200,
     createdAt: "Jan 1, 2020",
@@ -33,7 +33,7 @@
     icon: "/community_logo.jpg",
   };
 
-  // Mock posts for this community
+  // Mock posts for this report
   // TODO: Replace with API call
   const posts: PostResponse[] = [];
 
@@ -42,7 +42,7 @@
     {
       id: "1",
       type: "text",
-      community: params.name,
+      report: params.name,
       author: "user123",
       time: "4 hours ago",
       title: "Welcome to " + params.name + "!",
@@ -50,12 +50,12 @@
       downvotes: 5,
       commentsCount: 42,
       content:
-        "This is the community page. Join us to see more content and participate in discussions!",
+        "This is the report page. Join us to see more content and participate in discussions!",
     },
     {
       id: "2",
       type: "image",
-      community: params.name,
+      report: params.name,
       author: "photographer",
       time: "8 hours ago",
       title: "Check out this amazing photo!",
@@ -117,24 +117,24 @@
   });
 </script>
 
-<div class="community-page">
+<div class="report-page">
   <!-- Banner -->
-  <div class="community-banner">
-    <img src={community.banner} alt="Community banner" />
+  <div class="report-banner">
+    <img src={report.banner} alt="Community banner" />
   </div>
 
   <!-- Community Header -->
-  <div class="community-header">
-    <div class="community-header-content">
-      <div class="community-info">
-        <img src={community.icon} alt="Community icon" class="community-icon" />
-        <div class="community-title">
-          <h1>{community.displayName}</h1>
-          <p class="community-name">lk/{community.name}</p>
+  <div class="report-header">
+    <div class="report-header-content">
+      <div class="report-info">
+        <img src={report.icon} alt="Community icon" class="report-icon" />
+        <div class="report-title">
+          <h1>{report.displayName}</h1>
+          <p class="report-name">lk/{report.name}</p>
         </div>
       </div>
 
-      <div class="community-actions">
+      <div class="report-actions">
         <!-- Create Post Button -->
         <button
           class="create-post-action-btn"
@@ -186,9 +186,9 @@
     </div>
   </div>
 
-  <div class="community-container">
+  <div class="report-container">
     <!-- Main Content -->
-    <div class="community-main">
+    <div class="report-main">
       <!-- Sort Bar -->
       <div class="sorting-bar">
         <button
@@ -223,25 +223,25 @@
     </div>
 
     <!-- Sidebar -->
-    <div class="community-sidebar">
+    <div class="report-sidebar">
       <div class="about-card">
         <h3>About Community</h3>
-        <p class="about-description">{community.description}</p>
+        <p class="about-description">{report.description}</p>
 
-        <div class="community-stats">
+        <div class="report-stats">
           <div class="stat">
-            <div class="stat-value">{community.members.toLocaleString()}</div>
+            <div class="stat-value">{report.members.toLocaleString()}</div>
             <div class="stat-label">Members</div>
           </div>
           <div class="stat">
-            <div class="stat-value">{community.online.toLocaleString()}</div>
+            <div class="stat-value">{report.online.toLocaleString()}</div>
             <div class="stat-label">Online</div>
           </div>
         </div>
 
-        <div class="community-created">
+        <div class="report-created">
           <img src="/Calendar_duotone.svg" alt="Calendar" />
-          <span>Created {community.createdAt}</span>
+          <span>Created {report.createdAt}</span>
         </div>
       </div>
 
@@ -319,7 +319,7 @@
 <CreatePostModal
   show={showCreatePostModal}
   onClose={() => (showCreatePostModal = false)}
-  communityName={community.name}
+  communityName={report.name}
 />
 
 {#if showInviteModModal}
@@ -378,13 +378,13 @@
 {/if}
 
 <style>
-  .community-page {
+  .report-page {
     min-height: 100vh;
     background-color: white;
   }
 
   /* Banner */
-  .community-banner {
+  .report-banner {
     width: calc(100% - 48px);
     height: 200px;
     overflow: hidden;
@@ -393,20 +393,20 @@
     margin: 8px 24px;
   }
 
-  .community-banner img {
+  .report-banner img {
     width: 100%;
     height: 100%;
     object-fit: cover;
   }
 
   /* Community Header */
-  .community-header {
+  .report-header {
     background-color: white;
     border-bottom: 1px solid #edeff1;
     padding: 16px 0;
   }
 
-  .community-header-content {
+  .report-header-content {
     max-width: 100%;
     padding: 0 24px;
     margin: 0 auto;
@@ -416,14 +416,14 @@
     gap: 16px;
   }
 
-  .community-info {
+  .report-info {
     display: flex;
     align-items: center;
     gap: 16px;
     flex: 1;
   }
 
-  .community-actions {
+  .report-actions {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -499,7 +499,7 @@
     background: var(--darkblue--);
   }
 
-  .community-icon {
+  .report-icon {
     width: 120px;
     height: 120px;
     border-radius: 50%;
@@ -509,14 +509,14 @@
     object-fit: cover;
   }
 
-  .community-title h1 {
+  .report-title h1 {
     font-size: 28px;
     font-weight: 700;
     margin: 0;
     color: #1c1c1c;
   }
 
-  .community-name {
+  .report-name {
     font-size: 14px;
     color: #7c7c7c;
     margin: 4px 0 0 0;
@@ -550,7 +550,7 @@
   }
 
   /* Container */
-  .community-container {
+  .report-container {
     max-width: 100%;
     margin: 0 auto;
     padding: 24px;
@@ -560,7 +560,7 @@
   }
 
   /* Main Content */
-  .community-main {
+  .report-main {
     display: flex;
     flex-direction: column;
     gap: 16px;
@@ -608,7 +608,7 @@
   }
 
   /* Sidebar */
-  .community-sidebar {
+  .report-sidebar {
     display: flex;
     flex-direction: column;
     gap: 16px;
@@ -644,7 +644,7 @@
     margin: 12px 0;
   }
 
-  .community-stats {
+  .report-stats {
     display: flex;
     gap: 24px;
     padding: 12px 0;
@@ -669,7 +669,7 @@
     color: var(--grayfont);
   }
 
-  .community-created {
+  .report-created {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -678,7 +678,7 @@
     margin: 12px 0;
   }
 
-  .community-created img {
+  .report-created img {
     width: 20px;
     height: 20px;
   }
@@ -1018,11 +1018,11 @@
 
   /* Responsive */
   @media (max-width: 960px) {
-    .community-container {
+    .report-container {
       grid-template-columns: 1fr;
     }
 
-    .community-sidebar {
+    .report-sidebar {
       order: -1;
     }
   }

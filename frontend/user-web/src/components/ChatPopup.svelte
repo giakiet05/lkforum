@@ -37,7 +37,7 @@
   const currentUser = $derived($authStore.user);
   const channels = $derived($chatStore.channels);
   const activeChannelData = $derived($activeChannel);
-  const messages = $derived($activeChannelMessages);
+  const reports = $derived($activeChannelMessages);
   const isLoadingChannels = $derived($chatStore.isLoadingChannels);
   const isLoadingMessages = $derived($chatStore.isLoadingMessages);
 
@@ -88,7 +88,7 @@
   // Get last message for a channel
   function getLastMessage(channelId: string): string {
     const channelMessages = $chatStore.messagesByChannel.get(channelId) || [];
-    if (channelMessages.length === 0) return "No messages yet";
+    if (channelMessages.length === 0) return "No reports yet";
 
     const lastMsg = channelMessages[channelMessages.length - 1];
     const isCurrentUser = lastMsg.sender_id === currentUser?.id;
@@ -132,7 +132,7 @@
     }
   }
 
-  // Load messages for a channel
+  // Load reports for a channel
   async function loadMessagesForChannel(channelId: string) {
     try {
       setLoadingMessages(true);
@@ -145,7 +145,7 @@
       // Scroll to bottom
       setTimeout(scrollToBottom, 100);
     } catch (error) {
-      console.error("Failed to load messages:", error);
+      console.error("Failed to load reports:", error);
       setLoadingMessages(false);
     }
   }
@@ -174,7 +174,7 @@
     }
   }
 
-  // Handle incoming WebSocket messages
+  // Handle incoming WebSocket reports
   function handleIncomingMessage(message: MessageResponse) {
     addMessage(message.channel_id, message);
 
@@ -185,7 +185,7 @@
 
   // Scroll to bottom
   function scrollToBottom() {
-    const messagesArea = document.querySelector(".popup-messages-area");
+    const messagesArea = document.querySelector(".popup-reports-area");
     if (messagesArea) {
       messagesArea.scrollTop = messagesArea.scrollHeight;
     }
@@ -215,7 +215,7 @@
   }
 
   function handleExpand() {
-    push("/messages");
+    push("/reports");
     onClose();
   }
 
@@ -391,12 +391,12 @@
           </div>
 
           <!-- Messages Area -->
-          <div class="popup-messages-area">
+          <div class="popup-reports-area">
             {#if isLoadingMessages}
-              <div class="popup-loading">Loading messages...</div>
+              <div class="popup-loading">Loading reports...</div>
             {:else}
-              <div class="popup-messages-wrapper">
-                {#each messages as message (message.id)}
+              <div class="popup-reports-wrapper">
+                {#each reports as message (message.id)}
                   {@const isSent = message.sender_id === currentUser?.id}
                   <div class="popup-message-row" class:sent={isSent}>
                     {#if !isSent}
@@ -752,14 +752,14 @@
   }
 
   /* Messages Area */
-  .popup-messages-area {
+  .popup-reports-area {
     flex: 1;
     overflow-y: auto;
     padding: 16px;
     background: #f6f7f8;
   }
 
-  .popup-messages-wrapper {
+  .popup-reports-wrapper {
     display: flex;
     flex-direction: column;
     gap: 10px;

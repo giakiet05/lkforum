@@ -6,7 +6,7 @@
   interface Props {
     show: boolean;
     onClose: () => void;
-    communityName?: string; // Nếu có thì auto-fill community
+    communityName?: string; // Nếu có thì auto-fill report
   }
 
   let { show, onClose, communityName }: Props = $props();
@@ -60,7 +60,7 @@
     if (showCommunitySearch) {
       // Focus on search input after a small delay
       setTimeout(() => {
-        document.getElementById("community-search-input")?.focus();
+        document.getElementById("report-search-input")?.focus();
       }, 100);
     }
   }
@@ -80,7 +80,7 @@
     const draft = mockDraftsDetails[draftId];
     if (draft) {
       title = draft.title;
-      selectedCommunity = draft.community;
+      selectedCommunity = draft.report;
       activeTab = draft.tab;
       tags = draft.tags || [];
 
@@ -107,12 +107,12 @@
       return;
     }
     if (!selectedCommunity && !communityName) {
-      alert("Please select a community!");
+      alert("Please select a report!");
       return;
     }
 
     console.log("Creating post:", {
-      community: selectedCommunity || communityName,
+      report: selectedCommunity || communityName,
       title,
       tags,
       type: activeTab,
@@ -164,17 +164,17 @@
       </div>
 
       <!-- Community Selector -->
-      <div class="community-selector">
+      <div class="report-selector">
         {#if !showCommunitySearch}
-          <!-- Button state: Show community name or "Select a community" -->
-          <button class="community-display-btn" onclick={toggleCommunitySearch}>
-            <div class="community-icon">
+          <!-- Button state: Show report name or "Select a report" -->
+          <button class="report-display-btn" onclick={toggleCommunitySearch}>
+            <div class="report-icon">
               <img src="/LKlogo.jpg" alt="Community" />
             </div>
             <span
               >{selectedCommunity
                 ? `lk/${selectedCommunity}`
-                : "Select a community"}</span
+                : "Select a report"}</span
             >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
               <path
@@ -205,31 +205,31 @@
               />
             </svg>
             <input
-              id="community-search-input"
+              id="report-search-input"
               type="text"
               bind:value={communitySearchQuery}
-              placeholder="Select a community"
-              class="community-search-input"
+              placeholder="Select a report"
+              class="report-search-input"
             />
           </div>
         {/if}
 
         <!-- Dropdown list of communities -->
         {#if showCommunitySearch}
-          <div class="community-dropdown">
+          <div class="report-dropdown">
             {#if filteredCommunities.length > 0}
-              {#each filteredCommunities as community}
+              {#each filteredCommunities as report}
                 <button
-                  class="community-item"
-                  onclick={() => handleCommunitySelect(community.name)}
+                  class="report-item"
+                  onclick={() => handleCommunitySelect(report.name)}
                 >
-                  <div class="community-item-icon">
-                    <img src={community.icon} alt={community.name} />
+                  <div class="report-item-icon">
+                    <img src={report.icon} alt={report.name} />
                   </div>
-                  <div class="community-item-info">
-                    <div class="community-item-name">r/{community.name}</div>
-                    <div class="community-item-meta">
-                      {community.members} · {community.status}
+                  <div class="report-item-info">
+                    <div class="report-item-name">r/{report.name}</div>
+                    <div class="report-item-meta">
+                      {report.members} · {report.status}
                     </div>
                   </div>
                 </button>
@@ -420,12 +420,12 @@
   }
 
   /* Community Selector */
-  .community-selector {
+  .report-selector {
     margin-bottom: 16px;
     position: relative;
   }
 
-  .community-display-btn {
+  .report-display-btn {
     background: rgba(214, 216, 222, 0.4);
     width: fit-content;
     border-radius: 16px;
@@ -441,7 +441,7 @@
     transition: background 0.2s;
   }
 
-  .community-display-btn:hover {
+  .report-display-btn:hover {
     background: rgba(214, 216, 222, 0.5);
   }
 
@@ -459,7 +459,7 @@
     pointer-events: none;
   }
 
-  .community-search-input {
+  .report-search-input {
     width: 100%;
     background: rgba(214, 216, 222, 0.3);
     border: 2px solid var(--blue--);
@@ -470,11 +470,11 @@
     outline: none;
   }
 
-  .community-search-input::placeholder {
+  .report-search-input::placeholder {
     color: var(--grayfont);
   }
 
-  .community-dropdown {
+  .report-dropdown {
     position: absolute;
     top: 100%;
     left: 0;
@@ -489,7 +489,7 @@
     z-index: 10;
   }
 
-  .community-item {
+  .report-item {
     width: 100%;
     display: flex;
     align-items: center;
@@ -502,11 +502,11 @@
     transition: background 0.2s;
   }
 
-  .community-item:hover {
+  .report-item:hover {
     background: #f6f7f8;
   }
 
-  .community-item-icon {
+  .report-item-icon {
     width: 32px;
     height: 32px;
     border-radius: 50%;
@@ -514,24 +514,24 @@
     flex-shrink: 0;
   }
 
-  .community-item-icon img {
+  .report-item-icon img {
     width: 100%;
     height: 100%;
     object-fit: cover;
   }
 
-  .community-item-info {
+  .report-item-info {
     flex: 1;
   }
 
-  .community-item-name {
+  .report-item-name {
     font-size: 14px;
     font-weight: 600;
     color: #1c1c1c;
     margin-bottom: 4px;
   }
 
-  .community-item-meta {
+  .report-item-meta {
     font-size: 12px;
     color: var(--grayfont);
   }
@@ -543,7 +543,7 @@
     font-size: 14px;
   }
 
-  .community-icon {
+  .report-icon {
     width: 24px;
     height: 24px;
     border-radius: 50%;
@@ -553,7 +553,7 @@
     justify-content: center;
   }
 
-  .community-icon img {
+  .report-icon img {
     width: 100%;
     height: 100%;
     object-fit: cover;

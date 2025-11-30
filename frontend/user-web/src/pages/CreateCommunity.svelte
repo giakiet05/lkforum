@@ -204,11 +204,11 @@
     isLoading = true;
     error = "";
 
-    // Mock create community - sau này sẽ call API
+    // Mock create report - sau này sẽ call API
     setTimeout(() => {
       isLoading = false;
       alert(`Community "lk/${communityName}" created successfully!`);
-      // Navigate to the new community page
+      // Navigate to the new report page
       push(`/lk/${communityName}`);
     }, 1000);
   }
@@ -218,10 +218,10 @@
   }
 </script>
 
-<div class="create-community-page">
+<div class="create-report-page">
   <div class="container">
     <div class="header">
-      <h1>Create a community</h1>
+      <h1>Create a report</h1>
       <button class="close-btn" onclick={handleCancel}>×</button>
     </div>
 
@@ -254,7 +254,7 @@
         <textarea
           id="description"
           bind:value={description}
-          placeholder="What is your community about?"
+          placeholder="What is your report about?"
           rows="4"
           maxlength="500"
           disabled={isLoading}
@@ -291,7 +291,7 @@
               <span class="radio-title">Public</span>
             </div>
             <p class="radio-description">
-              Anyone can view, post, and comment to this community
+              Anyone can view, post, and comment to this report
             </p>
           </div>
         </label>
@@ -319,7 +319,7 @@
               <span class="radio-title">Restricted</span>
             </div>
             <p class="radio-description">
-              Anyone can view this community, but only approved users can post
+              Anyone can view this report, but only approved users can post
             </p>
           </div>
         </label>
@@ -347,7 +347,7 @@
               <span class="radio-title">Private</span>
             </div>
             <p class="radio-description">
-              Only approved users can view and submit to this community
+              Only approved users can view and submit to this report
             </p>
           </div>
         </label>
@@ -362,7 +362,7 @@
             disabled={isLoading}
           />
           <div class="checkbox-content">
-            <span class="checkbox-title">18+ year old community</span>
+            <span class="checkbox-title">18+ year old report</span>
             <p class="checkbox-description">
               Must be over 18 to view and contribute
             </p>
@@ -374,7 +374,7 @@
       <div class="form-section">
         <label class="label">Topics (Optional)</label>
         <p class="help-text">
-          Add up to 3 topics to help interested redditors find your community.
+          Add up to 3 topics to help interested redditors find your report.
         </p>
         <button
           type="button"
@@ -447,7 +447,7 @@
       </div>
 
       <p class="modal-subtitle">
-        Add up to 3 topics to help interested redditors find your community.
+        Add up to 3 topics to help interested redditors find your report.
       </p>
 
       <!-- Search Input -->
@@ -541,13 +541,13 @@
   <div class="modal-overlay" onclick={closeStyleModal}>
     <div class="modal-content" onclick={(e) => e.stopPropagation()}>
       <div class="modal-header">
-        <h2>Style your community</h2>
+        <h2>Style your report</h2>
         <button class="modal-close-btn" onclick={closeStyleModal}>×</button>
       </div>
 
       <p class="modal-subtitle">
         Adding visual flair will catch new members attention and help establish
-        your community's culture! You can update this at any time.
+        your report's culture! You can update this at any time.
       </p>
 
       <div class="style-content">
@@ -631,7 +631,7 @@
               {/if}
             </div>
             <div class="preview-info">
-              <h3>lk/{communityName || "community"}</h3>
+              <h3>lk/{communityName || "report"}</h3>
               <p>1 member · 1 online</p>
             </div>
           </div>
@@ -666,7 +666,7 @@
 {/if}
 
 <style>
-  .create-community-page {
+  .create-report-page {
     min-height: 100vh;
     background: #dae0e6;
     padding: 40px 20px;

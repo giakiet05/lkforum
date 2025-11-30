@@ -10,7 +10,7 @@
     {
       id: "1",
       type: "text",
-      community: "sveltejs",
+      report: "sveltejs",
       author: "user123",
       time: "4 hours ago",
       title: "Svelte 5 is amazing!",
@@ -23,7 +23,7 @@
     {
       id: "2",
       type: "image",
-      community: "pics",
+      report: "pics",
       author: "photographer",
       time: "8 hours ago",
       title: "Girl on wayhome, who is she?",
@@ -35,7 +35,7 @@
     {
       id: "3",
       type: "poll",
-      community: "polls",
+      report: "polls",
       author: "pollmaster",
       time: "1 day ago",
       title: "What is your favorite frontend framework?",
@@ -56,7 +56,7 @@
     {
       id: "4",
       type: "video",
-      community: "videos",
+      report: "videos",
       author: "videographer",
       time: "3 hours ago",
       title: "Flashback AMV",

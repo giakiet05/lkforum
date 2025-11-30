@@ -91,13 +91,13 @@ func (c *CommunityController) GetCommunitiesFilter(ctx *gin.Context) {
 		createFrom = t
 	}
 
-	response, err := c.communityService.GetCommunitiesFilter(name, description, is18Plus, createFrom, page, pageSize)
+	responses, err := c.communityService.GetCommunitiesFilter(name, description, is18Plus, createFrom, page, pageSize)
 	if err != nil {
 		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
 	}
 
-	dto.SendSuccess(ctx, http.StatusOK, "Communities retrieved successfully", response)
+	dto.SendSuccess(ctx, http.StatusOK, "Communities retrieved successfully", responses)
 }
 
 func (c *CommunityController) GetCommunityByModeratorID(ctx *gin.Context) {

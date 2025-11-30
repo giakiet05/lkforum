@@ -20,9 +20,9 @@
   }
 
   function toggleFavorite(communityId: string) {
-    const community = communities.find((c) => c.id === communityId);
-    if (community) {
-      community.isFavorite = !community.isFavorite;
+    const report = communities.find((c) => c.id === communityId);
+    if (report) {
+      report.isFavorite = !report.isFavorite;
     }
   }
 
@@ -86,21 +86,21 @@
 
       <!-- Communities List -->
       <div class="communities-list">
-        {#each communities as community (community.id)}
-          <div class="community-item">
+        {#each communities as report (report.id)}
+          <div class="report-item">
             <button
-              class="community-link"
-              onclick={() => navigateToCommunity(community.name)}
+              class="report-link"
+              onclick={() => navigateToCommunity(report.name)}
             >
-              <span class="community-icon">{community.icon || "📁"}</span>
-              <span class="community-name">lk/{community.name}</span>
+              <span class="report-icon">{report.icon || "📁"}</span>
+              <span class="report-name">lk/{report.name}</span>
             </button>
             <button
               class="favorite-button"
-              class:active={community.isFavorite}
-              onclick={() => toggleFavorite(community.id)}
+              class:active={report.isFavorite}
+              onclick={() => toggleFavorite(report.id)}
             >
-              {#if community.isFavorite}
+              {#if report.isFavorite}
                 <svg
                   width="16"
                   height="16"
@@ -240,7 +240,7 @@
     gap: 2px;
   }
 
-  .community-item {
+  .report-item {
     width: 100%;
     display: flex;
     align-items: center;
@@ -249,7 +249,7 @@
     padding: 0 4px;
   }
 
-  .community-link {
+  .report-link {
     flex: 1;
     display: flex;
     align-items: center;
@@ -263,11 +263,11 @@
     min-width: 0;
   }
 
-  .community-link:hover {
+  .report-link:hover {
     background: rgba(0, 0, 0, 0.08);
   }
 
-  .community-icon {
+  .report-icon {
     width: 24px;
     height: 24px;
     border-radius: 50%;
@@ -278,7 +278,7 @@
     flex-shrink: 0;
   }
 
-  .community-name {
+  .report-name {
     font-size: 14px;
     font-weight: 500;
     color: #1c1c1c;
