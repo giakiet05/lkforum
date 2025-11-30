@@ -67,7 +67,7 @@
       id: "7",
       name: "apple",
       description:
-        "An unofficial community about Apple and all of its devices and software.",
+        "An unofficial report about Apple and all of its devices and software.",
       icon: "🍎",
       isFavorite: false,
       isJoined: true,
@@ -99,16 +99,16 @@
   });
 
   function toggleFavorite(communityId: string) {
-    const community = allCommunities.find((c) => c.id === communityId);
-    if (community) {
-      community.isFavorite = !community.isFavorite;
+    const report = allCommunities.find((c) => c.id === communityId);
+    if (report) {
+      report.isFavorite = !report.isFavorite;
     }
   }
 
   function leaveCommunity(communityId: string) {
-    const community = allCommunities.find((c) => c.id === communityId);
-    if (community && confirm(`Leave lk/${community.name}?`)) {
-      // TODO: Call API to leave community
+    const report = allCommunities.find((c) => c.id === communityId);
+    if (report && confirm(`Leave lk/${report.name}?`)) {
+      // TODO: Call API to leave report
       allCommunities = allCommunities.filter((c) => c.id !== communityId);
     }
   }
@@ -167,30 +167,30 @@
 
     <!-- Communities List -->
     <div class="communities-list">
-      {#each filteredCommunities() as community (community.id)}
-        <div class="community-card">
-          <div class="community-main">
+      {#each filteredCommunities() as report (report.id)}
+        <div class="report-card">
+          <div class="report-main">
             <button
-              class="community-info"
-              onclick={() => navigateToCommunity(community.name)}
+              class="report-info"
+              onclick={() => navigateToCommunity(report.name)}
             >
-              <div class="community-avatar">{community.icon || "📁"}</div>
-              <div class="community-details">
-                <h3 class="community-name">lk/{community.name}</h3>
-                <p class="community-description">{community.description}</p>
+              <div class="report-avatar">{report.icon || "📁"}</div>
+              <div class="report-details">
+                <h3 class="report-name">lk/{report.name}</h3>
+                <p class="report-description">{report.description}</p>
               </div>
             </button>
 
-            <div class="community-actions">
+            <div class="report-actions">
               <button
                 class="favorite-btn"
-                class:active={community.isFavorite}
-                onclick={() => toggleFavorite(community.id)}
-                title={community.isFavorite
+                class:active={report.isFavorite}
+                onclick={() => toggleFavorite(report.id)}
+                title={report.isFavorite
                   ? "Remove from favorites"
                   : "Add to favorites"}
               >
-                {#if community.isFavorite}
+                {#if report.isFavorite}
                   <svg
                     width="20"
                     height="20"
@@ -224,9 +224,9 @@
           <!-- Leave button (appears on hover) -->
           <button
             class="leave-btn"
-            onclick={() => leaveCommunity(community.id)}
+            onclick={() => leaveCommunity(report.id)}
           >
-            Leave lk/{community.name}
+            Leave lk/{report.name}
           </button>
         </div>
       {/each}
@@ -336,7 +336,7 @@
     gap: 12px;
   }
 
-  .community-card {
+  .report-card {
     background: white;
     border: 1px solid #ccc;
     border-radius: 8px;
@@ -345,23 +345,23 @@
     position: relative;
   }
 
-  .community-card:hover {
+  .report-card:hover {
     border-color: #878a8c;
   }
 
-  .community-card:hover .leave-btn {
+  .report-card:hover .leave-btn {
     opacity: 1;
     pointer-events: auto;
   }
 
-  .community-main {
+  .report-main {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 16px;
   }
 
-  .community-info {
+  .report-info {
     flex: 1;
     display: flex;
     align-items: flex-start;
@@ -374,7 +374,7 @@
     min-width: 0;
   }
 
-  .community-avatar {
+  .report-avatar {
     width: 48px;
     height: 48px;
     border-radius: 50%;
@@ -386,19 +386,19 @@
     background: #f6f7f8;
   }
 
-  .community-details {
+  .report-details {
     flex: 1;
     min-width: 0;
   }
 
-  .community-name {
+  .report-name {
     font-size: 16px;
     font-weight: 600;
     color: #1c1c1c;
     margin: 0 0 4px 0;
   }
 
-  .community-description {
+  .report-description {
     font-size: 14px;
     color: #7c7c7c;
     margin: 0;
@@ -410,7 +410,7 @@
     -webkit-box-orient: vertical;
   }
 
-  .community-actions {
+  .report-actions {
     display: flex;
     align-items: center;
     gap: 12px;

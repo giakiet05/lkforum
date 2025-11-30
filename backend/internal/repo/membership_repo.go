@@ -23,6 +23,7 @@ type MembershipRepo interface {
 	CountMembersByCommunityID(ctx context.Context, communityID string) (int64, error)
 	UpdateCommunityMemberCount(ctx context.Context, communityID string, count int64) error
 
+	IsMember(ctx context.Context, userID string, communityID string) (bool, error)
 	IsUserExist(ctx context.Context, userID string) (bool, error)
 	IsCommunityExist(ctx context.Context, communityID string) (bool, error)
 }
@@ -197,6 +198,30 @@ func (m *membershipRepo) UpdateCommunityMemberCount(ctx context.Context, communi
 	}
 
 	return nil
+}
+
+func (m *membershipRepo) IsMember(ctx context.Context, userID string, communityID string) (bool, error) {
+	userObjID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return false, err
+	}
+
+	communityObjID, err := primitive.ObjectIDFromHex(communityID)
+	if err != nil {
+		return false, err
+	}
+
+	filter := bson.M{
+		"user_id":      userObjID,
+		"community_id": communityObjID,
+	}
+
+	count, err := m.membershipCollection.CountDocuments(ctx, filter)
+	if err != nil {
+		return false, err
+	}
+
+	return count > 0, nil
 }
 
 func (m *membershipRepo) IsUserExist(ctx context.Context, userID string) (bool, error) {

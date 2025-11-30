@@ -20,5 +20,5 @@ type Comment struct {
 type CommentAuthor struct {
 	ID       primitive.ObjectID `bson:"id" json:"id"`
 	Username string             `bson:"username" json:"username"`
-	Avatar   string             `bson:"avatar" json:"avatar"`
+	Avatar   *Image             `bson:"avatar" json:"avatar"`
 }

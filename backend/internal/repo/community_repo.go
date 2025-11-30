@@ -18,7 +18,14 @@ type CommunityRepo interface {
 	Create(ctx context.Context, community *model.Community) (*model.Community, error)
 	GetByID(ctx context.Context, id string) (*model.Community, error)
 	GetByIDs(ctx context.Context, ids []string) ([]*model.Community, error)
-	GetFilter(ctx context.Context, name string, description string, is18Plus bool, createFrom time.Time, page int, pageSize int) ([]model.Community, int64, error)
+	GetFilter(
+		ctx context.Context,
+		name string,
+		description string,
+		is18Plus bool,
+		createFrom time.Time,
+		page int, pageSize int,
+	) ([]model.Community, int64, error)
 	GetByModeratorIDPaginated(ctx context.Context, moderatorID string, page int, pageSize int) ([]model.Community, int64, error)
 	GetAllPaginated(ctx context.Context, page int, pageSize int) ([]model.Community, int64, error)
 	Update(ctx context.Context, communityID string, updates bson.M) (*model.Community, error)
@@ -46,32 +53,6 @@ func NewCommunityRepo(db *mongo.Database) CommunityRepo {
 		userCollection:         db.Collection(config.UserColName),
 		communityBanCollection: db.Collection(config.CommunityBanColName),
 	}
-}
-
-func (c *communityRepo) GetByIDs(ctx context.Context, ids []string) ([]*model.Community, error) {
-	if len(ids) == 0 {
-		return []*model.Community{}, nil
-	}
-
-	objIDs := make([]primitive.ObjectID, 0, len(ids))
-	for _, id := range ids {
-		if objID, err := primitive.ObjectIDFromHex(id); err == nil {
-			objIDs = append(objIDs, objID)
-		}
-	}
-
-	filter := bson.M{"_id": bson.M{"$in": objIDs}}
-	cursor, err := c.communityCollection.Find(ctx, filter)
-	if err != nil {
-		return nil, err
-	}
-	defer cursor.Close(ctx)
-
-	var communities []*model.Community
-	if err := cursor.All(ctx, &communities); err != nil {
-		return nil, err
-	}
-	return communities, nil
 }
 
 func (c *communityRepo) Create(ctx context.Context, community *model.Community) (*model.Community, error) {
@@ -102,6 +83,32 @@ func (c *communityRepo) GetByID(ctx context.Context, id string) (*model.Communit
 	return &community, nil
 }
 
+func (c *communityRepo) GetByIDs(ctx context.Context, ids []string) ([]*model.Community, error) {
+	if len(ids) == 0 {
+		return []*model.Community{}, nil
+	}
+
+	objIDs := make([]primitive.ObjectID, 0, len(ids))
+	for _, id := range ids {
+		if objID, err := primitive.ObjectIDFromHex(id); err == nil {
+			objIDs = append(objIDs, objID)
+		}
+	}
+
+	filter := bson.M{"_id": bson.M{"$in": objIDs}}
+	cursor, err := c.communityCollection.Find(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var communities []*model.Community
+	if err := cursor.All(ctx, &communities); err != nil {
+		return nil, err
+	}
+	return communities, nil
+}
+
 func (c *communityRepo) GetFilter(
 	ctx context.Context,
 	name string,
@@ -125,11 +132,6 @@ func (c *communityRepo) GetFilter(
 		filter["createdAt"] = bson.M{"$gte": createFrom}
 	}
 
-	total, err := c.communityCollection.CountDocuments(ctx, filter)
-	if err != nil {
-		return nil, 0, err
-	}
-
 	skip := (page - 1) * pageSize
 	opts := options.Find().SetSkip(int64(skip)).SetLimit(int64(pageSize)).SetSort(bson.M{"createAt": -1})
 
@@ -141,6 +143,11 @@ func (c *communityRepo) GetFilter(
 
 	var communities []model.Community
 	err = cursor.All(ctx, &communities)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	total, err := c.communityCollection.CountDocuments(ctx, filter)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -306,7 +313,7 @@ func (c *communityRepo) Delete(ctx context.Context, communityID string) error {
 	}
 
 	if res.DeletedCount == 0 {
-		return fmt.Errorf("no community found with id %v", communityID)
+		return apperror.ErrCommunityNotFound
 	}
 
 	return nil

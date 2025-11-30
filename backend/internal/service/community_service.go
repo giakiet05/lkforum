@@ -36,12 +36,13 @@ type CommunityService interface {
 }
 
 type communityService struct {
-	communityRepo repo.CommunityRepo
-	eventBus      bus.EventBus
+	communityRepo  repo.CommunityRepo
+	membershipRepo repo.MembershipRepo
+	eventBus       bus.EventBus
 }
 
-func NewCommunityService(communityRepo repo.CommunityRepo, bus bus.EventBus) CommunityService {
-	return &communityService{communityRepo: communityRepo, eventBus: bus}
+func NewCommunityService(communityRepo repo.CommunityRepo, membershipRepo repo.MembershipRepo, bus bus.EventBus) CommunityService {
+	return &communityService{communityRepo: communityRepo, membershipRepo: membershipRepo, eventBus: bus}
 }
 
 func (c *communityService) Start() {
@@ -98,6 +99,7 @@ func (c *communityService) CreateCommunity(req *dto.CreateCommunityRequest, user
 		Avatar:         req.Avatar,
 		Banner:         req.Banner,
 		Setting:        req.Setting,
+		Rules:          req.Rules,
 		Moderators:     req.Moderators,
 		CreateAt:       time.Now(),
 		CreateByID:     userObjectID,
@@ -111,6 +113,14 @@ func (c *communityService) CreateCommunity(req *dto.CreateCommunityRequest, user
 		if mongo.IsDuplicateKeyError(err) {
 			return nil, apperror.ErrCommunityNameExists
 		}
+		return nil, err
+	}
+	membership := &model.Membership{
+		UserID:      userObjectID,
+		CommunityID: community.ID,
+	}
+	_, err = c.membershipRepo.Create(ctx, membership)
+	if err != nil {
 		return nil, err
 	}
 
@@ -237,6 +247,10 @@ func (c *communityService) UpdateCommunity(req *dto.UpdateCommunityRequest, user
 		community.Setting = *req.Setting
 		updateCount++
 	}
+	if req.Rules != nil {
+		community.Rules = *req.Rules
+		updateCount++
+	}
 
 	if updateCount == 0 {
 		return nil, apperror.ErrNoFieldsToUpdate
@@ -282,7 +296,15 @@ func (c *communityService) AddModerator(req *dto.AddModeratorRequest, userID str
 			return err
 		}
 		if !existed {
-			return fmt.Errorf("new moderator id not found: %s", modDTO.ModeratorID)
+			return apperror.ErrInvalidID
+		}
+
+		ok, err = c.membershipRepo.IsMember(ctx, modDTO.ModeratorID, userID)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			return apperror.ErrUserNotMember
 		}
 
 		newModerators = append(
@@ -295,7 +317,7 @@ func (c *communityService) AddModerator(req *dto.AddModeratorRequest, userID str
 	}
 
 	if len(newModerators) == 0 {
-		return fmt.Errorf("no new modertor to add")
+		return apperror.ErrNoFieldsToUpdate
 	}
 
 	community.Moderators = append(community.Moderators, newModerators...)
@@ -321,7 +343,7 @@ func (c *communityService) RemoveModerator(req *dto.RemoveModeratorRequest, user
 
 	for _, modID := range req.RemovedModerator {
 		if userID == modID {
-			return fmt.Errorf("cannot remove yourself as a moderator")
+			return apperror.ErrCannotRemoveModerator
 		}
 
 		for i, mod := range community.Moderators {

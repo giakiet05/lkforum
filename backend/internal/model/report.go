@@ -13,6 +13,8 @@ type Report struct {
 	TargetType  ReportTargetType   `bson:"target_type" json:"target_type"`
 	Reason      string             `bson:"reason,omitempty" json:"reason,omitempty"`
 	Description *string            `bson:"description,omitempty" json:"description,omitempty"`
+	IsDeleted   bool               `bson:"is_deleted,omitempty" json:"is_deleted,omitempty"`
+	DeletedAt   *time.Time         `bson:"deleted_at,omitempty" json:"deleted_at,omitempty"`
 	CreatedAt   time.Time          `bson:"created_at,omitempty" json:"created_at,omitempty"`
 }
 

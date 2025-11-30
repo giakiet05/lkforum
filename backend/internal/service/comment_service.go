@@ -23,11 +23,12 @@ type CommentService interface {
 
 type commentService struct {
 	commentRepo repo.CommentRepo
+	userRepo    repo.UserRepo
 	bus         bus.EventBus
 }
 
-func NewCommentService(commentRepo repo.CommentRepo, bus bus.EventBus) CommentService {
-	return &commentService{commentRepo: commentRepo, bus: bus}
+func NewCommentService(commentRepo repo.CommentRepo, userRepo repo.UserRepo, bus bus.EventBus) CommentService {
+	return &commentService{commentRepo: commentRepo, userRepo: userRepo, bus: bus}
 }
 
 func (s *commentService) CreateComment(request *dto.CreateCommentRequest, userID string) (*model.Comment, error) {
@@ -60,10 +61,15 @@ func (s *commentService) CreateComment(request *dto.CreateCommentRequest, userID
 		}
 	}
 
+	user, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
 	author := model.CommentAuthor{
 		ID:       userObjectID,
-		Username: request.Username,
-		Avatar:   request.UserAvatar,
+		Username: user.Username,
+		Avatar:   user.RoleContent.AsUser.Avatar,
 	}
 
 	comment := &model.Comment{
@@ -90,8 +96,6 @@ func (s *commentService) CreateComment(request *dto.CreateCommentRequest, userID
 
 	return createdComment, nil
 }
-
-// ... other methods remain the same
 
 func (s *commentService) GetCommentByID(commentID string) (*model.Comment, error) {
 	ctx, cancel := util.NewDefaultDBContext()

@@ -119,12 +119,13 @@ var (
 	ErrInvalidInterest   = AppError{Code: "INVALID_INTEREST", Message: "Sở thích không hợp lệ"}
 
 	// Community-related
-	ErrCommunityNotFound   = AppError{Code: "COMMUNITY_NOT_FOUND", Message: "Không tìm thấy cộng đồng"}
-	ErrCommunityNameExists = AppError{Code: "COMMUNITY_NAME_EXISTS", Message: "Tên cộng đồng đã tồn tại"}
-	ErrCommunityDeleted    = AppError{Code: "COMMUNITY_DELETED", Message: "Cộng đồng đã bị xóa"}
-	ErrUserNotMember       = AppError{Code: "USER_NOT_MEMBER", Message: "Bạn chưa tham gia cộng đồng này"}
+	ErrCommunityNotFound     = AppError{Code: "COMMUNITY_NOT_FOUND", Message: "Không tìm thấy cộng đồng"}
+	ErrCommunityNameExists   = AppError{Code: "COMMUNITY_NAME_EXISTS", Message: "Tên cộng đồng đã tồn tại"}
+	ErrCommunityDeleted      = AppError{Code: "COMMUNITY_DELETED", Message: "Cộng đồng đã bị xóa"}
+	ErrCannotRemoveModerator = AppError{Code: "CANNOT_REMOVE_MODERATOR", Message: "Không thể xóa moderator này."}
 
 	// Membership-related
+	ErrUserNotMember          = AppError{Code: "USER_NOT_MEMBER", Message: "Bạn chưa tham gia cộng đồng này"}
 	ErrMembershipNotFound     = AppError{Code: "MEMBERSHIP_NOT_FOUND", Message: "Không tìm thấy thành viên"}
 	ErrAlreadyMember          = AppError{Code: "ALREADY_MEMBER", Message: "Bạn đã là thành viên của cộng đồng này"}
 	ErrMembershipCreateFailed = AppError{Code: "MEMBERSHIP_CREATE_FAILED", Message: "Không thể tạo thành viên"}
@@ -132,12 +133,12 @@ var (
 	ErrInvalidMembershipData  = AppError{Code: "INVALID_MEMBERSHIP_DATA", Message: "Dữ liệu thành viên không hợp lệ"}
 
 	// Post-related
-	ErrPostNotFound   = AppError{Code: "POST_NOT_FOUND", Message: "Không tìm thấy bài viết"}
-	ErrVoteNotFound   = AppError{Code: "VOTE_NOT_FOUND", Message: "Không tìm thấy bình chọn"}
-	ErrPollVoted      = AppError{Code: "POLL_ALREADY_VOTED", Message: "Bạn đã bình chọn lựa chọn này rồi"}
-	ErrPollCannotEdit = AppError{Code: "POLL_CANNOT_EDIT", Message: "Không thể chỉnh sửa bình chọn sau khi đã có người bình chọn"}
+	ErrPostNotFound    = AppError{Code: "POST_NOT_FOUND", Message: "Không tìm thấy bài viết"}
+	ErrVoteNotFound    = AppError{Code: "VOTE_NOT_FOUND", Message: "Không tìm thấy bình chọn"}
+	ErrPollVoted       = AppError{Code: "POLL_ALREADY_VOTED", Message: "Bạn đã bình chọn lựa chọn này rồi"}
+	ErrPollCannotEdit  = AppError{Code: "POLL_CANNOT_EDIT", Message: "Không thể chỉnh sửa bình chọn sau khi đã có người bình chọn"}
 	ErrAlreadyReported = AppError{Code: "ALREADY_REPORTED", Message: "Bạn đã báo cáo nội dung này rồi"}
-	ErrDraftNotFound  = AppError{Code: "DRAFT_NOT_FOUND", Message: "Không tìm thấy bản nháp"}
+	ErrDraftNotFound   = AppError{Code: "DRAFT_NOT_FOUND", Message: "Không tìm thấy bản nháp"}
 
 	// Comment-related
 	ErrCommentNotFound = AppError{Code: "COMMENT_NOT_FOUND", Message: "Không tìm thấy bình luận"}
@@ -146,4 +147,7 @@ var (
 	// Messaging-related
 	ErrChannelNotFound = AppError{Code: "CHANNEL_NOT_FOUND", Message: "Không tìm thấy kênh"}
 	ErrNoMessageFound  = AppError{Code: "NO_MESSAGE_FOUND", Message: "Không tìm thấy tin nhắn"}
+
+	// Report-related
+	ErrReportNotFound = AppError{Code: "REPORT_NOT_FOUND", Message: "Không tìm thấy report"}
 )

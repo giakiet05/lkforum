@@ -2,8 +2,8 @@
   import { push } from "svelte-spa-router";
   import { mockQueuePosts } from "../mocks/mod-queue.mock";
   import type { QueuePost } from "../mocks/mod-queue.mock";
-  import { mockCommunityRules } from "../mocks/community-rules.mock";
-  import type { CommunityRule } from "../mocks/community-rules.mock";
+  import { mockCommunityRules } from "../mocks/report-rules.mock";
+  import type { CommunityRule } from "../mocks/report-rules.mock";
   import { mockRestrictedUsers } from "../mocks/restricted-users.mock";
   import type { RestrictedUser } from "../mocks/restricted-users.mock";
   import { mockModerators, mockApprovedUsers } from "../mocks/moderators.mock";
@@ -729,7 +729,7 @@
                 <h2>Name and describe your rule</h2>
                 <p class="sub">
                   Rules set the expectations for members and redditors visiting
-                  your community
+                  your report
                 </p>
               </div>
             </div>

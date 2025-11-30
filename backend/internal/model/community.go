@@ -13,6 +13,7 @@ type Community struct {
 	Avatar         *string            `bson:"avatar,omitempty" json:"avatar,omitempty"`
 	Banner         *string            `bson:"banner,omitempty" json:"banner,omitempty"`
 	Setting        CommunitySetting   `bson:"setting,omitempty" json:"setting,omitempty"`
+	Rules          []CommunityRule    `bson:"rules,omitempty" json:"rules,omitempty"`
 	Moderators     []Moderator        `bson:"moderators,omitempty" json:"moderators,omitempty"`
 	MemberCount    int64              `bson:"member_count,omitempty" json:"member_count,omitempty"`
 	PostCount      int64              `bson:"post_count,omitempty" json:"post_count,omitempty"`
@@ -30,6 +31,11 @@ type CommunitySetting struct {
 	PostRequireApproval bool `bson:"post_require_approval" json:"post_require_approval"` // new posts need moderator approval
 	JoinRequireApproval bool `bson:"join_require_approval" json:"join_require_approval"` // new member need moderator approval
 	MaxPostLength       int  `bson:"max_post_length" json:"max_post_length"`
+}
+
+type CommunityRule struct {
+	Title       string `bson:"title" json:"title"`
+	Description string `bson:"description" json:"description"`
 }
 
 type Moderator struct {

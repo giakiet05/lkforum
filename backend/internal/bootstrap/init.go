@@ -49,6 +49,7 @@ type Services struct {
 	service.MessageService
 	service.PostHistoryService
 	service.DraftService
+	service.ReportService
 }
 
 type Controllers struct {
@@ -64,6 +65,7 @@ type Controllers struct {
 	controller.MessageController
 	controller.PostHistoryController
 	controller.DraftController
+	controller.ReportController
 }
 
 func initRepos(client *mongo.Client, db *mongo.Database) *Repos {
@@ -90,14 +92,15 @@ func initServices(repos *Repos, redisClient *redis.Client, emailSender email.Sen
 	services := &Services{
 		AuthService:         service.NewAuthService(repos.UserRepo, repos.EmailVerificationRepo, emailSender, redisClient),
 		UserService:         service.NewUserService(repos.UserRepo, eventBus, redisClient),
-		CommunityService:    service.NewCommunityService(repos.CommunityRepo, eventBus),
+		CommunityService:    service.NewCommunityService(repos.CommunityRepo, repos.MembershipRepo, eventBus),
 		MembershipService:   service.NewMembershipService(repos.MembershipRepo, redisClient),
-		CommentService:      service.NewCommentService(repos.CommentRepo, eventBus),
+		CommentService:      service.NewCommentService(repos.CommentRepo, repos.UserRepo, eventBus),
 		ReputationService:   service.NewReputationService(repos.UserRepo, eventBus),
 		NotificationService: service.NewNotificationService(repos.NotificationRepo, repos.UserRepo, repos.PostRepo, repos.CommentRepo, eventBus, redisClient),
 		ChannelService:      service.NewChannelService(repos.ChannelRepo, eventBus),
 		MessageService:      service.NewMessageService(repos.MessageRepo, repos.ChannelRepo, eventBus, redisClient),
 		PostHistoryService:  service.NewPostHistoryService(repos.PostHistoryRepo),
+		ReportService:       service.NewReportService(repos.ReportRepo),
 	}
 	// PostService needs to be created before DraftService due to dependency
 	services.PostService = service.NewPostService(repos.PostRepo, repos.PostVoteRepo, repos.PollVoteRepo, repos.UserRepo, repos.CommunityRepo, repos.SavedPostRepo, repos.ReportRepo, eventBus)
@@ -120,6 +123,7 @@ func initControllers(services *Services, wsHub *ws.Hub) *Controllers {
 		MessageController:      *controller.NewMessageController(services.MessageService),
 		PostHistoryController:  *controller.NewPostHistoryController(services.PostHistoryService),
 		DraftController:        *controller.NewDraftController(services.DraftService),
+		ReportController:       *controller.NewReportController(services.ReportService),
 	}
 }
 
@@ -145,6 +149,7 @@ func initRoutes(controllers *Controllers, r *gin.Engine) {
 	userroute.RegisterMessageRoutes(api, &controllers.MessageController)
 	userroute.RegisterPostHistoryRoutes(api, &controllers.PostHistoryController)
 	userroute.RegisterDraftRoutes(api, &controllers.DraftController)
+	userroute.RegisterReportRoutes(api, &controllers.ReportController)
 }
 
 func Init() (*gin.Engine, error) {
