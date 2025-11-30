@@ -12,6 +12,7 @@ type CreateCommunityRequest struct {
 	Avatar        *string                `json:"avatar,omitempty"`
 	Banner        *string                `json:"banner,omitempty"`
 	Setting       model.CommunitySetting `json:"setting,omitempty"`
+	Rules         []model.CommunityRule  `json:"rules,omitempty"`
 	Moderators    []model.Moderator      `json:"moderators,omitempty"`
 	CreatorName   string                 `json:"creator_name,omitempty"`
 	CreatorAvatar string                 `json:"creator_avatar,omitempty"`
@@ -23,6 +24,7 @@ type UpdateCommunityRequest struct {
 	Avatar      *string                 `json:"avatar,omitempty"`
 	Banner      *string                 `json:"banner,omitempty"`
 	Setting     *model.CommunitySetting `json:"setting,omitempty"`
+	Rules       *[]model.CommunityRule  `json:"rules,omitempty"`
 }
 
 type ModeratorDTO struct {
@@ -60,6 +62,7 @@ type CommunityResponse struct {
 	Avatar         *string                `json:"avatar"`
 	Banner         *string                `json:"banner"`
 	Setting        model.CommunitySetting `json:"setting"`
+	Rules          []model.CommunityRule  `json:"rules"`
 	Moderators     []model.Moderator      `json:"moderators"`
 	PostCount      int64                  `json:"post_count"`
 	MemberCount    int64                  `json:"member_count"`
@@ -86,6 +89,7 @@ func FromCommunity(community *model.Community) *CommunityResponse {
 		Avatar:         community.Avatar,
 		Banner:         community.Banner,
 		Setting:        community.Setting,
+		Rules:          community.Rules,
 		Moderators:     community.Moderators,
 		PostCount:      community.PostCount,
 		MemberCount:    community.MemberCount,

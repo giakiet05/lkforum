@@ -3,12 +3,10 @@ package dto
 import "github.com/giakiet05/lkforum/internal/model"
 
 type CreateCommentRequest struct {
-	UserID     string  `json:"user_id"`
-	Username   string  `json:"username"`
-	UserAvatar string  `json:"user_avatar"`
-	PostID     string  `json:"post_id"`
-	ParentID   *string `json:"parent_id,omitempty"`
-	Content    string  `json:"content"`
+	UserID   string  `json:"user_id"`
+	PostID   string  `json:"post_id"`
+	ParentID *string `json:"parent_id,omitempty"`
+	Content  string  `json:"content"`
 }
 
 type GetCommentsFilterQuery struct {

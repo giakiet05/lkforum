@@ -99,6 +99,7 @@ func (c *communityService) CreateCommunity(req *dto.CreateCommunityRequest, user
 		Avatar:         req.Avatar,
 		Banner:         req.Banner,
 		Setting:        req.Setting,
+		Rules:          req.Rules,
 		Moderators:     req.Moderators,
 		CreateAt:       time.Now(),
 		CreateByID:     userObjectID,
@@ -244,6 +245,10 @@ func (c *communityService) UpdateCommunity(req *dto.UpdateCommunityRequest, user
 	}
 	if req.Setting != nil {
 		community.Setting = *req.Setting
+		updateCount++
+	}
+	if req.Rules != nil {
+		community.Rules = *req.Rules
 		updateCount++
 	}
 
