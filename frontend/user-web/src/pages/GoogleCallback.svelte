@@ -2,7 +2,11 @@
   import { onMount } from "svelte";
   import { push } from "svelte-spa-router";
   import { setAuth } from "../stores/auth-store";
-  import { ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY, USER_KEY } from "../constants/auth-constants";
+  import {
+    ACCESS_TOKEN_KEY,
+    REFRESH_TOKEN_KEY,
+    USER_KEY,
+  } from "../constants/auth-constants";
 
   let status = $state<"loading" | "success" | "error">("loading");
   let errorMessage = $state("");

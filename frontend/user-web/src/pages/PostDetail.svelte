@@ -2,7 +2,24 @@
   import { onMount } from "svelte";
   import { push } from "svelte-spa-router";
   import CommentSection from "../components/CommentSection.svelte";
-  import type { PostResponse } from "../dtos/post-dto"
+  import type { PostResponse } from "../dtos/post-dto";
+  import {
+    voteOnPost,
+    savePost,
+    unsavePost,
+    getPostById,
+    voteOnPoll,
+    removePollVote,
+    deletePost,
+    reportPost,
+  } from "../services/post-service";
+  import { authStore } from "../stores/auth-store";
+  import {
+    savePollVote,
+    removePollVote as removeLocalPollVote,
+    hasVotedOnPoll,
+    getPollVotedOptions,
+  } from "../utils/poll-vote-storage";
 
   type PostDetailProps = {
     params?: { id: string };
@@ -10,24 +27,152 @@
 
   let { params = { id: "1" } }: PostDetailProps = $props();
 
-  let post: PostResponse | undefined = $state(undefined);
+  let post = $state<PostResponse | null>(null);
   let selectedOptions = $state<string[]>([]);
   let hasVoted = $state(false);
 
-  onMount(() => {
+  // Vote state
+  let userVote = $state<"up" | "down" | "">("");
+  let votesCount = $state(0);
+  let isVoting = $state(false);
+
+  // Save state
+  let isSaved = $state(false);
+  let isSaving = $state(false);
+
+  // Menu state
+  let showMenu = $state(false);
+  let showReportModal = $state(false);
+  let reportReason = $state("");
+  let reportDetails = $state("");
+  let isReporting = $state(false);
+
+  const currentUser = $derived($authStore.user);
+  const isOwnPost = $derived(
+    currentUser && post && post.author.id === currentUser.id
+  );
+
+  async function handleUpvote() {
+    if (!currentUser) {
+      alert("Please login to vote");
+      return;
+    }
+    if (isOwnPost) {
+      alert("You cannot vote on your own post");
+      return;
+    }
+    if (isVoting || !post) return;
+
+    try {
+      isVoting = true;
+      const newVote = userVote === "up" ? null : true;
+      await voteOnPost(post.id, newVote!);
+
+      if (userVote === "up") {
+        userVote = "";
+        votesCount--;
+      } else if (userVote === "down") {
+        userVote = "up";
+        votesCount += 2;
+      } else {
+        userVote = "up";
+        votesCount++;
+      }
+    } catch (error) {
+      console.error("Failed to vote:", error);
+    } finally {
+      isVoting = false;
+    }
+  }
+
+  async function handleDownvote() {
+    if (!currentUser) {
+      alert("Please login to vote");
+      return;
+    }
+    if (isOwnPost) {
+      alert("You cannot vote on your own post");
+      return;
+    }
+    if (isVoting || !post) return;
+
+    try {
+      isVoting = true;
+      const newVote = userVote === "down" ? null : false;
+      await voteOnPost(post.id, newVote!);
+
+      if (userVote === "down") {
+        userVote = "";
+        votesCount++;
+      } else if (userVote === "up") {
+        userVote = "down";
+        votesCount -= 2;
+      } else {
+        userVote = "down";
+        votesCount--;
+      }
+    } catch (error) {
+      console.error("Failed to vote:", error);
+    } finally {
+      isVoting = false;
+    }
+  }
+
+  async function handleSave() {
+    if (!currentUser) {
+      alert("Please login to save posts");
+      return;
+    }
+    if (isSaving || !post) return;
+
+    try {
+      isSaving = true;
+      if (isSaved) {
+        await unsavePost(post.id);
+        isSaved = false;
+      } else {
+        await savePost(post.id);
+        isSaved = true;
+      }
+    } catch (error) {
+      console.error("Failed to save post:", error);
+    } finally {
+      isSaving = false;
+    }
+  }
+
+  onMount(async () => {
     // Scroll to top when component mounts
     window.scrollTo(0, 0);
 
-    // TODO: Replace with API call to fetch post by ID
-    // For now, post will be undefined (no mock data)
-    // const response = await fetch(`/api/posts/${params.id}`);
-    // post = await response.json();
+    // Fetch post from API
+    try {
+      const fetchedPost = await getPostById(params.id);
+      post = fetchedPost;
+
+      // Initialize vote state from post data
+      userVote = (post.user_vote as "up" | "down" | "") || "";
+      votesCount = post.votes_count?.score || 0;
+
+      // TEMP FIX: Backend doesn't return user_vote_ids, use localStorage
+      hasVoted = post.type === "poll" ? hasVotedOnPoll(post.id) : false;
+    } catch (error) {
+      console.error("Failed to fetch post:", error);
+    }
   });
 
-  function handleVote(optionId: number) {
-    if (!post || hasVoted) return;
+  function handleVote(optionId: string) {
+    if (!post) return;
 
-    if (post.poll?.multipleChoice) {
+    // TEMP FIX: Check localStorage since backend doesn't return user_vote_ids
+    const votedOptions = getPollVotedOptions(post.id);
+    const alreadyVotedThisOption = votedOptions.includes(optionId);
+
+    if (post.content.poll?.allow_multiple) {
+      // Multiple choice: toggle selection (but can't revote same option)
+      if (alreadyVotedThisOption) {
+        return; // Already voted this option, can't vote again
+      }
       const index = selectedOptions.indexOf(optionId);
       if (index > -1) {
         selectedOptions.splice(index, 1);
@@ -36,28 +181,143 @@
       }
       selectedOptions = selectedOptions;
     } else {
+      // Single choice: can change vote to different option
+      if (alreadyVotedThisOption) {
+        return; // Already voted this option, no need to vote again
+      }
       selectedOptions = [optionId];
     }
   }
 
-  function submitVote() {
+  async function submitVote() {
     if (!post || selectedOptions.length === 0) return;
-
-    if (post.poll) {
-      for (const option of post.poll.options) {
-        if (selectedOptions.includes(option.id)) {
-          option.votes++;
-        }
-      }
-      post.poll.totalVotes += selectedOptions.length;
+    if (!currentUser) {
+      alert("Please login to vote on polls");
+      return;
     }
-    hasVoted = true;
+
+    try {
+      const optionId = selectedOptions[0];
+      const hasVotedBefore =
+        post.content.poll?.user_vote_ids &&
+        post.content.poll.user_vote_ids.length > 0;
+
+      // If single choice and already voted, remove old vote first
+      if (!post.content.poll?.allow_multiple && hasVotedBefore) {
+        await removePollVote(post.id);
+      }
+
+      // Submit new vote
+      const updatedPoll = await voteOnPoll(post.id, optionId);
+
+      // Update poll with fresh data from backend
+      if (post.content.poll && updatedPoll) {
+        post.content.poll.options = updatedPoll.options;
+        post.content.poll.total_votes = updatedPoll.total_votes;
+        post.content.poll.user_vote_ids = updatedPoll.user_vote_ids || [];
+      }
+
+      // TEMP FIX: Save to localStorage since backend doesn't return user_vote_ids
+      savePollVote(post.id, optionId);
+
+      // Clear selection
+      selectedOptions = [];
+      hasVoted = true;
+    } catch (error) {
+      console.error("Failed to vote on poll:", error);
+      alert("Failed to submit vote. Please try again.");
+    }
   }
 
   const getVotePercentage = (votes: number, total: number) => {
     if (total === 0) return 0;
     return (votes / total) * 100;
   };
+
+  function handleShare() {
+    if (!post) return;
+    const url = `${window.location.origin}/#/post/${post.id}`;
+
+    if (navigator.share) {
+      navigator
+        .share({
+          title: post.title,
+          url: url,
+        })
+        .catch(() => {
+          copyToClipboard(url);
+        });
+    } else {
+      copyToClipboard(url);
+    }
+  }
+
+  function copyToClipboard(text: string) {
+    navigator.clipboard
+      .writeText(text)
+      .then(() => {
+        alert("Link copied to clipboard!");
+      })
+      .catch(() => {
+        alert("Failed to copy link");
+      });
+  }
+
+  function toggleMenu() {
+    showMenu = !showMenu;
+  }
+
+  function handleEdit() {
+    showMenu = false;
+    push(`/post/${post!.id}/edit`);
+  }
+
+  async function handleDelete() {
+    showMenu = false;
+    if (!post || !confirm("Are you sure you want to delete this post?")) return;
+
+    try {
+      await deletePost(post.id);
+      push("/"); // Redirect to home after delete
+    } catch (error) {
+      console.error("Failed to delete post:", error);
+      alert("Failed to delete post. Please try again.");
+    }
+  }
+
+  function openReportModal() {
+    showMenu = false;
+    showReportModal = true;
+  }
+
+  function closeReportModal() {
+    showReportModal = false;
+    reportReason = "";
+    reportDetails = "";
+  }
+
+  async function handleReport(e: Event) {
+    e.preventDefault();
+    if (!post || !reportReason.trim()) {
+      alert("Please select a reason");
+      return;
+    }
+
+    try {
+      isReporting = true;
+      await reportPost(post.id, {
+        reason: reportReason,
+        details: reportDetails,
+      });
+      alert("Report submitted successfully");
+      closeReportModal();
+    } catch (error) {
+      console.error("Failed to report post:", error);
+      alert("Failed to submit report. Please try again.");
+    } finally {
+      isReporting = false;
+    }
+  }
 
   function goBack() {
     window.history.back();
@@ -85,33 +345,85 @@
     <article class="post-detail-container">
       <div class="post-main">
         <div class="post-header">
-          <span class="report-name">lk/{post.report}</span>
-          <span class="meta-divider">•</span>
-          <span class="author">Posted by u/{post.author}</span>
-          <span class="time">{post.time}</span>
+          <div class="post-header-left">
+            <span class="community-name">lk/{post.community.name}</span>
+            <span class="meta-divider">•</span>
+            <span class="author">Posted by u/{post.author.username}</span>
+            <span class="time"
+              >{new Date(post.created_at).toLocaleDateString()}</span
+            >
+          </div>
+          <div class="post-header-right">
+            <div class="menu-container">
+              <button
+                class="more-btn"
+                onclick={toggleMenu}
+                title="More options"
+              >
+                •••
+              </button>
+              {#if showMenu}
+                <div class="dropdown-menu">
+                  {#if isOwnPost}
+                    <button class="menu-item" onclick={handleEdit}>
+                      <img
+                        src="/write_icon.svg"
+                        alt="Edit"
+                        width="16"
+                        height="16"
+                      />
+                      <span>Edit Post</span>
+                    </button>
+                    <button class="menu-item delete" onclick={handleDelete}>
+                      <img
+                        src="/delete_icon.svg"
+                        alt="Delete"
+                        width="16"
+                        height="16"
+                      />
+                      <span>Delete Post</span>
+                    </button>
+                  {:else}
+                    <button class="menu-item" onclick={openReportModal}>
+                      <span>⚠️ Report</span>
+                    </button>
+                  {/if}
+                </div>
+              {/if}
+            </div>
+          </div>
         </div>
 
         <h1 class="post-title">{post.title}</h1>
 
         <div class="post-content">
-          {#if post.type === "text"}
-            <p class="text-content">{post.content}</p>
-          {:else if post.type === "image" && post.images}
+          {#if post.type === "text" && post.content.text}
+            <p class="text-content">{post.content.text}</p>
+          {:else if post.content.images && post.content.images.length > 0}
             <div class="image-gallery">
-              {#each post.images as src, i}
-                <img {src} alt="Post content {i + 1}" class="post-image" />
+              {#each post.content.images as image, i}
+                <img
+                  src={image.url}
+                  alt="Post content {i + 1}"
+                  class="post-image"
+                />
               {/each}
             </div>
-          {:else if post.type === "video" && post.videoUrl}
-            <video controls poster={post.thumbnailUrl} class="post-video">
-              <source src={post.videoUrl} type="video/mp4" />
+          {:else if post.content.videos && post.content.videos.length > 0}
+            <video
+              controls
+              poster={post.content.videos[0].thumbnail_url}
+              class="post-video"
+            >
+              <source src={post.content.videos[0].url} type="video/mp4" />
+              <track kind="captions" />
               Your browser does not support the video tag.
             </video>
-          {:else if post.type === "poll" && post.poll}
+          {:else if post.type === "poll" && post.content.poll}
             <div class="poll-container">
-              <h3 class="poll-question">{post.poll.question}</h3>
+              <h3 class="poll-question">{post.content.poll.question}</h3>
               <div class="poll-options">
-                {#each post.poll.options as option}
+                {#each post.content.poll.options as option}
                   <button
                     class="poll-option"
                     class:selected={selectedOptions.includes(option.id)}
@@ -121,17 +433,14 @@
                     {#if hasVoted}
                       <div
                         class="poll-result-bar"
-                        style="width: {getVotePercentage(
-                          option.votes,
-                          post.poll.totalVotes
-                        )}%;"
+                        style="width: {option.percentage}%;"
                       ></div>
                       <span class="poll-option-text">{option.text}</span>
                       <span class="poll-option-votes">{option.votes} votes</span
                       >
                     {:else}
                       <div class="radio-check">
-                        {#if post.poll.multipleChoice}
+                        {#if post.content.poll.allow_multiple}
                           <div
                             class="checkbox"
                             class:checked={selectedOptions.includes(option.id)}
@@ -158,7 +467,8 @@
                 </button>
               {/if}
               <p class="poll-footer">
-                {post.poll.totalVotes} votes • {post.poll.multipleChoice
+                {post.content.poll.total_votes} votes • {post.content.poll
+                  .allow_multiple
                   ? "Multiple choices allowed"
                   : "Single choice"}
               </p>
@@ -168,15 +478,31 @@
 
         <div class="post-footer">
           <div class="vote-actions">
-            <button class="footer-btn vote-btn" aria-label="Upvote">▲</button>
-            <span class="vote-count">{post.upvotes - post.downvotes}</span>
-            <button class="footer-btn vote-btn" aria-label="Downvote">▼</button>
+            <button
+              class="footer-btn vote-btn"
+              class:voted={userVote === "up"}
+              aria-label="Upvote"
+              disabled={isVoting || isOwnPost}
+              onclick={handleUpvote}
+            >
+              ▲
+            </button>
+            <span class="vote-count">{votesCount}</span>
+            <button
+              class="footer-btn vote-btn"
+              class:voted={userVote === "down"}
+              aria-label="Downvote"
+              disabled={isVoting || isOwnPost}
+              onclick={handleDownvote}
+            >
+              ▼
+            </button>
           </div>
           <button class="footer-btn">
             <img src="/CommentIcon.svg" alt="Comments" width="20" height="20" />
-            <span>{post.commentsCount} Comments</span>
+            <span>{post.comments_count} Comments</span>
           </button>
-          <button class="footer-btn">
+          <button class="footer-btn" onclick={handleShare}>
             <svg
               width="20"
               height="20"
@@ -193,12 +519,17 @@
             </svg>
             <span>Share</span>
           </button>
-          <button class="footer-btn">
+          <button
+            class="footer-btn"
+            class:saved={isSaved}
+            disabled={isSaving}
+            onclick={handleSave}
+          >
             <svg
               width="20"
               height="20"
               viewBox="0 0 24 24"
-              fill="none"
+              fill={isSaved ? "currentColor" : "none"}
               stroke="currentColor"
               stroke-width="2"
               stroke-linecap="round"
@@ -207,7 +538,7 @@
               <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"
               ></path>
             </svg>
-            <span>Save</span>
+            <span>{isSaved ? "Saved" : "Save"}</span>
           </button>
         </div>
       </div>
@@ -219,6 +550,51 @@
     <div class="loading">Loading...</div>
   {/if}
 </div>
+
+<!-- Report Modal -->
+{#if showReportModal}
+  <div class="modal-overlay" onclick={closeReportModal}>
+    <div class="modal-content" onclick={(e) => e.stopPropagation()}>
+      <div class="modal-header">
+        <h3>Report Post</h3>
+        <button class="close-btn" onclick={closeReportModal}>×</button>
+      </div>
+      <form onsubmit={handleReport}>
+        <div class="form-group">
+          <label for="report-reason">Reason *</label>
+          <select id="report-reason" bind:value={reportReason} required>
+            <option value="">Select a reason</option>
+            <option value="spam">Spam</option>
+            <option value="harassment">Harassment or Bullying</option>
+            <option value="hate">Hate Speech</option>
+            <option value="violence">Violence or Threat</option>
+            <option value="misinformation">Misinformation</option>
+            <option value="nsfw">NSFW Content</option>
+            <option value="copyright">Copyright Violation</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="report-details">Additional Details (Optional)</label>
+          <textarea
+            id="report-details"
+            bind:value={reportDetails}
+            placeholder="Provide more context about why you're reporting this post..."
+            rows="4"
+          ></textarea>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn-cancel" onclick={closeReportModal}>
+            Cancel
+          </button>
+          <button type="submit" class="btn-submit" disabled={isReporting}>
+            {isReporting ? "Submitting..." : "Submit Report"}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+{/if}
 
 <style>
   .post-detail-page {
@@ -278,11 +654,23 @@
   .post-header {
     display: flex;
     align-items: center;
+    justify-content: space-between;
     font-size: 12px;
     margin-bottom: 12px;
   }
 
-  .report-name {
+  .post-header-left {
+    display: flex;
+    align-items: center;
+  }
+
+  .post-header-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .community-name {
     font-weight: bold;
     color: #000000;
   }
@@ -299,6 +687,188 @@
 
   .author {
     margin-right: 4px;
+  }
+
+  /* Menu Dropdown */
+  .menu-container {
+    position: relative;
+  }
+
+  .more-btn {
+    background: none;
+    border: none;
+    font-size: 20px;
+    font-weight: bold;
+    color: #878a8c;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+  }
+
+  .more-btn:hover {
+    background: #f6f7f8;
+  }
+
+  .dropdown-menu {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: 4px;
+    background: white;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    min-width: 150px;
+    z-index: 1000;
+  }
+
+  .menu-item {
+    width: 100%;
+    padding: 10px 16px;
+    border: none;
+    background: white;
+    text-align: left;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .menu-item:hover {
+    background-color: #f6f7f8;
+  }
+
+  .menu-item.delete {
+    color: #d93025;
+  }
+
+  .menu-item.delete:hover {
+    background-color: #fef1f0;
+  }
+
+  /* Report Modal */
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+  }
+
+  .modal-content {
+    background: white;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 500px;
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    border-bottom: 1px solid #eee;
+  }
+
+  .modal-header h3 {
+    margin: 0;
+    font-size: 20px;
+  }
+
+  .close-btn {
+    background: none;
+    border: none;
+    font-size: 28px;
+    cursor: pointer;
+    color: #878a8c;
+    padding: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .close-btn:hover {
+    color: #000;
+  }
+
+  .modal-content form {
+    padding: 20px;
+  }
+
+  .form-group {
+    margin-bottom: 20px;
+  }
+
+  .form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: #1c1c1c;
+  }
+
+  .form-group select,
+  .form-group textarea {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 14px;
+    font-family: inherit;
+  }
+
+  .form-group textarea {
+    resize: vertical;
+  }
+
+  .modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 24px;
+  }
+
+  .btn-cancel,
+  .btn-submit {
+    padding: 10px 20px;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    border: none;
+  }
+
+  .btn-cancel {
+    background: #f6f7f8;
+    color: #1c1c1c;
+  }
+
+  .btn-cancel:hover {
+    background: #e9ebed;
+  }
+
+  .btn-submit {
+    background: var(--blue--);
+    color: white;
+  }
+
+  .btn-submit:hover:not(:disabled) {
+    background: var(--darkblue--);
+  }
+
+  .btn-submit:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 
   .post-title {
@@ -378,6 +948,20 @@
 
   .footer-btn:hover {
     background-color: var(--button-secondary-background-hover);
+  }
+
+  .vote-btn.voted {
+    color: var(--blue--);
+    font-weight: bold;
+  }
+
+  .footer-btn.saved {
+    color: var(--blue--);
+    font-weight: 600;
+  }
+
+  .footer-btn.saved svg {
+    fill: var(--blue--);
   }
 
   /* Poll Styles */

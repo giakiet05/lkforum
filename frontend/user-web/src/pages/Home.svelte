@@ -2,73 +2,128 @@
   import Post from "../components/Post.svelte";
   import type { PostResponse } from "../dtos/post-dto";
 
-  // TODO: Replace with API call to fetch posts
-  const posts: PostResponse[] = [];
-
-  /* Old mock data - needs to be replaced with real API data
+  // TODO: Replace with API call to fetch posts (keeping mock data for now)
   const posts: PostResponse[] = [
     {
       id: "1",
-      type: "text",
-      report: "sveltejs",
-      author: "user123",
-      time: "4 hours ago",
+      author: {
+        id: "user1",
+        username: "user123",
+        avatar: { public_id: "avatar1", url: "/avatar.jpg" },
+      },
+      community: {
+        id: "comm1",
+        name: "sveltejs",
+      },
       title: "Svelte 5 is amazing!",
-      upvotes: 123,
-      downvotes: 5,
-      commentsCount: 42,
-      content:
-        "I just tried out the new Svelte 5 features and they are mind-blowing. The new runes system is so intuitive!",
+      type: "text",
+      content: {
+        text: "I just tried out the new Svelte 5 features and they are mind-blowing. The new runes system is so intuitive!",
+      },
+      votes_count: {
+        up: 0,
+        down: 0,
+        score: 0,
+      },
+      comments_count: 42,
+      created_at: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(), // 4 hours ago
     },
     {
       id: "2",
-      type: "image",
-      report: "pics",
-      author: "photographer",
-      time: "8 hours ago",
+      author: {
+        id: "user2",
+        username: "photographer",
+        avatar: { public_id: "avatar2", url: "/avatar.jpg" },
+      },
+      community: {
+        id: "comm2",
+        name: "pics",
+      },
       title: "Girl on wayhome, who is she?",
-      upvotes: 456,
-      downvotes: 12,
-      commentsCount: 89,
-      images: ["/GirlFromNowhere.jpg"],
+      type: "text",
+      content: {
+        images: [
+          {
+            public_id: "img1",
+            url: "/GirlFromNowhere.jpg",
+            width: 800,
+            height: 600,
+          },
+        ],
+      },
+      votes_count: {
+        up: 0,
+        down: 0,
+        score: 0,
+      },
+      comments_count: 89,
+      created_at: new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString(), // 8 hours ago
     },
     {
       id: "3",
-      type: "poll",
-      report: "polls",
-      author: "pollmaster",
-      time: "1 day ago",
-      title: "What is your favorite frontend framework?",
-      upvotes: 789,
-      downvotes: 50,
-      commentsCount: 231,
-      poll: {
-        question: "What is your favorite frontend framework?",
-        options: [
-          { id: 1, text: "Svelte", votes: 450 },
-          { id: 2, text: "React", votes: 200 },
-          { id: 3, text: "Vue", votes: 139 },
-        ],
-        multipleChoice: false,
-        totalVotes: 789,
+      author: {
+        id: "user3",
+        username: "pollmaster",
+        avatar: { public_id: "avatar3", url: "/avatar.jpg" },
       },
+      community: {
+        id: "comm3",
+        name: "polls",
+      },
+      title: "What is your favorite frontend framework?",
+      type: "poll",
+      content: {
+        poll: {
+          question: "What is your favorite frontend framework?",
+          options: [
+            { id: "opt1", text: "Svelte", votes: 450, percentage: 57 },
+            { id: "opt2", text: "React", votes: 200, percentage: 25.3 },
+            { id: "opt3", text: "Vue", votes: 139, percentage: 17.6 },
+          ],
+          total_votes: 789,
+          allow_multiple: false,
+        },
+      },
+      votes_count: {
+        up: 0,
+        down: 0,
+        score: 0,
+      },
+      comments_count: 231,
+      created_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(), // 1 day ago
     },
     {
       id: "4",
-      type: "video",
-      report: "videos",
-      author: "videographer",
-      time: "3 hours ago",
+      author: {
+        id: "user4",
+        username: "videographer",
+        avatar: { public_id: "avatar4", url: "/avatar.jpg" },
+      },
+      community: {
+        id: "comm4",
+        name: "videos",
+      },
       title: "Flashback AMV",
-      upvotes: 250,
-      downvotes: 15,
-      commentsCount: 60,
-      videoUrl: "./video.mp4",
-      thumbnailUrl:
-        "https://i1.sndcdn.com/artworks-000307576689-fkq1mv-t500x500.jpg",
+      type: "text",
+      content: {
+        videos: [
+          {
+            public_id: "video1",
+            url: "/video.mp4",
+            thumbnail_url:
+              "https://i1.sndcdn.com/artworks-000307576689-fkq1mv-t500x500.jpg",
+          },
+        ],
+      },
+      votes_count: {
+        up: 0,
+        down: 0,
+        score: 0,
+      },
+      comments_count: 60,
+      created_at: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(), // 3 hours ago
     },
   ];
-  */
 
   let sortBy: "best" | "hot" | "new" | "top" | "rising" | "" = "";
 </script>

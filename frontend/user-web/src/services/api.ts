@@ -17,6 +17,16 @@ export async function handleApiResponse(res: Response): Promise<any> {
     try {
         const json: ApiResponse = await res.json();
         if (!res.ok || !json.success) {
+            // Log full error response for debugging
+            console.error("❌ API Error Response:", {
+                status: res.status,
+                statusText: res.statusText,
+                success: json.success,
+                message: json.message,
+                error_code: json.error_code,
+                data: json.data,
+                fullResponse: json
+            });
             // Use the message from the API, or a default one
             const message = json.message || `Request failed with status ${res.status}`;
             throw new ApiError(message, json.error_code as ApiErrorCode);
@@ -27,10 +37,13 @@ export async function handleApiResponse(res: Response): Promise<any> {
         if (error instanceof ApiError) {
             throw error; // Re-throw ApiError
         }
-        // JSON parse error
+        // JSON parse error - likely 500 error with empty body
         console.error("Failed to parse API response:", error);
+        const statusMessage = res.status === 500 
+            ? "Server error occurred. Please try with smaller images or contact support."
+            : "Phản hồi từ server không hợp lệ.";
         throw new ApiError(
-            "Phản hồi từ server không hợp lệ.",
+            statusMessage,
             ApiErrorCode.INTERNAL_ERROR
         );
     }
@@ -76,6 +89,9 @@ export async function publicFetch(path: string, options: RequestInit = {}): Prom
 export async function authenticatedFetch(path: string, options: RequestInit = {}): Promise<Response> {
     const url = path.startsWith("http") ? path : API_BASE_URL + path;
     const accessToken = await getValidAccessToken();
+    
+    console.log("🔑 Access token:", accessToken ? "✅ Found" : "❌ Missing");
+    
     if (!accessToken) {
         // Dispatch event để App.svelte handle logout
         window.dispatchEvent(new CustomEvent('auth:unauthorized'));
@@ -92,6 +108,13 @@ export async function authenticatedFetch(path: string, options: RequestInit = {}
     // Do not set Content-Type for FormData, the browser does it.
     if (!isFormData) {
         headers["Content-Type"] = "application/json";
+    }
+
+    console.log("📤 Request headers:", { ...headers, Authorization: `Bearer ${accessToken.substring(0, 20)}...` });
+    console.log("📤 Request URL:", url);
+    console.log("📤 Request method:", options.method || "GET");
+    if (!isFormData && options.body) {
+        console.log("📤 Request body:", options.body);
     }
 
     try {

@@ -2,6 +2,8 @@
   import Button from "../components/Button.svelte";
   import { push } from "svelte-spa-router";
   import { setAuth } from "../stores/auth-store";
+  import { Role, AuthProvider } from "../dtos/user-dto";
+  import { onDestroy } from "svelte";
 
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
 
@@ -17,6 +19,23 @@
   let loading = false;
   let error: string | null = null;
   let step: "email" | "otp" | "register" = "email"; // Step 1: email → Step 2: otp → Step 3: register
+
+  // OTP Resend Timer
+  let resendCountdown = 0;
+  let resendInterval: number | null = null;
+
+  function startResendTimer() {
+    resendCountdown = 60; // 60 giây
+    if (resendInterval) clearInterval(resendInterval);
+
+    resendInterval = window.setInterval(() => {
+      resendCountdown--;
+      if (resendCountdown <= 0 && resendInterval) {
+        clearInterval(resendInterval);
+        resendInterval = null;
+      }
+    }, 1000);
+  }
 
   function togglePasswordVisibility() {
     showPassword = !showPassword;
@@ -44,8 +63,9 @@
       await new Promise((resolve) => setTimeout(resolve, 1000));
       console.log("Mock: OTP sent to", email);
 
-      // Chuyển sang step nhập OTP
+      // Chuyển sang step nhập OTP và bắt đầu countdown timer
       step = "otp";
+      startResendTimer();
       error = null;
     } catch (err: any) {
       console.error("Send OTP error:", err);
@@ -117,8 +137,22 @@
           id: "mock-user-id",
           email: email,
           username: username,
-          role: "user",
+          reputation: 0,
+          title: "Thành viên mới",
+          role: Role.User,
+          provider: AuthProvider.Local,
           is_verified: true,
+          profile: {
+            avatar: undefined,
+            cover: undefined,
+            bio: undefined,
+            gender: undefined,
+            age: undefined,
+            location: undefined,
+            interests: [],
+            social_links: undefined,
+            stats: undefined,
+          },
         },
         access_token: "mock-access-token-" + Date.now(),
         refresh_token: "mock-refresh-token-" + Date.now(),
@@ -161,6 +195,8 @@
       await new Promise((resolve) => setTimeout(resolve, 1000));
       console.log("Mock: Resend OTP to", email);
 
+      // Bắt đầu countdown timer sau khi gửi thành công
+      startResendTimer();
       alert("Mã OTP mới đã được gửi đến email của bạn!");
       error = null;
     } catch (err: any) {
@@ -184,6 +220,13 @@
     confirmPassword = "";
     error = null;
   }
+
+  // Cleanup interval khi component bị destroy
+  onDestroy(() => {
+    if (resendInterval) {
+      clearInterval(resendInterval);
+    }
+  });
 </script>
 
 <div class="register-page">
@@ -268,9 +311,13 @@
             type="button"
             class="link-btn"
             on:click={handleResendOTP}
-            disabled={loading}
+            disabled={loading || resendCountdown > 0}
           >
-            Gửi lại mã OTP
+            {#if resendCountdown > 0}
+              Gửi lại sau {resendCountdown}s
+            {:else}
+              Gửi lại mã OTP
+            {/if}
           </button>
           <button
             type="button"
@@ -317,8 +364,15 @@
             <span
               class="password-toggle-icon"
               on:click={togglePasswordVisibility}
+              on:keydown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  togglePasswordVisibility();
+                }
+              }}
               role="button"
               tabindex="0"
+              aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
             >
               {#if showPassword}
                 <svg
@@ -539,12 +593,6 @@
     cursor: not-allowed;
   }
 
-  .decorative-section {
-    flex: 0 0 50%;
-    background-image: url("/background.png");
-    background-size: cover;
-    background-position: center;
-  }
   .password-group {
     position: relative;
   }
@@ -576,9 +624,8 @@
   }
 
   @media (max-width: 900px) {
-    /* Ẩn tấm ảnh ở giữa và phần nền trang trí */
-    .center-image-container,
-    .decorative-section {
+    /* Ẩn tấm ảnh ở giữa */
+    .center-image-container {
       display: none;
     }
 
@@ -593,11 +640,6 @@
     .form-wrapper {
       padding-right: 0;
       max-width: 100%;
-    }
-
-    /* Căn giữa lại link đăng nhập */
-    .signin-link {
-      text-align: center;
     }
   }
 </style>

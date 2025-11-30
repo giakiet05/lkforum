@@ -2,7 +2,8 @@ import type {
     CreateChannelRequest,
     ChannelResponse,
     GetChannelByUserIDQuery,
-    UpdateChannelRequest
+    UpdateChannelRequest,
+    PaginatedChannelsResponse
 } from "../dtos/channel-dto";
 import { authenticatedFetch, handleApiResponse } from "./api";
 
@@ -56,7 +57,7 @@ export async function getChannelsByUser(
     userId: string,
     page: number = 1,
     pageSize: number = 20
-): Promise<ChannelResponse[]> {
+): Promise<PaginatedChannelsResponse> {
     const params = new URLSearchParams({
         user_id: userId,
         page: page.toString(),

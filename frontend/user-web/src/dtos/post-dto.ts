@@ -3,8 +3,9 @@
 export interface CreatePostRequest {
     community_id: string;
     title: string;
-    type: "text" | "poll";
+    type: "text" | "poll" | "image" | "video";
     text?: string;
+    tags?: string[];
     poll?: CreatePollRequest;
 }
 
@@ -18,6 +19,7 @@ export interface CreatePollRequest {
 export interface UpdatePostRequest {
     title?: string;
     text?: string;
+    tags?: string[];
 }
 
 export interface UpdatePollRequest {
@@ -39,7 +41,7 @@ export interface RemovePollOptionsRequest {
 }
 
 export interface PostVoteRequest {
-    value: boolean; // true for upvote, false for downvote
+    value: boolean | null; // true = upvote, false = downvote, null = remove vote
 }
 
 export interface PollVoteRequest {
@@ -48,6 +50,11 @@ export interface PollVoteRequest {
 
 export interface RemoveImagesRequest {
     public_ids: string[];
+}
+
+export interface ReportPostRequest {
+    reason: string;
+    description?: string;
 }
 
 export interface GetPostsQuery {
@@ -106,7 +113,7 @@ export interface PollResponse {
 export interface PostContentResponse {
     text?: string;
     images?: Image[];
-    video?: Video;
+    videos?: Video[];
     poll?: PollResponse;
 }
 
@@ -121,11 +128,23 @@ export interface PostResponse {
     author: AuthorResponse;
     community: CommunityShortResponse;
     title: string;
-    type: "text" | "poll";
+    type: "text" | "poll" | "image" | "video";
     content: PostContentResponse;
     votes_count?: VotesCountResponse;
     user_vote?: string; // "up" or "down" or ""
     comments_count: number;
     created_at: string; // ISO 8601 format
     updated_at?: string; // ISO 8601 format
+    tags?: string[];
+}
+
+export interface Pagination {
+    page: number;
+    page_size: number;
+    total: number;
+}
+
+export interface PaginatedPostsResponse {
+    posts: PostResponse[];
+    pagination: Pagination;
 }

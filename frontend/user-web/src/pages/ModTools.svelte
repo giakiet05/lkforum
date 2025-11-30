@@ -1,13 +1,28 @@
 <script lang="ts">
   import { push } from "svelte-spa-router";
+  import { onMount } from "svelte";
   import { mockQueuePosts } from "../mocks/mod-queue.mock";
   import type { QueuePost } from "../mocks/mod-queue.mock";
-  import { mockCommunityRules } from "../mocks/report-rules.mock";
-  import type { CommunityRule } from "../mocks/report-rules.mock";
   import { mockRestrictedUsers } from "../mocks/restricted-users.mock";
   import type { RestrictedUser } from "../mocks/restricted-users.mock";
   import { mockModerators, mockApprovedUsers } from "../mocks/moderators.mock";
   import type { Moderator, ApprovedUser } from "../mocks/moderators.mock";
+  import {
+    getCommunities,
+    updateCommunity,
+    banUser,
+    unbanUser,
+    unmuteUser,
+    getBannedUsers,
+    addModerators,
+    removeModerators,
+  } from "../services/community-service";
+  import type {
+    CommunityResponse,
+    CommunityRule,
+    UserResponse,
+    Moderator as ModeratorType,
+  } from "../dtos/community-dto";
 
   export interface Props {
     params?: { name?: string };
@@ -16,6 +31,16 @@
   let { params }: Props = $props();
 
   const communityName = params?.name || "";
+
+  // Community data
+  let community = $state<CommunityResponse | null>(null);
+  let isLoadingCommunity = $state(true);
+  let communityRules = $state<CommunityRule[]>([]);
+  let bannedUsers = $state<UserResponse[]>([]);
+  let mutedUsers = $state<UserResponse[]>([]);
+  let moderators = $state<ModeratorType[]>([]);
+  let isLoadingRestricted = $state(false);
+  let isLoadingModerators = $state(false);
 
   type SidebarItem = "queue" | "restricted" | "members" | "rules";
   type QueueTab = "unmoderated" | "edited" | "removed" | "reported";
@@ -47,14 +72,72 @@
 
   // Rules state
   let showRuleForm = $state(false);
-  let editingRuleId = $state<number | null>(null);
+  let editingRuleIndex = $state<number | null>(null);
   let ruleName = $state("");
   let ruleDescription = $state("");
-  let reportReason = $state("");
 
   const isRuleFormValid = $derived(
     ruleName.trim().length > 0 && ruleDescription.trim().length > 0
   );
+
+  // Load community data
+  onMount(async () => {
+    await loadCommunity();
+    await loadRestrictedUsers();
+    await loadModerators();
+  });
+
+  async function loadCommunity() {
+    try {
+      isLoadingCommunity = true;
+      const response = await getCommunities({ limit: 100 });
+      const found = response.communities.find((c) => c.name === communityName);
+
+      if (found) {
+        community = found;
+        communityRules = found.rules || [];
+        moderators = found.moderators || [];
+      } else {
+        console.error("Community not found");
+      }
+    } catch (error) {
+      console.error("Failed to load community:", error);
+    } finally {
+      isLoadingCommunity = false;
+    }
+  }
+
+  async function loadRestrictedUsers() {
+    if (!community) return;
+
+    try {
+      isLoadingRestricted = true;
+      const [banned, muted] = await Promise.all([
+        getBannedUsers(community.id, "ban"),
+        getBannedUsers(community.id, "mute"),
+      ]);
+      bannedUsers = banned;
+      mutedUsers = muted;
+    } catch (error) {
+      console.error("Failed to load restricted users:", error);
+    } finally {
+      isLoadingRestricted = false;
+    }
+  }
+
+  async function loadModerators() {
+    if (!community) return;
+
+    try {
+      isLoadingModerators = true;
+      // Moderators are already loaded in community response
+      moderators = community.moderators || [];
+    } catch (error) {
+      console.error("Failed to load moderators:", error);
+    } finally {
+      isLoadingModerators = false;
+    }
+  }
 
   const filteredPosts = $derived(() => {
     let posts = mockQueuePosts.filter((p) => p.queueType === activeQueueTab);
@@ -109,53 +192,87 @@
   }
 
   function handleSaveRule() {
-    if (!isRuleFormValid) return;
-    console.log("Save rule:", { ruleName, ruleDescription, reportReason });
-    alert("Rule saved!");
-    // Reset form and go back to list
-    ruleName = "";
-    ruleDescription = "";
-    reportReason = "";
-    showRuleForm = false;
-    editingRuleId = null;
+    if (!isRuleFormValid || !community) return;
+
+    const newRule: CommunityRule = {
+      title: ruleName.trim(),
+      description: ruleDescription.trim(),
+    };
+
+    let updatedRules: CommunityRule[];
+    if (editingRuleIndex !== null) {
+      // Edit existing rule
+      updatedRules = [...communityRules];
+      updatedRules[editingRuleIndex] = newRule;
+    } else {
+      // Create new rule
+      updatedRules = [...communityRules, newRule];
+    }
+
+    // Update community via API
+    updateCommunity({
+      id: community.id,
+      rules: updatedRules,
+    })
+      .then(() => {
+        communityRules = updatedRules;
+        alert(editingRuleIndex !== null ? "Rule updated!" : "Rule created!");
+        handleBackToRulesList();
+      })
+      .catch((error) => {
+        console.error("Failed to save rule:", error);
+        alert("Failed to save rule. Please try again.");
+      });
   }
 
   function handleCreateRule() {
     showRuleForm = true;
-    editingRuleId = null;
+    editingRuleIndex = null;
     ruleName = "";
     ruleDescription = "";
-    reportReason = "";
   }
 
-  function handleEditRule(ruleId: number) {
-    // TODO: Load rule data from mock
-    showRuleForm = true;
-    editingRuleId = ruleId;
-    // Mock data for now
-    ruleName = "rule1";
-    ruleDescription = "we dont talk about this group";
-    reportReason = "";
+  function handleEditRule(index: number) {
+    const rule = communityRules[index];
+    if (rule) {
+      showRuleForm = true;
+      editingRuleIndex = index;
+      ruleName = rule.title;
+      ruleDescription = rule.description;
+    }
   }
 
-  function handleDeleteRule(ruleId: number) {
+  function handleDeleteRule(index: number) {
+    if (!community) return;
+
     if (confirm("Are you sure you want to delete this rule?")) {
-      console.log("Delete rule:", ruleId);
-      alert("Rule deleted!");
+      const updatedRules = communityRules.filter((_, i) => i !== index);
+
+      updateCommunity({
+        id: community.id,
+        rules: updatedRules,
+      })
+        .then(() => {
+          communityRules = updatedRules;
+          alert("Rule deleted!");
+        })
+        .catch((error) => {
+          console.error("Failed to delete rule:", error);
+          alert("Failed to delete rule. Please try again.");
+        });
     }
   }
 
   function handleBackToRulesList() {
     showRuleForm = false;
-    editingRuleId = null;
+    editingRuleIndex = null;
     ruleName = "";
     ruleDescription = "";
-    reportReason = "";
   }
 
   // Restricted Users functions
   const filteredRestrictedUsers = $derived(
-    mockRestrictedUsers.filter((u) => u.type === activeRestrictedTab)
+    activeRestrictedTab === "banned" ? bannedUsers : mutedUsers
   );
 
   function handleOpenBanModal() {
@@ -184,28 +301,96 @@
     showMuteModal = false;
   }
 
-  function handleBanUser() {
-    console.log("Ban user:", {
-      banUsername,
-      banRule,
-      banDuration,
-      banReason,
-      banNote,
-    });
-    alert("User banned!");
-    handleCloseBanModal();
+  async function handleBanUser() {
+    if (!community || !banUsername.trim()) {
+      alert("Please enter a username!");
+      return;
+    }
+
+    const lengthDays = parseInt(banDuration) || 30;
+
+    try {
+      // Note: You'll need to add a getUserByUsername API to get user_id from username
+      // For now, assuming banUsername is the user_id
+      await banUser({
+        community_id: community.id,
+        user_id: banUsername, // TODO: Should be user ID, not username
+        type: "ban",
+        reason: banReason || "Violation of community rules",
+        length_days: lengthDays,
+      });
+
+      alert("User banned successfully!");
+      await loadRestrictedUsers(); // Reload the list
+      handleCloseBanModal();
+    } catch (error) {
+      console.error("Failed to ban user:", error);
+      alert("Failed to ban user. Please try again.");
+    }
   }
 
-  function handleMuteUser() {
-    console.log("Mute user:", {
-      banUsername,
-      banRule,
-      banDuration,
-      banReason,
-      banNote,
-    });
-    alert("User muted!");
-    handleCloseMuteModal();
+  async function handleMuteUser() {
+    if (!community || !banUsername.trim()) {
+      alert("Please enter a username!");
+      return;
+    }
+
+    const lengthDays = parseInt(banDuration) || 30;
+
+    try {
+      await banUser({
+        community_id: community.id,
+        user_id: banUsername, // TODO: Should be user ID, not username
+        type: "mute",
+        reason: banReason || "Violation of community rules",
+        length_days: lengthDays,
+      });
+
+      alert("User muted successfully!");
+      await loadRestrictedUsers(); // Reload the list
+      handleCloseMuteModal();
+    } catch (error) {
+      console.error("Failed to mute user:", error);
+      alert("Failed to mute user. Please try again.");
+    }
+  }
+
+  async function handleUnbanUser(userId: string) {
+    if (!community) return;
+
+    if (confirm("Are you sure you want to unban this user?")) {
+      try {
+        await unbanUser({
+          community_id: community.id,
+          user_id: userId,
+        });
+
+        alert("User unbanned successfully!");
+        await loadRestrictedUsers();
+      } catch (error) {
+        console.error("Failed to unban user:", error);
+        alert("Failed to unban user. Please try again.");
+      }
+    }
+  }
+
+  async function handleUnmuteUser(userId: string) {
+    if (!community) return;
+
+    if (confirm("Are you sure you want to unmute this user?")) {
+      try {
+        await unmuteUser({
+          community_id: community.id,
+          user_id: userId,
+        });
+
+        alert("User unmuted successfully!");
+        await loadRestrictedUsers();
+      } catch (error) {
+        console.error("Failed to unmute user:", error);
+        alert("Failed to unmute user. Please try again.");
+      }
+    }
   }
 
   // Mod & Members functions
@@ -224,35 +409,69 @@
     inviteCanEdit = true;
   }
 
-  function handleInviteUser() {
-    if (!inviteUsername.trim()) {
+  async function handleInviteUser() {
+    if (!community || !inviteUsername.trim()) {
       alert("Please enter a username!");
       return;
     }
-    console.log(`Invite ${inviteType}:`, {
-      username: inviteUsername,
-      permission: invitePermission,
-      canEdit: inviteCanEdit,
-    });
-    alert(
-      `Invitation sent to ${inviteUsername} to become ${inviteType === "mod" ? "moderator" : "approved user"}!`
-    );
-    handleCloseInviteModal();
+
+    if (inviteType === "mod") {
+      try {
+        // TODO: Need to get user ID from username
+        await addModerators({
+          id: community.id,
+          added_moderator: [
+            {
+              id: inviteUsername, // TODO: Should be user ID
+              username: inviteUsername,
+            },
+          ],
+        });
+
+        alert(`${inviteUsername} added as moderator!`);
+        await loadCommunity(); // Reload to get updated moderators
+        handleCloseInviteModal();
+      } catch (error) {
+        console.error("Failed to add moderator:", error);
+        alert("Failed to add moderator. Please try again.");
+      }
+    } else {
+      // Approved users - not yet implemented in backend
+      alert("Approved users feature coming soon!");
+      handleCloseInviteModal();
+    }
   }
 
-  function handleEditMember(id: number, type: "mod" | "approved") {
-    console.log("Edit member:", id, type);
+  function handleEditMember(userId: string, type: "mod" | "approved") {
+    console.log("Edit member:", userId, type);
     alert("Edit member functionality coming soon!");
   }
 
-  function handleDeleteMember(id: number, type: "mod" | "approved") {
+  async function handleDeleteMember(userId: string, type: "mod" | "approved") {
+    if (!community) return;
+
     if (
       confirm(
         `Are you sure you want to remove this ${type === "mod" ? "moderator" : "approved user"}?`
       )
     ) {
-      console.log("Delete member:", id, type);
-      alert("Member removed!");
+      if (type === "mod") {
+        try {
+          await removeModerators({
+            id: community.id,
+            removed_moderator: [userId],
+          });
+
+          alert("Moderator removed!");
+          await loadCommunity(); // Reload to get updated moderators
+        } catch (error) {
+          console.error("Failed to remove moderator:", error);
+          alert("Failed to remove moderator. Please try again.");
+        }
+      } else {
+        // Approved users - not yet implemented
+        alert("Approved users feature coming soon!");
+      }
     }
   }
 </script>
@@ -473,20 +692,42 @@
             <div class="table-row">
               {#if activeRestrictedTab === "banned"}
                 <div class="col user-col">
-                  <img src={user.avatar} alt="" class="user-avatar" />
+                  <img
+                    src={user.avatar || "/default-avatar.png"}
+                    alt=""
+                    class="user-avatar"
+                  />
                   <span>{user.username}</span>
                 </div>
-                <div class="col">{user.duration}</div>
-                <div class="col">{user.date || "-"}</div>
-                <div class="col">{user.reason || "-"}</div>
-                <div class="col">{user.note || "-"}</div>
+                <div class="col">Permanent</div>
+                <div class="col">-</div>
+                <div class="col">-</div>
+                <div class="col">
+                  <button
+                    class="unban-btn"
+                    onclick={() => handleUnbanUser(user.id)}
+                  >
+                    Unban
+                  </button>
+                </div>
               {:else}
                 <div class="col user-col">
-                  <img src={user.avatar} alt="" class="user-avatar" />
+                  <img
+                    src={user.avatar || "/default-avatar.png"}
+                    alt=""
+                    class="user-avatar"
+                  />
                   <span>{user.username}</span>
                 </div>
-                <div class="col">{user.duration}</div>
-                <div class="col">{user.note || "-"}</div>
+                <div class="col">Permanent</div>
+                <div class="col">
+                  <button
+                    class="unban-btn"
+                    onclick={() => handleUnmuteUser(user.id)}
+                  >
+                    Unmute
+                  </button>
+                </div>
               {/if}
             </div>
           {:else}
@@ -545,19 +786,23 @@
               <div class="col"></div>
             </div>
 
-            {#each mockModerators as mod}
+            {#each moderators as mod}
               <div class="table-row moderators">
                 <div class="col user-col">
-                  <img src={mod.avatar} alt="" class="user-avatar" />
+                  <img
+                    src={mod.avatar || "/default-avatar.png"}
+                    alt=""
+                    class="user-avatar"
+                  />
                   <span>{mod.username}</span>
                 </div>
-                <div class="col">{mod.permissions}</div>
-                <div class="col">{mod.canEdit ? "Yes" : "No"}</div>
-                <div class="col joined-col">{mod.joinedDate}</div>
+                <div class="col">Everything</div>
+                <div class="col">Yes</div>
+                <div class="col joined-col">-</div>
                 <div class="col actions-col">
                   <button
                     class="icon-btn edit"
-                    onclick={() => handleEditMember(mod.id, "mod")}
+                    onclick={() => handleEditMember(mod.user_id, "mod")}
                     title="Edit moderator"
                   >
                     <img
@@ -569,7 +814,7 @@
                   </button>
                   <button
                     class="icon-btn delete"
-                    onclick={() => handleDeleteMember(mod.id, "mod")}
+                    onclick={() => handleDeleteMember(mod.user_id, "mod")}
                     title="Remove moderator"
                   >
                     <img
@@ -652,13 +897,15 @@
               <div class="col-created">CREATED</div>
             </div>
 
-            {#each mockCommunityRules as rule, index}
-              <div class="rule-row" onclick={() => handleEditRule(rule.id)}>
+            {#each communityRules as rule, index}
+              <div class="rule-row" onclick={() => handleEditRule(index)}>
                 <div class="rule-info">
                   <span class="rule-number">{index + 1}</span>
                   <div class="rule-details">
-                    <h3 class="rule-name">{rule.name}</h3>
-                    <p class="rule-desc">{rule.description}</p>
+                    <h3 class="rule-name">{rule.title}</h3>
+                    <p class="rule-desc" style="color: #666;">
+                      {rule.description}
+                    </p>
                   </div>
                 </div>
                 <div class="rule-actions">
@@ -666,7 +913,7 @@
                     class="icon-btn edit"
                     onclick={(e) => {
                       e.stopPropagation();
-                      handleEditRule(rule.id);
+                      handleEditRule(index);
                     }}
                     title="Edit rule"
                   >
@@ -681,7 +928,7 @@
                     class="icon-btn delete"
                     onclick={(e) => {
                       e.stopPropagation();
-                      handleDeleteRule(rule.id);
+                      handleDeleteRule(index);
                     }}
                     title="Delete rule"
                   >
@@ -761,28 +1008,6 @@
               </div>
             </div>
 
-            <h3 class="section-heading">Reporting</h3>
-            <p class="small">
-              Users or mods can select a report reason when reporting content
-            </p>
-
-            <div class="form-row">
-              <label>Report reason</label>
-              <div class="pill-input">
-                <input
-                  type="text"
-                  placeholder="Report reason"
-                  maxlength="100"
-                  bind:value={reportReason}
-                />
-                <span class="char-count">{100 - reportReason.length}</span>
-              </div>
-              <p class="hint">
-                By default, this is the same as your rule name. Max characters
-                100
-              </p>
-            </div>
-
             <div class="form-row save-row">
               <button
                 class="save-btn"
@@ -829,8 +1054,8 @@
       <div class="form-group">
         <select bind:value={banRule} class="modal-select">
           <option value="">Rules</option>
-          {#each mockCommunityRules as rule}
-            <option value={rule.name}>{rule.name}</option>
+          {#each communityRules as rule}
+            <option value={rule.title}>{rule.title}</option>
           {/each}
         </select>
       </div>
@@ -897,8 +1122,8 @@
       <div class="form-group">
         <select bind:value={banRule} class="modal-select">
           <option value="">Rules</option>
-          {#each mockCommunityRules as rule}
-            <option value={rule.name}>{rule.name}</option>
+          {#each communityRules as rule}
+            <option value={rule.title}>{rule.title}</option>
           {/each}
         </select>
       </div>

@@ -4,8 +4,6 @@ import type { Image } from './post-dto';
 
 export interface CreateCommentRequest {
     user_id: string;
-    username: string;
-    user_avatar: string;
     post_id: string;
     parent_id?: string;
     content: string;

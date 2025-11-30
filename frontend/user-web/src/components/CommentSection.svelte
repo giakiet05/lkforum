@@ -1,6 +1,12 @@
 <script lang="ts">
-  import { mockComments, type Comment } from "../mocks/comments.mock";
+  import { onMount } from "svelte";
+  import type { CommentResponse } from "../dtos/comment-dto";
   import CommentComponent from "./Comment.svelte";
+  import {
+    getCommentsByPostId,
+    createComment,
+  } from "../services/comment-service";
+  import { authStore } from "../stores/auth-store";
 
   type CommentSectionProps = {
     postId: string;
@@ -15,43 +21,59 @@
   let newCommentContent = $state("");
   let selectedImage = $state<File | null>(null);
   let imagePreview = $state<string | null>(null);
+  let comments = $state<CommentResponse[]>([]);
+  let isLoading = $state(true);
+  let isSubmitting = $state(false);
+  let totalComments = $state(0);
 
-  // Filter comments for this post
-  const postComments = $derived(
-    mockComments.filter((c) => c.postId === postId)
-  );
+  const currentUser = $derived($authStore.user);
+
+  // Fetch comments on mount
+  onMount(async () => {
+    await loadComments();
+  });
+
+  async function loadComments() {
+    try {
+      isLoading = true;
+      const response = await getCommentsByPostId({
+        post_id: postId,
+        page: 1,
+        page_size: 50,
+      });
+      comments = response.comments || [];
+      totalComments = response.pagination?.total || comments.length;
+    } catch (error) {
+      console.error("Failed to load comments:", error);
+    } finally {
+      isLoading = false;
+    }
+  }
 
   // Sort comments
   const sortedComments = $derived(
     (() => {
-      const comments = [...postComments];
+      const commentsToSort = [...comments];
 
       switch (sortBy) {
         case "top":
-          return comments.sort((a, b) => {
-            const scoreA = a.votesCount.up - a.votesCount.down;
-            const scoreB = b.votesCount.up - b.votesCount.down;
-            return scoreB - scoreA;
-          });
+          return commentsToSort;
         case "newest":
-          return comments.sort(
+          return commentsToSort.sort(
             (a, b) =>
-              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+              new Date(b.created_at).getTime() -
+              new Date(a.created_at).getTime()
           );
         case "oldest":
-          return comments.sort(
+          return commentsToSort.sort(
             (a, b) =>
-              new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+              new Date(a.created_at).getTime() -
+              new Date(b.created_at).getTime()
           );
         case "controversial":
-          return comments.sort((a, b) => {
-            // Comments with similar up/down votes are more controversial
-            const controversyA = Math.min(a.votesCount.up, a.votesCount.down);
-            const controversyB = Math.min(b.votesCount.up, b.votesCount.down);
-            return controversyB - controversyA;
-          });
+          return commentsToSort;
         default:
-          return comments;
+          return commentsToSort;
       }
     })()
   );
@@ -61,16 +83,33 @@
     showSortDropdown = false;
   };
 
-  const submitComment = () => {
-    if (newCommentContent.trim()) {
-      // Mock submit - in real app, would send to backend
-      console.log("Submitting comment:", newCommentContent);
-      if (selectedImage) {
-        console.log("With image:", selectedImage.name);
-      }
+  const submitComment = async () => {
+    if (!newCommentContent.trim()) return;
+    if (!currentUser) {
+      alert("Please login to comment");
+      return;
+    }
+
+    try {
+      isSubmitting = true;
+      await createComment({
+        user_id: currentUser.id,
+        username: currentUser.username,
+        user_avatar: currentUser.profile?.avatar?.url || "",
+        post_id: postId,
+        content: newCommentContent,
+      });
+
+      await loadComments();
+
       newCommentContent = "";
       selectedImage = null;
       imagePreview = null;
+    } catch (error) {
+      console.error("Failed to submit comment:", error);
+      alert("Failed to post comment. Please try again.");
+    } finally {
+      isSubmitting = false;
     }
   };
 
@@ -80,7 +119,6 @@
       const file = input.files[0];
       selectedImage = file;
 
-      // Create preview
       const reader = new FileReader();
       reader.onload = (e) => {
         imagePreview = e.target?.result as string;
@@ -95,15 +133,7 @@
   };
 
   const getTotalComments = () => {
-    const countReplies = (comment: Comment): number => {
-      return (
-        1 + comment.replies.reduce((sum, reply) => sum + countReplies(reply), 0)
-      );
-    };
-    return postComments.reduce(
-      (sum, comment) => sum + countReplies(comment),
-      0
-    );
+    return totalComments;
   };
 </script>
 
@@ -163,7 +193,13 @@
           <img src="/comment_picture.png" alt="" width="20" height="20" />
         </button>
       </div>
-      <button class="submit-btn" onclick={submitComment}>Comment</button>
+      <button
+        class="submit-btn"
+        onclick={submitComment}
+        disabled={isSubmitting}
+      >
+        {isSubmitting ? "Posting..." : "Comment"}
+      </button>
     </div>
   </div>
 
@@ -235,16 +271,20 @@
 
   <!-- Comments List -->
   <div class="comments-list">
-    {#each sortedComments as comment}
-      <CommentComponent {comment} depth={0} />
-    {/each}
-    {#if sortedComments.length === 0}
-      <div class="no-comments">
-        <p>No comments yet</p>
-        <p class="no-comments-subtitle">
-          Be the first to share what you think!
-        </p>
-      </div>
+    {#if isLoading}
+      <div class="loading">Loading comments...</div>
+    {:else}
+      {#each sortedComments as comment}
+        <CommentComponent {comment} depth={0} onUpdate={loadComments} />
+      {/each}
+      {#if sortedComments.length === 0}
+        <div class="no-comments">
+          <p>No comments yet</p>
+          <p class="no-comments-subtitle">
+            Be the first to share what you think!
+          </p>
+        </div>
+      {/if}
     {/if}
   </div>
 </div>
@@ -349,14 +389,6 @@
     display: block;
   }
 
-  .comment-submit {
-    display: flex;
-    justify-content: flex-end;
-    padding-top: 8px;
-    border-top: 1px solid #edeff1;
-    margin-top: 8px;
-  }
-
   .submit-btn {
     background: var(--blue--);
     color: white;
@@ -372,6 +404,11 @@
 
   .submit-btn:hover {
     background: var(--darkblue--);
+  }
+
+  .submit-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 
   /* Sort Bar */
@@ -486,5 +523,12 @@
     font-size: 14px;
     font-weight: 400;
     margin-top: 8px !important;
+  }
+
+  .loading {
+    text-align: center;
+    padding: 40px 20px;
+    color: #7c7c7c;
+    font-size: 14px;
   }
 </style>

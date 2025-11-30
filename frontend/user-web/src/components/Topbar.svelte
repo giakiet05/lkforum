@@ -3,6 +3,8 @@
   import CreatePostModal from "./CreatePostModal.svelte";
   import ChatPopup from "./ChatPopup.svelte";
   import { push } from "svelte-spa-router";
+  import { getCommunities } from "../services/community-service";
+  import type { CommunityResponse } from "../dtos/community-dto";
 
   type TopbarProps = {
     user?: { name: string; avatar?: string; karma?: number };
@@ -29,15 +31,87 @@
   let showChatPopup = $state(false);
   let dropdownElement: HTMLDivElement | null = null;
 
+  // Search dropdown state
+  let showSearchDropdown = $state(false);
+  let searchResults = $state<CommunityResponse[]>([]);
+  let isSearching = $state(false);
+  let searchTimeout: number | null = null;
+
+  async function performSearch(query: string) {
+    if (!query.trim()) {
+      searchResults = [];
+      showSearchDropdown = false;
+      return;
+    }
+
+    try {
+      isSearching = true;
+      // Remove c/ or lk/ prefix if user typed it
+      const cleanQuery = query.replace(/^(c\/|lk\/)/i, "").trim();
+      if (!cleanQuery) {
+        searchResults = [];
+        showSearchDropdown = false;
+        isSearching = false;
+        return;
+      }
+
+      const response = await getCommunities({ name: cleanQuery, limit: 5 });
+      searchResults = response.communities;
+      showSearchDropdown = searchResults.length > 0;
+    } catch (error) {
+      console.error("Search failed:", error);
+      searchResults = [];
+      showSearchDropdown = false;
+    } finally {
+      isSearching = false;
+    }
+  }
+
+  function handleSearchInput() {
+    // Debounce search
+    if (searchTimeout) {
+      clearTimeout(searchTimeout);
+    }
+
+    searchTimeout = window.setTimeout(() => {
+      performSearch(searchQuery);
+    }, 300);
+  }
+
   function handleSearch() {
-    if (searchQuery.trim()) onSearch?.(searchQuery);
+    if (searchQuery.trim()) {
+      onSearch?.(searchQuery);
+      showSearchDropdown = false;
+    }
   }
 
   function handleSearchKeydown(e: KeyboardEvent) {
     if (e.key === "Enter") {
       e.preventDefault();
       handleSearch();
+    } else if (e.key === "Escape") {
+      showSearchDropdown = false;
     }
+  }
+
+  function handleCommunityClick(communityName: string) {
+    push(`/c/${communityName}`);
+    searchQuery = "";
+    searchResults = [];
+    showSearchDropdown = false;
+  }
+
+  function handleSearchFocus() {
+    if (searchQuery.trim() && searchResults.length > 0) {
+      showSearchDropdown = true;
+    }
+  }
+
+  function handleSearchBlur() {
+    // Delay to allow click on dropdown items
+    setTimeout(() => {
+      showSearchDropdown = false;
+    }, 200);
   }
 
   function toggleUserMenu() {
@@ -137,10 +211,41 @@
           <input
             class="search-input"
             type="text"
-            placeholder="Search LKForum"
+            placeholder="Search communities"
             bind:value={searchQuery}
+            on:input={handleSearchInput}
             on:keydown={handleSearchKeydown}
+            on:focus={handleSearchFocus}
+            on:blur={handleSearchBlur}
           />
+
+          {#if showSearchDropdown && searchResults.length > 0}
+            <div class="search-dropdown">
+              <div class="search-dropdown-header">Communities</div>
+              {#each searchResults as community}
+                <button
+                  class="search-result-item"
+                  on:click={() => handleCommunityClick(community.name)}
+                >
+                  <img
+                    src={community.avatar || "/default-community.png"}
+                    alt=""
+                    class="community-avatar"
+                  />
+                  <div class="community-info">
+                    <div class="community-name">c/{community.name}</div>
+                    <div class="community-members">
+                      {community.member_count} members
+                    </div>
+                  </div>
+                </button>
+              {/each}
+            </div>
+          {/if}
+
+          {#if isSearching}
+            <div class="search-loading">Searching...</div>
+          {/if}
         </div>
       </div>
     </div>
@@ -462,6 +567,88 @@
 
   .search-input::placeholder {
     color: var(--muted-foreground);
+  }
+
+  .search-dropdown {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    right: 0;
+    background: var(--background);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+    max-height: 400px;
+    overflow-y: auto;
+  }
+
+  .search-dropdown-header {
+    padding: 8px 16px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted-foreground);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .search-result-item {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    text-align: left;
+  }
+
+  .search-result-item:hover {
+    background: var(--topbar-search-background);
+  }
+
+  .community-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+    background: var(--topbar-search-background);
+  }
+
+  .community-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .community-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--topbar-foreground);
+  }
+
+  .community-members {
+    font-size: 12px;
+    color: var(--muted-foreground);
+  }
+
+  .search-loading {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    right: 0;
+    padding: 12px 16px;
+    background: var(--background);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    font-size: 14px;
+    color: var(--muted-foreground);
+    text-align: center;
   }
 
   .topbar-actions {

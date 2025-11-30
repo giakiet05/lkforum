@@ -38,12 +38,13 @@ func RequireAuth() gin.HandlerFunc {
 		token := parts[1]
 		user, err := auth.ParseAccessToken(token)
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"error": "Invalid token",
+				"debug": err.Error(), // TEMP: Debug info
+			})
 			c.Abort()
 			return
-		}
-
-		// Load user settings from DB once per request
+		} // Load user settings from DB once per request
 		if userRepo != nil {
 			ctx, cancel := util.NewDefaultDBContext()
 			defer cancel()

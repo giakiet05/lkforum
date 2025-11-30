@@ -383,6 +383,12 @@ func (c *communityService) IsModerator(community *model.Community, userID string
 		return false, fmt.Errorf("invalid user id: %s", userID)
 	}
 
+	// Check if user is the creator
+	if community.CreateByID == objectID {
+		return true, nil
+	}
+
+	// Check if user is in moderators list
 	for _, m := range community.Moderators {
 		if m.UserID == objectID {
 			return true, nil

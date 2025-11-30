@@ -1,8 +1,11 @@
 <script lang="ts">
   import { push } from "svelte-spa-router";
   import CreateCommunityModal from "./CreateCommunityModal.svelte";
-  import type { SidebarCommunity } from "../mocks/sidebar-communities.mock";
-  import { mockSidebarCommunities } from "../mocks/sidebar-communities.mock";
+  import { getCommunities } from "../services/community-service";
+  import { authStore } from "../stores/auth-store";
+  import type { CommunityResponse } from "../dtos/community-dto";
+  import type { UserResponse } from "../dtos/user-dto";
+  import { onMount } from "svelte";
 
   type Props = {
     compact?: boolean;
@@ -10,20 +13,57 @@
 
   let { compact = false }: Props = $props();
 
-  let communities = $state<SidebarCommunity[]>(mockSidebarCommunities);
+  let userCommunities = $state<CommunityResponse[]>([]);
+  let isLoadingCommunities = $state(false);
+  let user = $state<UserResponse | null>(null);
 
   let isExpanded = $state(true);
   let showCreateModal = $state(false);
 
+  authStore.subscribe((state) => {
+    user = state.user;
+    if (user) {
+      loadUserCommunities();
+    }
+  });
+
+  onMount(() => {
+    if (user) {
+      loadUserCommunities();
+    }
+  });
+
+  async function loadUserCommunities() {
+    if (!user?.id) return;
+
+    try {
+      isLoadingCommunities = true;
+      const response = await getCommunities({ page: 1, limit: 100 });
+
+      console.log("All communities response:", response);
+      console.log("Current user ID:", user?.id);
+
+      // Backend returns {communities: [], pagination: {}}
+      const allCommunities = response.communities || [];
+
+      userCommunities = allCommunities.filter((community: any) => {
+        console.log(
+          `Community ${community.name} create_by_id:`,
+          community.create_by_id
+        );
+        return community.create_by_id === user?.id;
+      });
+
+      console.log("Filtered user communities:", userCommunities);
+    } catch (error) {
+      console.error("Failed to load user communities:", error);
+      userCommunities = [];
+    } finally {
+      isLoadingCommunities = false;
+    }
+  }
   function toggleExpand() {
     isExpanded = !isExpanded;
-  }
-
-  function toggleFavorite(communityId: string) {
-    const report = communities.find((c) => c.id === communityId);
-    if (report) {
-      report.isFavorite = !report.isFavorite;
-    }
   }
 
   function navigateToCommunity(communityName: string) {
@@ -32,6 +72,14 @@
 
   function handleCreateCommunity() {
     showCreateModal = true;
+  }
+
+  function handleCloseModal() {
+    showCreateModal = false;
+    // Reload communities after creating a new one
+    if (user) {
+      loadUserCommunities();
+    }
   }
 
   function handleManageCommunities() {
@@ -76,6 +124,34 @@
         <span class="action-label">Create Community</span>
       </button>
 
+      <!-- User's Communities -->
+      {#if isLoadingCommunities}
+        <div class="loading-message">
+          <span class="loading-spinner">⏳</span>
+          <span>Loading...</span>
+        </div>
+      {:else if userCommunities.length > 0}
+        <div class="user-communities-list">
+          {#each userCommunities as community (community.id)}
+            <button
+              class="community-item"
+              onclick={() => navigateToCommunity(community.name)}
+            >
+              {#if community.avatar}
+                <img
+                  src={community.avatar}
+                  alt={community.name}
+                  class="community-avatar"
+                />
+              {:else}
+                <span class="community-icon">📁</span>
+              {/if}
+              <span class="community-name">lk/{community.name}</span>
+            </button>
+          {/each}
+        </div>
+      {/if}
+
       <!-- Manage Communities -->
       <button class="action-button" onclick={handleManageCommunities}>
         <span class="action-icon">
@@ -83,60 +159,11 @@
         </span>
         <span class="action-label">Manage Communities</span>
       </button>
-
-      <!-- Communities List -->
-      <div class="communities-list">
-        {#each communities as report (report.id)}
-          <div class="report-item">
-            <button
-              class="report-link"
-              onclick={() => navigateToCommunity(report.name)}
-            >
-              <span class="report-icon">{report.icon || "📁"}</span>
-              <span class="report-name">lk/{report.name}</span>
-            </button>
-            <button
-              class="favorite-button"
-              class:active={report.isFavorite}
-              onclick={() => toggleFavorite(report.id)}
-            >
-              {#if report.isFavorite}
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 16 16"
-                  fill="currentColor"
-                >
-                  <path
-                    d="M8 1.5l1.5 4.5h4.5l-3.5 2.5 1.5 4.5L8 10.5 4 13l1.5-4.5L2 6h4.5L8 1.5z"
-                  />
-                </svg>
-              {:else}
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 16 16"
-                  fill="none"
-                  stroke="currentColor"
-                >
-                  <path
-                    d="M8 1.5l1.5 4.5h4.5l-3.5 2.5 1.5 4.5L8 10.5 4 13l1.5-4.5L2 6h4.5L8 1.5z"
-                    stroke-width="1.5"
-                  />
-                </svg>
-              {/if}
-            </button>
-          </div>
-        {/each}
-      </div>
     </div>
   {/if}
 </div>
 
-<CreateCommunityModal
-  show={showCreateModal}
-  onClose={() => (showCreateModal = false)}
-/>
+<CreateCommunityModal show={showCreateModal} onClose={handleCloseModal} />
 
 <style>
   .communities-section {
@@ -233,41 +260,63 @@
     text-align: left;
   }
 
-  .communities-list {
-    margin-top: 8px;
+  .loading-message {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    font-size: 13px;
+    color: #878a8c;
+  }
+
+  .loading-spinner {
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  .user-communities-list {
+    margin: 4px 0;
     display: flex;
     flex-direction: column;
     gap: 2px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid hsl(var(--sidebar-border));
   }
 
-  .report-item {
+  .community-item {
     width: 100%;
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 4px;
-    padding: 0 4px;
-  }
-
-  .report-link {
-    flex: 1;
-    display: flex;
-    align-items: center;
     gap: 10px;
-    padding: 8px 8px;
+    padding: 8px 12px;
     background: transparent;
     border: none;
     cursor: pointer;
     border-radius: 6px;
     transition: background 0.15s ease;
-    min-width: 0;
   }
 
-  .report-link:hover {
+  .community-item:hover {
     background: rgba(0, 0, 0, 0.08);
   }
 
-  .report-icon {
+  .community-avatar {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+  }
+
+  .community-icon {
     width: 24px;
     height: 24px;
     border-radius: 50%;
@@ -276,9 +325,11 @@
     justify-content: center;
     font-size: 16px;
     flex-shrink: 0;
+    background: #f0f0f0;
   }
 
-  .report-name {
+  .community-name {
+    flex: 1;
     font-size: 14px;
     font-weight: 500;
     color: #1c1c1c;
@@ -286,32 +337,5 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     text-align: left;
-  }
-
-  .favorite-button {
-    width: 20px;
-    height: 20px;
-    padding: 0;
-    background: transparent;
-    border: none;
-    cursor: pointer;
-    color: #d3d3d3;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    transition: color 0.15s ease;
-  }
-
-  .favorite-button:hover {
-    color: #ffd700;
-  }
-
-  .favorite-button.active {
-    color: #ffd700;
-  }
-
-  .favorite-button.active:hover {
-    color: #ffed4e;
   }
 </style>

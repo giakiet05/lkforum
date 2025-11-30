@@ -48,3 +48,14 @@ export interface ChannelResponse {
     created_at: string; // ISO 8601 format
     updated_at: string; // ISO 8601 format
 }
+
+export interface Pagination {
+    page: number;
+    page_size: number;
+    total: number;
+}
+
+export interface PaginatedChannelsResponse {
+    channels: ChannelResponse[];
+    pagination: Pagination;
+}

@@ -1,27 +1,56 @@
 <script lang="ts">
   import DraftsModal from "./DraftsModal.svelte";
   import { mockDraftsDetails } from "../mocks/drafts.mock";
-  import { mockJoinedCommunities } from "../mocks/joined-communities.mock";
+  import { createPost, uploadPostImages } from "../services/post-service";
+  import { getCommunities } from "../services/community-service";
+  import type { CommunityResponse } from "../dtos/community-dto";
 
   interface Props {
     show: boolean;
     onClose: () => void;
-    communityName?: string; // Nếu có thì auto-fill report
+    communityName?: string; // Nếu có thì auto-fill community
+    onPostCreated?: () => void; // Callback khi đăng bài thành công
   }
 
-  let { show, onClose, communityName }: Props = $props();
+  let { show, onClose, communityName, onPostCreated }: Props = $props();
 
-  let activeTab = $state<"text" | "images" | "link">("text");
+  let activeTab = $state<"text" | "images" | "link" | "poll">("text");
   let selectedCommunity = $state(communityName || "");
   let title = $state("");
   let tags = $state<string[]>([]);
   let bodyText = $state("");
   let linkUrl = $state("");
   let mediaFiles = $state<File[]>([]);
+
+  // Poll state
+  let pollQuestion = $state("");
+  let pollOptions = $state<string[]>(["", ""]);
+  let pollDuration = $state("3"); // days
+  let allowMultiple = $state(false);
+
   let isDragging = $state(false);
   let showCommunitySearch = $state(false);
   let communitySearchQuery = $state("");
   let showDraftsModal = $state(false);
+  let isSubmitting = $state(false);
+  let errorMessage = $state<string | null>(null);
+  let allCommunities = $state<CommunityResponse[]>([]);
+
+  // Load communities from API
+  $effect(() => {
+    if (show && allCommunities.length === 0) {
+      loadCommunities();
+    }
+  });
+
+  async function loadCommunities() {
+    try {
+      const response = await getCommunities({ limit: 100 });
+      allCommunities = response.communities;
+    } catch (error) {
+      console.error("Failed to load communities:", error);
+    }
+  }
 
   $effect(() => {
     if (communityName) {
@@ -30,9 +59,14 @@
   });
 
   const filteredCommunities = $derived(
-    mockJoinedCommunities.filter((c) =>
+    allCommunities.filter((c) =>
       c.name.toLowerCase().includes(communitySearchQuery.toLowerCase())
     )
+  );
+
+  // Get selected community details
+  const selectedCommunityData = $derived(
+    allCommunities.find((c) => c.name === selectedCommunity)
   );
 
   function handleClose() {
@@ -44,8 +78,14 @@
     bodyText = "";
     linkUrl = "";
     mediaFiles = [];
+    pollQuestion = "";
+    pollOptions = ["", ""];
+    pollDuration = "3";
+    allowMultiple = false;
     showCommunitySearch = false;
     communitySearchQuery = "";
+    errorMessage = null;
+    isSubmitting = false;
     onClose();
   }
 
@@ -60,7 +100,7 @@
     if (showCommunitySearch) {
       // Focus on search input after a small delay
       setTimeout(() => {
-        document.getElementById("report-search-input")?.focus();
+        document.getElementById("community-search-input")?.focus();
       }, 100);
     }
   }
@@ -80,7 +120,7 @@
     const draft = mockDraftsDetails[draftId];
     if (draft) {
       title = draft.title;
-      selectedCommunity = draft.report;
+      selectedCommunity = draft.community;
       activeTab = draft.tab;
       tags = draft.tags || [];
 
@@ -97,32 +137,131 @@
   }
 
   function handleSaveDraft() {
+    // TODO: Backend doesn't have drafts API yet
     console.log("Save draft:", { title, bodyText, tags, selectedCommunity });
-    alert("Draft saved!");
+    alert("Draft saved locally (backend API not available yet)");
   }
 
-  function handlePost() {
+  function addPollOption() {
+    if (pollOptions.length < 6) {
+      pollOptions = [...pollOptions, ""];
+    }
+  }
+
+  function removePollOption(index: number) {
+    if (pollOptions.length > 2) {
+      pollOptions = pollOptions.filter((_, i) => i !== index);
+    }
+  }
+
+  function updatePollOption(index: number, value: string) {
+    pollOptions[index] = value;
+    pollOptions = [...pollOptions];
+  }
+
+  async function handlePost() {
+    // Validation
     if (!title.trim()) {
-      alert("Title is required!");
-      return;
-    }
-    if (!selectedCommunity && !communityName) {
-      alert("Please select a report!");
+      errorMessage = "Title is required!";
       return;
     }
 
-    console.log("Creating post:", {
-      report: selectedCommunity || communityName,
-      title,
-      tags,
-      type: activeTab,
-      bodyText: activeTab === "text" ? bodyText : undefined,
-      linkUrl: activeTab === "link" ? linkUrl : undefined,
-      media: activeTab === "images" ? mediaFiles : undefined,
-    });
+    const targetCommunity = selectedCommunity || communityName;
+    if (!targetCommunity) {
+      errorMessage = "Please select a community!";
+      return;
+    }
 
-    alert("Post created successfully!");
-    handleClose();
+    // Poll validation
+    if (activeTab === "poll") {
+      if (!pollQuestion.trim()) {
+        errorMessage = "Poll question is required!";
+        return;
+      }
+      const filledOptions = pollOptions.filter((opt) => opt.trim() !== "");
+      if (filledOptions.length < 2) {
+        errorMessage = "Poll needs at least 2 options!";
+        return;
+      }
+    }
+
+    // Backend doesn't support link posts yet
+    if (activeTab === "link") {
+      errorMessage =
+        "Link posts are not supported yet. Please use Text or Images tab.";
+      return;
+    }
+
+    try {
+      isSubmitting = true;
+      errorMessage = null;
+
+      // Get community ID from name
+      let community: CommunityResponse | undefined;
+
+      if (allCommunities.length === 0) {
+        const response = await getCommunities({ limit: 100 });
+        allCommunities = response.communities;
+      }
+
+      community = allCommunities.find((c) => c.name === targetCommunity);
+
+      if (!community) {
+        errorMessage = "Community not found";
+        isSubmitting = false;
+        return;
+      }
+
+      // Create post
+      let postData: any = {
+        community_id: community.id,
+        title: title.trim(),
+        type: activeTab === "poll" ? "poll" : "text",
+        text: bodyText.trim() || undefined,
+      };
+
+      // Add poll data if poll type
+      if (activeTab === "poll") {
+        const filledOptions = pollOptions.filter((opt) => opt.trim() !== "");
+
+        // Calculate expires_at based on duration
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + parseInt(pollDuration));
+
+        postData.poll = {
+          question: pollQuestion.trim(),
+          options: filledOptions.map((text) => text.trim()), // Array of strings, not objects
+          expires_at: expiresAt.toISOString(),
+          allow_multiple: allowMultiple,
+        };
+      }
+
+      console.log("📤 Creating post with data:", postData);
+      const post = await createPost(postData);
+
+      // Upload images if any (2-step flow)
+      if (activeTab === "images" && mediaFiles.length > 0) {
+        await uploadPostImages(post.id, mediaFiles);
+      }
+
+      console.log("✅ Post created successfully:", post);
+
+      // Success! Notify parent to reload posts
+      if (onPostCreated) {
+        console.log("🔄 Calling onPostCreated callback to reload posts");
+        onPostCreated();
+      } else {
+        console.warn("⚠️ onPostCreated callback not provided!");
+      }
+
+      handleClose();
+    } catch (error) {
+      console.error("❌ Failed to create post:", error);
+      errorMessage =
+        error instanceof Error ? error.message : "Failed to create post";
+    } finally {
+      isSubmitting = false;
+    }
   }
 
   function handleDragOver(e: DragEvent) {
@@ -164,17 +303,20 @@
       </div>
 
       <!-- Community Selector -->
-      <div class="report-selector">
+      <div class="community-selector">
         {#if !showCommunitySearch}
-          <!-- Button state: Show report name or "Select a report" -->
-          <button class="report-display-btn" onclick={toggleCommunitySearch}>
-            <div class="report-icon">
-              <img src="/LKlogo.jpg" alt="Community" />
+          <!-- Button state: Show community name or "Select a community" -->
+          <button class="community-display-btn" onclick={toggleCommunitySearch}>
+            <div class="community-icon">
+              <img
+                src={selectedCommunityData?.avatar || "/LKlogo.jpg"}
+                alt={selectedCommunityData?.name || "Community"}
+              />
             </div>
             <span
               >{selectedCommunity
                 ? `lk/${selectedCommunity}`
-                : "Select a report"}</span
+                : "Select a community"}</span
             >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
               <path
@@ -205,31 +347,34 @@
               />
             </svg>
             <input
-              id="report-search-input"
+              id="community-search-input"
               type="text"
               bind:value={communitySearchQuery}
-              placeholder="Select a report"
-              class="report-search-input"
+              placeholder="Select a community"
+              class="community-search-input"
             />
           </div>
         {/if}
 
         <!-- Dropdown list of communities -->
         {#if showCommunitySearch}
-          <div class="report-dropdown">
+          <div class="community-dropdown">
             {#if filteredCommunities.length > 0}
-              {#each filteredCommunities as report}
+              {#each filteredCommunities as community}
                 <button
-                  class="report-item"
-                  onclick={() => handleCommunitySelect(report.name)}
+                  class="community-item"
+                  onclick={() => handleCommunitySelect(community.name)}
                 >
-                  <div class="report-item-icon">
-                    <img src={report.icon} alt={report.name} />
+                  <div class="community-item-icon">
+                    <img
+                      src={community.avatar || "/default-community.png"}
+                      alt={community.name}
+                    />
                   </div>
-                  <div class="report-item-info">
-                    <div class="report-item-name">r/{report.name}</div>
-                    <div class="report-item-meta">
-                      {report.members} · {report.status}
+                  <div class="community-item-info">
+                    <div class="community-item-name">lk/{community.name}</div>
+                    <div class="community-item-meta">
+                      {community.member_count} members
                     </div>
                   </div>
                 </button>
@@ -264,6 +409,13 @@
         >
           Link
         </button>
+        <button
+          class="tab-btn"
+          class:active={activeTab === "poll"}
+          onclick={() => (activeTab = "poll")}
+        >
+          Poll
+        </button>
       </div>
 
       <!-- Title Input -->
@@ -280,7 +432,10 @@
       </div>
 
       <!-- Add Tags Button -->
-      <button class="add-tags-btn">Add tags</button>
+      <!-- TODO: Backend doesn't support tags yet -->
+      <button class="add-tags-btn" disabled title="Tags not supported yet"
+        >Add tags</button
+      >
 
       <!-- Content Area based on active tab -->
       {#if activeTab === "text"}
@@ -341,25 +496,117 @@
           {/if}
         </div>
       {:else if activeTab === "link"}
+        <div class="warning-message">
+          ⚠️ Link posts are not supported yet. Please use Text or Images tab.
+        </div>
         <div class="input-group input-with-required">
           <input
             type="url"
             placeholder="Link URL"
             bind:value={linkUrl}
             class="link-input"
+            disabled
           />
           {#if !linkUrl}
             <span class="required-mark">*</span>
           {/if}
         </div>
+      {:else if activeTab === "poll"}
+        <div class="poll-container">
+          <!-- Poll Question -->
+          <div class="input-group input-with-required">
+            <input
+              type="text"
+              placeholder="Ask a question..."
+              bind:value={pollQuestion}
+              class="poll-question-input"
+            />
+            {#if !pollQuestion}
+              <span class="required-mark">*</span>
+            {/if}
+          </div>
+
+          <!-- Poll Options -->
+          <div class="poll-options">
+            {#each pollOptions as option, index}
+              <div class="poll-option-row">
+                <input
+                  type="text"
+                  placeholder={`Option ${index + 1}`}
+                  value={option}
+                  oninput={(e) =>
+                    updatePollOption(index, e.currentTarget.value)}
+                  class="poll-option-input"
+                />
+                {#if pollOptions.length > 2}
+                  <button
+                    class="remove-option-btn"
+                    onclick={() => removePollOption(index)}
+                    title="Remove option"
+                  >
+                    ✕
+                  </button>
+                {/if}
+              </div>
+            {/each}
+
+            <!-- Add Option Button -->
+            {#if pollOptions.length < 6}
+              <button class="add-option-btn" onclick={addPollOption}>
+                + Add option
+              </button>
+            {/if}
+          </div>
+
+          <!-- Poll Settings -->
+          <div class="poll-settings">
+            <div class="setting-row">
+              <label for="poll-duration">Poll duration:</label>
+              <select
+                id="poll-duration"
+                bind:value={pollDuration}
+                class="duration-select"
+              >
+                <option value="1">1 day</option>
+                <option value="3">3 days</option>
+                <option value="7">7 days</option>
+                <option value="14">14 days</option>
+              </select>
+            </div>
+
+            <div class="setting-row">
+              <label>
+                <input
+                  type="checkbox"
+                  bind:checked={allowMultiple}
+                  class="checkbox"
+                />
+                Allow multiple choices
+              </label>
+            </div>
+          </div>
+        </div>
+      {/if}
+
+      <!-- Error Message -->
+      {#if errorMessage}
+        <div class="error-message">
+          {errorMessage}
+        </div>
       {/if}
 
       <!-- Action Buttons -->
       <div class="modal-actions">
-        <button class="save-draft-btn" onclick={handleSaveDraft}
-          >Save draft</button
+        <button
+          class="save-draft-btn"
+          onclick={handleSaveDraft}
+          disabled={isSubmitting}
         >
-        <button class="post-btn" onclick={handlePost}>Post</button>
+          Save draft
+        </button>
+        <button class="post-btn" onclick={handlePost} disabled={isSubmitting}>
+          {isSubmitting ? "Posting..." : "Post"}
+        </button>
       </div>
     </div>
   </div>
@@ -420,12 +667,12 @@
   }
 
   /* Community Selector */
-  .report-selector {
+  .community-selector {
     margin-bottom: 16px;
     position: relative;
   }
 
-  .report-display-btn {
+  .community-display-btn {
     background: rgba(214, 216, 222, 0.4);
     width: fit-content;
     border-radius: 16px;
@@ -441,7 +688,7 @@
     transition: background 0.2s;
   }
 
-  .report-display-btn:hover {
+  .community-display-btn:hover {
     background: rgba(214, 216, 222, 0.5);
   }
 
@@ -459,7 +706,7 @@
     pointer-events: none;
   }
 
-  .report-search-input {
+  .community-search-input {
     width: 100%;
     background: rgba(214, 216, 222, 0.3);
     border: 2px solid var(--blue--);
@@ -470,11 +717,11 @@
     outline: none;
   }
 
-  .report-search-input::placeholder {
+  .community-search-input::placeholder {
     color: var(--grayfont);
   }
 
-  .report-dropdown {
+  .community-dropdown {
     position: absolute;
     top: 100%;
     left: 0;
@@ -489,7 +736,7 @@
     z-index: 10;
   }
 
-  .report-item {
+  .community-item {
     width: 100%;
     display: flex;
     align-items: center;
@@ -502,11 +749,11 @@
     transition: background 0.2s;
   }
 
-  .report-item:hover {
+  .community-item:hover {
     background: #f6f7f8;
   }
 
-  .report-item-icon {
+  .community-item-icon {
     width: 32px;
     height: 32px;
     border-radius: 50%;
@@ -514,24 +761,24 @@
     flex-shrink: 0;
   }
 
-  .report-item-icon img {
+  .community-item-icon img {
     width: 100%;
     height: 100%;
     object-fit: cover;
   }
 
-  .report-item-info {
+  .community-item-info {
     flex: 1;
   }
 
-  .report-item-name {
+  .community-item-name {
     font-size: 14px;
     font-weight: 600;
     color: #1c1c1c;
     margin-bottom: 4px;
   }
 
-  .report-item-meta {
+  .community-item-meta {
     font-size: 12px;
     color: var(--grayfont);
   }
@@ -543,7 +790,7 @@
     font-size: 14px;
   }
 
-  .report-icon {
+  .community-icon {
     width: 24px;
     height: 24px;
     border-radius: 50%;
@@ -553,7 +800,7 @@
     justify-content: center;
   }
 
-  .report-icon img {
+  .community-icon img {
     width: 100%;
     height: 100%;
     object-fit: cover;
@@ -645,8 +892,13 @@
     transition: background 0.2s;
   }
 
-  .add-tags-btn:hover {
+  .add-tags-btn:hover:not(:disabled) {
     background: #edeff1;
+  }
+
+  .add-tags-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 
   /* Body Text Container */
@@ -749,6 +1001,150 @@
     color: #1c1c1c;
   }
 
+  /* Error Message */
+  .error-message {
+    padding: 12px 16px;
+    background: #fee;
+    border: 1px solid #fcc;
+    border-radius: 8px;
+    color: #c00;
+    font-size: 14px;
+    margin-top: 16px;
+  }
+
+  /* Warning Message */
+  .warning-message {
+    padding: 12px 16px;
+    background: #fff3cd;
+    border: 1px solid #ffc107;
+    border-radius: 8px;
+    color: #856404;
+    font-size: 14px;
+    margin-bottom: 12px;
+  }
+
+  /* Poll Container */
+  .poll-container {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+
+  .poll-question-input {
+    width: 100%;
+    padding: 12px 16px;
+    border: 1px solid var(--lightgray--);
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--grayfont);
+  }
+
+  .poll-question-input:focus {
+    outline: none;
+    border-color: var(--blue--);
+  }
+
+  .poll-options {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .poll-option-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .poll-option-input {
+    flex: 1;
+    padding: 10px 14px;
+    border: 1px solid var(--lightgray--);
+    border-radius: 8px;
+    font-size: 14px;
+    color: var(--grayfont);
+  }
+
+  .poll-option-input:focus {
+    outline: none;
+    border-color: var(--blue--);
+  }
+
+  .remove-option-btn {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: 1px solid #edeff1;
+    border-radius: 4px;
+    color: #c00;
+    cursor: pointer;
+    font-size: 16px;
+    transition: all 0.2s;
+  }
+
+  .remove-option-btn:hover {
+    background: #fee;
+    border-color: #fcc;
+  }
+
+  .add-option-btn {
+    padding: 8px 16px;
+    background: transparent;
+    border: 1px dashed var(--blue--);
+    border-radius: 8px;
+    color: var(--blue--);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .add-option-btn:hover {
+    background: rgba(21, 48, 96, 0.05);
+  }
+
+  .poll-settings {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px;
+    background: #f6f7f8;
+    border-radius: 8px;
+  }
+
+  .setting-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 14px;
+  }
+
+  .duration-select {
+    padding: 6px 12px;
+    border: 1px solid var(--lightgray--);
+    border-radius: 6px;
+    background: white;
+    color: var(--grayfont);
+    font-size: 14px;
+    cursor: pointer;
+  }
+
+  .duration-select:focus {
+    outline: none;
+    border-color: var(--blue--);
+  }
+
+  .checkbox {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+  }
+
   /* Action Buttons */
   .modal-actions {
     display: flex;
@@ -769,12 +1165,18 @@
     border: none;
   }
 
+  .save-draft-btn:disabled,
+  .post-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
   .save-draft-btn {
     background: #f6f7f8;
     color: #1c1c1c;
   }
 
-  .save-draft-btn:hover {
+  .save-draft-btn:hover:not(:disabled) {
     background: #edeff1;
   }
 
@@ -783,7 +1185,7 @@
     color: white;
   }
 
-  .post-btn:hover {
+  .post-btn:hover:not(:disabled) {
     background: var(--darkblue--);
   }
 </style>

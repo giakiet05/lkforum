@@ -21,12 +21,24 @@ export function isTokenExpired(token: string): boolean {
 
 export async function getValidAccessToken(): Promise<string | null> {
     const token = localStorage.getItem(ACCESS_TOKEN_KEY);
-    if (token && !isTokenExpired(token)) {
-        return token;
+    console.log("🔍 Checking access token:", token ? "Found" : "Missing");
+    
+    if (token) {
+        const decoded = decodeToken(token);
+        console.log("🔐 Token payload:", decoded);
+        const isExpired = isTokenExpired(token);
+        console.log(`⏰ Token expired: ${isExpired}`, decoded?.exp ? `(expires at: ${new Date(decoded.exp * 1000).toISOString()})` : '');
+        
+        if (!isExpired) {
+            console.log("✅ Access token is valid");
+            return token;
+        }
     }
 
+    console.log("⚠️ Access token expired or missing, trying refresh...");
     const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
     if (!refreshToken) {
+        console.log("❌ No refresh token found");
         return null;
     }
 

@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -155,6 +156,8 @@ func (c *CommunityController) GetAllCommunities(ctx *gin.Context) {
 func (c *CommunityController) UpdateCommunity(ctx *gin.Context) {
 	var req dto.UpdateCommunityRequest
 	if err := ctx.ShouldBind(&req); err != nil {
+		// Log the actual binding error for debugging
+		log.Printf("UpdateCommunity binding error: %v", err)
 		dto.SendError(ctx, http.StatusBadRequest, apperror.Message(apperror.ErrBadRequest), apperror.ErrBadRequest.Code)
 		return
 	}

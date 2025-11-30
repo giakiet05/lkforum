@@ -17,6 +17,7 @@
   import {
     getChannelsByUser,
     updateChannel,
+    createChannel,
   } from "../services/channel-service";
   import { getMessages } from "../services/message-service";
   import { websocketService } from "../services/websocket-service";
@@ -116,11 +117,16 @@
 
   // Load channels
   async function loadChannels() {
-    if (!currentUser) return;
+    if (!currentUser) {
+      console.log("[ChatPopup] No current user, skipping load");
+      return;
+    }
 
     try {
+      console.log("[ChatPopup] Loading channels for user:", currentUser.id);
       setLoadingChannels(true);
       const userChannels = await getChannelsByUser(currentUser.id);
+      console.log("[ChatPopup] Loaded channels:", userChannels);
       setChannels(userChannels);
 
       // Auto-select first channel
@@ -128,7 +134,9 @@
         await handleSelectChannel(userChannels[0]);
       }
     } catch (error) {
-      console.error("Failed to load channels:", error);
+      console.error("[ChatPopup] Failed to load channels:", error);
+    } finally {
+      setLoadingChannels(false);
     }
   }
 
@@ -219,6 +227,37 @@
     onClose();
   }
 
+  // DEBUG: Create test channel with hardcoded user
+  async function handleDebugCreateChannel() {
+    if (!currentUser) {
+      alert("Not logged in!");
+      return;
+    }
+
+    // Prompt for user ID to create channel with
+    const targetUserId = prompt("Enter User ID to create channel with:");
+    if (!targetUserId) return;
+
+    const targetUsername = prompt("Enter their username:");
+    if (!targetUsername) return;
+
+    try {
+      console.log("[ChatPopup] Creating test channel with:", targetUserId);
+      const newChannel = await createChannel(
+        targetUserId,
+        targetUsername,
+        "" // Empty avatar for now
+      );
+      console.log("[ChatPopup] Channel created:", newChannel);
+
+      // Reload channels
+      await loadChannels();
+    } catch (error) {
+      console.error("[ChatPopup] Failed to create channel:", error);
+      alert("Failed to create channel: " + error);
+    }
+  }
+
   // Initialize when popup shows
   $effect(() => {
     if (show && currentUser && channels.length === 0) {
@@ -283,7 +322,15 @@
           {#if isLoadingChannels}
             <div class="popup-loading">Loading...</div>
           {:else if channels.length === 0}
-            <div class="popup-empty">No conversations</div>
+            <div class="popup-empty">
+              <p>No conversations</p>
+              <button
+                class="debug-create-channel-btn"
+                onclick={handleDebugCreateChannel}
+              >
+                🔧 Debug: Create Test Channel
+              </button>
+            </div>
           {:else}
             {#each channels as channel (channel.id)}
               {@const member = channel.members.find(
@@ -878,10 +925,31 @@
   .popup-loading,
   .popup-empty {
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
+    gap: 12px;
     padding: 20px;
     color: #7c7c7c;
     font-size: 13px;
+  }
+
+  .popup-empty p {
+    margin: 0;
+  }
+
+  .debug-create-channel-btn {
+    padding: 8px 16px;
+    background: var(--blue--);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .debug-create-channel-btn:hover {
+    background: #0056b3;
   }
 </style>
