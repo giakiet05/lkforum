@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
@@ -18,16 +19,23 @@ import (
 
 type CommunityService interface {
 	Start()
-	CreateCommunity(req *dto.CreateCommunityRequest, userID string) (*model.Community, error)
-	GetCommunityByID(id string) (*model.Community, error)
-	GetCommunitiesFilter(name string, description string, is18Plus bool, createFrom time.Time, page int, pageSize int) (*dto.PaginatedCommunitiesResponse, error)
+	CreateCommunity(req *dto.CreateCommunityRequest, requesterID string) (*model.Community, error)
+	GetCommunityByID(communityID string, requesterID *string) (*model.Community, error)
+	GetCommunitiesFilter(
+		requesterID *string,
+		name string,
+		description string,
+		is18Plus bool,
+		createFrom time.Time,
+		page int, pageSize int,
+	) (*dto.PaginatedCommunitiesResponse, error)
 	GetCommunitiesByModeratorIDPaginated(moderatorID string, page int, pageSize int) (*dto.PaginatedCommunitiesResponse, error)
-	GetAllCommunitiesPaginated(page int, pageSize int) (*dto.PaginatedCommunitiesResponse, error)
-	UpdateCommunity(req *dto.UpdateCommunityRequest, userID string) (*model.Community, error)
-	AddModerator(req *dto.AddModeratorRequest, userID string) error
-	RemoveModerator(req *dto.RemoveModeratorRequest, userID string) error
-	IsModerator(community *model.Community, userID string) (bool, error)
-	DeleteCommunityByID(communityID string, userID string) error
+	GetAllCommunitiesPaginated(requesterID *string, page int, pageSize int) (*dto.PaginatedCommunitiesResponse, error)
+	UpdateCommunity(req *dto.UpdateCommunityRequest, requesterID string) (*model.Community, error)
+	AddModerator(req *dto.AddModeratorRequest, requesterID string) error
+	RemoveModerator(req *dto.RemoveModeratorRequest, requesterID string) error
+	IsModerator(community *model.Community, requesterID string) (bool, error)
+	DeleteCommunityByID(communityID string, requesterID string) error
 
 	GetBannedUsers(communityID string, banTypeStr string, expired bool, requesterID string) ([]*model.User, error)
 	BanUser(req *dto.BanUserRequest, requesterID string) error
@@ -84,11 +92,11 @@ func (c *communityService) handleNewAvatar(event bus.Event) {
 	}
 }
 
-func (c *communityService) CreateCommunity(req *dto.CreateCommunityRequest, userID string) (*model.Community, error) {
+func (c *communityService) CreateCommunity(req *dto.CreateCommunityRequest, requesterID string) (*model.Community, error) {
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
 
-	userObjectID, err := primitive.ObjectIDFromHex(userID)
+	userObjectID, err := primitive.ObjectIDFromHex(requesterID)
 	if err != nil {
 		return nil, err
 	}
@@ -127,11 +135,21 @@ func (c *communityService) CreateCommunity(req *dto.CreateCommunityRequest, user
 	return community, nil
 }
 
-func (c *communityService) GetCommunityByID(id string) (*model.Community, error) {
+func (c *communityService) GetCommunityByID(communityID string, requesterID *string) (*model.Community, error) {
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
 
-	community, err := c.communityRepo.GetByID(ctx, id)
+	if requesterID != nil {
+		ok, err := c.communityRepo.IsUserBanned(ctx, *requesterID, model.Banned, communityID)
+		if err != nil {
+			return nil, err
+		}
+		if !ok {
+			return nil, apperror.ErrUserIsBannedFromCommunity
+		}
+	}
+
+	community, err := c.communityRepo.GetByID(ctx, communityID)
 	if err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
 			return nil, apperror.ErrCommunityNotFound
@@ -143,13 +161,14 @@ func (c *communityService) GetCommunityByID(id string) (*model.Community, error)
 }
 
 func (c *communityService) GetCommunitiesFilter(
+	requesterID *string,
 	name string,
 	description string,
 	is18Plus bool,
 	createFrom time.Time,
-	page int,
-	pageSize int,
+	page int, pageSize int,
 ) (*dto.PaginatedCommunitiesResponse, error) {
+
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
 
@@ -157,8 +176,15 @@ func (c *communityService) GetCommunitiesFilter(
 	if err != nil {
 		return nil, err
 	}
-	communitiesResponses := dto.FromCommunities(communities)
 
+	if requesterID != nil && len(communities) > 0 {
+		communities, err = c.filterOutBannedCommunities(ctx, *requesterID, communities)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	communitiesResponses := dto.FromCommunities(communities)
 	var response = &dto.PaginatedCommunitiesResponse{
 		Communities: communitiesResponses,
 		Pagination: dto.Pagination{
@@ -179,8 +205,8 @@ func (c *communityService) GetCommunitiesByModeratorIDPaginated(moderatorID stri
 	if err != nil {
 		return nil, err
 	}
-	communitiesResponses := dto.FromCommunities(communities)
 
+	communitiesResponses := dto.FromCommunities(communities)
 	var response = &dto.PaginatedCommunitiesResponse{
 		Communities: communitiesResponses,
 		Pagination: dto.Pagination{
@@ -192,7 +218,7 @@ func (c *communityService) GetCommunitiesByModeratorIDPaginated(moderatorID stri
 	return response, err
 }
 
-func (c *communityService) GetAllCommunitiesPaginated(page int, pageSize int) (*dto.PaginatedCommunitiesResponse, error) {
+func (c *communityService) GetAllCommunitiesPaginated(requesterID *string, page int, pageSize int) (*dto.PaginatedCommunitiesResponse, error) {
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
 
@@ -200,8 +226,15 @@ func (c *communityService) GetAllCommunitiesPaginated(page int, pageSize int) (*
 	if err != nil {
 		return nil, err
 	}
-	communitiesResponses := dto.FromCommunities(communities)
 
+	if requesterID != nil && len(communities) > 0 {
+		communities, err = c.filterOutBannedCommunities(ctx, *requesterID, communities)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	communitiesResponses := dto.FromCommunities(communities)
 	var response = &dto.PaginatedCommunitiesResponse{
 		Communities: communitiesResponses,
 		Pagination: dto.Pagination{
@@ -213,7 +246,7 @@ func (c *communityService) GetAllCommunitiesPaginated(page int, pageSize int) (*
 	return response, err
 }
 
-func (c *communityService) UpdateCommunity(req *dto.UpdateCommunityRequest, userID string) (*model.Community, error) {
+func (c *communityService) UpdateCommunity(req *dto.UpdateCommunityRequest, requesterID string) (*model.Community, error) {
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
 
@@ -222,7 +255,7 @@ func (c *communityService) UpdateCommunity(req *dto.UpdateCommunityRequest, user
 		return nil, err
 	}
 
-	ok, err := c.IsModerator(community, userID)
+	ok, err := c.IsModerator(community, requesterID)
 	if err != nil {
 		return nil, err
 	}
@@ -259,7 +292,7 @@ func (c *communityService) UpdateCommunity(req *dto.UpdateCommunityRequest, user
 	return community, c.communityRepo.Replace(ctx, community)
 }
 
-func (c *communityService) AddModerator(req *dto.AddModeratorRequest, userID string) error {
+func (c *communityService) AddModerator(req *dto.AddModeratorRequest, requesterID string) error {
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
 
@@ -268,7 +301,7 @@ func (c *communityService) AddModerator(req *dto.AddModeratorRequest, userID str
 		return err
 	}
 
-	ok, err := c.IsModerator(community, userID)
+	ok, err := c.IsModerator(community, requesterID)
 	if err != nil {
 		return err
 	}
@@ -299,7 +332,7 @@ func (c *communityService) AddModerator(req *dto.AddModeratorRequest, userID str
 			return apperror.ErrInvalidID
 		}
 
-		ok, err = c.membershipRepo.IsMember(ctx, modDTO.ModeratorID, userID)
+		ok, err = c.membershipRepo.IsMember(ctx, modDTO.ModeratorID, requesterID)
 		if err != nil {
 			return err
 		}
@@ -324,7 +357,7 @@ func (c *communityService) AddModerator(req *dto.AddModeratorRequest, userID str
 	return c.communityRepo.Replace(ctx, community)
 }
 
-func (c *communityService) RemoveModerator(req *dto.RemoveModeratorRequest, userID string) error {
+func (c *communityService) RemoveModerator(req *dto.RemoveModeratorRequest, requesterID string) error {
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
 
@@ -333,7 +366,7 @@ func (c *communityService) RemoveModerator(req *dto.RemoveModeratorRequest, user
 		return err
 	}
 
-	ok, err := c.IsModerator(community, userID)
+	ok, err := c.IsModerator(community, requesterID)
 	if err != nil {
 		return err
 	}
@@ -342,7 +375,7 @@ func (c *communityService) RemoveModerator(req *dto.RemoveModeratorRequest, user
 	}
 
 	for _, modID := range req.RemovedModerator {
-		if userID == modID {
+		if requesterID == modID {
 			return apperror.ErrCannotRemoveModerator
 		}
 
@@ -357,7 +390,7 @@ func (c *communityService) RemoveModerator(req *dto.RemoveModeratorRequest, user
 	return c.communityRepo.Replace(ctx, community)
 }
 
-func (c *communityService) DeleteCommunityByID(communityID string, userID string) error {
+func (c *communityService) DeleteCommunityByID(communityID string, requesterID string) error {
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
 
@@ -366,21 +399,21 @@ func (c *communityService) DeleteCommunityByID(communityID string, userID string
 		return err
 	}
 
-	ok, err := c.IsModerator(community, userID)
+	ok, err := c.IsModerator(community, requesterID)
 	if err != nil {
 		return err
 	}
 	if !ok {
-		return fmt.Errorf("user is not a moderator of the community")
+		return apperror.ErrForbidden
 	}
 
 	return c.communityRepo.Delete(ctx, communityID)
 }
 
-func (c *communityService) IsModerator(community *model.Community, userID string) (bool, error) {
-	objectID, err := primitive.ObjectIDFromHex(userID)
+func (c *communityService) IsModerator(community *model.Community, requesterID string) (bool, error) {
+	objectID, err := primitive.ObjectIDFromHex(requesterID)
 	if err != nil {
-		return false, fmt.Errorf("invalid user id: %s", userID)
+		return false, fmt.Errorf("invalid user id: %s", requesterID)
 	}
 
 	// Check if user is the creator
@@ -530,4 +563,44 @@ func (c *communityService) UnbanUser(userID string, communityID string, requeste
 	}
 
 	return c.communityRepo.UnbanUser(ctx, userID, communityID)
+}
+
+// FilterOutBannedCommunities removes communities from the list where the user is banned.
+func (c *communityService) filterOutBannedCommunities(
+	ctx context.Context,
+	requesterID string,
+	communities []*model.Community,
+) ([]*model.Community, error) {
+
+	if len(communities) == 0 {
+		return communities, nil
+	}
+
+	// 1. Collect community IDs
+	communityIDs := make([]string, 0, len(communities))
+	for _, cmt := range communities {
+		communityIDs = append(communityIDs, cmt.ID.Hex())
+	}
+
+	// 2. Get banned community IDs
+	bannedIDs, err := c.communityRepo.GetBannedCommunityIDs(ctx, requesterID, model.Banned, communityIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	// 3. Build banned set for fast lookup
+	bannedSet := make(map[string]struct{}, len(bannedIDs))
+	for _, id := range bannedIDs {
+		bannedSet[id] = struct{}{}
+	}
+
+	// 4. Filter out banned communities
+	filtered := make([]*model.Community, 0, len(communities))
+	for _, cmt := range communities {
+		if _, banned := bannedSet[cmt.ID.Hex()]; !banned {
+			filtered = append(filtered, cmt)
+		}
+	}
+
+	return filtered, nil
 }

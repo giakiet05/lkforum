@@ -119,10 +119,11 @@ var (
 	ErrInvalidInterest   = AppError{Code: "INVALID_INTEREST", Message: "Sở thích không hợp lệ"}
 
 	// Community-related
-	ErrCommunityNotFound     = AppError{Code: "COMMUNITY_NOT_FOUND", Message: "Không tìm thấy cộng đồng"}
-	ErrCommunityNameExists   = AppError{Code: "COMMUNITY_NAME_EXISTS", Message: "Tên cộng đồng đã tồn tại"}
-	ErrCommunityDeleted      = AppError{Code: "COMMUNITY_DELETED", Message: "Cộng đồng đã bị xóa"}
-	ErrCannotRemoveModerator = AppError{Code: "CANNOT_REMOVE_MODERATOR", Message: "Không thể xóa moderator này."}
+	ErrCommunityNotFound         = AppError{Code: "COMMUNITY_NOT_FOUND", Message: "Không tìm thấy cộng đồng"}
+	ErrCommunityNameExists       = AppError{Code: "COMMUNITY_NAME_EXISTS", Message: "Tên cộng đồng đã tồn tại"}
+	ErrCommunityDeleted          = AppError{Code: "COMMUNITY_DELETED", Message: "Cộng đồng đã bị xóa"}
+	ErrCannotRemoveModerator     = AppError{Code: "CANNOT_REMOVE_MODERATOR", Message: "Không thể xóa moderator này."}
+	ErrUserIsBannedFromCommunity = AppError{Code: "BANNED_COMMUNITY", Message: "Người dùng đã bị ban khỏi cộng đồng."}
 
 	// Membership-related
 	ErrUserNotMember          = AppError{Code: "USER_NOT_MEMBER", Message: "Bạn chưa tham gia cộng đồng này"}
@@ -143,6 +144,7 @@ var (
 	// Comment-related
 	ErrCommentNotFound = AppError{Code: "COMMENT_NOT_FOUND", Message: "Không tìm thấy bình luận"}
 	ErrDepthInvalid    = AppError{Code: "DEPTH_TOO_HIGH", Message: "Độ sâu phải từ 0 đến 2"}
+	ErrUserIsMuted     = AppError{Code: "USER_MUTED", Message: "Người dùng đã bị cấm bình luận"}
 
 	// Messaging-related
 	ErrChannelNotFound = AppError{Code: "CHANNEL_NOT_FOUND", Message: "Không tìm thấy kênh"}

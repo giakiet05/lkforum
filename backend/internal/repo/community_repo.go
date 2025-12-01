@@ -26,9 +26,9 @@ type CommunityRepo interface {
 		is18Plus bool,
 		createFrom time.Time,
 		page int, pageSize int,
-	) ([]model.Community, int64, error)
-	GetByModeratorIDPaginated(ctx context.Context, moderatorID string, page int, pageSize int) ([]model.Community, int64, error)
-	GetAllPaginated(ctx context.Context, page int, pageSize int) ([]model.Community, int64, error)
+	) ([]*model.Community, int64, error)
+	GetByModeratorIDPaginated(ctx context.Context, moderatorID string, page int, pageSize int) ([]*model.Community, int64, error)
+	GetAllPaginated(ctx context.Context, page int, pageSize int) ([]*model.Community, int64, error)
 	Update(ctx context.Context, communityID string, updates bson.M) (*model.Community, error)
 	UpdateUserAvatar(ctx context.Context, userID string, newAvatar string) error
 	Replace(ctx context.Context, community *model.Community) error
@@ -37,6 +37,7 @@ type CommunityRepo interface {
 
 	GetBannedUsers(ctx context.Context, communityID string, expired bool) ([]*model.User, error)
 	GetMutedUsers(ctx context.Context, communityID string, expired bool) ([]*model.User, error)
+	GetBannedCommunityIDs(ctx context.Context, userID string, banType model.CommunityBanType, communityIDs []string) ([]string, error)
 	BanUser(ctx context.Context, ban *model.CommunityBan) error
 	IsUserBanned(ctx context.Context, userID string, banType model.CommunityBanType, communityID string) (bool, error)
 	UnmuteUser(ctx context.Context, userID string, communityID string) error
@@ -119,7 +120,7 @@ func (c *communityRepo) GetFilter(
 	createFrom time.Time,
 	page int,
 	pageSize int,
-) ([]model.Community, int64, error) {
+) ([]*model.Community, int64, error) {
 	filter := bson.M{}
 	if name != "" {
 		filter["name"] = bson.M{"$regex": name, "$options": "i"}
@@ -143,7 +144,7 @@ func (c *communityRepo) GetFilter(
 	}
 	defer cursor.Close(ctx)
 
-	var communities []model.Community
+	var communities []*model.Community
 	err = cursor.All(ctx, &communities)
 	if err != nil {
 		return nil, 0, err
@@ -162,7 +163,7 @@ func (c *communityRepo) GetByModeratorIDPaginated(
 	moderatorID string,
 	page int,
 	pageSize int,
-) ([]model.Community, int64, error) {
+) ([]*model.Community, int64, error) {
 	modObjectID, err := primitive.ObjectIDFromHex(moderatorID)
 	if err != nil {
 		return nil, -1, err
@@ -178,7 +179,7 @@ func (c *communityRepo) GetByModeratorIDPaginated(
 	}
 	defer cursor.Close(ctx)
 
-	var communities []model.Community
+	var communities []*model.Community
 	if err := cursor.All(ctx, &communities); err != nil {
 		return nil, -1, err
 	}
@@ -195,7 +196,7 @@ func (c *communityRepo) GetAllPaginated(
 	ctx context.Context,
 	page int,
 	pageSize int,
-) ([]model.Community, int64, error) {
+) ([]*model.Community, int64, error) {
 	skip := (page - 1) * pageSize
 	filter := bson.M{
 		"is_deleted": false,
@@ -208,7 +209,7 @@ func (c *communityRepo) GetAllPaginated(
 	}
 	defer cursor.Close(ctx)
 
-	var communities []model.Community
+	var communities []*model.Community
 	if err := cursor.All(ctx, &communities); err != nil {
 		return nil, -1, err
 	}
@@ -380,6 +381,57 @@ func (c *communityRepo) GetBannedUsers(ctx context.Context, communityID string, 
 	}
 
 	return users, nil
+}
+
+func (c *communityRepo) GetBannedCommunityIDs(
+	ctx context.Context,
+	userID string,
+	banType model.CommunityBanType,
+	communityIDs []string,
+) ([]string, error) {
+
+	userOID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert communityIDs to ObjectIDs
+	communityOIDs := make([]primitive.ObjectID, 0, len(communityIDs))
+	for _, id := range communityIDs {
+		oid, err := primitive.ObjectIDFromHex(id)
+		if err != nil {
+			return nil, err
+		}
+		communityOIDs = append(communityOIDs, oid)
+	}
+
+	// Query all active bans for these communities
+	filter := bson.M{
+		"user_id":    userOID,
+		"type":       banType,
+		"is_deleted": false,
+		"expires_at": bson.M{"$gt": time.Now()},
+		"community_id": bson.M{
+			"$in": communityOIDs,
+		},
+	}
+
+	cursor, err := c.communityBanCollection.Find(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var bannedIDs []string
+	for cursor.Next(ctx) {
+		var ban model.CommunityBan
+		if err := cursor.Decode(&ban); err != nil {
+			return nil, err
+		}
+		bannedIDs = append(bannedIDs, ban.CommunityID.Hex())
+	}
+
+	return bannedIDs, nil
 }
 
 func (c *communityRepo) GetMutedUsers(ctx context.Context, communityID string, expired bool) ([]*model.User, error) {

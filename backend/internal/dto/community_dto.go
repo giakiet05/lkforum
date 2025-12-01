@@ -73,10 +73,10 @@ type CommunityResponse struct {
 	CreateAt       time.Time              `json:"create_at,omitempty"`
 }
 
-func FromCommunities(communities []model.Community) []*CommunityResponse {
+func FromCommunities(communities []*model.Community) []*CommunityResponse {
 	var communityResponses []*CommunityResponse
 	for _, community := range communities {
-		communityResponses = append(communityResponses, FromCommunity(&community))
+		communityResponses = append(communityResponses, FromCommunity(community))
 	}
 	return communityResponses
 }
