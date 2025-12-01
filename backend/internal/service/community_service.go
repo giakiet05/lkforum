@@ -29,7 +29,7 @@ type CommunityService interface {
 	IsModerator(community *model.Community, userID string) (bool, error)
 	DeleteCommunityByID(communityID string, userID string) error
 
-	GetBannedUsers(communityID string, banTypeStr string, requesterID string) ([]*model.User, error)
+	GetBannedUsers(communityID string, banTypeStr string, expired bool, requesterID string) ([]*model.User, error)
 	BanUser(req *dto.BanUserRequest, requesterID string) error
 	UnmuteUser(userID string, communityID string, requesterID string) error
 	UnbanUser(userID string, communityID string, requesterID string) error
@@ -397,7 +397,7 @@ func (c *communityService) IsModerator(community *model.Community, userID string
 	return false, nil
 }
 
-func (c *communityService) GetBannedUsers(communityID string, banTypeStr string, requesterID string) ([]*model.User, error) {
+func (c *communityService) GetBannedUsers(communityID string, banTypeStr string, expired bool, requesterID string) ([]*model.User, error) {
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
 
@@ -420,11 +420,11 @@ func (c *communityService) GetBannedUsers(communityID string, banTypeStr string,
 
 	banType := model.CommunityBanType(banTypeStr)
 	if banType == model.Banned {
-		return c.communityRepo.GetBannedUsers(ctx, communityID)
+		return c.communityRepo.GetBannedUsers(ctx, communityID, expired)
 	}
 
 	if banType == model.Muted {
-		return c.communityRepo.GetBannedUsers(ctx, communityID)
+		return c.communityRepo.GetBannedUsers(ctx, communityID, expired)
 	}
 
 	return nil, apperror.ErrBadRequest

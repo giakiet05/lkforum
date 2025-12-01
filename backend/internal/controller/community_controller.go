@@ -275,13 +275,26 @@ func (c *CommunityController) GetBanUsers(ctx *gin.Context) {
 		return
 	}
 
-	users, err := c.communityService.GetBannedUsers(communityID, banType, authUser.(auth.AuthUser).ID)
+	expiredStr := ctx.Query("expired")
+	expired := false
+
+	if expiredStr != "" {
+		parsed, err := strconv.ParseBool(expiredStr)
+		if err != nil {
+			dto.SendError(ctx, http.StatusBadRequest, apperror.Message(apperror.ErrBadRequest), apperror.ErrBadRequest.Code)
+			return
+		}
+		expired = parsed
+	}
+
+	users, err := c.communityService.GetBannedUsers(communityID, banType, expired, authUser.(auth.AuthUser).ID)
+
 	if err != nil {
 		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
 	}
-	userResponses := dto.FromUsers(users)
 
+	userResponses := dto.FromUsers(users)
 	dto.SendSuccess(ctx, http.StatusOK, "Banned user retrieved successfully", userResponses)
 }
 
