@@ -8,7 +8,7 @@ import (
 
 func RegisterWebSocketRoutes(rg *gin.RouterGroup, c *controller.WebSocketController) {
 	ws := rg.Group("/ws")
-	ws.Use(middleware.RequireAuth()) // WebSocket connections must be authenticated
+	ws.Use(middleware.RequireAuthSocket())
 	{
 		ws.GET("", c.HandleConnections)
 	}
