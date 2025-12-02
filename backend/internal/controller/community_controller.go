@@ -50,7 +50,13 @@ func (c *CommunityController) GetCommunityByID(ctx *gin.Context) {
 		return
 	}
 
-	community, err := c.communityService.GetCommunityByID(communityID)
+	var userID *string
+	authUser, exists := ctx.Get("authUser")
+	if exists {
+		userID = &authUser.(*auth.AuthUser).ID
+	}
+
+	community, err := c.communityService.GetCommunityByID(communityID, userID)
 	if err != nil {
 		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
@@ -92,7 +98,13 @@ func (c *CommunityController) GetCommunitiesFilter(ctx *gin.Context) {
 		createFrom = t
 	}
 
-	responses, err := c.communityService.GetCommunitiesFilter(name, description, is18Plus, createFrom, page, pageSize)
+	var userID *string
+	authUser, exists := ctx.Get("authUser")
+	if exists {
+		userID = &authUser.(*auth.AuthUser).ID
+	}
+
+	responses, err := c.communityService.GetCommunitiesFilter(userID, name, description, is18Plus, createFrom, page, pageSize)
 	if err != nil {
 		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
@@ -144,7 +156,13 @@ func (c *CommunityController) GetAllCommunities(ctx *gin.Context) {
 		pageSize = 10
 	}
 
-	response, err := c.communityService.GetAllCommunitiesPaginated(page, pageSize)
+	var userID *string
+	authUser, exists := ctx.Get("authUser")
+	if exists {
+		userID = &authUser.(*auth.AuthUser).ID
+	}
+
+	response, err := c.communityService.GetAllCommunitiesPaginated(userID, page, pageSize)
 	if err != nil {
 		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
@@ -156,7 +174,6 @@ func (c *CommunityController) GetAllCommunities(ctx *gin.Context) {
 func (c *CommunityController) UpdateCommunity(ctx *gin.Context) {
 	var req dto.UpdateCommunityRequest
 	if err := ctx.ShouldBind(&req); err != nil {
-		// Log the actual binding error for debugging
 		log.Printf("UpdateCommunity binding error: %v", err)
 		dto.SendError(ctx, http.StatusBadRequest, apperror.Message(apperror.ErrBadRequest), apperror.ErrBadRequest.Code)
 		return
@@ -275,13 +292,26 @@ func (c *CommunityController) GetBanUsers(ctx *gin.Context) {
 		return
 	}
 
-	users, err := c.communityService.GetBannedUsers(communityID, banType, authUser.(auth.AuthUser).ID)
+	expiredStr := ctx.Query("expired")
+	expired := false
+
+	if expiredStr != "" {
+		parsed, err := strconv.ParseBool(expiredStr)
+		if err != nil {
+			dto.SendError(ctx, http.StatusBadRequest, apperror.Message(apperror.ErrBadRequest), apperror.ErrBadRequest.Code)
+			return
+		}
+		expired = parsed
+	}
+
+	users, err := c.communityService.GetBannedUsers(communityID, banType, expired, authUser.(auth.AuthUser).ID)
+
 	if err != nil {
 		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
 	}
-	userResponses := dto.FromUsers(users)
 
+	userResponses := dto.FromUsers(users)
 	dto.SendSuccess(ctx, http.StatusOK, "Banned user retrieved successfully", userResponses)
 }
 

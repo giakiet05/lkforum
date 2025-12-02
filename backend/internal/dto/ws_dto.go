@@ -1,7 +1,6 @@
-package ws
+package dto
 
 import (
-	"github.com/giakiet05/lkforum/internal/dto"
 	"github.com/giakiet05/lkforum/internal/model"
 )
 
@@ -31,12 +30,12 @@ type NewMessagePayload struct {
 }
 
 type SendMessagePayload struct {
-	Message dto.MessageResponse `json:"message"`
+	Message MessageResponse `json:"message"`
 }
 
 type ACKMessagePayload struct {
-	TempMessageID string              `json:"temp_message_id"`
-	Message       dto.MessageResponse `json:"message"`
+	TempMessageID string          `json:"temp_message_id"`
+	Message       MessageResponse `json:"message"`
 }
 
 type TypingIndicatorPayload struct {

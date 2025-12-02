@@ -15,6 +15,8 @@ type CommunityBan struct {
 	BannedBy    primitive.ObjectID `bson:"banned_by"`
 	BannedAt    time.Time          `bson:"banned_at"`
 	ExpiresAt   time.Time          `bson:"expires_at"`
+	IsDeleted   bool               `bson:"is_deleted"`
+	DeletedAt   time.Time          `bson:"deleted_at"`
 }
 
 type CommunityBanType string

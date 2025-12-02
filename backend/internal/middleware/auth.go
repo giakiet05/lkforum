@@ -61,6 +61,40 @@ func RequireAuth() gin.HandlerFunc {
 	}
 }
 
+func RequireAuthSocket() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		token := c.Query("token")
+		if token == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Missing token in query parameter"})
+			c.Abort()
+			return
+		}
+
+		user, err := auth.ParseAccessToken(token)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"error": "Invalid token",
+				"debug": err.Error(),
+			})
+			c.Abort()
+			return
+		}
+
+		if userRepo != nil {
+			ctx, cancel := util.NewDefaultDBContext()
+			defer cancel()
+
+			dbUser, err := userRepo.GetByID(ctx, user.ID)
+			if err == nil && dbUser.Settings != nil {
+				user.Settings = dbUser.Settings
+			}
+		}
+
+		c.Set("authUser", user)
+		c.Next()
+	}
+}
+
 // LoadUserIfAuthenticated tries to parse the access token and load the user into the context.
 // Unlike RequireAuth, it does not fail if the token is missing or invalid.
 func LoadUserIfAuthenticated() gin.HandlerFunc {

@@ -12,10 +12,9 @@ func RegisterReportRoutes(rg *gin.RouterGroup, c *controller.ReportController) {
 	// Protected routes (require authentication)
 	reports.Use(middleware.RequireAuth())
 	{
-		reports.GET(":report_id", c.GetReportByID)
 		reports.GET("reporter", c.GetReportByReporterID)
-		reports.GET("filter", c.GetReportsFilter)
-		reports.DELETE(":report_id", c.DeleteReportByID)
+		reports.GET(":report_id", c.GetReportByID)
 		reports.DELETE("batch", c.DeleteReportsByID)
+		reports.DELETE(":report_id", c.DeleteReportByID)
 	}
 }

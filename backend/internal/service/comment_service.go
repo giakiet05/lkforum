@@ -22,13 +22,21 @@ type CommentService interface {
 }
 
 type commentService struct {
-	commentRepo repo.CommentRepo
-	userRepo    repo.UserRepo
-	bus         bus.EventBus
+	commentRepo   repo.CommentRepo
+	userRepo      repo.UserRepo
+	communityRepo repo.CommunityRepo
+	postRepo      repo.PostRepo
+	bus           bus.EventBus
 }
 
-func NewCommentService(commentRepo repo.CommentRepo, userRepo repo.UserRepo, bus bus.EventBus) CommentService {
-	return &commentService{commentRepo: commentRepo, userRepo: userRepo, bus: bus}
+func NewCommentService(
+	commentRepo repo.CommentRepo,
+	userRepo repo.UserRepo,
+	communityRepo repo.CommunityRepo,
+	postRepo repo.PostRepo,
+	bus bus.EventBus,
+) CommentService {
+	return &commentService{commentRepo: commentRepo, userRepo: userRepo, communityRepo: communityRepo, postRepo: postRepo, bus: bus}
 }
 
 func (s *commentService) CreateComment(request *dto.CreateCommentRequest, userID string) (*model.Comment, error) {
@@ -43,6 +51,19 @@ func (s *commentService) CreateComment(request *dto.CreateCommentRequest, userID
 	postObjectID, err := primitive.ObjectIDFromHex(request.PostID)
 	if err != nil {
 		return nil, err
+	}
+
+	post, err := s.postRepo.GetByID(ctx, request.PostID)
+	if err != nil {
+		return nil, err
+	}
+
+	ok, err := s.communityRepo.IsUserBanned(ctx, userID, model.Muted, post.CommunityID.Hex())
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, apperror.ErrUserIsMuted
 	}
 
 	var parentAuthorID string

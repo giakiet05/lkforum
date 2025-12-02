@@ -2,6 +2,7 @@ package repo
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -25,18 +26,20 @@ type CommunityRepo interface {
 		is18Plus bool,
 		createFrom time.Time,
 		page int, pageSize int,
-	) ([]model.Community, int64, error)
-	GetByModeratorIDPaginated(ctx context.Context, moderatorID string, page int, pageSize int) ([]model.Community, int64, error)
-	GetAllPaginated(ctx context.Context, page int, pageSize int) ([]model.Community, int64, error)
+	) ([]*model.Community, int64, error)
+	GetByModeratorIDPaginated(ctx context.Context, moderatorID string, page int, pageSize int) ([]*model.Community, int64, error)
+	GetAllPaginated(ctx context.Context, page int, pageSize int) ([]*model.Community, int64, error)
 	Update(ctx context.Context, communityID string, updates bson.M) (*model.Community, error)
 	UpdateUserAvatar(ctx context.Context, userID string, newAvatar string) error
 	Replace(ctx context.Context, community *model.Community) error
 	Delete(ctx context.Context, communityID string) error
 	IsUserExist(ctx context.Context, userID string) (bool, error)
 
-	GetBannedUsers(ctx context.Context, communityID string) ([]*model.User, error)
-	GetMutedUsers(ctx context.Context, communityID string) ([]*model.User, error)
+	GetBannedUsers(ctx context.Context, communityID string, expired bool) ([]*model.User, error)
+	GetMutedUsers(ctx context.Context, communityID string, expired bool) ([]*model.User, error)
+	GetBannedCommunityIDs(ctx context.Context, userID string, banType model.CommunityBanType, communityIDs []string) ([]string, error)
 	BanUser(ctx context.Context, ban *model.CommunityBan) error
+	IsUserBanned(ctx context.Context, userID string, banType model.CommunityBanType, communityID string) (bool, error)
 	UnmuteUser(ctx context.Context, userID string, communityID string) error
 	UnbanUser(ctx context.Context, userID string, communityID string) error
 }
@@ -117,7 +120,7 @@ func (c *communityRepo) GetFilter(
 	createFrom time.Time,
 	page int,
 	pageSize int,
-) ([]model.Community, int64, error) {
+) ([]*model.Community, int64, error) {
 	filter := bson.M{}
 	if name != "" {
 		filter["name"] = bson.M{"$regex": name, "$options": "i"}
@@ -141,7 +144,7 @@ func (c *communityRepo) GetFilter(
 	}
 	defer cursor.Close(ctx)
 
-	var communities []model.Community
+	var communities []*model.Community
 	err = cursor.All(ctx, &communities)
 	if err != nil {
 		return nil, 0, err
@@ -160,7 +163,7 @@ func (c *communityRepo) GetByModeratorIDPaginated(
 	moderatorID string,
 	page int,
 	pageSize int,
-) ([]model.Community, int64, error) {
+) ([]*model.Community, int64, error) {
 	modObjectID, err := primitive.ObjectIDFromHex(moderatorID)
 	if err != nil {
 		return nil, -1, err
@@ -176,7 +179,7 @@ func (c *communityRepo) GetByModeratorIDPaginated(
 	}
 	defer cursor.Close(ctx)
 
-	var communities []model.Community
+	var communities []*model.Community
 	if err := cursor.All(ctx, &communities); err != nil {
 		return nil, -1, err
 	}
@@ -193,7 +196,7 @@ func (c *communityRepo) GetAllPaginated(
 	ctx context.Context,
 	page int,
 	pageSize int,
-) ([]model.Community, int64, error) {
+) ([]*model.Community, int64, error) {
 	skip := (page - 1) * pageSize
 	filter := bson.M{
 		"is_deleted": false,
@@ -206,7 +209,7 @@ func (c *communityRepo) GetAllPaginated(
 	}
 	defer cursor.Close(ctx)
 
-	var communities []model.Community
+	var communities []*model.Community
 	if err := cursor.All(ctx, &communities); err != nil {
 		return nil, -1, err
 	}
@@ -336,16 +339,15 @@ func (c *communityRepo) IsUserExist(ctx context.Context, userID string) (bool, e
 	return true, nil
 }
 
-func (c *communityRepo) GetBannedUsers(ctx context.Context, communityID string) ([]*model.User, error) {
-	communityObjectID, err := primitive.ObjectIDFromHex(communityID)
+func (c *communityRepo) GetBannedUsers(ctx context.Context, communityID string, expired bool) ([]*model.User, error) {
+	communityOID, err := primitive.ObjectIDFromHex(communityID)
 	if err != nil {
 		return nil, err
 	}
 
-	cursor, err := c.communityBanCollection.Find(ctx, bson.M{
-		"community_id": communityObjectID,
-		"type":         model.Banned,
-	})
+	filter := buildBanFilter(communityOID, model.Banned, expired)
+
+	cursor, err := c.communityBanCollection.Find(ctx, filter)
 	if err != nil {
 		return nil, err
 	}
@@ -360,13 +362,11 @@ func (c *communityRepo) GetBannedUsers(ctx context.Context, communityID string) 
 		return []*model.User{}, nil
 	}
 
-	// 2. Extract user IDs
 	userIDs := make([]primitive.ObjectID, 0, len(bans))
 	for _, b := range bans {
 		userIDs = append(userIDs, b.UserID)
 	}
 
-	// 3. Query users
 	userCursor, err := c.userCollection.Find(ctx, bson.M{
 		"_id": bson.M{"$in": userIDs},
 	})
@@ -383,17 +383,66 @@ func (c *communityRepo) GetBannedUsers(ctx context.Context, communityID string) 
 	return users, nil
 }
 
-func (c *communityRepo) GetMutedUsers(ctx context.Context, communityID string) ([]*model.User, error) {
-	communityObjectID, err := primitive.ObjectIDFromHex(communityID)
+func (c *communityRepo) GetBannedCommunityIDs(
+	ctx context.Context,
+	userID string,
+	banType model.CommunityBanType,
+	communityIDs []string,
+) ([]string, error) {
+
+	userOID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
 		return nil, err
 	}
 
-	// 1. Find mute records
-	cursor, err := c.communityBanCollection.Find(ctx, bson.M{
-		"community_id": communityObjectID,
-		"type":         model.Muted,
-	})
+	// Convert communityIDs to ObjectIDs
+	communityOIDs := make([]primitive.ObjectID, 0, len(communityIDs))
+	for _, id := range communityIDs {
+		oid, err := primitive.ObjectIDFromHex(id)
+		if err != nil {
+			return nil, err
+		}
+		communityOIDs = append(communityOIDs, oid)
+	}
+
+	// Query all active bans for these communities
+	filter := bson.M{
+		"user_id":    userOID,
+		"type":       banType,
+		"is_deleted": false,
+		"expires_at": bson.M{"$gt": time.Now()},
+		"community_id": bson.M{
+			"$in": communityOIDs,
+		},
+	}
+
+	cursor, err := c.communityBanCollection.Find(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var bannedIDs []string
+	for cursor.Next(ctx) {
+		var ban model.CommunityBan
+		if err := cursor.Decode(&ban); err != nil {
+			return nil, err
+		}
+		bannedIDs = append(bannedIDs, ban.CommunityID.Hex())
+	}
+
+	return bannedIDs, nil
+}
+
+func (c *communityRepo) GetMutedUsers(ctx context.Context, communityID string, expired bool) ([]*model.User, error) {
+	communityOID, err := primitive.ObjectIDFromHex(communityID)
+	if err != nil {
+		return nil, err
+	}
+
+	filter := buildBanFilter(communityOID, model.Muted, expired)
+
+	cursor, err := c.communityBanCollection.Find(ctx, filter)
 	if err != nil {
 		return nil, err
 	}
@@ -408,13 +457,11 @@ func (c *communityRepo) GetMutedUsers(ctx context.Context, communityID string) (
 		return []*model.User{}, nil
 	}
 
-	// 2. Extract user IDs
 	userIDs := make([]primitive.ObjectID, 0, len(bans))
 	for _, b := range bans {
 		userIDs = append(userIDs, b.UserID)
 	}
 
-	// 3. Query users
 	userCursor, err := c.userCollection.Find(ctx, bson.M{
 		"_id": bson.M{"$in": userIDs},
 	})
@@ -444,44 +491,123 @@ func (c *communityRepo) BanUser(ctx context.Context, ban *model.CommunityBan) er
 	return err
 }
 
+func (c *communityRepo) IsUserBanned(ctx context.Context, userID string, banType model.CommunityBanType, communityID string) (bool, error) {
+	userOID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return false, err
+	}
+
+	communityOID, err := primitive.ObjectIDFromHex(communityID)
+	if err != nil {
+		return false, err
+	}
+
+	filter := bson.M{
+		"user_id":      userOID,
+		"community_id": communityOID,
+		"type":         banType,
+		"is_deleted":   false,
+		"expires_at": bson.M{
+			"$gt": time.Now(),
+		},
+	}
+
+	err = c.communityBanCollection.FindOne(ctx, filter).Err()
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return false, nil
+		}
+		return false, err
+	}
+
+	return true, nil
+}
+
 func (c *communityRepo) UnmuteUser(ctx context.Context, userID string, communityID string) error {
-	userObjectID, err := primitive.ObjectIDFromHex(userID)
+	userOID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
 		return err
 	}
 
-	communityObjectID, err := primitive.ObjectIDFromHex(communityID)
+	communityOID, err := primitive.ObjectIDFromHex(communityID)
 	if err != nil {
 		return err
 	}
 
-	// Remove ONLY the mute record
-	_, err = c.communityBanCollection.DeleteOne(ctx, bson.M{
-		"user_id":      userObjectID,
-		"community_id": communityObjectID,
+	filter := bson.M{
+		"user_id":      userOID,
+		"community_id": communityOID,
 		"type":         model.Muted,
-	})
+		"is_deleted":   false,
+	}
 
+	update := bson.M{
+		"$set": bson.M{
+			"is_deleted": true,
+			"deleted_at": time.Now(),
+		},
+	}
+
+	_, err = c.communityBanCollection.UpdateOne(ctx, filter, update)
 	return err
 }
 
 func (c *communityRepo) UnbanUser(ctx context.Context, userID string, communityID string) error {
-	userObjectID, err := primitive.ObjectIDFromHex(userID)
+	userOID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
 		return err
 	}
 
-	communityObjectID, err := primitive.ObjectIDFromHex(communityID)
+	communityOID, err := primitive.ObjectIDFromHex(communityID)
 	if err != nil {
 		return err
 	}
 
-	// Remove ONLY the ban record
-	_, err = c.communityBanCollection.DeleteOne(ctx, bson.M{
-		"user_id":      userObjectID,
-		"community_id": communityObjectID,
+	filter := bson.M{
+		"user_id":      userOID,
+		"community_id": communityOID,
 		"type":         model.Banned,
-	})
+		"is_deleted":   false,
+	}
 
+	update := bson.M{
+		"$set": bson.M{
+			"is_deleted": true,
+			"deleted_at": time.Now(),
+		},
+	}
+
+	_, err = c.communityBanCollection.UpdateOne(ctx, filter, update)
 	return err
+}
+
+func buildBanFilter(communityID primitive.ObjectID, banType model.CommunityBanType, expired bool) bson.M {
+	now := time.Now()
+
+	// active records:
+	activeFilter := bson.M{
+		"$or": []bson.M{
+			{"expires_at": bson.M{"$gt": now}}, // expires in future
+			{"expires_at": time.Time{}},        // permanent
+		},
+	}
+
+	// expired records:
+	expiredFilter := bson.M{
+		"expires_at": bson.M{"$lte": now}, // expired
+	}
+
+	return bson.M{
+		"community_id": communityID,
+		"type":         banType,
+		"is_deleted":   false,
+		"$and": []bson.M{
+			func() bson.M {
+				if expired {
+					return expiredFilter
+				}
+				return activeFilter
+			}(),
+		},
+	}
 }
