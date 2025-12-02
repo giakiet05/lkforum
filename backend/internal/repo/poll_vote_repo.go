@@ -133,6 +133,7 @@ func (r *pollVoteRepo) Vote(ctx context.Context, userID, postID, optionID string
 			return nil, err
 		}
 
+		// Check if user already voted this option → Toggle off (remove vote)
 		isAlreadyVoted := false
 		for _, id := range userVoteIDs {
 			if id == optionID {
@@ -141,9 +142,14 @@ func (r *pollVoteRepo) Vote(ctx context.Context, userID, postID, optionID string
 			}
 		}
 		if isAlreadyVoted {
-			return nil, apperror.ErrPollVoted
+			// Toggle off: Remove this specific vote
+			if err := r.removeSingleVoteInTransaction(sessCtx, userObjID, postObjID, optionID); err != nil {
+				return nil, err
+			}
+			return nil, nil
 		}
 
+		// For single-choice polls: remove existing votes before adding new one
 		if !post.Content.Poll.AllowMultiple && len(userVoteIDs) > 0 {
 			if err := r.removeVotesInTransaction(sessCtx, userObjID, postObjID); err != nil {
 				return nil, err
@@ -214,19 +220,46 @@ func (r *pollVoteRepo) getUserVoteIDsInTx(ctx context.Context, userID, postID pr
 	return optionIDs, nil
 }
 
+func (r *pollVoteRepo) removeSingleVoteInTransaction(sessCtx context.Context, userID, postID primitive.ObjectID, optionID string) error {
+	// Decrement vote count for the specific option
+	filter := bson.M{"_id": postID, "content.poll.options.id": optionID}
+	update := bson.M{"$inc": bson.M{"content.poll.options.$.votes": -1, "content.poll.total_votes": -1}}
+	if _, err := r.postCollection.UpdateOne(sessCtx, filter, update); err != nil {
+		return err
+	}
+
+	// Delete the specific poll vote
+	_, err := r.pollVoteCollection.DeleteOne(sessCtx, bson.M{
+		"post_id":   postID,
+		"user_id":   userID,
+		"option_id": optionID,
+	})
+	return err
+}
+
 func (r *pollVoteRepo) removeVotesInTransaction(sessCtx context.Context, userID, postID primitive.ObjectID) error {
 	votes, err := r.getUserVoteIDsInTx(sessCtx, userID, postID)
 	if err != nil || len(votes) == 0 {
 		return err
 	}
 
-	filter := bson.M{"_id": postID, "content.poll.options.id": bson.M{"$in": votes}}
-	update := bson.M{"$inc": bson.M{"content.poll.options.$.votes": -1, "content.poll.total_votes": -len(votes)}}
+	// Decrement vote count for each option separately
+	// Note: Must loop because MongoDB's $ operator only updates the first matched element
+	for _, optionID := range votes {
+		filter := bson.M{"_id": postID, "content.poll.options.id": optionID}
+		update := bson.M{"$inc": bson.M{"content.poll.options.$.votes": -1}}
+		if _, err := r.postCollection.UpdateOne(sessCtx, filter, update); err != nil {
+			return err
+		}
+	}
 
-	if _, err := r.postCollection.UpdateMany(sessCtx, filter, update); err != nil {
+	// Decrement total_votes
+	totalUpdate := bson.M{"$inc": bson.M{"content.poll.total_votes": -len(votes)}}
+	if _, err := r.postCollection.UpdateOne(sessCtx, bson.M{"_id": postID}, totalUpdate); err != nil {
 		return err
 	}
 
+	// Delete all poll votes
 	_, err = r.pollVoteCollection.DeleteMany(sessCtx, bson.M{"post_id": postID, "user_id": userID})
 	return err
 }

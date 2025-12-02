@@ -7,14 +7,20 @@ import (
 )
 
 type Comment struct {
-	ID        primitive.ObjectID  `bson:"_id,omitempty" json:"id,omitempty"`
-	Author    CommentAuthor       `bson:"author" json:"author"`
-	PostID    primitive.ObjectID  `bson:"post_id" json:"post_id"`
-	ParentID  *primitive.ObjectID `bson:"parent_id" json:"parent_id"`
-	Content   string              `bson:"content" json:"content"`
-	CreatedAt time.Time           `bson:"created_at,omitempty" json:"created_at,omitempty"`
-	DeletedAt *time.Time          `bson:"deleted_at,omitempty" json:"deleted_at,omitempty"`
-	IsDeleted bool                `bson:"is_deleted" json:"is_deleted"`
+	ID         primitive.ObjectID  `bson:"_id,omitempty" json:"id,omitempty"`
+	Author     CommentAuthor       `bson:"author" json:"author"`
+	PostID     primitive.ObjectID  `bson:"post_id" json:"post_id"`
+	ParentID   *primitive.ObjectID `bson:"parent_id" json:"parent_id"`
+	Content    string              `bson:"content" json:"content"`
+	VotesCount *VotesCount         `bson:"votes_count,omitempty" json:"votes_count,omitempty"`
+	CreatedAt  time.Time           `bson:"created_at,omitempty" json:"created_at,omitempty"`
+	DeletedAt  *time.Time          `bson:"deleted_at,omitempty" json:"deleted_at,omitempty"`
+	IsDeleted  bool                `bson:"is_deleted" json:"is_deleted"`
+
+	// Moderation fields
+	ModerationStatus ModerationStatus  `bson:"moderation_status,omitempty" json:"moderation_status,omitempty"`
+	ModerationResult *ModerationResult `bson:"moderation_result,omitempty" json:"moderation_result,omitempty"`
+	ModeratedAt      *time.Time        `bson:"moderated_at,omitempty" json:"moderated_at,omitempty"`
 }
 
 type CommentAuthor struct {

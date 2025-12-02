@@ -54,7 +54,7 @@ type PostService interface {
 
 type postService struct {
 	postRepo      repo.PostRepo
-	postVoteRepo  repo.PostVoteRepo
+	voteService   VoteService
 	pollVoteRepo  repo.PollVoteRepo
 	userRepo      repo.UserRepo
 	communityRepo repo.CommunityRepo
@@ -66,7 +66,7 @@ type postService struct {
 // NewPostService creates a new instance of PostService.
 func NewPostService(
 	postRepo repo.PostRepo,
-	postVoteRepo repo.PostVoteRepo,
+	voteService VoteService,
 	pollVoteRepo repo.PollVoteRepo,
 	userRepo repo.UserRepo,
 	communityRepo repo.CommunityRepo,
@@ -76,7 +76,7 @@ func NewPostService(
 ) PostService {
 	return &postService{
 		postRepo:      postRepo,
-		postVoteRepo:  postVoteRepo,
+		voteService:   voteService,
 		pollVoteRepo:  pollVoteRepo,
 		userRepo:      userRepo,
 		communityRepo: communityRepo,
@@ -100,16 +100,17 @@ func (s *postService) CreatePost(userID string, req *dto.CreatePostRequest) (*dt
 	}
 
 	post := &model.Post{
-		AuthorID:      authorID,
-		CommunityID:   communityID,
-		Title:         req.Title,
-		Type:          req.Type,
-		Content:       &model.PostContent{Text: req.Text},
-		VotesCount:    &model.VotesCount{Up: 1, Down: 0},
-		CommentsCount: 0,
-		IsDeleted:     false,
-		CreatedAt:     time.Now(),
-		Tags:          req.Tags,
+		AuthorID:         authorID,
+		CommunityID:      communityID,
+		Title:            req.Title,
+		Type:             req.Type,
+		Content:          &model.PostContent{Text: req.Text},
+		VotesCount:       &model.VotesCount{Up: 0, Down: 0},
+		CommentsCount:    0,
+		IsDeleted:        false,
+		CreatedAt:        time.Now(),
+		Tags:             req.Tags,
+		ModerationStatus: model.ModerationPending, // Set pending for moderation
 	}
 
 	if req.Type == model.PostTypePoll && req.Poll != nil {
@@ -134,8 +135,13 @@ func (s *postService) CreatePost(userID string, req *dto.CreatePostRequest) (*dt
 		return nil, err
 	}
 
-	go s.postVoteRepo.Vote(context.Background(), userID, createdPost.ID.Hex(), true)
-	s.bus.Publish(bus.PostCreatedEvent{AuthorID: userID})
+	go s.voteService.VoteOnTarget(userID, createdPost.ID.Hex(), model.VoteTargetPost, true)
+
+	// Publish event for moderation
+	s.bus.Publish(&bus.PostCreatedEvent{
+		PostID:   createdPost.ID.Hex(),
+		AuthorID: userID,
+	})
 
 	return s.GetPostByID(createdPost.ID.Hex(), userID)
 }
@@ -161,7 +167,7 @@ func (s *postService) GetPostByID(postID string, userID string) (*dto.PostRespon
 	var userPollVoteIDs []string
 
 	if userID != "" {
-		vote, _ := s.postVoteRepo.GetUserVote(ctx, userID, postID)
+		vote, _ := s.voteService.GetUserVote(userID, postID, model.VoteTargetPost)
 		if vote != nil {
 			if vote.Value {
 				userVoteStr = "up"
@@ -208,7 +214,7 @@ func (s *postService) GetPosts(userID string, query *dto.GetPostsQuery) (*dto.Pa
 	var userVotes map[string]string
 	var userPollVotes map[string][]string
 	if userID != "" {
-		userVotes, _ = s.postVoteRepo.FindUserVotes(ctx, userID, postIDs)
+		userVotes, _ = s.voteService.FindUserVotes(userID, postIDs, model.VoteTargetPost)
 		userPollVotes, _ = s.pollVoteRepo.FindUserVotes(ctx, userID, postIDs)
 	}
 
@@ -422,30 +428,7 @@ func (s *postService) RemoveVideosFromPost(userID, postID string, publicIDs []st
 }
 
 func (s *postService) VoteOnPost(userID, postID string, voteValue bool) (*dto.VotesCountResponse, error) {
-	ctx, cancel := util.NewDefaultDBContext()
-	defer cancel()
-
-	post, err := s.postRepo.GetByID(ctx, postID)
-	if err != nil {
-		return nil, err
-	}
-	if post.AuthorID.Hex() == userID {
-		return nil, apperror.ErrForbidden
-	}
-
-	prevVote, _ := s.postVoteRepo.GetUserVote(ctx, userID, postID)
-
-	if err := s.postVoteRepo.Vote(ctx, userID, postID, voteValue); err != nil {
-		return nil, err
-	}
-
-	s.publishVoteEvents(post.AuthorID.Hex(), userID, postID, prevVote, voteValue)
-
-	updatedPost, err := s.postRepo.GetByID(ctx, postID)
-	if err != nil {
-		return nil, err
-	}
-	return &dto.VotesCountResponse{Up: updatedPost.VotesCount.Up, Down: updatedPost.VotesCount.Down, Score: updatedPost.VotesCount.Up - updatedPost.VotesCount.Down}, nil
+	return s.voteService.VoteOnTarget(userID, postID, model.VoteTargetPost, voteValue)
 }
 
 func (s *postService) SavePost(userID, postID string) error {
@@ -534,7 +517,7 @@ func (s *postService) GetSavedPosts(userID string, query *dto.GetPostsQuery) (*d
 	var userVotes map[string]string
 	var userPollVotes map[string][]string
 	if userID != "" {
-		userVotes, _ = s.postVoteRepo.FindUserVotes(ctx, userID, postIDs)
+		userVotes, _ = s.voteService.FindUserVotes(userID, postIDs, model.VoteTargetPost)
 		userPollVotes, _ = s.pollVoteRepo.FindUserVotes(ctx, userID, postIDs)
 	}
 
@@ -818,24 +801,6 @@ func (s *postService) getPollResponse(ctx context.Context, postID, userID string
 	}
 	userPollVoteIDs, _ := s.pollVoteRepo.GetUserVoteIDs(ctx, userID, postID)
 	return dto.FromPoll(post.Content.Poll, userPollVoteIDs), nil
-}
-
-func (s *postService) publishVoteEvents(authorID, voterID, postID string, prevVote *model.Vote, newVoteValue bool) {
-	if prevVote == nil {
-		if newVoteValue {
-			s.bus.Publish(bus.PostUpvotedEvent{AuthorID: authorID, VoterID: voterID, PostID: postID})
-		} else {
-			s.bus.Publish(bus.PostDownvotedEvent{AuthorID: authorID, VoterID: voterID, PostID: postID})
-		}
-	} else if prevVote.Value != newVoteValue {
-		if newVoteValue {
-			s.bus.Publish(bus.PostDownvoteRemovedEvent{AuthorID: authorID, VoterID: voterID, PostID: postID})
-			s.bus.Publish(bus.PostUpvotedEvent{AuthorID: authorID, VoterID: voterID, PostID: postID})
-		} else {
-			s.bus.Publish(bus.PostUpvoteRemovedEvent{AuthorID: authorID, VoterID: voterID, PostID: postID})
-			s.bus.Publish(bus.PostDownvotedEvent{AuthorID: authorID, VoterID: voterID, PostID: postID})
-		}
-	}
 }
 
 // --- Helper methods ---

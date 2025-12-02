@@ -19,10 +19,12 @@ type CommentService interface {
 	GetCommentsFilterPaginated(query *dto.GetCommentsFilterQuery) (*dto.PaginatedCommentsResponse, error)
 	GetAllChildren(commentID string) ([]model.Comment, error)
 	DeleteCommentByID(commentID string, userID string) error
+	VoteOnComment(userID, commentID string, voteValue bool) (*dto.VotesCountResponse, error)
 }
 
 type commentService struct {
 	commentRepo   repo.CommentRepo
+	voteService   VoteService
 	userRepo      repo.UserRepo
 	communityRepo repo.CommunityRepo
 	postRepo      repo.PostRepo
@@ -31,12 +33,20 @@ type commentService struct {
 
 func NewCommentService(
 	commentRepo repo.CommentRepo,
+	voteService VoteService,
 	userRepo repo.UserRepo,
 	communityRepo repo.CommunityRepo,
 	postRepo repo.PostRepo,
 	bus bus.EventBus,
 ) CommentService {
-	return &commentService{commentRepo: commentRepo, userRepo: userRepo, communityRepo: communityRepo, postRepo: postRepo, bus: bus}
+	return &commentService{
+		commentRepo:   commentRepo,
+		voteService:   voteService,
+		userRepo:      userRepo,
+		communityRepo: communityRepo,
+		postRepo:      postRepo,
+		bus:           bus,
+	}
 }
 
 func (s *commentService) CreateComment(request *dto.CreateCommentRequest, userID string) (*model.Comment, error) {
@@ -94,12 +104,13 @@ func (s *commentService) CreateComment(request *dto.CreateCommentRequest, userID
 	}
 
 	comment := &model.Comment{
-		Author:    author,
-		PostID:    postObjectID,
-		ParentID:  parentObjectID,
-		Content:   request.Content,
-		CreatedAt: time.Now(),
-		IsDeleted: false,
+		Author:           author,
+		PostID:           postObjectID,
+		ParentID:         parentObjectID,
+		Content:          request.Content,
+		CreatedAt:        time.Now(),
+		IsDeleted:        false,
+		ModerationStatus: model.ModerationPending, // Set pending for moderation
 	}
 
 	createdComment, err := s.commentRepo.Create(ctx, comment)
@@ -107,12 +118,12 @@ func (s *commentService) CreateComment(request *dto.CreateCommentRequest, userID
 		return nil, err
 	}
 
-	// Publish event for reputation and notification systems
-	s.bus.Publish(bus.CommentCreatedEvent{
-		AuthorID:       userID,
-		PostID:         request.PostID,
+	// Publish event for moderation
+	s.bus.Publish(&bus.CommentCreatedEvent{
 		CommentID:      createdComment.ID.Hex(),
-		ParentAuthorID: parentAuthorID,
+		PostID:         request.PostID,
+		AuthorID:       userID,
+		ParentAuthorID: &parentAuthorID,
 	})
 
 	return createdComment, nil
@@ -231,4 +242,8 @@ func (s *commentService) DeleteCommentByID(commentID string, userID string) erro
 	}
 
 	return s.commentRepo.Delete(ctx, commentID)
+}
+
+func (s *commentService) VoteOnComment(userID, commentID string, voteValue bool) (*dto.VotesCountResponse, error) {
+	return s.voteService.VoteOnTarget(userID, commentID, model.VoteTargetComment, voteValue)
 }

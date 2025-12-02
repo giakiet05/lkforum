@@ -12,12 +12,16 @@ const (
 	TopicUserChangeAvatar = "user.avatar"
 
 	TopicPostCreated         = "post.created"
+	TopicPostApproved        = "post.approved"
+	TopicPostRejected        = "post.rejected"
 	TopicPostUpvoted         = "post.upvoted"
 	TopicPostDownvoted       = "post.downvoted"
 	TopicPostUpvoteRemoved   = "post.upvote_removed"
 	TopicPostDownvoteRemoved = "post.downvote_removed"
 
 	TopicCommentCreated         = "comment.created"
+	TopicCommentApproved        = "comment.approved"
+	TopicCommentRejected        = "comment.rejected"
 	TopicCommentUpvoted         = "comment.upvoted"
 	TopicCommentDownvoted       = "comment.downvoted"
 	TopicCommentUpvoteRemoved   = "comment.upvote_removed"
@@ -75,12 +79,33 @@ func (e UserChangeAvatarEventType) Payload() map[string]interface{} {
 // --- Post Events ---
 
 type PostCreatedEvent struct {
+	PostID   string
 	AuthorID string
 }
 
-func (e PostCreatedEvent) Topic() string { return TopicPostCreated }
-func (e PostCreatedEvent) Payload() map[string]interface{} {
-	return map[string]interface{}{"authorId": e.AuthorID}
+func (e *PostCreatedEvent) Topic() string { return TopicPostCreated }
+func (e *PostCreatedEvent) Payload() map[string]interface{} {
+	return map[string]interface{}{"post_id": e.PostID, "author_id": e.AuthorID}
+}
+
+type PostApprovedEvent struct {
+	PostID string
+}
+
+func (e *PostApprovedEvent) Topic() string { return TopicPostApproved }
+func (e *PostApprovedEvent) Payload() map[string]interface{} {
+	return map[string]interface{}{"post_id": e.PostID}
+}
+
+type PostRejectedEvent struct {
+	PostID   string
+	AuthorID string
+	Reason   string
+}
+
+func (e *PostRejectedEvent) Topic() string { return TopicPostRejected }
+func (e *PostRejectedEvent) Payload() map[string]interface{} {
+	return map[string]interface{}{"post_id": e.PostID, "author_id": e.AuthorID, "reason": e.Reason}
 }
 
 type PostUpvotedEvent struct {
@@ -91,7 +116,7 @@ type PostUpvotedEvent struct {
 
 func (e PostUpvotedEvent) Topic() string { return TopicPostUpvoted }
 func (e PostUpvotedEvent) Payload() map[string]interface{} {
-	return map[string]interface{}{"authorId": e.AuthorID, "voterId": e.VoterID, "postId": e.PostID}
+	return map[string]interface{}{"author_id": e.AuthorID, "voter_id": e.VoterID, "post_id": e.PostID}
 }
 
 type PostDownvotedEvent struct {
@@ -102,7 +127,7 @@ type PostDownvotedEvent struct {
 
 func (e PostDownvotedEvent) Topic() string { return TopicPostDownvoted }
 func (e PostDownvotedEvent) Payload() map[string]interface{} {
-	return map[string]interface{}{"authorId": e.AuthorID, "voterId": e.VoterID, "postId": e.PostID}
+	return map[string]interface{}{"author_id": e.AuthorID, "voter_id": e.VoterID, "post_id": e.PostID}
 }
 
 type PostUpvoteRemovedEvent struct {
@@ -113,7 +138,7 @@ type PostUpvoteRemovedEvent struct {
 
 func (e PostUpvoteRemovedEvent) Topic() string { return TopicPostUpvoteRemoved }
 func (e PostUpvoteRemovedEvent) Payload() map[string]interface{} {
-	return map[string]interface{}{"authorId": e.AuthorID, "voterId": e.VoterID, "postId": e.PostID}
+	return map[string]interface{}{"author_id": e.AuthorID, "voter_id": e.VoterID, "post_id": e.PostID}
 }
 
 type PostDownvoteRemovedEvent struct {
@@ -124,21 +149,93 @@ type PostDownvoteRemovedEvent struct {
 
 func (e PostDownvoteRemovedEvent) Topic() string { return TopicPostDownvoteRemoved }
 func (e PostDownvoteRemovedEvent) Payload() map[string]interface{} {
-	return map[string]interface{}{"authorId": e.AuthorID, "voterId": e.VoterID, "postId": e.PostID}
+	return map[string]interface{}{"author_id": e.AuthorID, "voter_id": e.VoterID, "post_id": e.PostID}
 }
 
 // --- Comment Events ---
 
 type CommentCreatedEvent struct {
-	AuthorID       string
-	PostID         string
 	CommentID      string
-	ParentAuthorID string
+	PostID         string
+	AuthorID       string
+	ParentAuthorID *string
 }
 
-func (e CommentCreatedEvent) Topic() string { return TopicCommentCreated }
-func (e CommentCreatedEvent) Payload() map[string]interface{} {
-	return map[string]interface{}{"authorId": e.AuthorID, "postId": e.PostID, "commentId": e.CommentID, "parentAuthorId": e.ParentAuthorID}
+func (e *CommentCreatedEvent) Topic() string { return TopicCommentCreated }
+func (e *CommentCreatedEvent) Payload() map[string]interface{} {
+	payload := map[string]interface{}{
+		"comment_id": e.CommentID,
+		"post_id":    e.PostID,
+		"author_id":  e.AuthorID,
+	}
+	if e.ParentAuthorID != nil {
+		payload["parent_author_id"] = *e.ParentAuthorID
+	}
+	return payload
+}
+
+type CommentApprovedEvent struct {
+	CommentID string
+}
+
+func (e *CommentApprovedEvent) Topic() string { return TopicCommentApproved }
+func (e *CommentApprovedEvent) Payload() map[string]interface{} {
+	return map[string]interface{}{"comment_id": e.CommentID}
+}
+
+type CommentRejectedEvent struct {
+	CommentID string
+	AuthorID  string
+	Reason    string
+}
+
+func (e *CommentRejectedEvent) Topic() string { return TopicCommentRejected }
+func (e *CommentRejectedEvent) Payload() map[string]interface{} {
+	return map[string]interface{}{"comment_id": e.CommentID, "author_id": e.AuthorID, "reason": e.Reason}
+}
+
+type CommentUpvotedEvent struct {
+	AuthorID  string
+	VoterID   string
+	CommentID string
+}
+
+func (e CommentUpvotedEvent) Topic() string { return TopicCommentUpvoted }
+func (e CommentUpvotedEvent) Payload() map[string]interface{} {
+	return map[string]interface{}{"author_id": e.AuthorID, "voter_id": e.VoterID, "comment_id": e.CommentID}
+}
+
+type CommentDownvotedEvent struct {
+	AuthorID  string
+	VoterID   string
+	CommentID string
+}
+
+func (e CommentDownvotedEvent) Topic() string { return TopicCommentDownvoted }
+func (e CommentDownvotedEvent) Payload() map[string]interface{} {
+	return map[string]interface{}{"author_id": e.AuthorID, "voter_id": e.VoterID, "comment_id": e.CommentID}
+}
+
+type CommentUpvoteRemovedEvent struct {
+	AuthorID  string
+	VoterID   string
+	CommentID string
+}
+
+func (e CommentUpvoteRemovedEvent) Topic() string { return TopicCommentUpvoteRemoved }
+func (e CommentUpvoteRemovedEvent) Payload() map[string]interface{} {
+	return map[string]interface{}{"author_id": e.AuthorID, "voter_id": e.VoterID, "comment_id": e.CommentID}
+}
+
+type CommentDownvoteRemovedEvent struct {
+	AuthorID  string
+	VoterID   string
+	CommentID string
+}
+
+func (e CommentDownvoteRemovedEvent) Topic() string { return TopicCommentDownvoteRemoved }
+func (e CommentDownvoteRemovedEvent) Payload() map[string]interface{} {
+	return map[string]interface{}{"author_id": e.AuthorID, "voter_id": e.VoterID, "comment_id": e.CommentID}
 }
 
 // --- Notification Events ---
@@ -150,7 +247,7 @@ type NotificationCreatedEvent struct {
 
 func (e NotificationCreatedEvent) Topic() string { return TopicNotificationCreated }
 func (e NotificationCreatedEvent) Payload() map[string]interface{} {
-	return map[string]interface{}{"recipientId": e.RecipientID, "notification": e.Notification}
+	return map[string]interface{}{"recipient_id": e.RecipientID, "notification": e.Notification}
 }
 
 // --- Message Events ---

@@ -12,42 +12,44 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-type PostVoteRepo interface {
-	Vote(ctx context.Context, userID, postID string, voteValue bool) error
-	RemoveVote(ctx context.Context, userID, postID string) error
-	GetUserVote(ctx context.Context, userID, postID string) (*model.Vote, error)
-	FindUserVotes(ctx context.Context, userID string, postIDs []string) (map[string]string, error)
+type VoteRepo interface {
+	Vote(ctx context.Context, userID, targetID string, targetType model.VoteTargetType, voteValue bool) error
+	RemoveVote(ctx context.Context, userID, targetID string, targetType model.VoteTargetType) error
+	GetUserVote(ctx context.Context, userID, targetID string, targetType model.VoteTargetType) (*model.Vote, error)
+	FindUserVotes(ctx context.Context, userID string, targetIDs []string, targetType model.VoteTargetType) (map[string]string, error)
 }
 
-type postVoteRepo struct {
-	client         *mongo.Client
-	postCollection *mongo.Collection
-	voteCollection *mongo.Collection
+type voteRepo struct {
+	client            *mongo.Client
+	postCollection    *mongo.Collection
+	commentCollection *mongo.Collection
+	voteCollection    *mongo.Collection
 }
 
-func NewPostVoteRepo(client *mongo.Client, db *mongo.Database) PostVoteRepo {
-	return &postVoteRepo{
-		client:         client,
-		postCollection: db.Collection(config.PostColName),
-		voteCollection: db.Collection(config.VoteColName),
+func NewVoteRepo(client *mongo.Client, db *mongo.Database) VoteRepo {
+	return &voteRepo{
+		client:            client,
+		postCollection:    db.Collection(config.PostColName),
+		commentCollection: db.Collection(config.CommentColName),
+		voteCollection:    db.Collection(config.VoteColName),
 	}
 }
 
-func (r *postVoteRepo) GetUserVote(ctx context.Context, userID, postID string) (*model.Vote, error) {
+func (r *voteRepo) GetUserVote(ctx context.Context, userID, targetID string, targetType model.VoteTargetType) (*model.Vote, error) {
 	userObjID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
 		return nil, apperror.ErrInvalidID
 	}
-	postObjID, err := primitive.ObjectIDFromHex(postID)
+	targetObjID, err := primitive.ObjectIDFromHex(targetID)
 	if err != nil {
 		return nil, apperror.ErrInvalidID
 	}
 
 	var vote model.Vote
 	filter := bson.M{
-		"target_id":   postObjID,
+		"target_id":   targetObjID,
 		"user_id":     userObjID,
-		"target_type": model.VoteTargetPost,
+		"target_type": targetType,
 	}
 
 	err = r.voteCollection.FindOne(ctx, filter).Decode(&vote)
@@ -60,8 +62,8 @@ func (r *postVoteRepo) GetUserVote(ctx context.Context, userID, postID string) (
 	return &vote, nil
 }
 
-func (r *postVoteRepo) FindUserVotes(ctx context.Context, userID string, postIDs []string) (map[string]string, error) {
-	if len(postIDs) == 0 {
+func (r *voteRepo) FindUserVotes(ctx context.Context, userID string, targetIDs []string, targetType model.VoteTargetType) (map[string]string, error) {
+	if len(targetIDs) == 0 {
 		return make(map[string]string), nil
 	}
 
@@ -70,19 +72,19 @@ func (r *postVoteRepo) FindUserVotes(ctx context.Context, userID string, postIDs
 		return nil, apperror.ErrInvalidID
 	}
 
-	postObjIDs := make([]primitive.ObjectID, len(postIDs))
-	for i, pid := range postIDs {
-		objID, err := primitive.ObjectIDFromHex(pid)
+	targetObjIDs := make([]primitive.ObjectID, len(targetIDs))
+	for i, tid := range targetIDs {
+		objID, err := primitive.ObjectIDFromHex(tid)
 		if err != nil {
 			continue // Skip invalid IDs
 		}
-		postObjIDs[i] = objID
+		targetObjIDs[i] = objID
 	}
 
 	filter := bson.M{
 		"user_id":     userObjID,
-		"target_type": model.VoteTargetPost,
-		"target_id":   bson.M{"$in": postObjIDs},
+		"target_type": targetType,
+		"target_id":   bson.M{"$in": targetObjIDs},
 	}
 
 	cursor, err := r.voteCollection.Find(ctx, filter)
@@ -107,12 +109,12 @@ func (r *postVoteRepo) FindUserVotes(ctx context.Context, userID string, postIDs
 	return userVotesMap, cursor.Err()
 }
 
-func (r *postVoteRepo) Vote(ctx context.Context, userID, postID string, voteValue bool) error {
+func (r *voteRepo) Vote(ctx context.Context, userID, targetID string, targetType model.VoteTargetType, voteValue bool) error {
 	userObjID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
 		return apperror.ErrInvalidID
 	}
-	postObjID, err := primitive.ObjectIDFromHex(postID)
+	targetObjID, err := primitive.ObjectIDFromHex(targetID)
 	if err != nil {
 		return apperror.ErrInvalidID
 	}
@@ -124,7 +126,7 @@ func (r *postVoteRepo) Vote(ctx context.Context, userID, postID string, voteValu
 	defer session.EndSession(ctx)
 
 	callback := func(sessCtx mongo.SessionContext) (interface{}, error) {
-		previousVote, err := r.getUserVoteInTx(sessCtx, userObjID, postObjID)
+		previousVote, err := r.getUserVoteInTx(sessCtx, userObjID, targetObjID, targetType)
 		if err != nil {
 			return nil, err
 		}
@@ -135,8 +137,8 @@ func (r *postVoteRepo) Vote(ctx context.Context, userID, postID string, voteValu
 			// Case 1: New vote
 			newVote := &model.Vote{
 				UserID:     userObjID,
-				TargetID:   postObjID,
-				TargetType: model.VoteTargetPost,
+				TargetID:   targetObjID,
+				TargetType: targetType,
 				Value:      voteValue,
 			}
 			if _, err := r.voteCollection.InsertOne(sessCtx, newVote); err != nil {
@@ -150,7 +152,7 @@ func (r *postVoteRepo) Vote(ctx context.Context, userID, postID string, voteValu
 		} else {
 			if previousVote.Value == voteValue {
 				// Case 2: Un-voting (e.g., clicking upvote again)
-				return nil, r.removeVoteInTransaction(sessCtx, previousVote)
+				return nil, r.removeVoteInTransaction(sessCtx, previousVote, targetType)
 			} else {
 				// Case 3: Changing vote (e.g., from up to down)
 				update := bson.M{"$set": bson.M{"value": voteValue}}
@@ -167,10 +169,8 @@ func (r *postVoteRepo) Vote(ctx context.Context, userID, postID string, voteValu
 			}
 		}
 
-		// Apply counter update to the posts reportCollection
-		postFilter := bson.M{"_id": postObjID}
-		postUpdate := bson.M{"$inc": bson.M{"votes_count.up": upInc, "votes_count.down": downInc}}
-		if _, err := r.postCollection.UpdateOne(sessCtx, postFilter, postUpdate); err != nil {
+		// Apply counter update to the appropriate collection
+		if err := r.updateTargetVoteCount(sessCtx, targetObjID, targetType, upInc, downInc); err != nil {
 			return nil, err
 		}
 		return nil, nil
@@ -180,12 +180,12 @@ func (r *postVoteRepo) Vote(ctx context.Context, userID, postID string, voteValu
 	return err
 }
 
-func (r *postVoteRepo) RemoveVote(ctx context.Context, userID, postID string) error {
+func (r *voteRepo) RemoveVote(ctx context.Context, userID, targetID string, targetType model.VoteTargetType) error {
 	userObjID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
 		return apperror.ErrInvalidID
 	}
-	postObjID, err := primitive.ObjectIDFromHex(postID)
+	targetObjID, err := primitive.ObjectIDFromHex(targetID)
 	if err != nil {
 		return apperror.ErrInvalidID
 	}
@@ -197,14 +197,14 @@ func (r *postVoteRepo) RemoveVote(ctx context.Context, userID, postID string) er
 	defer session.EndSession(ctx)
 
 	callback := func(sessCtx mongo.SessionContext) (interface{}, error) {
-		voteToRemove, err := r.getUserVoteInTx(sessCtx, userObjID, postObjID)
+		voteToRemove, err := r.getUserVoteInTx(sessCtx, userObjID, targetObjID, targetType)
 		if err != nil {
 			return nil, err
 		}
 		if voteToRemove == nil {
 			return nil, apperror.ErrVoteNotFound
 		}
-		return nil, r.removeVoteInTransaction(sessCtx, voteToRemove)
+		return nil, r.removeVoteInTransaction(sessCtx, voteToRemove, targetType)
 	}
 
 	_, err = session.WithTransaction(ctx, callback)
@@ -212,9 +212,9 @@ func (r *postVoteRepo) RemoveVote(ctx context.Context, userID, postID string) er
 }
 
 // getUserVoteInTx is a helper to get a vote within a transaction context.
-func (r *postVoteRepo) getUserVoteInTx(ctx context.Context, userID, postID primitive.ObjectID) (*model.Vote, error) {
+func (r *voteRepo) getUserVoteInTx(ctx context.Context, userID, targetID primitive.ObjectID, targetType model.VoteTargetType) (*model.Vote, error) {
 	var vote model.Vote
-	filter := bson.M{"target_id": postID, "user_id": userID, "target_type": model.VoteTargetPost}
+	filter := bson.M{"target_id": targetID, "user_id": userID, "target_type": targetType}
 	err := r.voteCollection.FindOne(ctx, filter).Decode(&vote)
 	if err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
@@ -226,7 +226,7 @@ func (r *postVoteRepo) getUserVoteInTx(ctx context.Context, userID, postID primi
 }
 
 // removeVoteInTransaction is a helper to delete a vote and update the counter within a transaction.
-func (r *postVoteRepo) removeVoteInTransaction(sessCtx mongo.SessionContext, vote *model.Vote) error {
+func (r *voteRepo) removeVoteInTransaction(sessCtx mongo.SessionContext, vote *model.Vote, targetType model.VoteTargetType) error {
 	if _, err := r.voteCollection.DeleteOne(sessCtx, bson.M{"_id": vote.ID}); err != nil {
 		return err
 	}
@@ -238,8 +238,24 @@ func (r *postVoteRepo) removeVoteInTransaction(sessCtx mongo.SessionContext, vot
 		downInc = -1
 	}
 
-	postFilter := bson.M{"_id": vote.TargetID}
-	postUpdate := bson.M{"$inc": bson.M{"votes_count.up": upInc, "votes_count.down": downInc}}
-	_, err := r.postCollection.UpdateOne(sessCtx, postFilter, postUpdate)
+	return r.updateTargetVoteCount(sessCtx, vote.TargetID, targetType, upInc, downInc)
+}
+
+// updateTargetVoteCount updates the vote count for either post or comment
+func (r *voteRepo) updateTargetVoteCount(ctx context.Context, targetID primitive.ObjectID, targetType model.VoteTargetType, upInc, downInc int) error {
+	filter := bson.M{"_id": targetID}
+	update := bson.M{"$inc": bson.M{"votes_count.up": upInc, "votes_count.down": downInc}}
+
+	var collection *mongo.Collection
+	switch targetType {
+	case model.VoteTargetPost:
+		collection = r.postCollection
+	case model.VoteTargetComment:
+		collection = r.commentCollection
+	default:
+		return apperror.ErrInvalidID
+	}
+
+	_, err := collection.UpdateOne(ctx, filter, update)
 	return err
 }

@@ -24,6 +24,7 @@ type CommentRepo interface {
 	GetByParentIDsPaginated(ctx context.Context, parentIDs []string, page int, pageSize int) ([]model.Comment, error)
 	GetAllChildren(ctx context.Context, commentID string) ([]model.Comment, error)
 	Delete(ctx context.Context, commentID string) error
+	UpdateByID(ctx context.Context, commentID string, update bson.M) error
 }
 
 type commentRepo struct {
@@ -219,6 +220,24 @@ func (c *commentRepo) Delete(ctx context.Context, commentID string) error {
 			"author.avatar":   "[deleted]",
 			"deleted_at":      time.Now(),
 		},
+	}
+
+	result, err := c.commentCollection.UpdateOne(ctx, bson.M{"_id": commentObjectID}, update)
+	if err != nil {
+		return err
+	}
+
+	if result.MatchedCount == 0 {
+		return apperror.ErrCommentNotFound
+	}
+
+	return nil
+}
+
+func (c *commentRepo) UpdateByID(ctx context.Context, commentID string, update bson.M) error {
+	commentObjectID, err := primitive.ObjectIDFromHex(commentID)
+	if err != nil {
+		return apperror.ErrInvalidID
 	}
 
 	result, err := c.commentCollection.UpdateOne(ctx, bson.M{"_id": commentObjectID}, update)
