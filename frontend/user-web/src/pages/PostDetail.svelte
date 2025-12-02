@@ -14,12 +14,6 @@
     reportPost,
   } from "../services/post-service";
   import { authStore } from "../stores/auth-store";
-  import {
-    savePollVote,
-    removePollVote as removeLocalPollVote,
-    hasVotedOnPoll,
-    getPollVotedOptions,
-  } from "../utils/poll-vote-storage";
 
   type PostDetailProps = {
     params?: { id: string };
@@ -29,7 +23,12 @@
 
   let post = $state<PostResponse | null>(null);
   let selectedOptions = $state<string[]>([]);
-  let hasVoted = $state(false);
+
+  // Check if user has voted based on backend data
+  const hasVoted = $derived(
+    post?.content.poll?.user_vote_ids &&
+      post.content.poll.user_vote_ids.length > 0
+  );
 
   // Vote state
   let userVote = $state<"up" | "down" | "">("");
@@ -153,9 +152,6 @@
       // Initialize vote state from post data
       userVote = (post.user_vote as "up" | "down" | "") || "";
       votesCount = post.votes_count?.score || 0;
-
-      // TEMP FIX: Backend doesn't return user_vote_ids, use localStorage
-      hasVoted = post.type === "poll" ? hasVotedOnPoll(post.id) : false;
     } catch (error) {
       console.error("Failed to fetch post:", error);
     }
@@ -164,9 +160,9 @@
   function handleVote(optionId: string) {
     if (!post) return;
 
-    // TEMP FIX: Check localStorage since backend doesn't return user_vote_ids
-    const votedOptions = getPollVotedOptions(post.id);
-    const alreadyVotedThisOption = votedOptions.includes(optionId);
+    // Check if already voted this option from backend data
+    const alreadyVotedThisOption =
+      post.content.poll?.user_vote_ids?.includes(optionId);
 
     if (post.content.poll?.allow_multiple) {
       // Multiple choice: toggle selection (but can't revote same option)
@@ -217,15 +213,32 @@
         post.content.poll.user_vote_ids = updatedPoll.user_vote_ids || [];
       }
 
-      // TEMP FIX: Save to localStorage since backend doesn't return user_vote_ids
-      savePollVote(post.id, optionId);
-
       // Clear selection
       selectedOptions = [];
-      hasVoted = true;
     } catch (error) {
       console.error("Failed to vote on poll:", error);
       alert("Failed to submit vote. Please try again.");
+    }
+  }
+
+  async function handleUnvote() {
+    if (!post || !currentUser) {
+      alert("Please login to manage votes");
+      return;
+    }
+
+    try {
+      const updatedPoll = await removePollVote(post.id);
+
+      // Update poll with fresh data from backend
+      if (post.content.poll && updatedPoll) {
+        post.content.poll.options = updatedPoll.options;
+        post.content.poll.total_votes = updatedPoll.total_votes;
+        post.content.poll.user_vote_ids = updatedPoll.user_vote_ids || [];
+      }
+    } catch (error) {
+      console.error("Failed to remove poll vote:", error);
+      alert("Failed to remove vote. Please try again.");
     }
   }
 
@@ -307,7 +320,6 @@
       isReporting = true;
       await reportPost(post.id, {
         reason: reportReason,
-        details: reportDetails,
       });
       alert("Report submitted successfully");
       closeReportModal();
@@ -412,7 +424,7 @@
           {:else if post.content.videos && post.content.videos.length > 0}
             <video
               controls
-              poster={post.content.videos[0].thumbnail_url}
+              poster={post.content.videos[0].thumbnail}
               class="post-video"
             >
               <source src={post.content.videos[0].url} type="video/mp4" />
@@ -424,48 +436,62 @@
               <h3 class="poll-question">{post.content.poll.question}</h3>
               <div class="poll-options">
                 {#each post.content.poll.options as option}
+                  {@const isVotedOption =
+                    post.content.poll.user_vote_ids?.includes(option.id)}
                   <button
                     class="poll-option"
                     class:selected={selectedOptions.includes(option.id)}
+                    class:voted={isVotedOption}
                     onclick={() => handleVote(option.id)}
-                    disabled={hasVoted}
+                    disabled={hasVoted && !post.content.poll.allow_multiple}
                   >
-                    {#if hasVoted}
-                      <div
-                        class="poll-result-bar"
-                        style="width: {option.percentage}%;"
-                      ></div>
+                    <div
+                      class="poll-result-bar"
+                      style="width: {option.percentage}%;"
+                    ></div>
+                    <div class="poll-option-content">
+                      {#if !hasVoted}
+                        <div class="radio-check">
+                          {#if post.content.poll.allow_multiple}
+                            <div
+                              class="checkbox"
+                              class:checked={selectedOptions.includes(
+                                option.id
+                              )}
+                            ></div>
+                          {:else}
+                            <div
+                              class="radio"
+                              class:checked={selectedOptions.includes(
+                                option.id
+                              )}
+                            ></div>
+                          {/if}
+                        </div>
+                      {/if}
                       <span class="poll-option-text">{option.text}</span>
-                      <span class="poll-option-votes">{option.votes} votes</span
+                      <span class="poll-option-percentage"
+                        >{option.percentage.toFixed(1)}%</span
                       >
-                    {:else}
-                      <div class="radio-check">
-                        {#if post.content.poll.allow_multiple}
-                          <div
-                            class="checkbox"
-                            class:checked={selectedOptions.includes(option.id)}
-                          ></div>
-                        {:else}
-                          <div
-                            class="radio"
-                            class:checked={selectedOptions.includes(option.id)}
-                          ></div>
-                        {/if}
-                      </div>
-                      <span class="poll-option-text">{option.text}</span>
-                    {/if}
+                    </div>
                   </button>
                 {/each}
               </div>
-              {#if !hasVoted}
-                <button
-                  class="vote-submit-btn"
-                  onclick={submitVote}
-                  disabled={selectedOptions.length === 0}
-                >
-                  Vote
-                </button>
-              {/if}
+              <div class="poll-actions">
+                {#if !hasVoted}
+                  <button
+                    class="vote-submit-btn"
+                    onclick={submitVote}
+                    disabled={selectedOptions.length === 0}
+                  >
+                    Vote
+                  </button>
+                {:else}
+                  <button class="unvote-btn" onclick={handleUnvote}>
+                    Remove Vote
+                  </button>
+                {/if}
+              </div>
               <p class="poll-footer">
                 {post.content.poll.total_votes} votes • {post.content.poll
                   .allow_multiple
@@ -986,7 +1012,7 @@
     display: flex;
     align-items: center;
     width: 100%;
-    padding: 12px 16px;
+    padding: 0;
     border: 2px solid #ccc;
     border-radius: 4px;
     background-color: white;
@@ -995,6 +1021,7 @@
     text-align: left;
     overflow: hidden;
     font-size: 15px;
+    min-height: 48px;
   }
 
   .poll-option:not(:disabled):hover {
@@ -1004,6 +1031,11 @@
   .poll-option.selected {
     border-color: var(--primary-color);
     background-color: #f0f8ff;
+  }
+
+  .poll-option.voted {
+    border-color: var(--primary-color);
+    border-width: 2px;
   }
 
   .poll-option:disabled {
@@ -1016,24 +1048,74 @@
     left: 0;
     height: 100%;
     background-color: var(--primary-color);
-    opacity: 0.2;
+    opacity: 0.15;
     transition: width 0.5s ease-in-out;
   }
 
-  .poll-option-text {
+  .poll-option-content {
     position: relative;
     z-index: 1;
+    display: flex;
+    align-items: center;
+    width: 100%;
+    padding: 12px 16px;
+    gap: 12px;
+  }
+
+  .poll-option-text {
     flex-grow: 1;
   }
 
-  .poll-option-votes {
-    position: relative;
-    z-index: 1;
-    font-weight: bold;
+  .poll-option-percentage {
+    font-weight: 600;
+    font-size: 16px;
+    color: var(--primary-color);
+    white-space: nowrap;
+  }
+
+  .poll-actions {
+    margin-top: 16px;
+    display: flex;
+    gap: 8px;
+  }
+
+  .vote-submit-btn,
+  .unvote-btn {
+    padding: 10px 28px;
+    border: none;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 15px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .vote-submit-btn {
+    background-color: var(--primary-color);
+    color: white;
+  }
+
+  .vote-submit-btn:hover:not(:disabled) {
+    background-color: var(--primary-color-dark);
+  }
+
+  .vote-submit-btn:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+  }
+
+  .unvote-btn {
+    background-color: #f0f0f0;
+    color: #333;
+    border: 1px solid #ddd;
+  }
+
+  .unvote-btn:hover {
+    background-color: #e0e0e0;
   }
 
   .radio-check {
-    margin-right: 12px;
+    margin-right: 0;
     flex-shrink: 0;
   }
 
@@ -1057,28 +1139,6 @@
   .checkbox.checked {
     border-color: var(--primary-color);
     background-color: var(--primary-color);
-  }
-
-  .vote-submit-btn {
-    margin-top: 12px;
-    padding: 10px 24px;
-    border: 1px solid var(--primary-color);
-    background-color: var(--primary-color);
-    color: white;
-    border-radius: 20px;
-    font-weight: bold;
-    font-size: 14px;
-    cursor: pointer;
-    font-family: "Roboto", sans-serif;
-  }
-
-  .vote-submit-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  .vote-submit-btn:not(:disabled):hover {
-    background-color: var(--primary-color-hover);
   }
 
   .poll-footer {

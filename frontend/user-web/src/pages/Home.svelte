@@ -5,14 +5,14 @@
   // TODO: Replace with API call to fetch posts (keeping mock data for now)
   const posts: PostResponse[] = [
     {
-      id: "1",
+      id: "675e1a2b3c4d5e6f7a8b9c0d",
       author: {
-        id: "user1",
+        id: "675e1a2b3c4d5e6f7a8b9c0e",
         username: "user123",
         avatar: { public_id: "avatar1", url: "/avatar.jpg" },
       },
       community: {
-        id: "comm1",
+        id: "675e1a2b3c4d5e6f7a8b9c0f",
         name: "sveltejs",
       },
       title: "Svelte 5 is amazing!",
@@ -29,14 +29,14 @@
       created_at: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(), // 4 hours ago
     },
     {
-      id: "2",
+      id: "675e1a2b3c4d5e6f7a8b9c10",
       author: {
-        id: "user2",
+        id: "675e1a2b3c4d5e6f7a8b9c11",
         username: "photographer",
         avatar: { public_id: "avatar2", url: "/avatar.jpg" },
       },
       community: {
-        id: "comm2",
+        id: "675e1a2b3c4d5e6f7a8b9c12",
         name: "pics",
       },
       title: "Girl on wayhome, who is she?",
@@ -60,14 +60,14 @@
       created_at: new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString(), // 8 hours ago
     },
     {
-      id: "3",
+      id: "675e1a2b3c4d5e6f7a8b9c13",
       author: {
-        id: "user3",
+        id: "675e1a2b3c4d5e6f7a8b9c14",
         username: "pollmaster",
         avatar: { public_id: "avatar3", url: "/avatar.jpg" },
       },
       community: {
-        id: "comm3",
+        id: "675e1a2b3c4d5e6f7a8b9c15",
         name: "polls",
       },
       title: "What is your favorite frontend framework?",
@@ -93,14 +93,14 @@
       created_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(), // 1 day ago
     },
     {
-      id: "4",
+      id: "675e1a2b3c4d5e6f7a8b9c16",
       author: {
-        id: "user4",
+        id: "675e1a2b3c4d5e6f7a8b9c17",
         username: "videographer",
         avatar: { public_id: "avatar4", url: "/avatar.jpg" },
       },
       community: {
-        id: "comm4",
+        id: "675e1a2b3c4d5e6f7a8b9c18",
         name: "videos",
       },
       title: "Flashback AMV",

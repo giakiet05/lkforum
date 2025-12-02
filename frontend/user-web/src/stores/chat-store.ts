@@ -158,13 +158,19 @@ export function setMessages(channelId: string, messages: MessageResponse[]) {
  * Add a new message to a channel
  */
 export function addMessage(channelId: string, message: MessageResponse) {
+    console.log("💾 [chat-store] Adding message to channel:", channelId, message);
     chatStore.update(state => {
         const newMessagesByChannel = new Map(state.messagesByChannel);
         const currentMessages = newMessagesByChannel.get(channelId) || [];
         
+        console.log("💾 [chat-store] Current messages count:", currentMessages.length);
+        
         // Avoid duplicates
         if (!currentMessages.find(m => m.id === message.id)) {
             newMessagesByChannel.set(channelId, [...currentMessages, message]);
+            console.log("💾 [chat-store] Message added! New count:", currentMessages.length + 1);
+        } else {
+            console.log("💾 [chat-store] Message already exists, skipping");
         }
 
         return {

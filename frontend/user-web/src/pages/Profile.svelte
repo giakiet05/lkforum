@@ -3,7 +3,6 @@
   import { push } from "svelte-spa-router";
   import Post from "../components/Post.svelte";
   import type { PostResponse } from "../dtos/post-dto";
-  import type { CommentResponse } from "../dtos/comment-dto";
   import type { UserResponse } from "../dtos/user-dto";
   import {
     getMyProfile,
@@ -11,7 +10,6 @@
     uploadCover,
   } from "../services/user-service";
   import { getPostsByUserId, getSavedPosts } from "../services/post-service";
-  import { getCommentsByUserId } from "../services/comment-service";
   import { ApiError } from "../errors/api-error";
   import { setAuth } from "../stores/auth-store";
 
@@ -20,23 +18,17 @@
   let errorMessage = $state<string | null>(null);
 
   let posts = $state<PostResponse[]>([]);
-  let comments = $state<CommentResponse[]>([]);
   let savedPosts = $state<PostResponse[]>([]);
   let isLoadingPosts = $state(false);
-  let isLoadingComments = $state(false);
   let isLoadingSaved = $state(false);
 
   // Flags to prevent infinite loading when user has no data
   let hasLoadedPosts = $state(false);
-  let hasLoadedComments = $state(false);
   let hasLoadedSaved = $state(false);
   let postsError = $state<string | null>(null);
-  let commentsError = $state<string | null>(null);
   let savedError = $state<string | null>(null);
 
-  let activeTab = $state<
-    "posts" | "comments" | "upvoted" | "downvoted" | "saved"
-  >("posts");
+  let activeTab = $state<"posts" | "saved">("posts");
   let sortBy = $state<"hot" | "newest" | "oldest">("hot");
 
   let avatarFileInput = $state<HTMLInputElement | undefined>();
@@ -62,13 +54,6 @@
   $effect(() => {
     if (user && activeTab === "posts" && !hasLoadedPosts && !postsError) {
       loadUserPosts();
-    } else if (
-      user &&
-      activeTab === "comments" &&
-      !hasLoadedComments &&
-      !commentsError
-    ) {
-      loadUserComments();
     } else if (
       user &&
       activeTab === "saved" &&
@@ -200,27 +185,6 @@
     } finally {
       isLoadingPosts = false;
       hasLoadedPosts = true;
-    }
-  }
-
-  async function loadUserComments() {
-    if (!user) return;
-
-    try {
-      isLoadingComments = true;
-      commentsError = null;
-      comments = await getCommentsByUserId(user.id, 1, 20);
-    } catch (error) {
-      console.error("Failed to load comments:", error);
-      if (error instanceof ApiError) {
-        commentsError = error.message;
-      } else {
-        commentsError = "Failed to load comments. Please try again.";
-      }
-      comments = [];
-    } finally {
-      isLoadingComments = false;
-      hasLoadedComments = true;
     }
   }
 
@@ -388,21 +352,6 @@
           >
           <button
             class="tab-btn"
-            class:active={activeTab === "comments"}
-            onclick={() => (activeTab = "comments")}>Comments</button
-          >
-          <button
-            class="tab-btn"
-            class:active={activeTab === "upvoted"}
-            onclick={() => (activeTab = "upvoted")}>Upvoted</button
-          >
-          <button
-            class="tab-btn"
-            class:active={activeTab === "downvoted"}
-            onclick={() => (activeTab = "downvoted")}>Downvoted</button
-          >
-          <button
-            class="tab-btn"
             class:active={activeTab === "saved"}
             onclick={() => (activeTab = "saved")}>Saved</button
           >
@@ -439,53 +388,6 @@
                 {/each}
               </div>
             {/if}
-          {:else if activeTab === "comments"}
-            {#if isLoadingComments}
-              <div class="loading-posts">
-                <div class="spinner"></div>
-                <p>Loading comments...</p>
-              </div>
-            {:else if commentsError}
-              <div class="error-state">
-                <p>{commentsError}</p>
-                <button class="retry-btn" onclick={loadUserComments}
-                  >Retry</button
-                >
-              </div>
-            {:else if comments.length === 0}
-              <div class="empty-state">
-                <p>No comments yet</p>
-              </div>
-            {:else}
-              <div class="comments-list">
-                {#each comments as comment}
-                  <div class="comment-item">
-                    <div class="comment-header">
-                      <img
-                        src={comment.author.avatar || "/avatar.jpg"}
-                        alt={comment.author.username}
-                        class="comment-avatar"
-                      />
-                      <span class="comment-author"
-                        >{comment.author.username}</span
-                      >
-                      <span class="comment-time">{comment.created_at}</span>
-                    </div>
-                    <div class="comment-content">{comment.content}</div>
-                  </div>
-                {/each}
-              </div>
-            {/if}
-          {:else if activeTab === "upvoted"}
-            <div class="coming-soon">
-              <p>Upvoted posts feature coming soon...</p>
-              <p class="note">Backend API needed</p>
-            </div>
-          {:else if activeTab === "downvoted"}
-            <div class="coming-soon">
-              <p>Downvoted posts feature coming soon...</p>
-              <p class="note">Backend API needed</p>
-            </div>
           {:else if activeTab === "saved"}
             {#if isLoadingSaved}
               <div class="loading-posts">
@@ -1305,67 +1207,11 @@
     color: #7c7c7c;
   }
 
-  /* Coming Soon State */
-  .coming-soon {
-    text-align: center;
-    padding: 4rem 2rem;
-    color: #7c7c7c;
-  }
-
-  .coming-soon p {
-    margin: 0.5rem 0;
-  }
-
-  .coming-soon .note {
+  .empty-state .note {
     font-size: 0.85rem;
     color: #999;
     font-style: italic;
-  }
-
-  /* Comments List */
-  .comments-list {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-  }
-
-  .comment-item {
-    background: white;
-    border: 1px solid #e6e6e6;
-    border-radius: 4px;
-    padding: 1rem;
-  }
-
-  .comment-header {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin-bottom: 0.5rem;
-  }
-
-  .comment-avatar {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    object-fit: cover;
-  }
-
-  .comment-author {
-    font-weight: 600;
-    color: #1a1a1b;
-    font-size: 0.9rem;
-  }
-
-  .comment-time {
-    color: #7c7c7c;
-    font-size: 0.85rem;
-    margin-left: auto;
-  }
-
-  .comment-content {
-    color: #1a1a1b;
-    line-height: 1.5;
-    padding-left: 2.5rem;
+    margin-top: 0.5rem;
   }
 
   /* Placeholder styles */
