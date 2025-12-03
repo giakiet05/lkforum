@@ -42,7 +42,14 @@ func (c *UserController) GetUsers(ctx *gin.Context) {
 func (c *UserController) GetUserByUsername(ctx *gin.Context) {
 	username := ctx.Param("username")
 
-	user, err := c.service.GetUserByUsername(username)
+	// Get requester ID (may be empty for unauthenticated requests)
+	requesterID, _ := ctx.Get("user_id")
+	requesterIDStr := ""
+	if id, ok := requesterID.(string); ok {
+		requesterIDStr = id
+	}
+
+	user, err := c.service.GetUserByUsername(username, requesterIDStr)
 	if err != nil {
 		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return

@@ -323,10 +323,27 @@ func (s *postService) UpdatePost(postID string, userID string, req *dto.UpdatePo
 		return s.GetPostByID(postID, userID)
 	}
 
+	// Check if user is admin/moderator
+	author, _ := s.userRepo.GetByID(ctx, userID)
+	isAdminOrMod := author != nil && (author.Role == "admin" || author.Role == "moderator")
+
+	// Set moderation status to pending for normal users
+	if !isAdminOrMod {
+		update["$set"].(bson.M)["moderation_status"] = model.ModerationPending
+		update["$set"].(bson.M)["moderation_reason"] = nil
+		update["$set"].(bson.M)["moderated_at"] = nil
+	}
+
 	update["$set"].(bson.M)["updated_at"] = time.Now()
 	if err := s.postRepo.UpdateByID(ctx, postID, update); err != nil {
 		return nil, err
 	}
+
+	// Publish PostUpdatedEvent for moderation
+	s.bus.Publish(&bus.PostUpdatedEvent{
+		PostID:   postID,
+		AuthorID: userID,
+	})
 
 	return s.GetPostByID(postID, userID)
 }

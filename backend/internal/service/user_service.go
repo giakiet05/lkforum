@@ -31,7 +31,7 @@ type UserService interface {
 	ChangePassword(userID, oldPassword, newPassword string) error
 
 	GetUserByID(id string) (*dto.UserResponse, error)
-	GetUserByUsername(username string) (*dto.UserResponse, error)
+	GetUserByUsername(username string, requesterID string) (*dto.UserResponse, error)
 	GetUserByEmail(email string) (*dto.UserResponse, error)
 	GetUsers(query *dto.GetUsersQuery) (*dto.PaginatedUsersResponse, error)
 
@@ -354,7 +354,7 @@ func (s *userService) GetUserByID(id string) (*dto.UserResponse, error) {
 	return dto.FromUser(user), nil
 }
 
-func (s *userService) GetUserByUsername(username string) (*dto.UserResponse, error) {
+func (s *userService) GetUserByUsername(username string, requesterID string) (*dto.UserResponse, error) {
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
 	user, err := s.userRepo.GetByUsername(ctx, username)
@@ -364,6 +364,15 @@ func (s *userService) GetUserByUsername(username string) (*dto.UserResponse, err
 		}
 		return nil, err
 	}
+
+	// Check if profile is private
+	if user.Settings != nil && !user.Settings.Privacy.ShowProfile {
+		// Only allow user themselves to view their own private profile
+		if requesterID == "" || user.ID.Hex() != requesterID {
+			return nil, apperror.ErrForbidden
+		}
+	}
+
 	return dto.FromUser(user), nil
 }
 

@@ -28,14 +28,16 @@ type MessageService interface {
 type messageService struct {
 	messageRepository repo.MessageRepo
 	channelRepository repo.ChannelRepo
+	userRepository    repo.UserRepo
 	eventBus          bus.EventBus
 	redisClient       *redis.Client
 }
 
-func NewMessageService(messageRepo repo.MessageRepo, channelRepo repo.ChannelRepo, bus bus.EventBus, redis *redis.Client) MessageService {
+func NewMessageService(messageRepo repo.MessageRepo, channelRepo repo.ChannelRepo, userRepo repo.UserRepo, bus bus.EventBus, redis *redis.Client) MessageService {
 	return &messageService{
 		messageRepository: messageRepo,
 		channelRepository: channelRepo,
+		userRepository:    userRepo,
 		eventBus:          bus,
 		redisClient:       redis,
 	}
@@ -114,6 +116,17 @@ func (m *messageService) handleNewMessage(event bus.Event) {
 		if member.UserID == senderObjectID {
 			isMember = true
 		} else {
+			// Check if recipient allows direct messages
+			recipient, err := m.userRepository.GetByID(ctx, member.UserID.Hex())
+			if err == nil && recipient.Settings != nil && !recipient.Settings.Privacy.AllowDirectMessages {
+				// Recipient has disabled DMs - reject message
+				m.publishMessageError(senderID, channelID, tempMessageID, *apperror.NewError(
+					nil,
+					apperror.ErrForbidden.Code,
+					fmt.Sprintf("User %s has disabled direct messages", recipient.Username),
+				))
+				return
+			}
 			recipientIDs = append(recipientIDs, member.UserID.Hex())
 		}
 	}

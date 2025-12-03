@@ -8,7 +8,6 @@ import (
 	reflect "reflect"
 
 	dto "github.com/giakiet05/lkforum/internal/dto"
-	model "github.com/giakiet05/lkforum/internal/model"
 	gomock "github.com/golang/mock/gomock"
 )
 

@@ -98,6 +98,11 @@ func (s *notificationService) handlePostUpvoted(event bus.Event) {
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
 
+	// Check if recipient wants upvote notifications
+	if !s.shouldNotify(ctx, authorID, model.NotificationTypeLike) {
+		return
+	}
+
 	// Redis batch key
 	batchKey := fmt.Sprintf(postUpvoteBatchKeyPrefix, postID)
 
@@ -179,6 +184,11 @@ func (s *notificationService) handleCommentUpvoted(event bus.Event) {
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
 
+	// Check if recipient wants upvote notifications
+	if !s.shouldNotify(ctx, authorID, model.NotificationTypeLike) {
+		return
+	}
+
 	// Redis batch key
 	batchKey := fmt.Sprintf(commentUpvoteBatchKeyPrefix, commentID)
 
@@ -257,6 +267,10 @@ func (s *notificationService) handleCommentCreatedReply(event bus.Event) {
 
 	// Only handle reply notifications here (instant notification)
 	if parentAuthorID != "" && authorID != parentAuthorID {
+		// Check if recipient wants comment notifications
+		if !s.shouldNotify(ctx, parentAuthorID, model.NotificationTypeComment) {
+			return
+		}
 		author, err := s.userRepo.GetByID(ctx, authorID)
 		if err != nil {
 			return
@@ -314,6 +328,11 @@ func (s *notificationService) handleCommentApprovedForPost(event bus.Event) {
 
 	// Skip if this is a reply and parent author is post author (already handled by reply notification)
 	if parentAuthorID != "" && parentAuthorID == postAuthorID {
+		return
+	}
+
+	// Check if recipient wants comment notifications
+	if !s.shouldNotify(ctx, postAuthorID, model.NotificationTypeComment) {
 		return
 	}
 
@@ -851,4 +870,39 @@ func (s *notificationService) sendPostCommentBatchNotification(ctx context.Conte
 // splitBatchKey splits Redis key by colon
 func splitBatchKey(key string) []string {
 	return strings.Split(key, ":")
+}
+
+// shouldNotify checks if recipient wants to receive this notification type
+func (s *notificationService) shouldNotify(ctx context.Context, recipientID string, notifType model.NotificationType) bool {
+	recipient, err := s.userRepo.GetByID(ctx, recipientID)
+	if err != nil {
+		// If can't get user settings, allow notification (fail-open)
+		return true
+	}
+
+	// No settings = use defaults (all enabled)
+	if recipient.Settings == nil {
+		return true
+	}
+
+	settings := recipient.Settings.Notifications
+
+	// Check in-app enabled first
+	if !settings.InAppEnabled {
+		return false
+	}
+
+	// Check specific notification type preferences
+	switch notifType {
+	case model.NotificationTypeComment:
+		return settings.NotifyOnComment
+	case model.NotificationTypeLike:
+		return settings.NotifyOnUpvote
+	case model.NotificationTypeMention:
+		return settings.NotifyOnMention
+	case model.NotificationTypeNewMessage:
+		return settings.NotifyOnMessage
+	default:
+		return true // Unknown types allowed by default
+	}
 }

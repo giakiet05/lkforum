@@ -52,6 +52,7 @@ func (s *moderationService) Start() {
 	eventChannel := make(bus.EventListener, 100)
 
 	s.bus.Subscribe(bus.TopicPostCreated, eventChannel)
+	s.bus.Subscribe(bus.TopicPostUpdated, eventChannel)
 	s.bus.Subscribe(bus.TopicCommentCreated, eventChannel)
 
 	log.Println("ModerationService started and subscribed to events.")
@@ -64,6 +65,8 @@ func (s *moderationService) processEvents(ch bus.EventListener) {
 		switch event.Topic() {
 		case bus.TopicPostCreated:
 			s.handlePostCreated(event)
+		case bus.TopicPostUpdated:
+			s.handlePostUpdated(event)
 		case bus.TopicCommentCreated:
 			s.handleCommentCreated(event)
 		}
@@ -85,6 +88,42 @@ func (s *moderationService) handlePostCreated(event bus.Event) {
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
+
+		if err := s.ModeratePost(ctx, postID); err != nil {
+			log.Printf("Post moderation failed for %s: %v", postID, err)
+		}
+	}()
+}
+
+func (s *moderationService) handlePostUpdated(event bus.Event) {
+	payload := event.Payload()
+	postID, ok := payload["post_id"].(string)
+	if !ok {
+		postID, ok = payload["PostID"].(string)
+		if !ok {
+			log.Printf("Invalid PostUpdatedEvent payload: %v", payload)
+			return
+		}
+	}
+
+	// Run moderation in background
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		// Get post to check moderation status
+		post, err := s.postRepo.GetByID(ctx, postID)
+		if err != nil {
+			log.Printf("Failed to get post %s: %v", postID, err)
+			return
+		}
+
+		// Only moderate if status is pending (normal users)
+		// Admin/moderator edits won't have pending status
+		if post.ModerationStatus != model.ModerationPending {
+			log.Printf("Skipping moderation for post %s (status: %s)", postID, post.ModerationStatus)
+			return
+		}
 
 		if err := s.ModeratePost(ctx, postID); err != nil {
 			log.Printf("Post moderation failed for %s: %v", postID, err)
