@@ -19,6 +19,7 @@ type CommentRepo interface {
 	GetCommentsFilterPaginated(
 		ctx context.Context,
 		postID *string, parentID *string, userID *string, content *string,
+		currentUserID *string,
 		page int, pageSize int,
 	) ([]model.Comment, int64, error)
 	GetByParentIDsPaginated(ctx context.Context, parentIDs []string, page int, pageSize int) ([]model.Comment, error)
@@ -72,6 +73,7 @@ func (c *commentRepo) GetCommentsFilterPaginated(
 	parentID *string,
 	userID *string,
 	content *string,
+	currentUserID *string,
 	page int, pageSize int,
 ) ([]model.Comment, int64, error) {
 
@@ -106,6 +108,22 @@ func (c *commentRepo) GetCommentsFilterPaginated(
 	if content != nil && *content != "" {
 		// Case-insensitive partial match
 		filter["content"] = bson.M{"$regex": primitive.Regex{Pattern: *content, Options: "i"}}
+	}
+
+	// Moderation filter
+	if currentUserID == nil || *currentUserID == "" {
+		// Guest user: only see approved comments
+		filter["moderation_status"] = model.ModerationApproved
+	} else {
+		// Logged-in user: see approved + own comments (pending/rejected)
+		currentUserObjectID, err := primitive.ObjectIDFromHex(*currentUserID)
+		if err != nil {
+			return nil, 0, apperror.ErrInvalidID
+		}
+		filter["$or"] = []bson.M{
+			{"moderation_status": model.ModerationApproved},
+			{"author.id": currentUserObjectID},
+		}
 	}
 
 	// Pagination and sorting

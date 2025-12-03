@@ -78,6 +78,28 @@ func (c *PostController) GetPosts(ctx *gin.Context) {
 	dto.SendSuccess(ctx, http.StatusOK, "Posts retrieved successfully", posts)
 }
 
+func (c *PostController) GetMyPosts(ctx *gin.Context) {
+	authUser, exists := ctx.Get("authUser")
+	if !exists {
+		dto.SendError(ctx, http.StatusUnauthorized, apperror.ErrForbidden.Message, apperror.ErrForbidden.Code)
+		return
+	}
+
+	var query dto.GetPostsQuery
+	if err := ctx.ShouldBindQuery(&query); err != nil {
+		dto.SendError(ctx, http.StatusBadRequest, "Invalid query parameters", apperror.ErrBadRequest.Code)
+		return
+	}
+
+	posts, err := c.service.GetMyPosts(authUser.(auth.AuthUser).ID, &query)
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
+		return
+	}
+
+	dto.SendSuccess(ctx, http.StatusOK, "My posts retrieved successfully", posts)
+}
+
 func (c *PostController) UpdatePost(ctx *gin.Context) {
 	authUser, exists := ctx.Get("authUser")
 	if !exists {

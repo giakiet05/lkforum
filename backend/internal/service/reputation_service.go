@@ -36,12 +36,12 @@ func NewReputationService(userRepo repo.UserRepo, bus bus.EventBus) ReputationSe
 func (s *reputationService) Start() {
 	eventChannel := make(bus.EventListener, 100)
 
-	s.eventBus.Subscribe(bus.TopicPostCreated, eventChannel)
+	s.eventBus.Subscribe(bus.TopicPostApproved, eventChannel)
 	s.eventBus.Subscribe(bus.TopicPostUpvoted, eventChannel)
 	s.eventBus.Subscribe(bus.TopicPostDownvoted, eventChannel)
 	s.eventBus.Subscribe(bus.TopicPostUpvoteRemoved, eventChannel)
 	s.eventBus.Subscribe(bus.TopicPostDownvoteRemoved, eventChannel)
-	s.eventBus.Subscribe(bus.TopicCommentCreated, eventChannel)
+	s.eventBus.Subscribe(bus.TopicCommentApproved, eventChannel)
 	s.eventBus.Subscribe(bus.TopicCommentUpvoted, eventChannel)
 	s.eventBus.Subscribe(bus.TopicCommentDownvoted, eventChannel)
 	s.eventBus.Subscribe(bus.TopicCommentUpvoteRemoved, eventChannel)
@@ -56,7 +56,7 @@ func (s *reputationService) Start() {
 func (s *reputationService) processEvents(ch bus.EventListener) {
 	for event := range ch {
 		switch event.Topic() {
-		case bus.TopicPostCreated:
+		case bus.TopicPostApproved:
 			s.handleReputationUpdate(event, "author_id", PointsPostCreated)
 		case bus.TopicPostUpvoted:
 			s.handleReputationUpdate(event, "author_id", PointsPostUpvoted)
@@ -70,7 +70,7 @@ func (s *reputationService) processEvents(ch bus.EventListener) {
 			// Revert the downvote: add back +2 points to author, +1 to voter
 			s.handleReputationUpdate(event, "author_id", -PointsPostDownvoted)
 			s.handleReputationUpdate(event, "voter_id", -PointsDownvoteAction)
-		case bus.TopicCommentCreated:
+		case bus.TopicCommentApproved:
 			s.handleReputationUpdate(event, "author_id", PointsCommentCreated)
 		case bus.TopicCommentUpvoted:
 			s.handleReputationUpdate(event, "author_id", PointsCommentUpvoted)

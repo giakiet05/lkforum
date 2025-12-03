@@ -231,6 +231,12 @@ func (s *moderationService) shouldSkipModeration(user *model.User) bool {
 }
 
 func (s *moderationService) approvePost(ctx context.Context, postID string, status model.ModerationStatus, result *model.ModerationResult) error {
+	// Get post to retrieve author ID
+	post, err := s.postRepo.GetByID(ctx, postID)
+	if err != nil {
+		return err
+	}
+
 	now := time.Now()
 	update := repo.UpdateDocument{
 		"$set": bson.M{
@@ -243,13 +249,16 @@ func (s *moderationService) approvePost(ctx context.Context, postID string, stat
 		update["$set"].(bson.M)["moderation_result"] = result
 	}
 
-	err := s.postRepo.UpdateByID(ctx, postID, update)
+	err = s.postRepo.UpdateByID(ctx, postID, update)
 	if err != nil {
 		return err
 	}
 
-	// Publish approved event
-	s.bus.Publish(&bus.PostApprovedEvent{PostID: postID})
+	// Publish approved event with author ID
+	s.bus.Publish(&bus.PostApprovedEvent{
+		PostID:   postID,
+		AuthorID: post.AuthorID.Hex(),
+	})
 
 	log.Printf("Post %s approved (status: %s)", postID, status)
 	return nil
@@ -282,6 +291,12 @@ func (s *moderationService) rejectPost(ctx context.Context, postID, authorID str
 }
 
 func (s *moderationService) approveComment(ctx context.Context, commentID string, status model.ModerationStatus, result *model.ModerationResult) error {
+	// Get comment to retrieve full details for event
+	comment, err := s.commentRepo.GetByID(ctx, commentID)
+	if err != nil {
+		return err
+	}
+
 	now := time.Now()
 	update := bson.M{
 		"$set": bson.M{
@@ -294,10 +309,27 @@ func (s *moderationService) approveComment(ctx context.Context, commentID string
 		update["$set"].(bson.M)["moderation_result"] = result
 	}
 
-	err := s.commentRepo.UpdateByID(ctx, commentID, update)
+	err = s.commentRepo.UpdateByID(ctx, commentID, update)
 	if err != nil {
 		return err
 	}
+
+	// Get parent author ID if exists
+	var parentAuthorID *string
+	if comment.ParentID != nil {
+		if parentComment, err := s.commentRepo.GetByID(ctx, comment.ParentID.Hex()); err == nil {
+			parentAuthorIDStr := parentComment.Author.ID.Hex()
+			parentAuthorID = &parentAuthorIDStr
+		}
+	}
+
+	// Publish approved event with full details
+	s.bus.Publish(&bus.CommentApprovedEvent{
+		CommentID:      commentID,
+		PostID:         comment.PostID.Hex(),
+		AuthorID:       comment.Author.ID.Hex(),
+		ParentAuthorID: parentAuthorID,
+	})
 
 	log.Printf("Comment %s approved (status: %s)", commentID, status)
 	return nil

@@ -89,12 +89,13 @@ func (e *PostCreatedEvent) Payload() map[string]interface{} {
 }
 
 type PostApprovedEvent struct {
-	PostID string
+	PostID   string
+	AuthorID string
 }
 
 func (e *PostApprovedEvent) Topic() string { return TopicPostApproved }
 func (e *PostApprovedEvent) Payload() map[string]interface{} {
-	return map[string]interface{}{"post_id": e.PostID}
+	return map[string]interface{}{"post_id": e.PostID, "author_id": e.AuthorID}
 }
 
 type PostRejectedEvent struct {
@@ -175,12 +176,23 @@ func (e *CommentCreatedEvent) Payload() map[string]interface{} {
 }
 
 type CommentApprovedEvent struct {
-	CommentID string
+	CommentID      string
+	PostID         string
+	AuthorID       string
+	ParentAuthorID *string
 }
 
 func (e *CommentApprovedEvent) Topic() string { return TopicCommentApproved }
 func (e *CommentApprovedEvent) Payload() map[string]interface{} {
-	return map[string]interface{}{"comment_id": e.CommentID}
+	payload := map[string]interface{}{
+		"comment_id": e.CommentID,
+		"post_id":    e.PostID,
+		"author_id":  e.AuthorID,
+	}
+	if e.ParentAuthorID != nil {
+		payload["parent_author_id"] = *e.ParentAuthorID
+	}
+	return payload
 }
 
 type CommentRejectedEvent struct {

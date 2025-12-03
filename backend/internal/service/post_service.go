@@ -24,6 +24,7 @@ type PostService interface {
 	CreatePost(userID string, req *dto.CreatePostRequest) (*dto.PostResponse, error)
 	GetPostByID(postID string, userID string) (*dto.PostResponse, error)
 	GetPosts(userID string, query *dto.GetPostsQuery) (*dto.PaginatedPostsResponse, error)
+	GetMyPosts(userID string, query *dto.GetPostsQuery) (*dto.PaginatedPostsResponse, error)
 	UpdatePost(postID string, userID string, req *dto.UpdatePostRequest) (*dto.PostResponse, error)
 	DeletePost(postID string, userID string) error
 
@@ -231,6 +232,62 @@ func (s *postService) GetPosts(userID string, query *dto.GetPostsQuery) (*dto.Pa
 			Page:     query.Page,
 			PageSize: limit,
 			Total:    totalPosts,
+		},
+	}, nil
+}
+
+func (s *postService) GetMyPosts(userID string, query *dto.GetPostsQuery) (*dto.PaginatedPostsResponse, error) {
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
+
+	userObjID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return nil, apperror.ErrInvalidID
+	}
+
+	filter := repo.Filter{
+		"author_id": userObjID,
+		"is_hidden": bson.M{"$ne": true},
+		"is_draft":  bson.M{"$ne": true},
+	}
+	findOptions := s.buildFindOptions(query)
+
+	posts, total, err := s.postRepo.Find(ctx, filter, findOptions)
+	if err != nil {
+		return nil, err
+	}
+	if total == 0 {
+		return &dto.PaginatedPostsResponse{Posts: []*dto.PostResponse{}}, nil
+	}
+
+	author, _ := s.userRepo.GetByID(ctx, userID)
+	authorsMap := map[string]*model.User{userID: author}
+
+	_, communityIDs := s.extractIDs(posts)
+	communities, _ := s.communityRepo.GetByIDs(ctx, communityIDs)
+	communitiesMap := s.mapCommunities(communities)
+
+	postIDs := make([]string, len(posts))
+	for i, p := range posts {
+		postIDs[i] = p.ID.Hex()
+	}
+
+	userVotes, _ := s.voteService.FindUserVotes(userID, postIDs, model.VoteTargetPost)
+	userPollVotes, _ := s.pollVoteRepo.FindUserVotes(ctx, userID, postIDs)
+
+	responses := dto.FromPostsWithModeration(posts, authorsMap, communitiesMap, userVotes, userPollVotes)
+
+	limit := query.Limit
+	if limit <= 0 {
+		limit = 10
+	}
+
+	return &dto.PaginatedPostsResponse{
+		Posts: responses,
+		Pagination: dto.Pagination{
+			Page:     query.Page,
+			PageSize: limit,
+			Total:    total,
 		},
 	}, nil
 }
@@ -807,8 +864,9 @@ func (s *postService) getPollResponse(ctx context.Context, postID, userID string
 
 func (s *postService) buildFilter(query *dto.GetPostsQuery) repo.Filter {
 	filter := repo.Filter{
-		"is_hidden": bson.M{"$ne": true},
-		"is_draft":  bson.M{"$ne": true},
+		"is_hidden":          bson.M{"$ne": true},
+		"is_draft":           bson.M{"$ne": true},
+		"moderation_status":  model.ModerationApproved,
 	}
 	if query.CommunityID != "" {
 		if id, err := primitive.ObjectIDFromHex(query.CommunityID); err == nil {

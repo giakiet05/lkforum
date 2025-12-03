@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 
+	"github.com/giakiet05/lkforum/internal/apperror"
 	"github.com/giakiet05/lkforum/internal/dto"
 	"github.com/giakiet05/lkforum/internal/model"
 	"github.com/giakiet05/lkforum/internal/platform/bus"
@@ -41,6 +42,11 @@ func (s *voteService) VoteOnTarget(userID, targetID string, targetType model.Vot
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
 
+	// Check moderation status before allowing vote
+	if err := s.checkModerationStatus(ctx, targetID, targetType); err != nil {
+		return nil, err
+	}
+
 	// Get author ID based on target type
 	authorID, err := s.getAuthorID(ctx, targetID, targetType)
 	if err != nil {
@@ -74,6 +80,29 @@ func (s *voteService) FindUserVotes(userID string, targetIDs []string, targetTyp
 	defer cancel()
 
 	return s.voteRepo.FindUserVotes(ctx, userID, targetIDs, targetType)
+}
+
+// checkModerationStatus checks if target is approved before allowing vote
+func (s *voteService) checkModerationStatus(ctx context.Context, targetID string, targetType model.VoteTargetType) error {
+	switch targetType {
+	case model.VoteTargetPost:
+		post, err := s.postRepo.GetByID(ctx, targetID)
+		if err != nil {
+			return err
+		}
+		if post.ModerationStatus != model.ModerationApproved {
+			return apperror.ErrForbidden
+		}
+	case model.VoteTargetComment:
+		comment, err := s.commentRepo.GetByID(ctx, targetID)
+		if err != nil {
+			return err
+		}
+		if comment.ModerationStatus != model.ModerationApproved {
+			return apperror.ErrForbidden
+		}
+	}
+	return nil
 }
 
 // getAuthorID retrieves the author ID based on target type

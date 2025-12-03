@@ -55,6 +55,7 @@ func (s *notificationService) Start() {
 
 	s.eventBus.Subscribe(bus.TopicPostUpvoted, eventChannel)
 	s.eventBus.Subscribe(bus.TopicCommentCreated, eventChannel)
+	s.eventBus.Subscribe(bus.TopicCommentApproved, eventChannel)
 	s.eventBus.Subscribe(bus.TopicCommentUpvoted, eventChannel)
 	s.eventBus.Subscribe(bus.TopicBroadcast, eventChannel)
 
@@ -70,7 +71,9 @@ func (s *notificationService) processEvents(ch bus.EventListener) {
 		case bus.TopicPostUpvoted:
 			s.handlePostUpvoted(event)
 		case bus.TopicCommentCreated:
-			s.handleCommentCreated(event)
+			s.handleCommentCreatedReply(event)
+		case bus.TopicCommentApproved:
+			s.handleCommentApprovedForPost(event)
 		case bus.TopicCommentUpvoted:
 			s.handleCommentUpvoted(event)
 		case bus.TopicBroadcast:
@@ -241,7 +244,8 @@ func (s *notificationService) handleCommentUpvoted(event bus.Event) {
 	}
 }
 
-func (s *notificationService) handleCommentCreated(event bus.Event) {
+// handleCommentCreatedReply handles instant notifications for comment replies only
+func (s *notificationService) handleCommentCreatedReply(event bus.Event) {
 	payload := event.Payload()
 	authorID, _ := payload["author_id"].(string)
 	parentAuthorID, _ := payload["parent_author_id"].(string)
@@ -251,7 +255,7 @@ func (s *notificationService) handleCommentCreated(event bus.Event) {
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
 
-	// Case 1: Reply to parent comment (existing logic - instant notification)
+	// Only handle reply notifications here (instant notification)
 	if parentAuthorID != "" && authorID != parentAuthorID {
 		author, err := s.userRepo.GetByID(ctx, authorID)
 		if err != nil {
@@ -282,8 +286,19 @@ func (s *notificationService) handleCommentCreated(event bus.Event) {
 			Notification: dto.FromNotification(createdNotification),
 		})
 	}
+}
 
-	// Case 2: Top-level comment or comment on post (batched notification for post author)
+// handleCommentApprovedForPost handles batched notifications for approved comments on posts
+func (s *notificationService) handleCommentApprovedForPost(event bus.Event) {
+	payload := event.Payload()
+	commentID, _ := payload["comment_id"].(string)
+	postID, _ := payload["post_id"].(string)
+	authorID, _ := payload["author_id"].(string)
+	parentAuthorID, _ := payload["parent_author_id"].(string)
+
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
+
 	// Get post to find post author
 	post, err := s.postRepo.GetByID(ctx, postID)
 	if err != nil {
@@ -297,7 +312,7 @@ func (s *notificationService) handleCommentCreated(event bus.Event) {
 		return
 	}
 
-	// Skip if already notified as parent author
+	// Skip if this is a reply and parent author is post author (already handled by reply notification)
 	if parentAuthorID != "" && parentAuthorID == postAuthorID {
 		return
 	}
