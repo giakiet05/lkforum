@@ -37,7 +37,8 @@ func (c *CommentController) CreateComment(ctx *gin.Context) {
 		return
 	}
 
-	dto.SendSuccess(ctx, http.StatusCreated, "Comment created successfully", dto.FromComment(comment))
+	userID := authUser.(auth.AuthUser).ID
+	dto.SendSuccess(ctx, http.StatusCreated, "Comment created successfully", dto.FromComment(comment, &userID))
 }
 
 func (c *CommentController) GetCommentByID(ctx *gin.Context) {
@@ -53,7 +54,13 @@ func (c *CommentController) GetCommentByID(ctx *gin.Context) {
 		return
 	}
 
-	dto.SendSuccess(ctx, http.StatusOK, "Comment retrieved successfully", dto.FromComment(comment))
+	var userID *string
+	if val, exists := ctx.Get("authUser"); exists {
+		uid := val.(auth.AuthUser).ID
+		userID = &uid
+	}
+
+	dto.SendSuccess(ctx, http.StatusOK, "Comment retrieved successfully", dto.FromComment(comment, userID))
 }
 
 func (c *CommentController) GetCommentByPostID(ctx *gin.Context) {
@@ -63,7 +70,13 @@ func (c *CommentController) GetCommentByPostID(ctx *gin.Context) {
 		return
 	}
 
-	response, err := c.commentService.GetCommentByPostIDPaginated(query)
+	var currentUserID *string
+	if val, exists := ctx.Get("authUser"); exists {
+		uid := val.(auth.AuthUser).ID
+		currentUserID = &uid
+	}
+
+	response, err := c.commentService.GetCommentByPostIDPaginated(query, currentUserID)
 	if err != nil {
 		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
@@ -79,7 +92,13 @@ func (c *CommentController) GetCommentsFilter(ctx *gin.Context) {
 		return
 	}
 
-	response, err := c.commentService.GetCommentsFilterPaginated(query)
+	var currentUserID *string
+	if val, exists := ctx.Get("authUser"); exists {
+		uid := val.(auth.AuthUser).ID
+		currentUserID = &uid
+	}
+
+	response, err := c.commentService.GetCommentsFilterPaginated(query, currentUserID)
 	if err != nil {
 		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return

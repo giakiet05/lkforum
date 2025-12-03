@@ -36,10 +36,16 @@ func NewReputationService(userRepo repo.UserRepo, bus bus.EventBus) ReputationSe
 func (s *reputationService) Start() {
 	eventChannel := make(bus.EventListener, 100)
 
-	s.eventBus.Subscribe(bus.TopicPostCreated, eventChannel)
+	s.eventBus.Subscribe(bus.TopicPostApproved, eventChannel)
 	s.eventBus.Subscribe(bus.TopicPostUpvoted, eventChannel)
 	s.eventBus.Subscribe(bus.TopicPostDownvoted, eventChannel)
-	s.eventBus.Subscribe(bus.TopicCommentCreated, eventChannel)
+	s.eventBus.Subscribe(bus.TopicPostUpvoteRemoved, eventChannel)
+	s.eventBus.Subscribe(bus.TopicPostDownvoteRemoved, eventChannel)
+	s.eventBus.Subscribe(bus.TopicCommentApproved, eventChannel)
+	s.eventBus.Subscribe(bus.TopicCommentUpvoted, eventChannel)
+	s.eventBus.Subscribe(bus.TopicCommentDownvoted, eventChannel)
+	s.eventBus.Subscribe(bus.TopicCommentUpvoteRemoved, eventChannel)
+	s.eventBus.Subscribe(bus.TopicCommentDownvoteRemoved, eventChannel)
 
 	log.Println("ReputationService started and subscribed to events.")
 
@@ -50,15 +56,34 @@ func (s *reputationService) Start() {
 func (s *reputationService) processEvents(ch bus.EventListener) {
 	for event := range ch {
 		switch event.Topic() {
-		case bus.TopicPostCreated:
-			s.handleReputationUpdate(event, "authorId", PointsPostCreated)
+		case bus.TopicPostApproved:
+			s.handleReputationUpdate(event, "author_id", PointsPostCreated)
 		case bus.TopicPostUpvoted:
-			s.handleReputationUpdate(event, "authorId", PointsPostUpvoted)
+			s.handleReputationUpdate(event, "author_id", PointsPostUpvoted)
 		case bus.TopicPostDownvoted:
-			s.handleReputationUpdate(event, "authorId", PointsPostDownvoted)
-			s.handleReputationUpdate(event, "voterId", PointsDownvoteAction)
-		case bus.TopicCommentCreated:
-			s.handleReputationUpdate(event, "authorId", PointsCommentCreated)
+			s.handleReputationUpdate(event, "author_id", PointsPostDownvoted)
+			s.handleReputationUpdate(event, "voter_id", PointsDownvoteAction)
+		case bus.TopicPostUpvoteRemoved:
+			// Revert the upvote: remove +10 points from author
+			s.handleReputationUpdate(event, "author_id", -PointsPostUpvoted)
+		case bus.TopicPostDownvoteRemoved:
+			// Revert the downvote: add back +2 points to author, +1 to voter
+			s.handleReputationUpdate(event, "author_id", -PointsPostDownvoted)
+			s.handleReputationUpdate(event, "voter_id", -PointsDownvoteAction)
+		case bus.TopicCommentApproved:
+			s.handleReputationUpdate(event, "author_id", PointsCommentCreated)
+		case bus.TopicCommentUpvoted:
+			s.handleReputationUpdate(event, "author_id", PointsCommentUpvoted)
+		case bus.TopicCommentDownvoted:
+			s.handleReputationUpdate(event, "author_id", PointsCommentDownvoted)
+			s.handleReputationUpdate(event, "voter_id", PointsDownvoteAction)
+		case bus.TopicCommentUpvoteRemoved:
+			// Revert the upvote: remove +5 points from author
+			s.handleReputationUpdate(event, "author_id", -PointsCommentUpvoted)
+		case bus.TopicCommentDownvoteRemoved:
+			// Revert the downvote: add back +1 point to author, +1 to voter
+			s.handleReputationUpdate(event, "author_id", -PointsCommentDownvoted)
+			s.handleReputationUpdate(event, "voter_id", -PointsDownvoteAction)
 		default:
 			log.Printf("ReputationService: Received unknown event topic: %s", event.Topic())
 		}

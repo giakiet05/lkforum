@@ -9,6 +9,7 @@ import (
 	"github.com/giakiet05/lkforum/internal/middleware"
 	"github.com/giakiet05/lkforum/internal/platform/bus"
 	"github.com/giakiet05/lkforum/internal/platform/email"
+	"github.com/giakiet05/lkforum/internal/platform/gemini"
 	"github.com/giakiet05/lkforum/internal/platform/ws"
 	"github.com/giakiet05/lkforum/internal/repo"
 	userroute "github.com/giakiet05/lkforum/internal/route/user"
@@ -24,7 +25,7 @@ type Repos struct {
 	repo.MembershipRepo
 	repo.PostRepo
 	repo.PollVoteRepo
-	repo.PostVoteRepo
+	repo.VoteRepo
 	repo.CommentRepo
 	repo.NotificationRepo
 	repo.ChannelRepo
@@ -43,6 +44,7 @@ type Services struct {
 	service.MembershipService
 	service.PostService
 	service.CommentService
+	service.VoteService
 	service.ReputationService
 	service.NotificationService
 	service.ChannelService
@@ -50,6 +52,7 @@ type Services struct {
 	service.PostHistoryService
 	service.DraftService
 	service.ReportService
+	service.ModerationService
 }
 
 type Controllers struct {
@@ -74,7 +77,7 @@ func initRepos(client *mongo.Client, db *mongo.Database) *Repos {
 		CommunityRepo:         repo.NewCommunityRepo(db),
 		MembershipRepo:        repo.NewMembershipRepo(db),
 		PostRepo:              repo.NewPostRepo(db),
-		PostVoteRepo:          repo.NewPostVoteRepo(client, db),
+		VoteRepo:              repo.NewVoteRepo(client, db),
 		PollVoteRepo:          repo.NewPollVoteRepo(client, db),
 		CommentRepo:           repo.NewCommentRepo(db),
 		NotificationRepo:      repo.NewNotificationRepo(db),
@@ -88,7 +91,7 @@ func initRepos(client *mongo.Client, db *mongo.Database) *Repos {
 	}
 }
 
-func initServices(repos *Repos, redisClient *redis.Client, emailSender email.Sender, eventBus bus.EventBus) *Services {
+func initServices(repos *Repos, redisClient *redis.Client, emailSender email.Sender, eventBus bus.EventBus, geminiClient *gemini.GeminiClient) *Services {
 	services := &Services{
 		AuthService:         service.NewAuthService(repos.UserRepo, repos.EmailVerificationRepo, emailSender, redisClient),
 		UserService:         service.NewUserService(repos.UserRepo, eventBus, redisClient),
@@ -102,9 +105,19 @@ func initServices(repos *Repos, redisClient *redis.Client, emailSender email.Sen
 		PostHistoryService:  service.NewPostHistoryService(repos.PostHistoryRepo),
 		ReportService:       service.NewReportService(repos.ReportRepo),
 	}
-	// PostService needs to be created before DraftService due to dependency
-	services.PostService = service.NewPostService(repos.PostRepo, repos.PostVoteRepo, repos.PollVoteRepo, repos.UserRepo, repos.CommunityRepo, repos.SavedPostRepo, repos.ReportRepo, eventBus)
+
+	// VoteService needs to be created first as PostService and CommentService depend on it
+	services.VoteService = service.NewVoteService(repos.VoteRepo, repos.PostRepo, repos.CommentRepo, eventBus)
+
+	// PostService and CommentService need VoteService
+	services.PostService = service.NewPostService(repos.PostRepo, services.VoteService, repos.PollVoteRepo, repos.UserRepo, repos.CommunityRepo, repos.SavedPostRepo, repos.ReportRepo, eventBus)
+	services.CommentService = service.NewCommentService(repos.CommentRepo, services.VoteService, repos.UserRepo, repos.CommunityRepo, repos.PostRepo, eventBus)
+
+	// DraftService needs PostService
 	services.DraftService = service.NewDraftService(repos.DraftRepo, repos.PostRepo, services.PostService)
+
+	// ModerationService
+	services.ModerationService = service.NewModerationService(repos.PostRepo, repos.CommentRepo, repos.UserRepo, geminiClient, eventBus, &config.Cfg.Gemini)
 
 	return services
 }
@@ -182,8 +195,14 @@ func Init() (*gin.Engine, error) {
 	wsHub := ws.NewHub(eventBus)
 	emailSender := email.NewSMTPSender()
 
+	// Initialize Gemini client for content moderation
+	geminiClient, err := gemini.NewGeminiClient(&config.Cfg.Gemini)
+	if err != nil {
+		log.Printf("Warning: Gemini client initialization failed: %v. Content moderation will be disabled.", err)
+	}
+
 	repos := initRepos(client, db)
-	services := initServices(repos, redisClient, emailSender, eventBus)
+	services := initServices(repos, redisClient, emailSender, eventBus, geminiClient)
 	controllers := initControllers(services, wsHub)
 
 	// Inject userRepo into middleware for settings caching
@@ -198,6 +217,7 @@ func Init() (*gin.Engine, error) {
 	services.MessageService.Start()
 	services.ChannelService.Start()
 	services.CommunityService.Start()
+	services.ModerationService.Start() // Start content moderation service
 
 	return router, nil
 }
