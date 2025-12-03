@@ -97,6 +97,7 @@ func initServices(repos *Repos, redisClient *redis.Client, emailSender email.Sen
 		UserService:         service.NewUserService(repos.UserRepo, eventBus, redisClient),
 		CommunityService:    service.NewCommunityService(repos.CommunityRepo, repos.MembershipRepo, eventBus),
 		MembershipService:   service.NewMembershipService(repos.MembershipRepo, redisClient),
+		CommentService:      service.NewCommentService(repos.CommentRepo, repos.UserRepo, repos.CommunityRepo, repos.PostRepo, eventBus),
 		ReputationService:   service.NewReputationService(repos.UserRepo, eventBus),
 		NotificationService: service.NewNotificationService(repos.NotificationRepo, repos.UserRepo, repos.PostRepo, repos.CommentRepo, eventBus, redisClient),
 		ChannelService:      service.NewChannelService(repos.ChannelRepo, eventBus),
