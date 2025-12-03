@@ -10,8 +10,8 @@ func RegisterUserRoutes(rg *gin.RouterGroup, c *controller.UserController) {
 	users := rg.Group("/users")
 
 	// Public routes - anyone can view a user's profile
+	users.GET("/", c.GetUsers)
 	users.GET("/profile/:username", c.GetUserByUsername)
-
 	// Metadata endpoints - public, used for dropdowns
 	users.GET("/provinces", c.GetProvinces)
 	users.GET("/interests", c.GetInterests)

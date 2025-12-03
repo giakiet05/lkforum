@@ -64,21 +64,6 @@ func (mr *MockUserRepoMockRecorder) Delete(ctx, id interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*MockUserRepo)(nil).Delete), ctx, id)
 }
 
-// GetAll mocks base method.
-func (m *MockUserRepo) GetAll(ctx context.Context) ([]*model.User, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetAll", ctx)
-	ret0, _ := ret[0].([]*model.User)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetAll indicates an expected call of GetAll.
-func (mr *MockUserRepoMockRecorder) GetAll(ctx interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAll", reflect.TypeOf((*MockUserRepo)(nil).GetAll), ctx)
-}
-
 // GetByEmail mocks base method.
 func (m *MockUserRepo) GetByEmail(ctx context.Context, email string) (*model.User, error) {
 	m.ctrl.T.Helper()
@@ -137,22 +122,6 @@ func (m *MockUserRepo) GetByUsername(ctx context.Context, username string) (*mod
 func (mr *MockUserRepoMockRecorder) GetByUsername(ctx, username interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByUsername", reflect.TypeOf((*MockUserRepo)(nil).GetByUsername), ctx, username)
-}
-
-// GetPaginated mocks base method.
-func (m *MockUserRepo) GetPaginated(ctx context.Context, page, pageSize int) ([]*model.User, int64, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetPaginated", ctx, page, pageSize)
-	ret0, _ := ret[0].([]*model.User)
-	ret1, _ := ret[1].(int64)
-	ret2, _ := ret[2].(error)
-	return ret0, ret1, ret2
-}
-
-// GetPaginated indicates an expected call of GetPaginated.
-func (mr *MockUserRepoMockRecorder) GetPaginated(ctx, page, pageSize interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPaginated", reflect.TypeOf((*MockUserRepo)(nil).GetPaginated), ctx, page, pageSize)
 }
 
 // Update mocks base method.

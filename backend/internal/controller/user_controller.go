@@ -2,7 +2,6 @@ package controller
 
 import (
 	"net/http"
-	"strconv"
 
 	"github.com/giakiet05/lkforum/internal/apperror"
 	"github.com/giakiet05/lkforum/internal/auth"
@@ -23,12 +22,15 @@ func NewUserController(service service.UserService) *UserController {
 	return &UserController{service: service}
 }
 
-// GetUsers retrieves a paginated list of users (for admin or public listing).
+// GetUsers retrieves a paginated list of users with optional username search.
 func (c *UserController) GetUsers(ctx *gin.Context) {
-	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(ctx.DefaultQuery("pageSize", "10"))
+	var query dto.GetUsersQuery
+	if err := ctx.ShouldBindQuery(&query); err != nil {
+		dto.SendError(ctx, http.StatusBadRequest, "Invalid query parameters", apperror.ErrBadRequest.Code)
+		return
+	}
 
-	response, err := c.service.GetUsers(page, pageSize)
+	response, err := c.service.GetUsers(&query)
 	if err != nil {
 		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return

@@ -108,21 +108,6 @@ func (mr *MockUserServiceMockRecorder) DeleteUser(id interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteUser", reflect.TypeOf((*MockUserService)(nil).DeleteUser), id)
 }
 
-// GetAllUsers mocks base method.
-func (m *MockUserService) GetAllUsers() ([]*model.User, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetAllUsers")
-	ret0, _ := ret[0].([]*model.User)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetAllUsers indicates an expected call of GetAllUsers.
-func (mr *MockUserServiceMockRecorder) GetAllUsers() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAllUsers", reflect.TypeOf((*MockUserService)(nil).GetAllUsers))
-}
-
 // GetSettings mocks base method.
 func (m *MockUserService) GetSettings(userID string) (*dto.SettingsResponse, error) {
 	m.ctrl.T.Helper()
@@ -184,18 +169,18 @@ func (mr *MockUserServiceMockRecorder) GetUserByUsername(username interface{}) *
 }
 
 // GetUsers mocks base method.
-func (m *MockUserService) GetUsers(page, pageSize int) (*dto.PaginatedUsersResponse, error) {
+func (m *MockUserService) GetUsers(query *dto.GetUsersQuery) (*dto.PaginatedUsersResponse, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetUsers", page, pageSize)
+	ret := m.ctrl.Call(m, "GetUsers", query)
 	ret0, _ := ret[0].(*dto.PaginatedUsersResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetUsers indicates an expected call of GetUsers.
-func (mr *MockUserServiceMockRecorder) GetUsers(page, pageSize interface{}) *gomock.Call {
+func (mr *MockUserServiceMockRecorder) GetUsers(query interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUsers", reflect.TypeOf((*MockUserService)(nil).GetUsers), page, pageSize)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUsers", reflect.TypeOf((*MockUserService)(nil).GetUsers), query)
 }
 
 // UpdateAvatar mocks base method.

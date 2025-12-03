@@ -11,6 +11,13 @@ import (
 
 // New Registration Flow (Verify Email First)
 
+// GetUsersQuery contains query parameters for searching and paginating users
+type GetUsersQuery struct {
+	Username string `form:"username"`
+	Page     int    `form:"page"`
+	PageSize int    `form:"pageSize"`
+}
+
 // UserProfileUpdateRequest defines the fields a user can update for their own profile.
 type UserProfileUpdateRequest struct {
 	Bio         *string           `json:"bio" binding:"omitempty,max=500"`
