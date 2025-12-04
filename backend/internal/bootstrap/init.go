@@ -55,6 +55,7 @@ type Services struct {
 	service.ModerationService
 	service.AdminUserService
 	service.AdminCommunityService
+	service.AdminStatsService
 }
 
 type Controllers struct {
@@ -73,6 +74,7 @@ type Controllers struct {
 	controller.ReportController
 	controller.AdminUserController
 	controller.AdminCommunityController
+	controller.AdminStatsController
 }
 
 func initRepos(client *mongo.Client, db *mongo.Database) *Repos {
@@ -100,7 +102,6 @@ func initServices(repos *Repos, redisClient *redis.Client, emailSender email.Sen
 		AuthService:         service.NewAuthService(repos.UserRepo, repos.EmailVerificationRepo, emailSender, redisClient),
 		UserService:         service.NewUserService(repos.UserRepo, eventBus, redisClient),
 		MembershipService:   service.NewMembershipService(repos.MembershipRepo, redisClient),
-		CommentService:      service.NewCommentService(repos.CommentRepo, repos.UserRepo, repos.CommunityRepo, repos.PostRepo, eventBus),
 		ReputationService:   service.NewReputationService(repos.UserRepo, eventBus),
 		NotificationService: service.NewNotificationService(repos.NotificationRepo, repos.UserRepo, repos.PostRepo, repos.CommentRepo, eventBus, redisClient),
 		ChannelService:      service.NewChannelService(repos.ChannelRepo, eventBus),
@@ -128,6 +129,7 @@ func initServices(repos *Repos, redisClient *redis.Client, emailSender email.Sen
 	// AdminUserService for admin operations
 	services.AdminUserService = service.NewAdminUserService(repos.UserRepo)
 	services.AdminCommunityService = service.NewAdminCommunityService(repos.CommunityRepo)
+	services.AdminStatsService = service.NewAdminStatsService(repos.UserRepo, repos.CommunityRepo, repos.PostRepo, repos.CommentRepo, repos.ReportRepo)
 
 	return services
 }
@@ -149,6 +151,7 @@ func initControllers(services *Services, wsHub *ws.Hub) *Controllers {
 		ReportController:       *controller.NewReportController(services.ReportService),
 		AdminUserController:    *controller.NewAdminUserController(services.AdminUserService),
 		AdminCommunityController: *controller.NewAdminCommunityController(services.AdminCommunityService),
+		AdminStatsController:   *controller.NewAdminStatsController(services.AdminStatsService),
 	}
 }
 
@@ -177,6 +180,8 @@ func initRoutes(controllers *Controllers, r *gin.Engine) {
 	route.RegisterReportRoutes(api, &controllers.ReportController)
 	route.RegisterAdminUserRoutes(api, &controllers.AdminUserController)
 	route.RegisterAdminCommunityRoutes(api, &controllers.CommunityController, &controllers.AdminCommunityController)
+	route.RegisterAdminReportRoutes(api, &controllers.ReportController)
+	route.RegisterAdminStatsRoutes(api, &controllers.AdminStatsController)
 }
 
 func Init() (*gin.Engine, error) {

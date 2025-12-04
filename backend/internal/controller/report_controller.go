@@ -76,13 +76,7 @@ func (rc *ReportController) GetReportByIDAdmin(ctx *gin.Context) {
 		return
 	}
 
-	authUser, exists := ctx.Get("authUser")
-	if !exists {
-		dto.SendError(ctx, http.StatusForbidden, apperror.ErrForbidden.Message, apperror.ErrForbidden.Code)
-		return
-	}
-
-	report, err := rc.reportService.GetReportByID(reportID, authUser.(auth.AuthUser).ID, true)
+	report, err := rc.reportService.GetReportByID(reportID, "", true)
 	if err != nil {
 		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return

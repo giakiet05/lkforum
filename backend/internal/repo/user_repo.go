@@ -25,6 +25,13 @@ type UserRepo interface {
 	GetByUsername(ctx context.Context, username string) (*model.User, error)
 	GetByEmail(ctx context.Context, email string) (*model.User, error)
 	Find(ctx context.Context, filter Filter, opts *FindOptions) ([]*model.User, int64, error)
+	
+	// Stats methods
+	CountTotal(ctx context.Context) (int64, error)
+	CountActiveAfter(ctx context.Context, since time.Time) (int64, error)
+	CountCreatedAfter(ctx context.Context, since time.Time) (int64, error)
+	CountBanned(ctx context.Context) (int64, error)
+	CountVerified(ctx context.Context) (int64, error)
 }
 
 type userRepo struct {
@@ -221,4 +228,37 @@ func (r *userRepo) Find(ctx context.Context, filter Filter, opts *FindOptions) (
 	}
 
 	return users, total, nil
+}
+
+// Stats methods implementations
+func (r *userRepo) CountTotal(ctx context.Context) (int64, error) {
+	return r.userCollection.CountDocuments(ctx, bson.M{})
+}
+
+func (r *userRepo) CountActiveAfter(ctx context.Context, since time.Time) (int64, error) {
+	filter := bson.M{
+		"last_login": bson.M{"$gte": since},
+	}
+	return r.userCollection.CountDocuments(ctx, filter)
+}
+
+func (r *userRepo) CountCreatedAfter(ctx context.Context, since time.Time) (int64, error) {
+	filter := bson.M{
+		"created_at": bson.M{"$gte": since},
+	}
+	return r.userCollection.CountDocuments(ctx, filter)
+}
+
+func (r *userRepo) CountBanned(ctx context.Context) (int64, error) {
+	filter := bson.M{
+		"is_banned": true,
+	}
+	return r.userCollection.CountDocuments(ctx, filter)
+}
+
+func (r *userRepo) CountVerified(ctx context.Context) (int64, error) {
+	filter := bson.M{
+		"is_verified": true,
+	}
+	return r.userCollection.CountDocuments(ctx, filter)
 }
