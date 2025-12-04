@@ -5,6 +5,8 @@
   import { push } from "svelte-spa-router";
   import { getCommunities } from "../services/community-service";
   import type { CommunityResponse } from "../dtos/community-dto";
+  import { searchUsers } from "../services/user-service";
+  import type { UserResponse } from "../dtos/user-dto";
 
   type TopbarProps = {
     user?: { name: string; avatar?: string; karma?: number };
@@ -29,38 +31,52 @@
   let showAuthModal = $state(false);
   let showCreatePostModal = $state(false);
   let showChatPopup = $state(false);
-  let dropdownElement: HTMLDivElement | null = null;
+  let dropdownElement = $state<HTMLDivElement | null>(null);
 
   // Search dropdown state
   let showSearchDropdown = $state(false);
-  let searchResults = $state<CommunityResponse[]>([]);
+  let communityResults = $state<CommunityResponse[]>([]);
+  let userResults = $state<UserResponse[]>([]);
   let isSearching = $state(false);
   let searchTimeout: number | null = null;
 
   async function performSearch(query: string) {
     if (!query.trim()) {
-      searchResults = [];
+      communityResults = [];
+      userResults = [];
       showSearchDropdown = false;
       return;
     }
 
     try {
       isSearching = true;
-      // Remove c/ or lk/ prefix if user typed it
-      const cleanQuery = query.replace(/^(c\/|lk\/)/i, "").trim();
+      const cleanQuery = query.replace(/^(c\/|lk\/|u\/)/i, "").trim();
       if (!cleanQuery) {
-        searchResults = [];
+        communityResults = [];
+        userResults = [];
         showSearchDropdown = false;
         isSearching = false;
         return;
       }
 
-      const response = await getCommunities({ name: cleanQuery, limit: 5 });
-      searchResults = response.communities;
-      showSearchDropdown = searchResults.length > 0;
+      // TODO: Backend needs public user search endpoint (currently /api/users requires admin auth)
+      // For now, only search communities
+      const communitiesResponse = await getCommunities({
+        name: cleanQuery,
+        limit: 5,
+      }).catch(() => ({
+        communities: [],
+        pagination: { page: 1, page_size: 0, total_items: 0, total_pages: 0 },
+      }));
+
+      communityResults = communitiesResponse.communities;
+      userResults = []; // Disabled until backend adds public user search API
+      showSearchDropdown =
+        communityResults.length > 0 || userResults.length > 0;
     } catch (error) {
       console.error("Search failed:", error);
-      searchResults = [];
+      communityResults = [];
+      userResults = [];
       showSearchDropdown = false;
     } finally {
       isSearching = false;
@@ -97,12 +113,24 @@
   function handleCommunityClick(communityName: string) {
     push(`/c/${communityName}`);
     searchQuery = "";
-    searchResults = [];
+    communityResults = [];
+    userResults = [];
+    showSearchDropdown = false;
+  }
+
+  function handleUserClick(username: string) {
+    push(`/profile/${username}`);
+    searchQuery = "";
+    communityResults = [];
+    userResults = [];
     showSearchDropdown = false;
   }
 
   function handleSearchFocus() {
-    if (searchQuery.trim() && searchResults.length > 0) {
+    if (
+      searchQuery.trim() &&
+      (communityResults.length > 0 || userResults.length > 0)
+    ) {
       showSearchDropdown = true;
     }
   }
@@ -211,7 +239,7 @@
           <input
             class="search-input"
             type="text"
-            placeholder="Search communities"
+            placeholder="Search communities and users"
             bind:value={searchQuery}
             on:input={handleSearchInput}
             on:keydown={handleSearchKeydown}
@@ -219,27 +247,60 @@
             on:blur={handleSearchBlur}
           />
 
-          {#if showSearchDropdown && searchResults.length > 0}
+          {#if showSearchDropdown && (communityResults.length > 0 || userResults.length > 0)}
             <div class="search-dropdown">
-              <div class="search-dropdown-header">Communities</div>
-              {#each searchResults as community}
-                <button
-                  class="search-result-item"
-                  on:click={() => handleCommunityClick(community.name)}
-                >
-                  <img
-                    src={community.avatar || "/default-community.png"}
-                    alt=""
-                    class="community-avatar"
-                  />
-                  <div class="community-info">
-                    <div class="community-name">c/{community.name}</div>
-                    <div class="community-members">
-                      {community.member_count} members
+              {#if communityResults.length > 0}
+                <div class="search-dropdown-header">Communities</div>
+                {#each communityResults as community}
+                  <button
+                    class="search-result-item"
+                    on:click={() => handleCommunityClick(community.name)}
+                  >
+                    <img
+                      src={community.avatar || "/default-community.png"}
+                      alt=""
+                      class="result-avatar"
+                    />
+                    <div class="result-info">
+                      <div class="result-name">c/{community.name}</div>
+                      <div class="result-meta">
+                        {community.member_count} members
+                      </div>
                     </div>
-                  </div>
-                </button>
-              {/each}
+                  </button>
+                {/each}
+              {/if}
+
+              {#if userResults.length > 0}
+                {#if communityResults.length > 0}
+                  <div class="search-dropdown-divider"></div>
+                {/if}
+                <div class="search-dropdown-header">Users</div>
+                {#each userResults as userResult}
+                  <button
+                    class="search-result-item"
+                    on:click={() => handleUserClick(userResult.username)}
+                  >
+                    {#if userResult.profile?.avatar?.url}
+                      <img
+                        src={userResult.profile.avatar.url}
+                        alt=""
+                        class="result-avatar"
+                      />
+                    {:else}
+                      <div class="result-avatar fallback">
+                        {userResult.username.charAt(0).toUpperCase()}
+                      </div>
+                    {/if}
+                    <div class="result-info">
+                      <div class="result-name">u/{userResult.username}</div>
+                      <div class="result-meta">
+                        {userResult.reputation} karma • {userResult.title}
+                      </div>
+                    </div>
+                  </button>
+                {/each}
+              {/if}
             </div>
           {/if}
 
@@ -577,30 +638,55 @@
     background: var(--background);
     border: 1px solid var(--border);
     border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    z-index: 1000;
-    max-height: 400px;
-    overflow-y: auto;
-  }
+    .search-dropdown-divider {
+      height: 1px;
+      background: var(--border);
+      margin: 4px 0;
+    }
 
-  .search-dropdown-header {
-    padding: 8px 16px;
-    font-size: 11px;
-    font-weight: 600;
-    color: var(--muted-foreground);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    border-bottom: 1px solid var(--border);
-  }
+    .result-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      object-fit: cover;
+      background: var(--topbar-search-background);
+      flex-shrink: 0;
+    }
 
-  .search-result-item {
-    width: 100%;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 12px 16px;
-    background: transparent;
-    border: none;
+    .result-avatar.fallback {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--topbar-accent);
+      color: white;
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    .result-info {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+
+    .result-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--topbar-foreground);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .result-meta {
+      font-size: 12px;
+      color: var(--muted-foreground);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
     cursor: pointer;
     transition: background-color 0.2s;
     text-align: left;
@@ -608,32 +694,6 @@
 
   .search-result-item:hover {
     background: var(--topbar-search-background);
-  }
-
-  .community-avatar {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    object-fit: cover;
-    background: var(--topbar-search-background);
-  }
-
-  .community-info {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-
-  .community-name {
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--topbar-foreground);
-  }
-
-  .community-members {
-    font-size: 12px;
-    color: var(--muted-foreground);
   }
 
   .search-loading {
@@ -835,13 +895,6 @@
 
   .login-button:hover {
     opacity: 0.9;
-  }
-
-  .overlay {
-    position: fixed;
-    inset: 0;
-    z-index: 250;
-    background: rgba(0, 0, 0, 0.1);
   }
 
   @media (min-width: 640px) {
