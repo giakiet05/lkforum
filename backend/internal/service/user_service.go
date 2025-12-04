@@ -393,9 +393,10 @@ func (s *userService) GetUsers(query *dto.GetUsersQuery) (*dto.PaginatedUsersRes
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
 
-	// Build filter
+	// Build filter - exclude deleted and banned users for regular users
 	filter := repo.Filter{
 		"deleted_at": bson.M{"$exists": false},
+		"is_banned":  false, // Only show non-banned users
 	}
 
 	// Add username search if provided

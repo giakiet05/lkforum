@@ -22,29 +22,32 @@ type ModerationService interface {
 }
 
 type moderationService struct {
-	postRepo     repo.PostRepo
-	commentRepo  repo.CommentRepo
-	userRepo     repo.UserRepo
-	geminiClient *gemini.GeminiClient
-	bus          bus.EventBus
-	config       *config.GeminiConfig
+	postRepo      repo.PostRepo
+	commentRepo   repo.CommentRepo
+	userRepo      repo.UserRepo
+	communityRepo repo.CommunityRepo
+	geminiClient  *gemini.GeminiClient
+	bus           bus.EventBus
+	config        *config.GeminiConfig
 }
 
 func NewModerationService(
 	postRepo repo.PostRepo,
 	commentRepo repo.CommentRepo,
 	userRepo repo.UserRepo,
+	communityRepo repo.CommunityRepo,
 	geminiClient *gemini.GeminiClient,
 	bus bus.EventBus,
 	config *config.GeminiConfig,
 ) ModerationService {
 	return &moderationService{
-		postRepo:     postRepo,
-		commentRepo:  commentRepo,
-		userRepo:     userRepo,
-		geminiClient: geminiClient,
-		bus:          bus,
-		config:       config,
+		postRepo:      postRepo,
+		commentRepo:   commentRepo,
+		userRepo:      userRepo,
+		communityRepo: communityRepo,
+		geminiClient:  geminiClient,
+		bus:           bus,
+		config:        config,
 	}
 }
 
@@ -158,6 +161,18 @@ func (s *moderationService) ModeratePost(ctx context.Context, postID string) err
 	post, err := s.postRepo.GetByID(ctx, postID)
 	if err != nil {
 		return fmt.Errorf("failed to get post: %w", err)
+	}
+
+	// Get community to check settings
+	community, err := s.communityRepo.GetByID(ctx, post.CommunityID.Hex())
+	if err != nil {
+		return fmt.Errorf("failed to get community: %w", err)
+	}
+
+	// If community requires manual approval, skip automated moderation
+	if community.Setting.PostRequireApproval {
+		log.Printf("Post %s requires manual approval in community %s, skipping automated moderation", postID, community.Name)
+		return nil
 	}
 
 	// Check if moderation should be skipped

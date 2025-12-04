@@ -12,7 +12,7 @@ import (
 	"github.com/giakiet05/lkforum/internal/platform/gemini"
 	"github.com/giakiet05/lkforum/internal/platform/ws"
 	"github.com/giakiet05/lkforum/internal/repo"
-	userroute "github.com/giakiet05/lkforum/internal/route/user"
+	"github.com/giakiet05/lkforum/internal/route"
 	"github.com/giakiet05/lkforum/internal/service"
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
@@ -53,6 +53,8 @@ type Services struct {
 	service.DraftService
 	service.ReportService
 	service.ModerationService
+	service.AdminUserService
+	service.AdminCommunityService
 }
 
 type Controllers struct {
@@ -69,6 +71,8 @@ type Controllers struct {
 	controller.PostHistoryController
 	controller.DraftController
 	controller.ReportController
+	controller.AdminUserController
+	controller.AdminCommunityController
 }
 
 func initRepos(client *mongo.Client, db *mongo.Database) *Repos {
@@ -95,7 +99,6 @@ func initServices(repos *Repos, redisClient *redis.Client, emailSender email.Sen
 	services := &Services{
 		AuthService:         service.NewAuthService(repos.UserRepo, repos.EmailVerificationRepo, emailSender, redisClient),
 		UserService:         service.NewUserService(repos.UserRepo, eventBus, redisClient),
-		CommunityService:    service.NewCommunityService(repos.CommunityRepo, repos.MembershipRepo, eventBus),
 		MembershipService:   service.NewMembershipService(repos.MembershipRepo, redisClient),
 		ReputationService:   service.NewReputationService(repos.UserRepo, eventBus),
 		NotificationService: service.NewNotificationService(repos.NotificationRepo, repos.UserRepo, repos.PostRepo, repos.CommentRepo, eventBus, redisClient),
@@ -109,14 +112,21 @@ func initServices(repos *Repos, redisClient *redis.Client, emailSender email.Sen
 	services.VoteService = service.NewVoteService(repos.VoteRepo, repos.PostRepo, repos.CommentRepo, eventBus)
 
 	// PostService and CommentService need VoteService
-	services.PostService = service.NewPostService(repos.PostRepo, services.VoteService, repos.PollVoteRepo, repos.UserRepo, repos.CommunityRepo, repos.SavedPostRepo, repos.ReportRepo, eventBus)
+	services.PostService = service.NewPostService(repos.PostRepo, services.VoteService, repos.PollVoteRepo, repos.UserRepo, repos.CommunityRepo, repos.MembershipRepo, repos.SavedPostRepo, repos.ReportRepo, eventBus)
 	services.CommentService = service.NewCommentService(repos.CommentRepo, services.VoteService, repos.UserRepo, repos.CommunityRepo, repos.PostRepo, eventBus)
+
+	// CommunityService needs PostRepo and UserRepo for manual moderation
+	services.CommunityService = service.NewCommunityService(repos.CommunityRepo, repos.MembershipRepo, repos.PostRepo, repos.UserRepo, eventBus)
 
 	// DraftService needs PostService
 	services.DraftService = service.NewDraftService(repos.DraftRepo, repos.PostRepo, services.PostService)
 
-	// ModerationService
-	services.ModerationService = service.NewModerationService(repos.PostRepo, repos.CommentRepo, repos.UserRepo, geminiClient, eventBus, &config.Cfg.Gemini)
+	// ModerationService needs CommunityRepo for checking PostRequireApproval
+	services.ModerationService = service.NewModerationService(repos.PostRepo, repos.CommentRepo, repos.UserRepo, repos.CommunityRepo, geminiClient, eventBus, &config.Cfg.Gemini)
+
+	// AdminUserService for admin operations
+	services.AdminUserService = service.NewAdminUserService(repos.UserRepo)
+	services.AdminCommunityService = service.NewAdminCommunityService(repos.CommunityRepo)
 
 	return services
 }
@@ -136,6 +146,8 @@ func initControllers(services *Services, wsHub *ws.Hub) *Controllers {
 		PostHistoryController:  *controller.NewPostHistoryController(services.PostHistoryService),
 		DraftController:        *controller.NewDraftController(services.DraftService),
 		ReportController:       *controller.NewReportController(services.ReportService),
+		AdminUserController:    *controller.NewAdminUserController(services.AdminUserService),
+		AdminCommunityController: *controller.NewAdminCommunityController(services.AdminCommunityService),
 	}
 }
 
@@ -149,19 +161,21 @@ func initRoutes(controllers *Controllers, r *gin.Engine) {
 		c.JSON(200, gin.H{"message": "Welcome to LKForum API!"})
 	})
 
-	userroute.RegisterAuthRoutes(api, &controllers.AuthController, &controllers.UserController)
-	userroute.RegisterUserRoutes(api, &controllers.UserController)
-	userroute.RegisterCommunityRoutes(api, &controllers.CommunityController)
-	userroute.RegisterMembershipRoutes(api, &controllers.MembershipController)
-	userroute.RegisterPostRoutes(api, &controllers.PostController)
-	userroute.RegisterCommentRoutes(api, &controllers.CommentController)
-	userroute.RegisterNotificationRoutes(api, &controllers.NotificationController)
-	userroute.RegisterWebSocketRoutes(api, &controllers.WebSocketController)
-	userroute.RegisterChannelRoutes(api, &controllers.ChannelController)
-	userroute.RegisterMessageRoutes(api, &controllers.MessageController)
-	userroute.RegisterPostHistoryRoutes(api, &controllers.PostHistoryController)
-	userroute.RegisterDraftRoutes(api, &controllers.DraftController)
-	userroute.RegisterReportRoutes(api, &controllers.ReportController)
+	route.RegisterAuthRoutes(api, &controllers.AuthController, &controllers.UserController)
+	route.RegisterUserRoutes(api, &controllers.UserController)
+	route.RegisterCommunityRoutes(api, &controllers.CommunityController)
+	route.RegisterMembershipRoutes(api, &controllers.MembershipController)
+	route.RegisterPostRoutes(api, &controllers.PostController)
+	route.RegisterCommentRoutes(api, &controllers.CommentController)
+	route.RegisterNotificationRoutes(api, &controllers.NotificationController)
+	route.RegisterWebSocketRoutes(api, &controllers.WebSocketController)
+	route.RegisterChannelRoutes(api, &controllers.ChannelController)
+	route.RegisterMessageRoutes(api, &controllers.MessageController)
+	route.RegisterPostHistoryRoutes(api, &controllers.PostHistoryController)
+	route.RegisterDraftRoutes(api, &controllers.DraftController)
+	route.RegisterReportRoutes(api, &controllers.ReportController)
+	route.RegisterAdminUserRoutes(api, &controllers.AdminUserController)
+	route.RegisterAdminCommunityRoutes(api, &controllers.CommunityController, &controllers.AdminCommunityController)
 }
 
 func Init() (*gin.Engine, error) {
