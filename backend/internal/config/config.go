@@ -24,6 +24,7 @@ type AppConfig struct {
 	Redis                RedisConfig
 	Google               GoogleConfig
 	Cloudinary           CloudinaryConfig
+	Gemini               GeminiConfig
 }
 
 // SMTPConfig holds the email server configuration
@@ -56,6 +57,16 @@ type CloudinaryConfig struct {
 	APISecret    string
 	UploadFolder string
 	UploadPreset string
+}
+
+// GeminiConfig holds the Gemini AI configuration
+type GeminiConfig struct {
+	APIKey              string
+	Model               string
+	Enabled             bool
+	ConfidenceThreshold float64
+	Timeout             int
+	MaxRetries          int
 }
 
 // Cfg is a global variable holding the application's configuration
@@ -106,6 +117,13 @@ func LoadConfig() {
 	Cfg.Cloudinary.UploadFolder = getEnv("CLOUDINARY_FOLDER", "lkforum")
 	Cfg.Cloudinary.UploadPreset = getEnv("CLOUDINARY_UPLOAD_PRESET", "lkforum_preset")
 
+	Cfg.Gemini.APIKey = getEnv("GEMINI_API_KEY", "")
+	Cfg.Gemini.Model = getEnv("GEMINI_MODEL", "gemini-2.0-flash-lite")
+	Cfg.Gemini.Enabled = getEnv("GEMINI_ENABLED", "true") == "true"
+	Cfg.Gemini.ConfidenceThreshold = getEnvFloat("GEMINI_CONFIDENCE_THRESHOLD", 0.7)
+	Cfg.Gemini.Timeout = getEnvInt("GEMINI_TIMEOUT", 15)
+	Cfg.Gemini.MaxRetries = getEnvInt("GEMINI_MAX_RETRIES", 3)
+
 	log.Println("Configuration loaded successfully")
 }
 
@@ -121,6 +139,16 @@ func getEnv(key, defaultValue string) string {
 func getEnvInt(key string, defaultValue int) int {
 	if valueStr, exists := os.LookupEnv(key); exists {
 		if value, err := strconv.Atoi(valueStr); err == nil {
+			return value
+		}
+	}
+	return defaultValue
+}
+
+// Helper function to get float environment variable with a default value
+func getEnvFloat(key string, defaultValue float64) float64 {
+	if valueStr, exists := os.LookupEnv(key); exists {
+		if value, err := strconv.ParseFloat(valueStr, 64); err == nil {
 			return value
 		}
 	}

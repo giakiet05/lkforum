@@ -91,18 +91,21 @@ type GetPostsQuery struct {
 
 // PostResponse is the detailed post object returned to the client.
 type PostResponse struct {
-	ID            string                 `json:"id"`
-	Author        AuthorResponse         `json:"author"`
-	Community     CommunityShortResponse `json:"community"`
-	Title         string                 `json:"title"`
-	Type          model.PostType         `json:"type"`
-	Content       PostContentResponse    `json:"content"`
-	VotesCount    *VotesCountResponse    `json:"votes_count,omitempty"`
-	UserVote      string                 `json:"user_vote,omitempty"`
-	CommentsCount int                    `json:"comments_count"`
-	CreatedAt     time.Time              `json:"created_at"`
-	UpdatedAt     *time.Time             `json:"updated_at,omitempty"`
-	Tags          []string               `json:"tags,omitempty"`
+	ID               string                 `json:"id"`
+	Author           AuthorResponse         `json:"author"`
+	Community        CommunityShortResponse `json:"community"`
+	Title            string                 `json:"title"`
+	Type             model.PostType         `json:"type"`
+	Content          PostContentResponse    `json:"content"`
+	VotesCount       *VotesCountResponse    `json:"votes_count,omitempty"`
+	UserVote         string                 `json:"user_vote,omitempty"`
+	CommentsCount    int                    `json:"comments_count"`
+	CreatedAt        time.Time              `json:"created_at"`
+	UpdatedAt        *time.Time             `json:"updated_at,omitempty"`
+	Tags             []string               `json:"tags,omitempty"`
+	ModerationStatus *string                `json:"moderation_status,omitempty"`
+	ModerationReason *string                `json:"moderation_reason,omitempty"`
+	ModeratedAt      *time.Time             `json:"moderated_at,omitempty"`
 }
 
 // AuthorResponse contains short public information about a user.
@@ -243,6 +246,28 @@ func FromPosts(posts []*model.Post, authors map[string]*model.User, communities 
 		userPollVote := userPollVotes[post.ID.Hex()]
 
 		responses[i] = FromPost(post, author, community, userVote, userPollVote)
+	}
+	return responses
+}
+
+// FromPostsWithModeration creates a slice of PostResponse with moderation info included.
+func FromPostsWithModeration(posts []*model.Post, authors map[string]*model.User, communities map[string]*model.Community, userVotes map[string]string, userPollVotes map[string][]string) []*PostResponse {
+	responses := make([]*PostResponse, len(posts))
+	for i, post := range posts {
+		author := authors[post.AuthorID.Hex()]
+		community := communities[post.CommunityID.Hex()]
+		userVote := userVotes[post.ID.Hex()]
+		userPollVote := userPollVotes[post.ID.Hex()]
+
+		resp := FromPost(post, author, community, userVote, userPollVote)
+
+		// Add moderation info
+		statusStr := string(post.ModerationStatus)
+		resp.ModerationStatus = &statusStr
+		resp.ModerationReason = &post.ModerationResult.Reason
+		resp.ModeratedAt = post.ModeratedAt
+
+		responses[i] = resp
 	}
 	return responses
 }

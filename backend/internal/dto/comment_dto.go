@@ -1,6 +1,10 @@
 package dto
 
-import "github.com/giakiet05/lkforum/internal/model"
+import (
+	"time"
+
+	"github.com/giakiet05/lkforum/internal/model"
+)
 
 type CreateCommentRequest struct {
 	UserID   string  `json:"user_id"`
@@ -27,20 +31,23 @@ type GetCommentByPostIDQuery struct {
 }
 
 type CommentResponse struct {
-	ID        string              `json:"id"`
-	Author    model.CommentAuthor `json:"author"`
-	PostID    string              `json:"post_id"`
-	ParentID  *string             `json:"parent_id,omitempty"`
-	Children  []CommentResponse   `json:"children"`
-	Content   string              `json:"content"`
-	CreatedAt string              `json:"created_at"`
-	IsDeleted bool                `json:"is_deleted"`
+	ID               string              `json:"id"`
+	Author           model.CommentAuthor `json:"author"`
+	PostID           string              `json:"post_id"`
+	ParentID         *string             `json:"parent_id,omitempty"`
+	Children         []CommentResponse   `json:"children"`
+	Content          string              `json:"content"`
+	CreatedAt        string              `json:"created_at"`
+	IsDeleted        bool                `json:"is_deleted"`
+	ModerationStatus *string             `json:"moderation_status,omitempty"`
+	ModerationReason *string             `json:"moderation_reason,omitempty"`
+	ModeratedAt      *time.Time          `json:"moderated_at,omitempty"`
 }
 
-func FromComments(comments []model.Comment) []*CommentResponse {
+func FromComments(comments []model.Comment, currentUserID *string) []*CommentResponse {
 	commentMap := make(map[string]*CommentResponse)
 	for _, c := range comments {
-		resp := FromComment(&c)
+		resp := FromComment(&c, currentUserID)
 		commentMap[resp.ID] = resp
 	}
 
@@ -74,14 +81,14 @@ func FromComments(comments []model.Comment) []*CommentResponse {
 	return result
 }
 
-func FromComment(comment *model.Comment) *CommentResponse {
+func FromComment(comment *model.Comment, currentUserID *string) *CommentResponse {
 	var parentID *string
 	if comment.ParentID != nil {
 		pid := comment.ParentID.Hex()
 		parentID = &pid
 	}
 
-	return &CommentResponse{
+	resp := &CommentResponse{
 		ID:        comment.ID.Hex(),
 		Author:    comment.Author,
 		PostID:    comment.PostID.Hex(),
@@ -90,16 +97,26 @@ func FromComment(comment *model.Comment) *CommentResponse {
 		CreatedAt: comment.CreatedAt.Format("2006-01-02 15:04:05"),
 		IsDeleted: comment.IsDeleted,
 	}
+
+	// Add moderation info only for author's own comments
+	if currentUserID != nil && comment.Author.ID.Hex() == *currentUserID {
+		statusStr := string(comment.ModerationStatus)
+		resp.ModerationStatus = &statusStr
+		resp.ModerationReason = &comment.ModerationResult.Reason
+		resp.ModeratedAt = comment.ModeratedAt
+	}
+
+	return resp
 }
 
-func FromCommentWithChildren(comments []model.Comment) *CommentResponse {
+func FromCommentWithChildren(comments []model.Comment, currentUserID *string) *CommentResponse {
 	if len(comments) == 0 {
 		return nil
 	}
 
 	commentMap := make(map[string]*CommentResponse)
 	for _, c := range comments {
-		resp := FromComment(&c)
+		resp := FromComment(&c, currentUserID)
 		commentMap[resp.ID] = resp
 	}
 

@@ -23,6 +23,9 @@ func RegisterPostRoutes(rg *gin.RouterGroup, c *controller.PostController) {
 		private.PUT("/:id", c.UpdatePost)
 		private.DELETE("/:id", c.DeletePost)
 
+		// My Posts
+		private.GET("/me", c.GetMyPosts)
+
 		// Save, Hide & Report
 		private.GET("/saved", c.GetSavedPosts)
 		private.GET("/hidden", c.GetHiddenPosts)

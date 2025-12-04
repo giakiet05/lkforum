@@ -1,8 +1,10 @@
 package service
 
 import (
+	"context"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/giakiet05/lkforum/internal/config"
@@ -53,11 +55,14 @@ func (s *notificationService) Start() {
 
 	s.eventBus.Subscribe(bus.TopicPostUpvoted, eventChannel)
 	s.eventBus.Subscribe(bus.TopicCommentCreated, eventChannel)
+	s.eventBus.Subscribe(bus.TopicCommentApproved, eventChannel)
+	s.eventBus.Subscribe(bus.TopicCommentUpvoted, eventChannel)
 	s.eventBus.Subscribe(bus.TopicBroadcast, eventChannel)
 
 	log.Println("NotificationService started and subscribed to events.")
 
 	go s.processEvents(eventChannel)
+	go s.processBatchedNotifications()
 }
 
 func (s *notificationService) processEvents(ch bus.EventListener) {
@@ -66,7 +71,11 @@ func (s *notificationService) processEvents(ch bus.EventListener) {
 		case bus.TopicPostUpvoted:
 			s.handlePostUpvoted(event)
 		case bus.TopicCommentCreated:
-			s.handleCommentCreated(event)
+			s.handleCommentCreatedReply(event)
+		case bus.TopicCommentApproved:
+			s.handleCommentApprovedForPost(event)
+		case bus.TopicCommentUpvoted:
+			s.handleCommentUpvoted(event)
 		case bus.TopicBroadcast:
 			s.handleBroadcast(event)
 		}
@@ -75,9 +84,9 @@ func (s *notificationService) processEvents(ch bus.EventListener) {
 
 func (s *notificationService) handlePostUpvoted(event bus.Event) {
 	payload := event.Payload()
-	authorID, _ := payload["authorId"].(string)
-	voterID, _ := payload["voterId"].(string)
-	postID, _ := payload["postId"].(string)
+	authorID, _ := payload["author_id"].(string)
+	voterID, _ := payload["voter_id"].(string)
+	postID, _ := payload["post_id"].(string)
 
 	if authorID == "" || voterID == "" || postID == "" {
 		return
@@ -89,83 +98,283 @@ func (s *notificationService) handlePostUpvoted(event bus.Event) {
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
 
-	voter, err := s.userRepo.GetByID(ctx, voterID)
+	// Redis batch key
+	batchKey := fmt.Sprintf(postUpvoteBatchKeyPrefix, postID)
+
+	// Check if this is the first upvote
+	isFirst, err := s.isFirstInBatch(ctx, batchKey, voterID)
+	if err != nil {
+		log.Printf("ERROR: Failed to check first upvote: %v", err)
+		return
+	}
+
+	// Add to batch
+	if err := s.addToBatch(ctx, batchKey, voterID, postUpvoteBatchTTL); err != nil {
+		log.Printf("ERROR: Failed to add to batch: %v", err)
+		return
+	}
+
+	// If first upvote, send instant notification
+	if isFirst {
+		voter, err := s.userRepo.GetByID(ctx, voterID)
+		if err != nil {
+			return
+		}
+
+		post, err := s.postRepo.GetByID(ctx, postID)
+		if err != nil {
+			return
+		}
+
+		recipientObjID, _ := primitive.ObjectIDFromHex(authorID)
+		actorObjID, _ := primitive.ObjectIDFromHex(voterID)
+
+		notification := &model.Notification{
+			RecipientID: recipientObjID,
+			ActorID:     actorObjID,
+			Type:        model.NotificationTypeLike,
+			Message:     fmt.Sprintf("%s đã thích bài viết của bạn: %s", voter.Username, post.Title),
+			Link:        fmt.Sprintf("/posts/%s", postID),
+			IsRead:      false,
+			CreatedAt:   time.Now(),
+		}
+
+		createdNotification, err := s.notificationRepo.Create(ctx, notification)
+		if err != nil {
+			log.Printf("ERROR: NotificationService: failed to create notification: %v", err)
+			return
+		}
+
+		s.eventBus.Publish(bus.NotificationCreatedEvent{
+			RecipientID:  authorID,
+			Notification: dto.FromNotification(createdNotification),
+		})
+		return
+	}
+
+	// Check if reached threshold
+	count, err := s.getBatchCount(ctx, batchKey)
 	if err != nil {
 		return
 	}
 
-	post, err := s.postRepo.GetByID(ctx, postID) // Sửa lỗi ở đây
-	if err != nil {
-		return
+	if count >= postUpvoteThreshold {
+		s.sendPostUpvoteBatchNotification(ctx, batchKey)
 	}
-
-	recipientObjID, _ := primitive.ObjectIDFromHex(authorID)
-	actorObjID, _ := primitive.ObjectIDFromHex(voterID)
-
-	notification := &model.Notification{
-		RecipientID: recipientObjID,
-		ActorID:     actorObjID,
-		Type:        model.NotificationTypeLike,
-		Message:     fmt.Sprintf("%s đã thích bài viết của bạn: %s", voter.Username, post.Title),
-		Link:        fmt.Sprintf("/posts/%s", postID),
-		IsRead:      false,
-		CreatedAt:   time.Now(),
-	}
-
-	createdNotification, err := s.notificationRepo.Create(ctx, notification)
-	if err != nil {
-		log.Printf("ERROR: NotificationService: failed to create notification: %v", err)
-		return
-	}
-
-	s.eventBus.Publish(bus.NotificationCreatedEvent{
-		RecipientID:  authorID,
-		Notification: dto.FromNotification(createdNotification),
-	})
 }
 
-func (s *notificationService) handleCommentCreated(event bus.Event) {
+func (s *notificationService) handleCommentUpvoted(event bus.Event) {
 	payload := event.Payload()
-	authorID, _ := payload["authorId"].(string)
-	parentAuthorID, _ := payload["parentAuthorId"].(string)
-	postID, _ := payload["postId"].(string)
-	commentID, _ := payload["commentId"].(string)
+	authorID, _ := payload["author_id"].(string)
+	voterID, _ := payload["voter_id"].(string)
+	commentID, _ := payload["comment_id"].(string)
 
-	if parentAuthorID == "" || authorID == parentAuthorID {
+	if authorID == "" || voterID == "" || commentID == "" {
+		return
+	}
+	if authorID == voterID {
 		return
 	}
 
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
 
-	author, err := s.userRepo.GetByID(ctx, authorID)
+	// Redis batch key
+	batchKey := fmt.Sprintf(commentUpvoteBatchKeyPrefix, commentID)
+
+	// Check if this is the first upvote
+	isFirst, err := s.isFirstInBatch(ctx, batchKey, voterID)
+	if err != nil {
+		log.Printf("ERROR: Failed to check first upvote: %v", err)
+		return
+	}
+
+	// Add to batch
+	if err := s.addToBatch(ctx, batchKey, voterID, commentUpvoteBatchTTL); err != nil {
+		log.Printf("ERROR: Failed to add to batch: %v", err)
+		return
+	}
+
+	// If first upvote, send instant notification
+	if isFirst {
+		voter, err := s.userRepo.GetByID(ctx, voterID)
+		if err != nil {
+			return
+		}
+
+		comment, err := s.commentRepo.GetByID(ctx, commentID)
+		if err != nil {
+			return
+		}
+
+		recipientObjID, _ := primitive.ObjectIDFromHex(authorID)
+		actorObjID, _ := primitive.ObjectIDFromHex(voterID)
+
+		notification := &model.Notification{
+			RecipientID: recipientObjID,
+			ActorID:     actorObjID,
+			Type:        model.NotificationTypeLike,
+			Message:     fmt.Sprintf("%s đã thích bình luận của bạn", voter.Username),
+			Link:        fmt.Sprintf("/posts/%s#comment-%s", comment.PostID.Hex(), commentID),
+			IsRead:      false,
+			CreatedAt:   time.Now(),
+		}
+
+		createdNotification, err := s.notificationRepo.Create(ctx, notification)
+		if err != nil {
+			log.Printf("ERROR: NotificationService: failed to create notification: %v", err)
+			return
+		}
+
+		s.eventBus.Publish(bus.NotificationCreatedEvent{
+			RecipientID:  authorID,
+			Notification: dto.FromNotification(createdNotification),
+		})
+		return
+	}
+
+	// Check if reached threshold
+	count, err := s.getBatchCount(ctx, batchKey)
 	if err != nil {
 		return
 	}
 
-	recipientObjID, _ := primitive.ObjectIDFromHex(parentAuthorID)
-	actorObjID, _ := primitive.ObjectIDFromHex(authorID)
-
-	notification := &model.Notification{
-		RecipientID: recipientObjID,
-		ActorID:     actorObjID,
-		Type:        model.NotificationTypeComment,
-		Message:     fmt.Sprintf("%s đã trả lời một bình luận của bạn.", author.Username),
-		Link:        fmt.Sprintf("/posts/%s#comment-%s", postID, commentID),
-		IsRead:      false,
-		CreatedAt:   time.Now(),
+	if count >= commentUpvoteThreshold {
+		s.sendCommentUpvoteBatchNotification(ctx, batchKey)
 	}
+}
 
-	createdNotification, err := s.notificationRepo.Create(ctx, notification)
+// handleCommentCreatedReply handles instant notifications for comment replies only
+func (s *notificationService) handleCommentCreatedReply(event bus.Event) {
+	payload := event.Payload()
+	authorID, _ := payload["author_id"].(string)
+	parentAuthorID, _ := payload["parent_author_id"].(string)
+	postID, _ := payload["post_id"].(string)
+	commentID, _ := payload["comment_id"].(string)
+
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
+
+	// Only handle reply notifications here (instant notification)
+	if parentAuthorID != "" && authorID != parentAuthorID {
+		author, err := s.userRepo.GetByID(ctx, authorID)
+		if err != nil {
+			return
+		}
+
+		recipientObjID, _ := primitive.ObjectIDFromHex(parentAuthorID)
+		actorObjID, _ := primitive.ObjectIDFromHex(authorID)
+
+		notification := &model.Notification{
+			RecipientID: recipientObjID,
+			ActorID:     actorObjID,
+			Type:        model.NotificationTypeComment,
+			Message:     fmt.Sprintf("%s đã trả lời một bình luận của bạn.", author.Username),
+			Link:        fmt.Sprintf("/posts/%s#comment-%s", postID, commentID),
+			IsRead:      false,
+			CreatedAt:   time.Now(),
+		}
+
+		createdNotification, err := s.notificationRepo.Create(ctx, notification)
+		if err != nil {
+			log.Printf("ERROR: NotificationService: failed to create notification: %v", err)
+			return
+		}
+
+		s.eventBus.Publish(bus.NotificationCreatedEvent{
+			RecipientID:  parentAuthorID,
+			Notification: dto.FromNotification(createdNotification),
+		})
+	}
+}
+
+// handleCommentApprovedForPost handles batched notifications for approved comments on posts
+func (s *notificationService) handleCommentApprovedForPost(event bus.Event) {
+	payload := event.Payload()
+	commentID, _ := payload["comment_id"].(string)
+	postID, _ := payload["post_id"].(string)
+	authorID, _ := payload["author_id"].(string)
+	parentAuthorID, _ := payload["parent_author_id"].(string)
+
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
+
+	// Get post to find post author
+	post, err := s.postRepo.GetByID(ctx, postID)
 	if err != nil {
-		log.Printf("ERROR: NotificationService: failed to create notification: %v", err)
 		return
 	}
 
-	s.eventBus.Publish(bus.NotificationCreatedEvent{
-		RecipientID:  parentAuthorID,
-		Notification: dto.FromNotification(createdNotification),
-	})
+	postAuthorID := post.AuthorID.Hex()
+
+	// Skip if commenter is post author
+	if authorID == postAuthorID {
+		return
+	}
+
+	// Skip if this is a reply and parent author is post author (already handled by reply notification)
+	if parentAuthorID != "" && parentAuthorID == postAuthorID {
+		return
+	}
+
+	// Batching logic for post author notification
+	batchKey := fmt.Sprintf(postCommentBatchKeyPrefix, postID)
+
+	// Check if this is the first comment
+	isFirst, err := s.isFirstInBatch(ctx, batchKey, authorID)
+	if err != nil {
+		log.Printf("ERROR: Failed to check first comment: %v", err)
+		return
+	}
+
+	// Add to batch
+	if err := s.addToBatch(ctx, batchKey, authorID, postCommentBatchTTL); err != nil {
+		log.Printf("ERROR: Failed to add to batch: %v", err)
+		return
+	}
+
+	// If first comment, send instant notification
+	if isFirst {
+		author, err := s.userRepo.GetByID(ctx, authorID)
+		if err != nil {
+			return
+		}
+
+		recipientObjID, _ := primitive.ObjectIDFromHex(postAuthorID)
+		actorObjID, _ := primitive.ObjectIDFromHex(authorID)
+
+		notification := &model.Notification{
+			RecipientID: recipientObjID,
+			ActorID:     actorObjID,
+			Type:        model.NotificationTypeComment,
+			Message:     fmt.Sprintf("%s đã bình luận vào bài viết của bạn", author.Username),
+			Link:        fmt.Sprintf("/posts/%s#comment-%s", postID, commentID),
+			IsRead:      false,
+			CreatedAt:   time.Now(),
+		}
+
+		createdNotification, err := s.notificationRepo.Create(ctx, notification)
+		if err != nil {
+			log.Printf("ERROR: NotificationService: failed to create notification: %v", err)
+			return
+		}
+
+		s.eventBus.Publish(bus.NotificationCreatedEvent{
+			RecipientID:  postAuthorID,
+			Notification: dto.FromNotification(createdNotification),
+		})
+		return
+	}
+
+	// Check if reached threshold
+	count, err := s.getBatchCount(ctx, batchKey)
+	if err != nil {
+		return
+	}
+
+	if count >= postCommentThreshold {
+		s.sendPostCommentBatchNotification(ctx, batchKey)
+	}
 }
 
 func (s *notificationService) handleBroadcast(event bus.Event) {
@@ -254,4 +463,392 @@ func (s *notificationService) MarkAllAsRead(recipientID string) (int64, error) {
 	defer cancel()
 
 	return s.notificationRepo.MarkAllAsRead(ctx, recipientID)
+}
+
+// ========== Redis Batching Helpers ==========
+
+const (
+	postUpvoteBatchKeyPrefix    = "notification:batch:post:%s:upvotes"
+	commentUpvoteBatchKeyPrefix = "notification:batch:comment:%s:upvotes"
+	postCommentBatchKeyPrefix   = "notification:batch:post:%s:comments"
+
+	postUpvoteBatchTTL    = 3600 // 1 hour
+	commentUpvoteBatchTTL = 3600 // 1 hour
+	postCommentBatchTTL   = 1800 // 30 minutes
+
+	postUpvoteThreshold    = 10 // Gửi ngay khi đủ 10 upvotes
+	commentUpvoteThreshold = 5  // Gửi ngay khi đủ 5 upvotes
+	postCommentThreshold   = 3  // Gửi ngay khi đủ 3 comments
+
+	batchProcessInterval = 300 // Check mỗi 5 phút
+)
+
+// addToBatch adds an actor to a batched notification
+func (s *notificationService) addToBatch(ctx context.Context, key string, actorID string, ttl int) error {
+	score := float64(time.Now().Unix())
+	if err := s.redisClient.ZAdd(ctx, key, redis.Z{
+		Score:  score,
+		Member: actorID,
+	}).Err(); err != nil {
+		return err
+	}
+
+	// Set TTL
+	s.redisClient.Expire(ctx, key, time.Duration(ttl)*time.Second)
+	return nil
+}
+
+// getBatchMembers gets all members from a batch
+func (s *notificationService) getBatchMembers(ctx context.Context, key string) ([]string, error) {
+	members, err := s.redisClient.ZRange(ctx, key, 0, -1).Result()
+	if err != nil {
+		return nil, err
+	}
+	return members, nil
+}
+
+// getBatchCount gets the count of members in a batch
+func (s *notificationService) getBatchCount(ctx context.Context, key string) (int64, error) {
+	count, err := s.redisClient.ZCard(ctx, key).Result()
+	return count, err
+}
+
+// clearBatch removes a batch key
+func (s *notificationService) clearBatch(ctx context.Context, key string) error {
+	return s.redisClient.Del(ctx, key).Err()
+}
+
+// isFirstInBatch checks if this is the first item in batch
+func (s *notificationService) isFirstInBatch(ctx context.Context, key string, actorID string) (bool, error) {
+	// Check if key exists
+	exists, err := s.redisClient.Exists(ctx, key).Result()
+	if err != nil {
+		return false, err
+	}
+
+	// If key doesn't exist, this is the first
+	if exists == 0 {
+		return true, nil
+	}
+
+	// Check if this actor already exists in the batch
+	score, err := s.redisClient.ZScore(ctx, key, actorID).Result()
+	if err != nil && err != redis.Nil {
+		return false, err
+	}
+
+	// If actor already in batch (score exists), this is NOT first
+	if err != redis.Nil && score > 0 {
+		return false, nil
+	}
+
+	// Actor not in batch yet, check current count
+	count, err := s.getBatchCount(ctx, key)
+	if err != nil {
+		return false, err
+	}
+
+	// If batch is empty, this is the first
+	return count == 0, nil
+}
+
+// processBatchedNotifications runs periodically to send batched notifications
+func (s *notificationService) processBatchedNotifications() {
+	ticker := time.NewTicker(time.Duration(batchProcessInterval) * time.Second)
+	defer ticker.Stop()
+
+	log.Println("Batched notification processor started")
+
+	for range ticker.C {
+		ctx, cancel := util.NewDefaultDBContext()
+
+		// Process post upvote batches
+		s.processPostUpvoteBatches(ctx)
+
+		// Process comment upvote batches
+		s.processCommentUpvoteBatches(ctx)
+
+		// Process post comment batches
+		s.processPostCommentBatches(ctx)
+
+		cancel()
+	}
+}
+
+// processPostUpvoteBatches processes all pending post upvote batches
+func (s *notificationService) processPostUpvoteBatches(ctx context.Context) {
+	pattern := fmt.Sprintf(postUpvoteBatchKeyPrefix, "*")
+	keys, err := s.redisClient.Keys(ctx, pattern).Result()
+	if err != nil {
+		log.Printf("ERROR: Failed to get post upvote batch keys: %v", err)
+		return
+	}
+
+	for _, key := range keys {
+		count, err := s.getBatchCount(ctx, key)
+		if err != nil {
+			continue
+		}
+
+		if count == 0 {
+			s.clearBatch(ctx, key)
+			continue
+		}
+
+		s.sendPostUpvoteBatchNotification(ctx, key)
+	}
+}
+
+// processCommentUpvoteBatches processes all pending comment upvote batches
+func (s *notificationService) processCommentUpvoteBatches(ctx context.Context) {
+	pattern := fmt.Sprintf(commentUpvoteBatchKeyPrefix, "*")
+	keys, err := s.redisClient.Keys(ctx, pattern).Result()
+	if err != nil {
+		log.Printf("ERROR: Failed to get comment upvote batch keys: %v", err)
+		return
+	}
+
+	for _, key := range keys {
+		// Check if batch has expired or reached threshold
+		count, err := s.getBatchCount(ctx, key)
+		if err != nil {
+			continue
+		}
+
+		// Skip if empty
+		if count == 0 {
+			s.clearBatch(ctx, key)
+			continue
+		}
+
+		// Send batched notification
+		s.sendCommentUpvoteBatchNotification(ctx, key)
+	}
+}
+
+// processPostCommentBatches processes all pending post comment batches
+func (s *notificationService) processPostCommentBatches(ctx context.Context) {
+	pattern := fmt.Sprintf(postCommentBatchKeyPrefix, "*")
+	keys, err := s.redisClient.Keys(ctx, pattern).Result()
+	if err != nil {
+		log.Printf("ERROR: Failed to get post comment batch keys: %v", err)
+		return
+	}
+
+	for _, key := range keys {
+		count, err := s.getBatchCount(ctx, key)
+		if err != nil {
+			continue
+		}
+
+		if count == 0 {
+			s.clearBatch(ctx, key)
+			continue
+		}
+
+		s.sendPostCommentBatchNotification(ctx, key)
+	}
+}
+
+// sendPostUpvoteBatchNotification sends batched post upvote notification
+func (s *notificationService) sendPostUpvoteBatchNotification(ctx context.Context, batchKey string) {
+	// Extract postID from key: "notification:batch:post:{postID}:upvotes"
+	parts := splitBatchKey(batchKey)
+	if len(parts) < 4 {
+		return
+	}
+	postID := parts[3]
+
+	// Get all voters
+	voterIDs, err := s.getBatchMembers(ctx, batchKey)
+	if err != nil || len(voterIDs) == 0 {
+		return
+	}
+
+	// Get post to find author
+	post, err := s.postRepo.GetByID(ctx, postID)
+	if err != nil {
+		log.Printf("ERROR: Failed to get post %s: %v", postID, err)
+		return
+	}
+
+	authorID := post.AuthorID.Hex()
+
+	// Get first voter info
+	firstVoter, err := s.userRepo.GetByID(ctx, voterIDs[0])
+	if err != nil {
+		return
+	}
+
+	// Build message
+	var message string
+	if len(voterIDs) == 1 {
+		message = fmt.Sprintf("%s đã thích bài viết của bạn: %s", firstVoter.Username, post.Title)
+	} else {
+		message = fmt.Sprintf("%s và %d người khác đã thích bài viết của bạn: %s", firstVoter.Username, len(voterIDs)-1, post.Title)
+	}
+
+	recipientObjID, _ := primitive.ObjectIDFromHex(authorID)
+	actorObjID, _ := primitive.ObjectIDFromHex(voterIDs[0])
+
+	notification := &model.Notification{
+		RecipientID: recipientObjID,
+		ActorID:     actorObjID,
+		Type:        model.NotificationTypeLike,
+		Message:     message,
+		Link:        fmt.Sprintf("/posts/%s", postID),
+		IsRead:      false,
+		CreatedAt:   time.Now(),
+	}
+
+	createdNotification, err := s.notificationRepo.Create(ctx, notification)
+	if err != nil {
+		log.Printf("ERROR: Failed to create batched notification: %v", err)
+		return
+	}
+
+	s.eventBus.Publish(bus.NotificationCreatedEvent{
+		RecipientID:  authorID,
+		Notification: dto.FromNotification(createdNotification),
+	})
+
+	// Clear batch after sending
+	s.clearBatch(ctx, batchKey)
+}
+
+// sendCommentUpvoteBatchNotification sends batched comment upvote notification
+func (s *notificationService) sendCommentUpvoteBatchNotification(ctx context.Context, batchKey string) {
+	// Extract commentID from key: "notification:batch:comment:{commentID}:upvotes"
+	parts := splitBatchKey(batchKey)
+	if len(parts) < 4 {
+		return
+	}
+	commentID := parts[3]
+
+	// Get all voters
+	voterIDs, err := s.getBatchMembers(ctx, batchKey)
+	if err != nil || len(voterIDs) == 0 {
+		return
+	}
+
+	// Get comment to find author and postID
+	comment, err := s.commentRepo.GetByID(ctx, commentID)
+	if err != nil {
+		log.Printf("ERROR: Failed to get comment %s: %v", commentID, err)
+		return
+	}
+
+	authorID := comment.Author.ID.Hex()
+
+	// Get first voter info
+	firstVoter, err := s.userRepo.GetByID(ctx, voterIDs[0])
+	if err != nil {
+		return
+	}
+
+	// Build message
+	var message string
+	if len(voterIDs) == 1 {
+		message = fmt.Sprintf("%s đã thích bình luận của bạn", firstVoter.Username)
+	} else {
+		message = fmt.Sprintf("%s và %d người khác đã thích bình luận của bạn", firstVoter.Username, len(voterIDs)-1)
+	}
+
+	recipientObjID, _ := primitive.ObjectIDFromHex(authorID)
+	actorObjID, _ := primitive.ObjectIDFromHex(voterIDs[0])
+
+	notification := &model.Notification{
+		RecipientID: recipientObjID,
+		ActorID:     actorObjID,
+		Type:        model.NotificationTypeLike,
+		Message:     message,
+		Link:        fmt.Sprintf("/posts/%s#comment-%s", comment.PostID.Hex(), commentID),
+		IsRead:      false,
+		CreatedAt:   time.Now(),
+	}
+
+	createdNotification, err := s.notificationRepo.Create(ctx, notification)
+	if err != nil {
+		log.Printf("ERROR: Failed to create batched notification: %v", err)
+		return
+	}
+
+	s.eventBus.Publish(bus.NotificationCreatedEvent{
+		RecipientID:  authorID,
+		Notification: dto.FromNotification(createdNotification),
+	})
+
+	// Clear batch after sending
+	s.clearBatch(ctx, batchKey)
+}
+
+// sendPostCommentBatchNotification sends batched post comment notification
+func (s *notificationService) sendPostCommentBatchNotification(ctx context.Context, batchKey string) {
+	// Extract postID from key: "notification:batch:post:{postID}:comments"
+	parts := splitBatchKey(batchKey)
+	if len(parts) < 4 {
+		return
+	}
+	postID := parts[3]
+
+	// Get all commenters
+	commenterIDs, err := s.getBatchMembers(ctx, batchKey)
+	if err != nil || len(commenterIDs) == 0 {
+		return
+	}
+
+	// Get post to find author
+	post, err := s.postRepo.GetByID(ctx, postID)
+	if err != nil {
+		log.Printf("ERROR: Failed to get post %s: %v", postID, err)
+		return
+	}
+
+	authorID := post.AuthorID.Hex()
+
+	// Get first commenter info
+	firstCommenter, err := s.userRepo.GetByID(ctx, commenterIDs[0])
+	if err != nil {
+		return
+	}
+
+	// Build message
+	var message string
+	if len(commenterIDs) == 1 {
+		message = fmt.Sprintf("%s đã bình luận vào bài viết của bạn", firstCommenter.Username)
+	} else {
+		message = fmt.Sprintf("%s và %d người khác đã bình luận vào bài viết của bạn", firstCommenter.Username, len(commenterIDs)-1)
+	}
+
+	recipientObjID, _ := primitive.ObjectIDFromHex(authorID)
+	actorObjID, _ := primitive.ObjectIDFromHex(commenterIDs[0])
+
+	notification := &model.Notification{
+		RecipientID: recipientObjID,
+		ActorID:     actorObjID,
+		Type:        model.NotificationTypeComment,
+		Message:     message,
+		Link:        fmt.Sprintf("/posts/%s", postID),
+		IsRead:      false,
+		CreatedAt:   time.Now(),
+	}
+
+	createdNotification, err := s.notificationRepo.Create(ctx, notification)
+	if err != nil {
+		log.Printf("ERROR: Failed to create batched notification: %v", err)
+		return
+	}
+
+	s.eventBus.Publish(bus.NotificationCreatedEvent{
+		RecipientID:  authorID,
+		Notification: dto.FromNotification(createdNotification),
+	})
+
+	// Clear batch after sending
+	s.clearBatch(ctx, batchKey)
+}
+
+// splitBatchKey splits Redis key by colon
+func splitBatchKey(key string) []string {
+	return strings.Split(key, ":")
 }

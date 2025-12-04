@@ -15,14 +15,16 @@ import (
 type CommentService interface {
 	CreateComment(request *dto.CreateCommentRequest, userID string) (*model.Comment, error)
 	GetCommentByID(commentID string) (*model.Comment, error)
-	GetCommentByPostIDPaginated(query *dto.GetCommentByPostIDQuery) (*dto.PaginatedCommentsResponse, error)
-	GetCommentsFilterPaginated(query *dto.GetCommentsFilterQuery) (*dto.PaginatedCommentsResponse, error)
+	GetCommentByPostIDPaginated(query *dto.GetCommentByPostIDQuery, currentUserID *string) (*dto.PaginatedCommentsResponse, error)
+	GetCommentsFilterPaginated(query *dto.GetCommentsFilterQuery, currentUserID *string) (*dto.PaginatedCommentsResponse, error)
 	GetAllChildren(commentID string) ([]model.Comment, error)
 	DeleteCommentByID(commentID string, userID string) error
+	VoteOnComment(userID, commentID string, voteValue bool) (*dto.VotesCountResponse, error)
 }
 
 type commentService struct {
 	commentRepo   repo.CommentRepo
+	voteService   VoteService
 	userRepo      repo.UserRepo
 	communityRepo repo.CommunityRepo
 	postRepo      repo.PostRepo
@@ -31,12 +33,20 @@ type commentService struct {
 
 func NewCommentService(
 	commentRepo repo.CommentRepo,
+	voteService VoteService,
 	userRepo repo.UserRepo,
 	communityRepo repo.CommunityRepo,
 	postRepo repo.PostRepo,
 	bus bus.EventBus,
 ) CommentService {
-	return &commentService{commentRepo: commentRepo, userRepo: userRepo, communityRepo: communityRepo, postRepo: postRepo, bus: bus}
+	return &commentService{
+		commentRepo:   commentRepo,
+		voteService:   voteService,
+		userRepo:      userRepo,
+		communityRepo: communityRepo,
+		postRepo:      postRepo,
+		bus:           bus,
+	}
 }
 
 func (s *commentService) CreateComment(request *dto.CreateCommentRequest, userID string) (*model.Comment, error) {
@@ -94,12 +104,13 @@ func (s *commentService) CreateComment(request *dto.CreateCommentRequest, userID
 	}
 
 	comment := &model.Comment{
-		Author:    author,
-		PostID:    postObjectID,
-		ParentID:  parentObjectID,
-		Content:   request.Content,
-		CreatedAt: time.Now(),
-		IsDeleted: false,
+		Author:           author,
+		PostID:           postObjectID,
+		ParentID:         parentObjectID,
+		Content:          request.Content,
+		CreatedAt:        time.Now(),
+		IsDeleted:        false,
+		ModerationStatus: model.ModerationPending, // Set pending for moderation
 	}
 
 	createdComment, err := s.commentRepo.Create(ctx, comment)
@@ -107,12 +118,12 @@ func (s *commentService) CreateComment(request *dto.CreateCommentRequest, userID
 		return nil, err
 	}
 
-	// Publish event for reputation and notification systems
-	s.bus.Publish(bus.CommentCreatedEvent{
-		AuthorID:       userID,
-		PostID:         request.PostID,
+	// Publish event for moderation
+	s.bus.Publish(&bus.CommentCreatedEvent{
 		CommentID:      createdComment.ID.Hex(),
-		ParentAuthorID: parentAuthorID,
+		PostID:         request.PostID,
+		AuthorID:       userID,
+		ParentAuthorID: &parentAuthorID,
 	})
 
 	return createdComment, nil
@@ -125,7 +136,7 @@ func (s *commentService) GetCommentByID(commentID string) (*model.Comment, error
 	return s.commentRepo.GetByID(ctx, commentID)
 }
 
-func (s *commentService) GetCommentByPostIDPaginated(query *dto.GetCommentByPostIDQuery) (*dto.PaginatedCommentsResponse, error) {
+func (s *commentService) GetCommentByPostIDPaginated(query *dto.GetCommentByPostIDQuery, currentUserID *string) (*dto.PaginatedCommentsResponse, error) {
 	if query.Depth < 0 || query.Depth > 2 {
 		return nil, apperror.ErrDepthInvalid
 	}
@@ -141,7 +152,7 @@ func (s *commentService) GetCommentByPostIDPaginated(query *dto.GetCommentByPost
 		return nil, apperror.ErrInvalidID
 	}
 
-	comments, total, err := s.commentRepo.GetCommentsFilterPaginated(ctx, &query.PostID, nil, nil, nil, query.Page, query.PageSize)
+	comments, total, err := s.commentRepo.GetCommentsFilterPaginated(ctx, &query.PostID, nil, nil, nil, currentUserID, query.Page, query.PageSize)
 	if err != nil {
 		return nil, err
 	}
@@ -173,7 +184,7 @@ func (s *commentService) GetCommentByPostIDPaginated(query *dto.GetCommentByPost
 		}
 	}
 
-	commentsResponse := dto.FromComments(comments)
+	commentsResponse := dto.FromComments(comments, currentUserID)
 	var response = &dto.PaginatedCommentsResponse{
 		Comments: commentsResponse,
 		Pagination: dto.Pagination{
@@ -185,7 +196,7 @@ func (s *commentService) GetCommentByPostIDPaginated(query *dto.GetCommentByPost
 	return response, nil
 }
 
-func (s *commentService) GetCommentsFilterPaginated(query *dto.GetCommentsFilterQuery) (*dto.PaginatedCommentsResponse, error) {
+func (s *commentService) GetCommentsFilterPaginated(query *dto.GetCommentsFilterQuery, currentUserID *string) (*dto.PaginatedCommentsResponse, error) {
 	if query.PageSize < 1 || query.PageSize > 500 || query.Page <= 0 {
 		return nil, apperror.ErrPaginationInvalid
 	}
@@ -193,12 +204,12 @@ func (s *commentService) GetCommentsFilterPaginated(query *dto.GetCommentsFilter
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
 
-	comments, total, err := s.commentRepo.GetCommentsFilterPaginated(ctx, query.PostID, query.ParentID, query.UserID, query.Content, query.Page, query.PageSize)
+	comments, total, err := s.commentRepo.GetCommentsFilterPaginated(ctx, query.PostID, query.ParentID, query.UserID, query.Content, currentUserID, query.Page, query.PageSize)
 	if err != nil {
 		return nil, err
 	}
 
-	commentsResponse := dto.FromComments(comments)
+	commentsResponse := dto.FromComments(comments, currentUserID)
 	var response = &dto.PaginatedCommentsResponse{
 		Comments: commentsResponse,
 		Pagination: dto.Pagination{
@@ -231,4 +242,8 @@ func (s *commentService) DeleteCommentByID(commentID string, userID string) erro
 	}
 
 	return s.commentRepo.Delete(ctx, commentID)
+}
+
+func (s *commentService) VoteOnComment(userID, commentID string, voteValue bool) (*dto.VotesCountResponse, error) {
+	return s.voteService.VoteOnTarget(userID, commentID, model.VoteTargetComment, voteValue)
 }
