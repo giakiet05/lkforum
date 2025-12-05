@@ -363,6 +363,30 @@ func (s *userService) GetUserByUsername(username string) (*dto.UserResponse, err
 		}
 		return nil, err
 	}
+
+	// Check if user has disabled profile visibility
+	if user.Settings != nil && !user.Settings.Privacy.ShowProfile {
+		// Return limited profile info (username, avatar, cover only)
+		limitedProfile := &dto.UserResponse{
+			ID:       user.ID.Hex(),
+			Username: user.Username,
+			Profile:  dto.UserProfileResponse{},
+		}
+
+		// Include avatar and cover if they exist
+		if user.RoleContent.AsUser != nil {
+			if user.RoleContent.AsUser.Avatar != nil {
+				limitedProfile.Profile.Avatar = user.RoleContent.AsUser.Avatar
+			}
+			if user.RoleContent.AsUser.Cover != nil {
+				limitedProfile.Profile.Cover = user.RoleContent.AsUser.Cover
+			}
+		}
+
+		// Return error with limited data
+		return limitedProfile, apperror.ErrForbidden
+	}
+
 	return dto.FromUser(user), nil
 }
 

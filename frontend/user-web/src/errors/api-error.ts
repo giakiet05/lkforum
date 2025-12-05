@@ -5,7 +5,7 @@ import { ApiErrorCode } from "./error-codes";
  * Contains a message for display and a code for programmatic handling.
  */
 export class ApiError extends Error {
-    constructor(public message: string, public code?: ApiErrorCode) {
+    constructor(public message: string, public code?: ApiErrorCode, public data?: any) {
         super(message);
         this.name = "ApiError";
     }

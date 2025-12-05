@@ -17,10 +17,17 @@ func SendSuccess(c *gin.Context, statusCode int, message string, data interface{
 	})
 }
 
-func SendError(c *gin.Context, statusCode int, message string, errorCode string) {
-	c.JSON(statusCode, ApiResponse{
+func SendError(c *gin.Context, statusCode int, message string, errorCode string, data ...interface{}) {
+	response := ApiResponse{
 		Success:   false,
 		Message:   message,
 		ErrorCode: errorCode,
-	})
+	}
+
+	// If data is provided, include it in the response
+	if len(data) > 0 && data[0] != nil {
+		response.Data = data[0]
+	}
+
+	c.JSON(statusCode, response)
 }

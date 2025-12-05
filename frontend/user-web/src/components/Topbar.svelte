@@ -116,7 +116,8 @@
   }
 
   function handleCommunityClick(communityName: string) {
-    push(`/c/${communityName}`);
+    console.log("🔍 Navigating to community:", communityName);
+    push(`/lk/${communityName}`);
     searchQuery = "";
     communityResults = [];
     userResults = [];

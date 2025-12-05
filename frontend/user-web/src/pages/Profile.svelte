@@ -6,16 +6,30 @@
   import type { UserResponse } from "../dtos/user-dto";
   import {
     getMyProfile,
+    getUserByUsername,
     uploadAvatar,
     uploadCover,
   } from "../services/user-service";
-  import { getMyPosts, getSavedPosts } from "../services/post-service";
+  import {
+    getMyPosts,
+    getSavedPosts,
+    getPostsByUserId,
+  } from "../services/post-service";
   import { ApiError } from "../errors/api-error";
   import { setAuth } from "../stores/auth-store";
+
+  // Route params
+  let { params = {} }: { params?: { username?: string } } = $props();
 
   let user = $state<UserResponse | null>(null);
   let isLoadingUser = $state(true);
   let errorMessage = $state<string | null>(null);
+  let isPrivateProfile = $state(false);
+  let privateProfileData = $state<{
+    username?: string;
+    avatar_url?: string;
+    cover_url?: string;
+  } | null>(null);
 
   let posts = $state<PostResponse[]>([]);
   let savedPosts = $state<PostResponse[]>([]);
@@ -68,10 +82,33 @@
     try {
       isLoadingUser = true;
       errorMessage = null;
-      user = await getMyProfile();
+      isPrivateProfile = false;
+      privateProfileData = null;
+
+      // If username param exists, load that user's profile
+      // Otherwise load current user's profile
+      if (params.username) {
+        user = await getUserByUsername(params.username);
+      } else {
+        user = await getMyProfile();
+      }
     } catch (error) {
       console.error("Failed to load profile:", error);
-      if (error instanceof ApiError) {
+      if (error instanceof ApiError && error.code === "FORBIDDEN") {
+        // Profile is private - show limited info
+        isPrivateProfile = true;
+        console.log("🔒 Private profile detected");
+        console.log("Error data:", error.data);
+        // Extract basic profile data from error response
+        const profileData = error.data || {};
+        console.log("Profile data:", profileData);
+        privateProfileData = {
+          username: profileData.username || params.username || "User",
+          avatar_url: profileData.profile?.avatar?.url,
+          cover_url: profileData.profile?.cover?.url,
+        };
+        console.log("Private profile data:", privateProfileData);
+      } else if (error instanceof ApiError) {
         errorMessage = error.message;
       } else {
         errorMessage = "Failed to load profile. Please try again.";
@@ -80,6 +117,9 @@
       isLoadingUser = false;
     }
   }
+
+  // Check if viewing own profile
+  const isOwnProfile = $derived(!params.username);
 
   async function handleAvatarChange(event: Event) {
     const input = event.target as HTMLInputElement;
@@ -173,7 +213,14 @@
     try {
       isLoadingPosts = true;
       postsError = null;
-      posts = await getMyPosts({ page: 1, limit: 20 });
+
+      // If viewing other user's profile, use their ID
+      // Otherwise use getMyPosts for current user
+      if (isOwnProfile) {
+        posts = await getMyPosts({ page: 1, limit: 20 });
+      } else {
+        posts = await getPostsByUserId(user.id, 1, 20);
+      }
     } catch (error) {
       console.error("Failed to load posts:", error);
       if (error instanceof ApiError) {
@@ -251,6 +298,68 @@
     <div class="spinner"></div>
     <p>Loading profile...</p>
   </div>
+{:else if isPrivateProfile && privateProfileData}
+  <div class="profile-page private-profile">
+    <div class="profile-header">
+      <!-- Cover Image -->
+      <div class="cover-image-wrapper">
+        {#if privateProfileData.cover_url}
+          <img
+            src={privateProfileData.cover_url}
+            alt="Cover"
+            class="cover-image"
+          />
+        {:else}
+          <div class="cover-placeholder"></div>
+        {/if}
+      </div>
+
+      <!-- Profile Info Bar with Avatar -->
+      <div class="profile-info-bar">
+        <div class="profile-details">
+          <div class="avatar-wrapper">
+            {#if privateProfileData.avatar_url}
+              <img
+                src={privateProfileData.avatar_url}
+                alt={privateProfileData.username}
+                class="profile-avatar"
+              />
+            {:else}
+              <div class="avatar-placeholder">
+                {privateProfileData.username[0]?.toUpperCase() || "U"}
+              </div>
+            {/if}
+          </div>
+          <div class="profile-text">
+            <h1 class="username">{privateProfileData.username}</h1>
+            <p class="user-handle">u/{privateProfileData.username}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Private Account Message -->
+    <div class="private-message">
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="48"
+        height="48"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        class="lock-icon"
+      >
+        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+      </svg>
+      <h2>Đây là tài khoản riêng tư</h2>
+      <p>
+        Chỉ những người được chấp thuận mới có thể xem nội dung của tài khoản
+        này.
+      </p>
+    </div>
+  </div>
 {:else if errorMessage}
   <div class="error-state">
     <p>{errorMessage}</p>
@@ -280,20 +389,22 @@
         {:else}
           <div class="cover-placeholder"></div>
         {/if}
-        <div class="cover-actions">
-          <button
-            class="change-cover-btn"
-            onclick={() => coverFileInput?.click()}
-            disabled={isUploadingCover}
-            title="Change cover"
-          >
-            {#if isUploadingCover}
-              <div class="mini-spinner"></div>
-            {:else}
-              <img src="/change_profile_image.png" alt="Change cover" />
-            {/if}
-          </button>
-        </div>
+        {#if isOwnProfile}
+          <div class="cover-actions">
+            <button
+              class="change-cover-btn"
+              onclick={() => coverFileInput?.click()}
+              disabled={isUploadingCover}
+              title="Change cover"
+            >
+              {#if isUploadingCover}
+                <div class="mini-spinner"></div>
+              {:else}
+                <img src="/change_profile_image.png" alt="Change cover" />
+              {/if}
+            </button>
+          </div>
+        {/if}
       </div>
       <div class="profile-info-bar">
         <div class="profile-details">
@@ -309,36 +420,40 @@
                 {user.username[0].toUpperCase()}
               </div>
             {/if}
-            <button
-              class="change-avatar-btn"
-              onclick={() => avatarFileInput?.click()}
-              disabled={isUploadingAvatar}
-              title="Change avatar"
-            >
-              {#if isUploadingAvatar}
-                <div class="mini-spinner"></div>
-              {:else}
-                <img src="/change_profile_image.png" alt="Change avatar" />
-              {/if}
-            </button>
+            {#if isOwnProfile}
+              <button
+                class="change-avatar-btn"
+                onclick={() => avatarFileInput?.click()}
+                disabled={isUploadingAvatar}
+                title="Change avatar"
+              >
+                {#if isUploadingAvatar}
+                  <div class="mini-spinner"></div>
+                {:else}
+                  <img src="/change_profile_image.png" alt="Change avatar" />
+                {/if}
+              </button>
+            {/if}
           </div>
           <div class="profile-text">
             <h1 class="username">{user.username}</h1>
             <p class="user-handle">u/{user.username}</p>
           </div>
         </div>
-        <div class="profile-actions">
-          <button class="action-btn primary" onclick={handleCreatePost}>
-            <i class="fas fa-plus"></i>
-            + Create Post
-          </button>
-          <button class="action-btn secondary" onclick={handleEditProfile}>
-            Edit Profile
-          </button>
-          <button class="action-btn tertiary" onclick={handleSettings}>
-            <img src="/dot.png" alt="Settings" class="settings-icon" />
-          </button>
-        </div>
+        {#if isOwnProfile}
+          <div class="profile-actions">
+            <button class="action-btn primary" onclick={handleCreatePost}>
+              <i class="fas fa-plus"></i>
+              + Create Post
+            </button>
+            <button class="action-btn secondary" onclick={handleEditProfile}>
+              Edit Profile
+            </button>
+            <button class="action-btn tertiary" onclick={handleSettings}>
+              <img src="/dot.png" alt="Settings" class="settings-icon" />
+            </button>
+          </div>
+        {/if}
       </div>
     </div>
 
@@ -350,11 +465,13 @@
             class:active={activeTab === "posts"}
             onclick={() => (activeTab = "posts")}>Posts</button
           >
-          <button
-            class="tab-btn"
-            class:active={activeTab === "saved"}
-            onclick={() => (activeTab = "saved")}>Saved</button
-          >
+          {#if isOwnProfile}
+            <button
+              class="tab-btn"
+              class:active={activeTab === "saved"}
+              onclick={() => (activeTab = "saved")}>Saved</button
+            >
+          {/if}
 
           <div class="sort-options">
             <select bind:value={sortBy}>
@@ -1177,6 +1294,38 @@
     100% {
       transform: rotate(360deg);
     }
+  }
+
+  /* Private Profile Styles */
+  .private-message {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 4rem 2rem;
+    margin: 2rem 0;
+    background-color: white;
+    border-radius: 8px;
+  }
+
+  .lock-icon {
+    color: #7c7c7c;
+    margin-bottom: 1.5rem;
+  }
+
+  .private-message h2 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #1a1a1b;
+    margin-bottom: 0.75rem;
+  }
+
+  .private-message p {
+    font-size: 1rem;
+    color: #7c7c7c;
+    max-width: 400px;
+    line-height: 1.5;
   }
 
   .retry-btn {
