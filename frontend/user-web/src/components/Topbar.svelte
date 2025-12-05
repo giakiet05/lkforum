@@ -59,18 +59,23 @@
         return;
       }
 
-      // TODO: Backend needs public user search endpoint (currently /api/users requires admin auth)
-      // For now, only search communities
-      const communitiesResponse = await getCommunities({
-        name: cleanQuery,
-        limit: 5,
-      }).catch(() => ({
-        communities: [],
-        pagination: { page: 1, page_size: 0, total_items: 0, total_pages: 0 },
-      }));
+      // Search both communities and users in parallel
+      const [communitiesResponse, usersResponse] = await Promise.all([
+        getCommunities({
+          name: cleanQuery,
+          limit: 3,
+        }).catch(() => ({
+          communities: [],
+          pagination: { page: 1, page_size: 0, total_items: 0, total_pages: 0 },
+        })),
+        searchUsers(cleanQuery, 1, 3).catch(() => ({
+          users: [],
+          pagination: { page: 1, page_size: 0, total_items: 0, total_pages: 0 },
+        })),
+      ]);
 
-      communityResults = communitiesResponse.communities;
-      userResults = []; // Disabled until backend adds public user search API
+      communityResults = communitiesResponse?.communities || [];
+      userResults = usersResponse?.users || [];
       showSearchDropdown =
         communityResults.length > 0 || userResults.length > 0;
     } catch (error) {
@@ -637,63 +642,97 @@
     right: 0;
     background: var(--background);
     border: 1px solid var(--border);
-    border-radius: 8px;
-    .search-dropdown-divider {
-      height: 1px;
-      background: var(--border);
-      margin: 4px 0;
-    }
+    border-radius: 12px;
+    box-shadow:
+      0 8px 24px rgba(0, 0, 0, 0.12),
+      0 2px 6px rgba(0, 0, 0, 0.08);
+    overflow: hidden;
+    max-height: 480px;
+    overflow-y: auto;
+    z-index: 1000;
+  }
 
-    .result-avatar {
-      width: 32px;
-      height: 32px;
-      border-radius: 50%;
-      object-fit: cover;
-      background: var(--topbar-search-background);
-      flex-shrink: 0;
-    }
+  .search-dropdown-header {
+    padding: 12px 16px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #000000;
+    background: var(--background);
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
 
-    .result-avatar.fallback {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: var(--topbar-accent);
-      color: white;
-      font-weight: 600;
-      font-size: 14px;
-    }
+  .search-dropdown-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 8px 0;
+  }
 
-    .result-info {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-      min-width: 0;
-    }
-
-    .result-name {
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--topbar-foreground);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .result-meta {
-      font-size: 12px;
-      color: var(--muted-foreground);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
+  .search-result-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 10px 16px;
+    background: transparent;
+    border: none;
     cursor: pointer;
-    transition: background-color 0.2s;
+    transition: background-color 0.15s ease;
     text-align: left;
   }
 
   .search-result-item:hover {
     background: var(--topbar-search-background);
+  }
+
+  .result-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    object-fit: cover;
+    background: var(--topbar-search-background);
+    flex-shrink: 0;
+    border: 1px solid var(--border);
+  }
+
+  .result-avatar.fallback {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--topbar-accent);
+    color: white;
+    font-weight: 700;
+    font-size: 15px;
+  }
+
+  .result-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+  }
+
+  .result-name {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--topbar-foreground);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.3;
+  }
+
+  .result-meta {
+    font-size: 12px;
+    color: var(--muted-foreground);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.2;
   }
 
   .search-loading {

@@ -109,6 +109,7 @@
         limit: postsPerPage,
       });
 
+      console.log("📦 Fetched posts response:", fetchedPosts);
       console.log(`✅ Loaded ${fetchedPosts.length} posts`);
       posts = fetchedPosts;
     } catch (error) {

@@ -31,7 +31,7 @@ type UserService interface {
 	GetUserByID(id string) (*dto.UserResponse, error)
 	GetUserByUsername(username string) (*dto.UserResponse, error)
 	GetUserByEmail(email string) (*dto.UserResponse, error)
-	GetUsers(page, pageSize int) (*dto.PaginatedUsersResponse, error)
+	GetUsers(page, pageSize int, username string) (*dto.PaginatedUsersResponse, error)
 	GetAllUsers() ([]*model.User, error)
 
 	GetSettings(userID string) (*dto.SettingsResponse, error)
@@ -379,7 +379,7 @@ func (s *userService) GetUserByEmail(email string) (*dto.UserResponse, error) {
 	return dto.FromUser(user), nil
 }
 
-func (s *userService) GetUsers(page, pageSize int) (*dto.PaginatedUsersResponse, error) {
+func (s *userService) GetUsers(page, pageSize int, username string) (*dto.PaginatedUsersResponse, error) {
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
 
@@ -390,7 +390,7 @@ func (s *userService) GetUsers(page, pageSize int) (*dto.PaginatedUsersResponse,
 		pageSize = 10
 	}
 
-	users, total, err := s.userRepo.GetPaginated(ctx, page, pageSize)
+	users, total, err := s.userRepo.GetPaginated(ctx, page, pageSize, username)
 	if err != nil {
 		return nil, err
 	}

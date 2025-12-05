@@ -196,29 +196,14 @@ export async function searchUsers(username?: string, page = 1, pageSize = 5): Pr
         pageSize: pageSize.toString(),
     });
 
-    // Note: Backend doesn't support username filter yet, but we'll use pagination
-    // to limit results. If backend adds username filter in future, add it here.
+    // Add username filter if provided (backend now supports it!)
+    if (username) {
+        params.append('username', username);
+    }
     
     const res = await publicFetch(`/api/users?${params.toString()}`, {
         method: "GET",
     });
 
-    const data = await handleApiResponse(res);
-    
-    // If username provided, filter client-side (temporary until backend supports filter)
-    if (username && data.users) {
-        const filtered = data.users.filter((u: UserResponse) => 
-            u.username.toLowerCase().includes(username.toLowerCase())
-        );
-        return {
-            users: filtered.slice(0, pageSize),
-            pagination: {
-                ...data.pagination,
-                total_items: filtered.length,
-                total_pages: Math.ceil(filtered.length / pageSize)
-            }
-        };
-    }
-    
-    return data;
+    return await handleApiResponse(res);
 }

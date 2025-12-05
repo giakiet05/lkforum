@@ -264,7 +264,9 @@ func FromPostsWithModeration(posts []*model.Post, authors map[string]*model.User
 		// Add moderation info
 		statusStr := string(post.ModerationStatus)
 		resp.ModerationStatus = &statusStr
-		resp.ModerationReason = &post.ModerationResult.Reason
+		if post.ModerationResult != nil {
+			resp.ModerationReason = &post.ModerationResult.Reason
+		}
 		resp.ModeratedAt = post.ModeratedAt
 
 		responses[i] = resp

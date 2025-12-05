@@ -25,7 +25,7 @@ type UserRepo interface {
 	GetByUsername(ctx context.Context, username string) (*model.User, error)
 	GetByEmail(ctx context.Context, email string) (*model.User, error)
 	GetAll(ctx context.Context) ([]*model.User, error)
-	GetPaginated(ctx context.Context, page, pageSize int) ([]*model.User, int64, error)
+	GetPaginated(ctx context.Context, page, pageSize int, username string) ([]*model.User, int64, error)
 }
 
 type userRepo struct {
@@ -180,9 +180,18 @@ func (r *userRepo) GetByEmail(ctx context.Context, email string) (*model.User, e
 	return &user, nil
 }
 
-func (r *userRepo) GetPaginated(ctx context.Context, page, pageSize int) ([]*model.User, int64, error) {
+func (r *userRepo) GetPaginated(ctx context.Context, page, pageSize int, username string) ([]*model.User, int64, error) {
 	skip := (page - 1) * pageSize
-	filter := bson.M{"deleted_at": bson.M{"$exists": false}}
+	filter := bson.M{
+		"deleted_at": bson.M{"$exists": false},
+		"role":       "user", // Only return regular users, not admins
+	}
+
+	// Add username filter if provided (case-insensitive regex)
+	if username != "" {
+		filter["username"] = bson.M{"$regex": username, "$options": "i"}
+	}
+
 	cursor, err := r.userCollection.Find(ctx, filter, options.Find().SetSkip(int64(skip)).SetLimit(int64(pageSize)))
 	if err != nil {
 		return nil, 0, err

@@ -9,7 +9,7 @@
     uploadAvatar,
     uploadCover,
   } from "../services/user-service";
-  import { getPostsByUserId, getSavedPosts } from "../services/post-service";
+  import { getMyPosts, getSavedPosts } from "../services/post-service";
   import { ApiError } from "../errors/api-error";
   import { setAuth } from "../stores/auth-store";
 
@@ -173,7 +173,7 @@
     try {
       isLoadingPosts = true;
       postsError = null;
-      posts = await getPostsByUserId(user.id, 1, 20);
+      posts = await getMyPosts({ page: 1, limit: 20 });
     } catch (error) {
       console.error("Failed to load posts:", error);
       if (error instanceof ApiError) {

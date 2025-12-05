@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"mime/multipart"
 	"time"
 
@@ -111,7 +112,7 @@ func (s *postService) CreatePost(userID string, req *dto.CreatePostRequest) (*dt
 		IsDeleted:        false,
 		CreatedAt:        time.Now(),
 		Tags:             req.Tags,
-		ModerationStatus: model.ModerationPending, // Set pending for moderation
+		ModerationStatus: model.ModerationApproved, // Auto-approve for now
 	}
 
 	if req.Type == model.PostTypePoll && req.Poll != nil {
@@ -191,10 +192,14 @@ func (s *postService) GetPosts(userID string, query *dto.GetPostsQuery) (*dto.Pa
 	filter := s.buildFilter(query)
 	findOptions := s.buildFindOptions(query)
 
+	fmt.Printf("🔍 GetPosts filter: %+v\n", filter)
+
 	posts, totalPosts, err := s.postRepo.Find(ctx, filter, findOptions)
 	if err != nil {
 		return nil, err
 	}
+
+	fmt.Printf("📊 Found %d posts\n", totalPosts)
 
 	if totalPosts == 0 {
 		return &dto.PaginatedPostsResponse{Posts: []*dto.PostResponse{}}, nil
@@ -256,8 +261,25 @@ func (s *postService) GetMyPosts(userID string, query *dto.GetPostsQuery) (*dto.
 	if err != nil {
 		return nil, err
 	}
+
+	limit := query.Limit
+	if limit <= 0 {
+		limit = 10
+	}
+	page := query.Page
+	if page <= 0 {
+		page = 1
+	}
+
 	if total == 0 {
-		return &dto.PaginatedPostsResponse{Posts: []*dto.PostResponse{}}, nil
+		return &dto.PaginatedPostsResponse{
+			Posts: []*dto.PostResponse{},
+			Pagination: dto.Pagination{
+				Page:     page,
+				PageSize: limit,
+				Total:    0,
+			},
+		}, nil
 	}
 
 	author, _ := s.userRepo.GetByID(ctx, userID)
@@ -277,15 +299,10 @@ func (s *postService) GetMyPosts(userID string, query *dto.GetPostsQuery) (*dto.
 
 	responses := dto.FromPostsWithModeration(posts, authorsMap, communitiesMap, userVotes, userPollVotes)
 
-	limit := query.Limit
-	if limit <= 0 {
-		limit = 10
-	}
-
 	return &dto.PaginatedPostsResponse{
 		Posts: responses,
 		Pagination: dto.Pagination{
-			Page:     query.Page,
+			Page:     page,
 			PageSize: limit,
 			Total:    total,
 		},
@@ -864,9 +881,9 @@ func (s *postService) getPollResponse(ctx context.Context, postID, userID string
 
 func (s *postService) buildFilter(query *dto.GetPostsQuery) repo.Filter {
 	filter := repo.Filter{
-		"is_hidden":          bson.M{"$ne": true},
-		"is_draft":           bson.M{"$ne": true},
-		"moderation_status":  model.ModerationApproved,
+		"is_hidden":         bson.M{"$ne": true},
+		"is_draft":          bson.M{"$ne": true},
+		"moderation_status": model.ModerationApproved,
 	}
 	if query.CommunityID != "" {
 		if id, err := primitive.ObjectIDFromHex(query.CommunityID); err == nil {

@@ -27,8 +27,9 @@ func NewUserController(service service.UserService) *UserController {
 func (c *UserController) GetUsers(ctx *gin.Context) {
 	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(ctx.DefaultQuery("pageSize", "10"))
+	username := ctx.Query("username") // Optional username filter
 
-	response, err := c.service.GetUsers(page, pageSize)
+	response, err := c.service.GetUsers(page, pageSize, username)
 	if err != nil {
 		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
