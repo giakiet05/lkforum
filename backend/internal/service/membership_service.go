@@ -82,7 +82,7 @@ func (m *membershipService) CreateMembership(req *dto.CreateMembershipRequest, u
 		return nil, err
 	}
 
-	err = m.increaseMembersCount(userID)
+	err = m.increaseMembersCount(req.CommunityID)
 	if err != nil {
 		return nil, err
 	}
@@ -165,7 +165,7 @@ func (m *membershipService) DeleteMembership(req *dto.DeleteMembershipRequest, u
 		return err
 	}
 
-	err = m.decreaseMembersCount(userID)
+	err = m.decreaseMembersCount(req.CommunityID)
 	if err != nil {
 		return err
 	}

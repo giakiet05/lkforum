@@ -2,6 +2,7 @@
   import { push } from "svelte-spa-router";
   import CreateCommunityModal from "./CreateCommunityModal.svelte";
   import { getCommunities } from "../services/community-service";
+  import { getMembershipsByUserId } from "../services/membership-service";
   import { authStore } from "../stores/auth-store";
   import type { CommunityResponse } from "../dtos/community-dto";
   import type { UserResponse } from "../dtos/user-dto";
@@ -38,23 +39,29 @@
 
     try {
       isLoadingCommunities = true;
+      
+      // Get user's memberships to find joined communities
+      const memberships = await getMembershipsByUserId(user.id);
+      console.log("User memberships:", memberships);
+
+      if (memberships.length === 0) {
+        userCommunities = [];
+        return;
+      }
+
+      // Get community IDs from memberships
+      const joinedCommunityIds = memberships.map((m: any) => m.community_id);
+      console.log("Joined community IDs:", joinedCommunityIds);
+
+      // Get all communities and filter by joined ones
       const response = await getCommunities({ page: 1, limit: 100 });
-
-      console.log("All communities response:", response);
-      console.log("Current user ID:", user?.id);
-
-      // Backend returns {communities: [], pagination: {}}
       const allCommunities = response.communities || [];
 
-      userCommunities = allCommunities.filter((community: any) => {
-        console.log(
-          `Community ${community.name} create_by_id:`,
-          community.create_by_id
-        );
-        return community.create_by_id === user?.id;
-      });
+      userCommunities = allCommunities.filter((community: any) => 
+        joinedCommunityIds.includes(community.id)
+      );
 
-      console.log("Filtered user communities:", userCommunities);
+      console.log("Filtered joined communities:", userCommunities);
     } catch (error) {
       console.error("Failed to load user communities:", error);
       userCommunities = [];

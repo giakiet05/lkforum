@@ -7,10 +7,9 @@ import (
 )
 
 type CreateCommentRequest struct {
-	UserID   string  `json:"user_id"`
-	PostID   string  `json:"post_id"`
+	PostID   string  `json:"post_id" binding:"required"`
 	ParentID *string `json:"parent_id,omitempty"`
-	Content  string  `json:"content"`
+	Content  string  `json:"content" binding:"required"`
 }
 
 type GetCommentsFilterQuery struct {
@@ -102,7 +101,9 @@ func FromComment(comment *model.Comment, currentUserID *string) *CommentResponse
 	if currentUserID != nil && comment.Author.ID.Hex() == *currentUserID {
 		statusStr := string(comment.ModerationStatus)
 		resp.ModerationStatus = &statusStr
-		resp.ModerationReason = &comment.ModerationResult.Reason
+		if comment.ModerationResult != nil {
+			resp.ModerationReason = &comment.ModerationResult.Reason
+		}
 		resp.ModeratedAt = comment.ModeratedAt
 	}
 
