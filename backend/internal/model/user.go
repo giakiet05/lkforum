@@ -26,8 +26,14 @@ type User struct {
 	RoleContent RoleContent        `bson:"role_content,omitempty" json:"role_content,omitempty"`
 	Settings    *UserSettings      `bson:"settings,omitempty" json:"settings,omitempty"`
 	IsVerified  bool               `bson:"is_verified" json:"is_verified"` // Always true for local users after registration
-	CreatedAt   time.Time          `bson:"created_at,omitempty" json:"created_at,omitempty"`
-	DeletedAt   *time.Time         `bson:"deleted_at,omitempty" json:"deleted_at,omitempty"`
+
+	// Ban fields
+	IsBanned  bool       `bson:"is_banned" json:"is_banned"`
+	BanUntil  *time.Time `bson:"ban_until,omitempty" json:"ban_until,omitempty"` // null = permanent ban
+	BanReason *string    `bson:"ban_reason,omitempty" json:"ban_reason,omitempty"`
+
+	CreatedAt time.Time  `bson:"created_at,omitempty" json:"created_at,omitempty"`
+	DeletedAt *time.Time `bson:"deleted_at,omitempty" json:"deleted_at,omitempty"` // Soft delete by user
 }
 
 type Role string
@@ -61,10 +67,6 @@ type UserRoleContent struct {
 
 	// Activity Stats
 	Stats *ActivityStats `bson:"stats,omitempty" json:"stats,omitempty"`
-
-	// Status Fields
-	BanStart *time.Time `bson:"ban_start,omitempty" json:"ban_start,omitempty"`
-	BanEnd   *time.Time `bson:"ban_end,omitempty" json:"ban_end,omitempty"`
 }
 
 // SocialLinks contains user's social media links.
@@ -89,6 +91,21 @@ type AdminRoleContent struct {
 	Permissions []string `bson:"permissions,omitempty" json:"permissions,omitempty"`
 }
 
+// IsBannedNow checks if user is currently banned
+func (u *User) IsBannedNow() bool {
+	if !u.IsBanned {
+		return false
+	}
+
+	// BanUntil = nil → permanent ban
+	if u.BanUntil == nil {
+		return true
+	}
+
+	// BanUntil > now → still banned
+	return u.BanUntil.After(time.Now())
+}
+
 func CloneUser(u *User) *User {
 	if u == nil {
 		return nil
@@ -100,6 +117,18 @@ func CloneUser(u *User) *User {
 	if u.DeletedAt != nil {
 		t := *u.DeletedAt
 		clone.DeletedAt = &t
+	}
+
+	// Deep copy BanUntil
+	if u.BanUntil != nil {
+		t := *u.BanUntil
+		clone.BanUntil = &t
+	}
+
+	// Deep copy BanReason
+	if u.BanReason != nil {
+		s := *u.BanReason
+		clone.BanReason = &s
 	}
 
 	// Deep copy Settings
@@ -205,18 +234,6 @@ func CloneUserRoleContent(u *UserRoleContent) *UserRoleContent {
 	if u.Stats != nil {
 		stats := *u.Stats
 		clone.Stats = &stats
-	}
-
-	// BanStart
-	if u.BanStart != nil {
-		t := *u.BanStart
-		clone.BanStart = &t
-	}
-
-	// BanEnd
-	if u.BanEnd != nil {
-		t := *u.BanEnd
-		clone.BanEnd = &t
 	}
 
 	return &clone

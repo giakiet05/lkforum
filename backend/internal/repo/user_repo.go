@@ -24,8 +24,14 @@ type UserRepo interface {
 	GetByIDs(ctx context.Context, ids []string) ([]*model.User, error)
 	GetByUsername(ctx context.Context, username string) (*model.User, error)
 	GetByEmail(ctx context.Context, email string) (*model.User, error)
-	GetAll(ctx context.Context) ([]*model.User, error)
-	GetPaginated(ctx context.Context, page, pageSize int) ([]*model.User, int64, error)
+	Find(ctx context.Context, filter Filter, opts *FindOptions) ([]*model.User, int64, error)
+	
+	// Stats methods
+	CountTotal(ctx context.Context) (int64, error)
+	CountActiveAfter(ctx context.Context, since time.Time) (int64, error)
+	CountCreatedAfter(ctx context.Context, since time.Time) (int64, error)
+	CountBanned(ctx context.Context) (int64, error)
+	CountVerified(ctx context.Context) (int64, error)
 }
 
 type userRepo struct {
@@ -59,23 +65,6 @@ func (r *userRepo) GetByIDs(ctx context.Context, ids []string) ([]*model.User, e
 	if err := cursor.All(ctx, &users); err != nil {
 		return nil, err
 	}
-	return users, nil
-}
-
-func (r *userRepo) GetAll(ctx context.Context) ([]*model.User, error) {
-	cursor, err := r.userCollection.Find(ctx, bson.M{"deleted_at": bson.M{"$exists": false}})
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		_ = cursor.Close(ctx)
-	}()
-
-	var users []*model.User
-	if err := cursor.All(ctx, &users); err != nil {
-		return nil, err
-	}
-
 	return users, nil
 }
 
@@ -180,26 +169,96 @@ func (r *userRepo) GetByEmail(ctx context.Context, email string) (*model.User, e
 	return &user, nil
 }
 
-func (r *userRepo) GetPaginated(ctx context.Context, page, pageSize int) ([]*model.User, int64, error) {
-	skip := (page - 1) * pageSize
-	filter := bson.M{"deleted_at": bson.M{"$exists": false}}
-	cursor, err := r.userCollection.Find(ctx, filter, options.Find().SetSkip(int64(skip)).SetLimit(int64(pageSize)))
+// Find fetches users with filter and pagination options
+func (r *userRepo) Find(ctx context.Context, filter Filter, opts *FindOptions) ([]*model.User, int64, error) {
+	// Get total count
+	countPipeline := mongo.Pipeline{
+		{{"$match", bson.M(filter)}},
+		{{"$count", "total"}},
+	}
+	cursor, err := r.userCollection.Aggregate(ctx, countPipeline)
 	if err != nil {
 		return nil, 0, err
 	}
-	defer func() {
-		_ = cursor.Close(ctx)
-	}()
+
+	var countResult []struct {
+		Total int64 `bson:"total"`
+	}
+	if err = cursor.All(ctx, &countResult); err != nil {
+		return nil, 0, err
+	}
+
+	var total int64
+	if len(countResult) > 0 {
+		total = countResult[0].Total
+	}
+
+	// If no documents, return early
+	if total == 0 {
+		return []*model.User{}, 0, nil
+	}
+
+	// Get paginated data
+	findOptions := options.Find()
+	if opts != nil {
+		if opts.Sort != nil {
+			sortDoc := bson.D{}
+			for key, value := range opts.Sort {
+				sortDoc = append(sortDoc, bson.E{Key: key, Value: value})
+			}
+			findOptions.SetSort(sortDoc)
+		}
+		if opts.Skip > 0 {
+			findOptions.SetSkip(opts.Skip)
+		}
+		if opts.Limit > 0 {
+			findOptions.SetLimit(opts.Limit)
+		}
+	}
+
+	cursor, err = r.userCollection.Find(ctx, bson.M(filter), findOptions)
+	if err != nil {
+		return nil, total, err
+	}
+	defer cursor.Close(ctx)
 
 	var users []*model.User
 	if err := cursor.All(ctx, &users); err != nil {
 		return nil, 0, err
 	}
 
-	count, err := r.userCollection.CountDocuments(ctx, filter)
-	if err != nil {
-		return nil, 0, err
-	}
+	return users, total, nil
+}
 
-	return users, count, nil
+// Stats methods implementations
+func (r *userRepo) CountTotal(ctx context.Context) (int64, error) {
+	return r.userCollection.CountDocuments(ctx, bson.M{})
+}
+
+func (r *userRepo) CountActiveAfter(ctx context.Context, since time.Time) (int64, error) {
+	filter := bson.M{
+		"last_login": bson.M{"$gte": since},
+	}
+	return r.userCollection.CountDocuments(ctx, filter)
+}
+
+func (r *userRepo) CountCreatedAfter(ctx context.Context, since time.Time) (int64, error) {
+	filter := bson.M{
+		"created_at": bson.M{"$gte": since},
+	}
+	return r.userCollection.CountDocuments(ctx, filter)
+}
+
+func (r *userRepo) CountBanned(ctx context.Context) (int64, error) {
+	filter := bson.M{
+		"is_banned": true,
+	}
+	return r.userCollection.CountDocuments(ctx, filter)
+}
+
+func (r *userRepo) CountVerified(ctx context.Context) (int64, error) {
+	filter := bson.M{
+		"is_verified": true,
+	}
+	return r.userCollection.CountDocuments(ctx, filter)
 }

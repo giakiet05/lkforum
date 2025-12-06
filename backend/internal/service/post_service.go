@@ -54,14 +54,15 @@ type PostService interface {
 }
 
 type postService struct {
-	postRepo      repo.PostRepo
-	voteService   VoteService
-	pollVoteRepo  repo.PollVoteRepo
-	userRepo      repo.UserRepo
-	communityRepo repo.CommunityRepo
-	savedPostRepo repo.SavedPostRepo
-	reportRepo    repo.ReportRepo
-	bus           bus.EventBus
+	postRepo       repo.PostRepo
+	voteService    VoteService
+	pollVoteRepo   repo.PollVoteRepo
+	userRepo       repo.UserRepo
+	communityRepo  repo.CommunityRepo
+	membershipRepo repo.MembershipRepo
+	savedPostRepo  repo.SavedPostRepo
+	reportRepo     repo.ReportRepo
+	bus            bus.EventBus
 }
 
 // NewPostService creates a new instance of PostService.
@@ -71,19 +72,21 @@ func NewPostService(
 	pollVoteRepo repo.PollVoteRepo,
 	userRepo repo.UserRepo,
 	communityRepo repo.CommunityRepo,
+	membershipRepo repo.MembershipRepo,
 	savedPostRepo repo.SavedPostRepo,
 	reportRepo repo.ReportRepo,
 	bus bus.EventBus,
 ) PostService {
 	return &postService{
-		postRepo:      postRepo,
-		voteService:   voteService,
-		pollVoteRepo:  pollVoteRepo,
-		userRepo:      userRepo,
-		communityRepo: communityRepo,
-		savedPostRepo: savedPostRepo,
-		reportRepo:    reportRepo,
-		bus:           bus,
+		postRepo:       postRepo,
+		voteService:    voteService,
+		pollVoteRepo:   pollVoteRepo,
+		userRepo:       userRepo,
+		communityRepo:  communityRepo,
+		membershipRepo: membershipRepo,
+		savedPostRepo:  savedPostRepo,
+		reportRepo:     reportRepo,
+		bus:            bus,
 	}
 }
 
@@ -187,6 +190,36 @@ func (s *postService) GetPostByID(postID string, userID string) (*dto.PostRespon
 func (s *postService) GetPosts(userID string, query *dto.GetPostsQuery) (*dto.PaginatedPostsResponse, error) {
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
+
+	// Check if filtering by community and if it's private
+	if query.CommunityID != "" {
+		community, err := s.communityRepo.GetByID(ctx, query.CommunityID)
+		if err != nil {
+			return nil, err
+		}
+
+		// Check if community is banned
+		if community.IsBanned {
+			return nil, apperror.ErrCommunityNotFound // Or create a specific ErrCommunityBanned
+		}
+
+		// If community is private, check membership
+		if community.Setting.IsPrivate {
+			// User must be logged in
+			if userID == "" {
+				return nil, apperror.ErrForbidden
+			}
+
+			// Check if user is a member
+			isMember, err := s.membershipRepo.IsMember(ctx, userID, query.CommunityID)
+			if err != nil {
+				return nil, err
+			}
+			if !isMember {
+				return nil, apperror.ErrForbidden
+			}
+		}
+	}
 
 	filter := s.buildFilter(query)
 	findOptions := s.buildFindOptions(query)
@@ -323,10 +356,27 @@ func (s *postService) UpdatePost(postID string, userID string, req *dto.UpdatePo
 		return s.GetPostByID(postID, userID)
 	}
 
+	// Check if user is admin/moderator
+	author, _ := s.userRepo.GetByID(ctx, userID)
+	isAdminOrMod := author != nil && (author.Role == "admin" || author.Role == "moderator")
+
+	// Set moderation status to pending for normal users
+	if !isAdminOrMod {
+		update["$set"].(bson.M)["moderation_status"] = model.ModerationPending
+		update["$set"].(bson.M)["moderation_reason"] = nil
+		update["$set"].(bson.M)["moderated_at"] = nil
+	}
+
 	update["$set"].(bson.M)["updated_at"] = time.Now()
 	if err := s.postRepo.UpdateByID(ctx, postID, update); err != nil {
 		return nil, err
 	}
+
+	// Publish PostUpdatedEvent for moderation
+	s.bus.Publish(&bus.PostUpdatedEvent{
+		PostID:   postID,
+		AuthorID: userID,
+	})
 
 	return s.GetPostByID(postID, userID)
 }
@@ -946,7 +996,10 @@ func (s *postService) mapUsers(users []*model.User) map[string]*model.User {
 func (s *postService) mapCommunities(communities []*model.Community) map[string]*model.Community {
 	communitiesMap := make(map[string]*model.Community, len(communities))
 	for _, c := range communities {
-		communitiesMap[c.ID.Hex()] = c
+		// Only include non-banned communities
+		if !c.IsBanned {
+			communitiesMap[c.ID.Hex()] = c
+		}
 	}
 	return communitiesMap
 }

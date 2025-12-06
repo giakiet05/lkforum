@@ -261,7 +261,7 @@ func (c *CommunityController) DeleteCommunityByID(ctx *gin.Context) {
 }
 
 func (c *CommunityController) BanUser(ctx *gin.Context) {
-	var req dto.BanUserRequest
+	var req dto.CommunityBanUserRequest
 	if err := ctx.ShouldBind(&req); err != nil {
 		dto.SendError(ctx, http.StatusBadRequest, apperror.Message(apperror.ErrBadRequest), apperror.ErrBadRequest.Code)
 		return
@@ -273,13 +273,14 @@ func (c *CommunityController) BanUser(ctx *gin.Context) {
 		return
 	}
 
-	err := c.communityService.BanUser(&req, authUser.(auth.AuthUser).ID)
+	userID := authUser.(auth.AuthUser).ID
+	err := c.communityService.BanUser(&req, userID)
 	if err != nil {
 		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
 	}
 
-	dto.SendSuccess(ctx, http.StatusOK, "Ban user successfully", gin.H{"id": req.UserID})
+	dto.SendSuccess(ctx, http.StatusOK, "Ban user successfully", gin.H{"id": userID})
 }
 
 func (c *CommunityController) GetBanUsers(ctx *gin.Context) {
@@ -357,4 +358,74 @@ func (c *CommunityController) UnmuteUser(ctx *gin.Context) {
 	}
 
 	dto.SendSuccess(ctx, http.StatusOK, "Unmuted user successfully", gin.H{"id": req.UserID})
+}
+
+func (c *CommunityController) GetPendingPosts(ctx *gin.Context) {
+	communityID := ctx.Param("community_id")
+	if communityID == "" {
+		dto.SendError(ctx, http.StatusBadRequest, "Community ID is required", apperror.ErrBadRequest.Code)
+		return
+	}
+
+	authUser, exists := ctx.Get("authUser")
+	if !exists {
+		dto.SendError(ctx, http.StatusForbidden, apperror.ErrForbidden.Message, apperror.ErrForbidden.Code)
+		return
+	}
+
+	pageStr := ctx.DefaultQuery("page", "1")
+	pageSizeStr := ctx.DefaultQuery("page_size", "10")
+
+	page, err := strconv.Atoi(pageStr)
+	if err != nil || page < 1 {
+		page = 1
+	}
+
+	pageSize, err := strconv.Atoi(pageSizeStr)
+	if err != nil || pageSize < 1 {
+		pageSize = 10
+	}
+
+	response, err := c.communityService.GetPendingPosts(communityID, authUser.(auth.AuthUser).ID, page, pageSize)
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
+		return
+	}
+
+	dto.SendSuccess(ctx, http.StatusOK, "Pending posts retrieved successfully", response)
+}
+
+func (c *CommunityController) ModeratePost(ctx *gin.Context) {
+	communityID := ctx.Param("community_id")
+	postID := ctx.Param("post_id")
+
+	if communityID == "" || postID == "" {
+		dto.SendError(ctx, http.StatusBadRequest, "Community ID and Post ID are required", apperror.ErrBadRequest.Code)
+		return
+	}
+
+	var req dto.ModeratePostRequest
+	if err := ctx.ShouldBind(&req); err != nil {
+		dto.SendError(ctx, http.StatusBadRequest, apperror.Message(apperror.ErrBadRequest), apperror.ErrBadRequest.Code)
+		return
+	}
+
+	authUser, exists := ctx.Get("authUser")
+	if !exists {
+		dto.SendError(ctx, http.StatusForbidden, apperror.ErrForbidden.Message, apperror.ErrForbidden.Code)
+		return
+	}
+
+	err := c.communityService.ModeratePost(communityID, postID, authUser.(auth.AuthUser).ID, req.Approve, req.Reason)
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
+		return
+	}
+
+	status := "approved"
+	if !req.Approve {
+		status = "rejected"
+	}
+
+	dto.SendSuccess(ctx, http.StatusOK, "Post "+status+" successfully", gin.H{"post_id": postID, "status": status})
 }

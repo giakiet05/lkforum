@@ -3,6 +3,7 @@ package repo
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/giakiet05/lkforum/internal/apperror"
 	"github.com/giakiet05/lkforum/internal/config"
@@ -24,6 +25,11 @@ type PostRepo interface {
 	Delete(ctx context.Context, id string) error
 	SoftDelete(ctx context.Context, id string) error
 	Increment(ctx context.Context, id string, field string, value int) error
+	
+	// Stats methods
+	CountTotal(ctx context.Context) (int64, error)
+	CountCreatedAfter(ctx context.Context, since time.Time) (int64, error)
+	CountPendingApproval(ctx context.Context) (int64, error)
 }
 
 type postRepo struct {
@@ -194,4 +200,23 @@ func (r *postRepo) SoftDelete(ctx context.Context, id string) error {
 func (r *postRepo) Increment(ctx context.Context, id string, field string, value int) error {
 	update := UpdateDocument{"$inc": bson.M{field: value}}
 	return r.UpdateByID(ctx, id, update)
+}
+
+// Stats methods implementations
+func (r *postRepo) CountTotal(ctx context.Context) (int64, error) {
+	return r.collection.CountDocuments(ctx, bson.M{})
+}
+
+func (r *postRepo) CountCreatedAfter(ctx context.Context, since time.Time) (int64, error) {
+	filter := bson.M{
+		"created_at": bson.M{"$gte": since},
+	}
+	return r.collection.CountDocuments(ctx, filter)
+}
+
+func (r *postRepo) CountPendingApproval(ctx context.Context) (int64, error) {
+	filter := bson.M{
+		"moderation_status": "pending",
+	}
+	return r.collection.CountDocuments(ctx, filter)
 }

@@ -42,7 +42,7 @@ type RemoveModeratorRequest struct {
 	RemovedModerator []string `json:"removed_moderator" binding:"required"`
 }
 
-type BanUserRequest struct {
+type CommunityBanUserRequest struct {
 	CommunityID string `json:"community_id" binding:"required"`
 	UserID      string `json:"user_id" binding:"required"`
 	Type        string `json:"type" binding:"required"`
@@ -53,6 +53,11 @@ type BanUserRequest struct {
 type UnbanUserRequest struct {
 	CommunityID string `json:"community_id" binding:"required"`
 	UserID      string `json:"user_id" binding:"required"`
+}
+
+type ModeratePostRequest struct {
+	Approve bool    `json:"approve" binding:"required"`
+	Reason  *string `json:"reason,omitempty" binding:"max=500"`
 }
 
 type CommunityResponse struct {

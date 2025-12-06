@@ -32,6 +32,10 @@ type ReportRepo interface {
 
 	IsReporter(ctx context.Context, userID string, reportID string) (bool, error)
 	IsReporterOfAllReports(ctx context.Context, userID string, reportIDs []string) (bool, error)
+	
+	// Stats methods
+	CountPending(ctx context.Context) (int64, error)
+	CountCreatedAfter(ctx context.Context, since time.Time) (int64, error)
 }
 
 type reportRepo struct {
@@ -233,4 +237,19 @@ func (r *reportRepo) IsReporterOfAllReports(ctx context.Context, userID string, 
 	}
 
 	return count == int64(len(reportIDs)), nil
+}
+
+// Stats methods implementations
+func (r *reportRepo) CountPending(ctx context.Context) (int64, error) {
+filter := bson.M{
+"is_deleted": bson.M{"": true},
+}
+return r.reportCollection.CountDocuments(ctx, filter)
+}
+
+func (r *reportRepo) CountCreatedAfter(ctx context.Context, since time.Time) (int64, error) {
+filter := bson.M{
+"created_at": bson.M{"": since},
+}
+return r.reportCollection.CountDocuments(ctx, filter)
 }
