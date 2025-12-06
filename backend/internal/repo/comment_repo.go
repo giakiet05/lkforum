@@ -26,6 +26,10 @@ type CommentRepo interface {
 	GetAllChildren(ctx context.Context, commentID string) ([]model.Comment, error)
 	Delete(ctx context.Context, commentID string) error
 	UpdateByID(ctx context.Context, commentID string, update bson.M) error
+	
+	// Stats methods
+	CountTotal(ctx context.Context) (int64, error)
+	CountCreatedAfter(ctx context.Context, since time.Time) (int64, error)
 }
 
 type commentRepo struct {
@@ -268,4 +272,16 @@ func (c *commentRepo) UpdateByID(ctx context.Context, commentID string, update b
 	}
 
 	return nil
+}
+
+// Stats methods implementations
+func (c *commentRepo) CountTotal(ctx context.Context) (int64, error) {
+return c.commentCollection.CountDocuments(ctx, bson.M{})
+}
+
+func (c *commentRepo) CountCreatedAfter(ctx context.Context, since time.Time) (int64, error) {
+filter := bson.M{
+"created_at": bson.M{"": since},
+}
+return c.commentCollection.CountDocuments(ctx, filter)
 }

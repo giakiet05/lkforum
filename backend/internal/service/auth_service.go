@@ -206,6 +206,7 @@ func (s *authService) CompleteRegistration(verificationToken, username, password
 		Role:       model.UserRole,
 		Settings:   model.NewDefaultSettings(),
 		IsVerified: true, // Always true since we verified email first
+		IsBanned:   false, // Initialize ban status
 		CreatedAt:  time.Now(),
 		RoleContent: model.RoleContent{
 			AsUser: &model.UserRoleContent{
@@ -303,6 +304,21 @@ func (s *authService) Login(identifier, password string) (*model.User, string, s
 		return nil, "", "", apperror.ErrEmailNotVerified
 	}
 
+	// Check if user is banned
+	if user.IsBanned {
+		// Check if ban has expired
+		if user.BanUntil != nil && time.Now().After(*user.BanUntil) {
+			// Ban expired, unban user
+			user.IsBanned = false
+			user.BanUntil = nil
+			user.BanReason = nil
+			s.userRepo.Update(ctx, user)
+		} else {
+			// Still banned
+			return nil, "", "", apperror.ErrUserInactive
+		}
+	}
+
 	accessToken, refreshToken, err := auth.GenerateToken(user.ID.Hex(), string(user.Role))
 	if err != nil {
 		return nil, "", "", err
@@ -324,6 +340,21 @@ func (s *authService) RefreshToken(refreshToken string) (string, string, error) 
 			return "", "", apperror.ErrUserNotFound
 		}
 		return "", "", err
+	}
+
+	// Check if user is banned
+	if user.IsBanned {
+		// Check if ban has expired
+		if user.BanUntil != nil && time.Now().After(*user.BanUntil) {
+			// Ban expired, unban user
+			user.IsBanned = false
+			user.BanUntil = nil
+			user.BanReason = nil
+			s.userRepo.Update(ctx, user)
+		} else {
+			// Still banned
+			return "", "", apperror.ErrUserInactive
+		}
 	}
 
 	accessToken, newRefreshToken, err := auth.GenerateToken(user.ID.Hex(), string(user.Role))
@@ -397,6 +428,21 @@ func (s *authService) ProcessGoogleCallback(code string) (*GoogleAuthResult, err
 		return nil, apperror.ErrLoginMethodMismatch
 	}
 
+	// Check if user is banned
+	if user.IsBanned {
+		// Check if ban has expired
+		if user.BanUntil != nil && time.Now().After(*user.BanUntil) {
+			// Ban expired, unban user
+			user.IsBanned = false
+			user.BanUntil = nil
+			user.BanReason = nil
+			s.userRepo.Update(ctx, user)
+		} else {
+			// Still banned
+			return nil, apperror.ErrUserInactive
+		}
+	}
+
 	accessToken, refreshToken, err := auth.GenerateToken(user.ID.Hex(), string(user.Role))
 	if err != nil {
 		return nil, err
@@ -435,6 +481,7 @@ func (s *authService) CompleteGoogleSetup(setupToken, username string) (*model.U
 		Role:       model.UserRole,
 		Settings:   model.NewDefaultSettings(),
 		IsVerified: true,
+		IsBanned:   false, // Initialize ban status
 		CreatedAt:  time.Now(),
 		RoleContent: model.RoleContent{
 			AsUser: &model.UserRoleContent{

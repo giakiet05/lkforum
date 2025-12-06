@@ -29,6 +29,14 @@ type CommunityRepo interface {
 	) ([]*model.Community, int64, error)
 	GetByModeratorIDPaginated(ctx context.Context, moderatorID string, page int, pageSize int) ([]*model.Community, int64, error)
 	GetAllPaginated(ctx context.Context, page int, pageSize int) ([]*model.Community, int64, error)
+	FindCommunities(ctx context.Context, filter Filter, findOptions *FindOptions) ([]*model.Community, int64, error)
+	
+	// Stats methods
+	CountTotal(ctx context.Context) (int64, error)
+	CountActive(ctx context.Context) (int64, error)
+	CountCreatedAfter(ctx context.Context, since time.Time) (int64, error)
+	CountBanned(ctx context.Context) (int64, error)
+	CountPrivate(ctx context.Context) (int64, error)
 	Update(ctx context.Context, communityID string, updates bson.M) (*model.Community, error)
 	UpdateUserAvatar(ctx context.Context, userID string, newAvatar string) error
 	Replace(ctx context.Context, community *model.Community) error
@@ -610,4 +618,92 @@ func buildBanFilter(communityID primitive.ObjectID, banType model.CommunityBanTy
 			}(),
 		},
 	}
+}
+
+// FindCommunities finds communities with generic filter and options
+func (c *communityRepo) FindCommunities(ctx context.Context, filter Filter, findOptions *FindOptions) ([]*model.Community, int64, error) {
+	// Convert Filter to bson.M
+	bsonFilter := bson.M(filter)
+
+	// Count total documents
+	total, err := c.communityCollection.CountDocuments(ctx, bsonFilter)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// Prepare MongoDB find options
+	opts := options.Find()
+	if findOptions != nil {
+		if findOptions.Limit > 0 {
+			opts.SetLimit(findOptions.Limit)
+		}
+		if findOptions.Skip > 0 {
+			opts.SetSkip(findOptions.Skip)
+		}
+		if len(findOptions.Sort) > 0 {
+			opts.SetSort(bson.D(func() []bson.E {
+				var sortFields []bson.E
+				for field, order := range findOptions.Sort {
+					sortFields = append(sortFields, bson.E{Key: field, Value: order})
+				}
+				return sortFields
+			}()))
+		}
+	}
+
+	// Execute find
+	cursor, err := c.communityCollection.Find(ctx, bsonFilter, opts)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer cursor.Close(ctx)
+
+	var communities []*model.Community
+	for cursor.Next(ctx) {
+		var community model.Community
+		if err := cursor.Decode(&community); err != nil {
+			return nil, 0, err
+		}
+		communities = append(communities, &community)
+	}
+
+	if err := cursor.Err(); err != nil {
+		return nil, 0, err
+	}
+
+	return communities, total, nil
+}
+
+// Stats methods implementations
+func (c *communityRepo) CountTotal(ctx context.Context) (int64, error) {
+	return c.communityCollection.CountDocuments(ctx, bson.M{})
+}
+
+func (c *communityRepo) CountActive(ctx context.Context) (int64, error) {
+	filter := bson.M{
+		"is_deleted": bson.M{"$ne": true},
+		"is_banned":  bson.M{"$ne": true},
+	}
+	return c.communityCollection.CountDocuments(ctx, filter)
+}
+
+func (c *communityRepo) CountCreatedAfter(ctx context.Context, since time.Time) (int64, error) {
+	filter := bson.M{
+		"create_at": bson.M{"$gte": since},
+	}
+	return c.communityCollection.CountDocuments(ctx, filter)
+}
+
+func (c *communityRepo) CountBanned(ctx context.Context) (int64, error) {
+	filter := bson.M{
+		"is_banned": true,
+	}
+	return c.communityCollection.CountDocuments(ctx, filter)
+}
+
+func (c *communityRepo) CountPrivate(ctx context.Context) (int64, error) {
+	filter := bson.M{
+		"setting.is_private": true,
+	}
+	return c.communityCollection.CountDocuments(ctx, filter)
 }

@@ -18,10 +18,10 @@ type VoteService interface {
 }
 
 type voteService struct {
-	voteRepo      repo.VoteRepo
-	postRepo      repo.PostRepo
-	commentRepo   repo.CommentRepo
-	eventBus      bus.EventBus
+	voteRepo    repo.VoteRepo
+	postRepo    repo.PostRepo
+	commentRepo repo.CommentRepo
+	eventBus    bus.EventBus
 }
 
 func NewVoteService(

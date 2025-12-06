@@ -238,21 +238,34 @@ func FromPoll(poll *model.Poll, userVoteIDs []string) *PollResponse {
 
 // FromPosts creates a slice of PostResponse with optimized data fetching.
 func FromPosts(posts []*model.Post, authors map[string]*model.User, communities map[string]*model.Community, userVotes map[string]string, userPollVotes map[string][]string) []*PostResponse {
-	responses := make([]*PostResponse, len(posts))
-	for i, post := range posts {
+	var validPosts []*PostResponse
+	for _, post := range posts {
 		author := authors[post.AuthorID.Hex()]
 		community := communities[post.CommunityID.Hex()]
+
+		// Skip posts from banned communities
+		if community == nil {
+			continue
+		}
+
 		userVote := userVotes[post.ID.Hex()]
 		userPollVote := userPollVotes[post.ID.Hex()]
 
-		responses[i] = FromPost(post, author, community, userVote, userPollVote)
+		validPosts = append(validPosts, FromPost(post, author, community, userVote, userPollVote))
 	}
-	return responses
+	return validPosts
 }
 
 // FromPostsWithModeration creates a slice of PostResponse with moderation info included.
-func FromPostsWithModeration(posts []*model.Post, authors map[string]*model.User, communities map[string]*model.Community, userVotes map[string]string, userPollVotes map[string][]string) []*PostResponse {
+func FromPostsWithModeration(
+	posts []*model.Post,
+	authors map[string]*model.User,
+	communities map[string]*model.Community,
+	userVotes map[string]string,
+	userPollVotes map[string][]string,
+) []*PostResponse {
 	responses := make([]*PostResponse, len(posts))
+
 	for i, post := range posts {
 		author := authors[post.AuthorID.Hex()]
 		community := communities[post.CommunityID.Hex()]
@@ -261,15 +274,22 @@ func FromPostsWithModeration(posts []*model.Post, authors map[string]*model.User
 
 		resp := FromPost(post, author, community, userVote, userPollVote)
 
-		// Add moderation info
-		statusStr := string(post.ModerationStatus)
-		resp.ModerationStatus = &statusStr
+		// Always include status
+		status := string(post.ModerationStatus)
+		resp.ModerationStatus = &status
+
+		// ModerationResult may be nil
 		if post.ModerationResult != nil {
 			resp.ModerationReason = &post.ModerationResult.Reason
+		} else {
+			resp.ModerationReason = nil
 		}
+
+		// ModeratedAt may be nil
 		resp.ModeratedAt = post.ModeratedAt
 
 		responses[i] = resp
 	}
+
 	return responses
 }

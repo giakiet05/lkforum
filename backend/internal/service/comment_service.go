@@ -19,12 +19,10 @@ type CommentService interface {
 	GetCommentsFilterPaginated(query *dto.GetCommentsFilterQuery, currentUserID *string) (*dto.PaginatedCommentsResponse, error)
 	GetAllChildren(commentID string) ([]model.Comment, error)
 	DeleteCommentByID(commentID string, userID string) error
-	VoteOnComment(userID, commentID string, voteValue bool) (*dto.VotesCountResponse, error)
 }
 
 type commentService struct {
 	commentRepo   repo.CommentRepo
-	voteService   VoteService
 	userRepo      repo.UserRepo
 	communityRepo repo.CommunityRepo
 	postRepo      repo.PostRepo
@@ -33,7 +31,6 @@ type commentService struct {
 
 func NewCommentService(
 	commentRepo repo.CommentRepo,
-	voteService VoteService,
 	userRepo repo.UserRepo,
 	communityRepo repo.CommunityRepo,
 	postRepo repo.PostRepo,
@@ -41,7 +38,6 @@ func NewCommentService(
 ) CommentService {
 	return &commentService{
 		commentRepo:   commentRepo,
-		voteService:   voteService,
 		userRepo:      userRepo,
 		communityRepo: communityRepo,
 		postRepo:      postRepo,
@@ -242,8 +238,4 @@ func (s *commentService) DeleteCommentByID(commentID string, userID string) erro
 	}
 
 	return s.commentRepo.Delete(ctx, commentID)
-}
-
-func (s *commentService) VoteOnComment(userID, commentID string, voteValue bool) (*dto.VotesCountResponse, error) {
-	return s.voteService.VoteOnTarget(userID, commentID, model.VoteTargetComment, voteValue)
 }

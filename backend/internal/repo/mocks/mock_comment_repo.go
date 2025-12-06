@@ -7,9 +7,11 @@ package mocks
 import (
 	context "context"
 	reflect "reflect"
+	time "time"
 
 	model "github.com/giakiet05/lkforum/internal/model"
 	gomock "github.com/golang/mock/gomock"
+	bson "go.mongodb.org/mongo-driver/bson"
 )
 
 // MockCommentRepo is a mock of CommentRepo interface.
@@ -33,6 +35,36 @@ func NewMockCommentRepo(ctrl *gomock.Controller) *MockCommentRepo {
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockCommentRepo) EXPECT() *MockCommentRepoMockRecorder {
 	return m.recorder
+}
+
+// CountCreatedAfter mocks base method.
+func (m *MockCommentRepo) CountCreatedAfter(ctx context.Context, since time.Time) (int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CountCreatedAfter", ctx, since)
+	ret0, _ := ret[0].(int64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CountCreatedAfter indicates an expected call of CountCreatedAfter.
+func (mr *MockCommentRepoMockRecorder) CountCreatedAfter(ctx, since interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CountCreatedAfter", reflect.TypeOf((*MockCommentRepo)(nil).CountCreatedAfter), ctx, since)
+}
+
+// CountTotal mocks base method.
+func (m *MockCommentRepo) CountTotal(ctx context.Context) (int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CountTotal", ctx)
+	ret0, _ := ret[0].(int64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CountTotal indicates an expected call of CountTotal.
+func (mr *MockCommentRepoMockRecorder) CountTotal(ctx interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CountTotal", reflect.TypeOf((*MockCommentRepo)(nil).CountTotal), ctx)
 }
 
 // Create mocks base method.
@@ -110,9 +142,9 @@ func (mr *MockCommentRepoMockRecorder) GetByParentIDsPaginated(ctx, parentIDs, p
 }
 
 // GetCommentsFilterPaginated mocks base method.
-func (m *MockCommentRepo) GetCommentsFilterPaginated(ctx context.Context, postID, parentID, userID, content *string, page, pageSize int) ([]model.Comment, int64, error) {
+func (m *MockCommentRepo) GetCommentsFilterPaginated(ctx context.Context, postID, parentID, userID, content, currentUserID *string, page, pageSize int) ([]model.Comment, int64, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetCommentsFilterPaginated", ctx, postID, parentID, userID, content, page, pageSize)
+	ret := m.ctrl.Call(m, "GetCommentsFilterPaginated", ctx, postID, parentID, userID, content, currentUserID, page, pageSize)
 	ret0, _ := ret[0].([]model.Comment)
 	ret1, _ := ret[1].(int64)
 	ret2, _ := ret[2].(error)
@@ -120,7 +152,21 @@ func (m *MockCommentRepo) GetCommentsFilterPaginated(ctx context.Context, postID
 }
 
 // GetCommentsFilterPaginated indicates an expected call of GetCommentsFilterPaginated.
-func (mr *MockCommentRepoMockRecorder) GetCommentsFilterPaginated(ctx, postID, parentID, userID, content, page, pageSize interface{}) *gomock.Call {
+func (mr *MockCommentRepoMockRecorder) GetCommentsFilterPaginated(ctx, postID, parentID, userID, content, currentUserID, page, pageSize interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCommentsFilterPaginated", reflect.TypeOf((*MockCommentRepo)(nil).GetCommentsFilterPaginated), ctx, postID, parentID, userID, content, page, pageSize)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCommentsFilterPaginated", reflect.TypeOf((*MockCommentRepo)(nil).GetCommentsFilterPaginated), ctx, postID, parentID, userID, content, currentUserID, page, pageSize)
+}
+
+// UpdateByID mocks base method.
+func (m *MockCommentRepo) UpdateByID(ctx context.Context, commentID string, update bson.M) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateByID", ctx, commentID, update)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateByID indicates an expected call of UpdateByID.
+func (mr *MockCommentRepoMockRecorder) UpdateByID(ctx, commentID, update interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateByID", reflect.TypeOf((*MockCommentRepo)(nil).UpdateByID), ctx, commentID, update)
 }

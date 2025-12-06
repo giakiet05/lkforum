@@ -14,6 +14,8 @@ import (
 	"github.com/giakiet05/lkforum/internal/repo"
 	"github.com/giakiet05/lkforum/internal/util"
 	"github.com/redis/go-redis/v9"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -29,10 +31,9 @@ type UserService interface {
 	ChangePassword(userID, oldPassword, newPassword string) error
 
 	GetUserByID(id string) (*dto.UserResponse, error)
-	GetUserByUsername(username string) (*dto.UserResponse, error)
+	GetUserByUsername(username string, requesterID string) (*dto.UserResponse, error)
 	GetUserByEmail(email string) (*dto.UserResponse, error)
-	GetUsers(page, pageSize int, username string) (*dto.PaginatedUsersResponse, error)
-	GetAllUsers() ([]*model.User, error)
+	GetUsers(query *dto.GetUsersQuery) (*dto.PaginatedUsersResponse, error)
 
 	GetSettings(userID string) (*dto.SettingsResponse, error)
 	UpdateSettings(userID string, req *dto.UpdateSettingsRequest) (*dto.SettingsResponse, error)
@@ -353,7 +354,7 @@ func (s *userService) GetUserByID(id string) (*dto.UserResponse, error) {
 	return dto.FromUser(user), nil
 }
 
-func (s *userService) GetUserByUsername(username string) (*dto.UserResponse, error) {
+func (s *userService) GetUserByUsername(username string, requesterID string) (*dto.UserResponse, error) {
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
 	user, err := s.userRepo.GetByUsername(ctx, username)
@@ -364,9 +365,14 @@ func (s *userService) GetUserByUsername(username string) (*dto.UserResponse, err
 		return nil, err
 	}
 
-	// Check if user has disabled profile visibility
+	// Check if profile is private
 	if user.Settings != nil && !user.Settings.Privacy.ShowProfile {
-		// Return limited profile info (username, avatar, cover only)
+		// Allow user to view their own private profile
+		if requesterID != "" && user.ID.Hex() == requesterID {
+			return dto.FromUser(user), nil
+		}
+
+		// Return limited profile info (username, avatar, cover only) for others
 		limitedProfile := &dto.UserResponse{
 			ID:       user.ID.Hex(),
 			Username: user.Username,
@@ -403,18 +409,41 @@ func (s *userService) GetUserByEmail(email string) (*dto.UserResponse, error) {
 	return dto.FromUser(user), nil
 }
 
-func (s *userService) GetUsers(page, pageSize int, username string) (*dto.PaginatedUsersResponse, error) {
+func (s *userService) GetUsers(query *dto.GetUsersQuery) (*dto.PaginatedUsersResponse, error) {
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
 
+	// Build filter - exclude deleted and banned users for regular users
+	filter := repo.Filter{
+		"deleted_at": bson.M{"$exists": false},
+		"is_banned":  false, // Only show non-banned users
+	}
+
+	// Add username search if provided
+	if query.Username != "" {
+		filter["username"] = bson.M{"$regex": primitive.Regex{Pattern: query.Username, Options: "i"}}
+	}
+
+	// Pagination
+	page := query.Page
 	if page < 1 {
 		page = 1
 	}
+	pageSize := query.PageSize
 	if pageSize < 1 {
 		pageSize = 10
 	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
 
-	users, total, err := s.userRepo.GetPaginated(ctx, page, pageSize, username)
+	findOptions := &repo.FindOptions{
+		Skip:  int64((page - 1) * pageSize),
+		Limit: int64(pageSize),
+		Sort:  map[string]int{"created_at": -1},
+	}
+
+	users, total, err := s.userRepo.Find(ctx, filter, findOptions)
 	if err != nil {
 		return nil, err
 	}
@@ -429,12 +458,6 @@ func (s *userService) GetUsers(page, pageSize int, username string) (*dto.Pagina
 			Total:    total,
 		},
 	}, nil
-}
-
-func (s *userService) GetAllUsers() ([]*model.User, error) {
-	ctx, cancel := util.NewDefaultDBContext()
-	defer cancel()
-	return s.userRepo.GetAll(ctx)
 }
 
 func (s *userService) GetSettings(userID string) (*dto.SettingsResponse, error) {

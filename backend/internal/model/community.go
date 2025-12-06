@@ -24,6 +24,7 @@ type Community struct {
 	Is18Plus       bool               `bson:"is_18_plus" json:"is_18_plus"`
 	IsDeleted      bool               `bson:"is_deleted" json:"is_deleted"`
 	IsBanned       bool               `bson:"is_banned" json:"is_banned"`
+	BanReason      *string            `bson:"ban_reason,omitempty" json:"ban_reason,omitempty"`
 }
 
 type CommunitySetting struct {

@@ -12,6 +12,7 @@ const (
 	TopicUserChangeAvatar = "user.avatar"
 
 	TopicPostCreated         = "post.created"
+	TopicPostUpdated         = "post.updated"
 	TopicPostApproved        = "post.approved"
 	TopicPostRejected        = "post.rejected"
 	TopicPostUpvoted         = "post.upvoted"
@@ -85,6 +86,16 @@ type PostCreatedEvent struct {
 
 func (e *PostCreatedEvent) Topic() string { return TopicPostCreated }
 func (e *PostCreatedEvent) Payload() map[string]interface{} {
+	return map[string]interface{}{"post_id": e.PostID, "author_id": e.AuthorID}
+}
+
+type PostUpdatedEvent struct {
+	PostID   string
+	AuthorID string
+}
+
+func (e *PostUpdatedEvent) Topic() string { return TopicPostUpdated }
+func (e *PostUpdatedEvent) Payload() map[string]interface{} {
 	return map[string]interface{}{"post_id": e.PostID, "author_id": e.AuthorID}
 }
 
