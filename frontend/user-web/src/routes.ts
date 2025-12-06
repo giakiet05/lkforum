@@ -18,6 +18,7 @@ const routes = {
     '/login': Login,
     '/register': Register,
     '/profile': Profile,
+    '/profile/:username': Profile,
     '/settings': Settings,
     '/post/:id': PostDetail,
     '/post/:id/edit': EditPost,

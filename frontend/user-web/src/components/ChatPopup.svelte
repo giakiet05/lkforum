@@ -125,13 +125,13 @@
     try {
       console.log("[ChatPopup] Loading channels for user:", currentUser.id);
       setLoadingChannels(true);
-      const userChannels = await getChannelsByUser(currentUser.id);
-      console.log("[ChatPopup] Loaded channels:", userChannels);
-      setChannels(userChannels);
+      const response = await getChannelsByUser(currentUser.id);
+      console.log("[ChatPopup] Loaded channels:", response);
+      setChannels(response.channels);
 
       // Auto-select first channel
-      if (userChannels.length > 0 && !$chatStore.activeChannelId) {
-        await handleSelectChannel(userChannels[0]);
+      if (response.channels.length > 0 && !$chatStore.activeChannelId) {
+        await handleSelectChannel(response.channels[0]);
       }
     } catch (error) {
       console.error("[ChatPopup] Failed to load channels:", error);
@@ -146,6 +146,9 @@
       setLoadingMessages(true);
       const channelMessages = await getMessages({ channel_id: channelId });
       setMessages(channelId, channelMessages);
+      console.log(
+        `✅ Loaded ${channelMessages.length} messages for channel ${channelId}`
+      );
 
       // Mark as read
       markChannelAsRead(channelId);
@@ -153,7 +156,10 @@
       // Scroll to bottom
       setTimeout(scrollToBottom, 100);
     } catch (error) {
-      console.error("Failed to load reports:", error);
+      console.error("Failed to load messages:", error);
+      console.log(
+        `⚠️ API error - keeping any existing messages from WebSocket`
+      );
       setLoadingMessages(false);
     }
   }
@@ -184,6 +190,7 @@
 
   // Handle incoming WebSocket reports
   function handleIncomingMessage(message: MessageResponse) {
+    console.log("📨 [ChatPopup] Received WebSocket message:", message);
     addMessage(message.channel_id, message);
 
     if (message.channel_id === $chatStore.activeChannelId) {
@@ -234,12 +241,38 @@
       return;
     }
 
-    // Prompt for user ID to create channel with
-    const targetUserId = prompt("Enter User ID to create channel with:");
-    if (!targetUserId) return;
+    console.log("=== YOUR USER INFO ===");
+    console.log("Your User ID:", currentUser.id);
+    console.log("Your Username:", currentUser.username);
+    console.log("Full User Object:", currentUser);
+    console.log("====================");
 
-    const targetUsername = prompt("Enter their username:");
-    if (!targetUsername) return;
+    // Quick test: Use hardcoded user IDs from your communities
+    const testUserIds = [
+      { id: "6915936f2ae7e4bba023dad1", username: "sample0_creator" },
+      { id: "6905e0bcbaa66c4cb5effe24", username: "golang_enthusiast" },
+    ];
+
+    // Show selection
+    const choice = prompt(
+      `YOUR USER ID: ${currentUser.id}\n\nChoose test user to chat with:\n1. ${testUserIds[0].username} (${testUserIds[0].id})\n2. ${testUserIds[1].username} (${testUserIds[1].id})\n\nOr enter custom User ID:`
+    );
+
+    if (!choice) return;
+
+    let targetUserId: string;
+    let targetUsername: string;
+
+    if (choice === "1") {
+      targetUserId = testUserIds[0].id;
+      targetUsername = testUserIds[0].username;
+    } else if (choice === "2") {
+      targetUserId = testUserIds[1].id;
+      targetUsername = testUserIds[1].username;
+    } else {
+      targetUserId = choice;
+      targetUsername = prompt("Enter their username:") || "Unknown";
+    }
 
     try {
       console.log("[ChatPopup] Creating test channel with:", targetUserId);
@@ -259,24 +292,39 @@
   }
 
   // Initialize when popup shows
+  // WebSocket lifecycle
   $effect(() => {
-    if (show && currentUser && channels.length === 0) {
-      loadChannels();
-
-      // Connect WebSocket if not connected
+    if (show && currentUser) {
+      // Connect WebSocket and register message handler
       if (!websocketService.isConnected()) {
         websocketService
           .connect()
           .then(() => {
+            console.log("📞 Registering WebSocket message handler");
             websocketService.onMessage(handleIncomingMessage);
           })
           .catch((error) => {
             console.error("Failed to connect WebSocket:", error);
           });
       } else {
+        console.log(
+          "📞 Registering WebSocket message handler (already connected)"
+        );
         websocketService.onMessage(handleIncomingMessage);
       }
     }
+  });
+
+  // Load channels on open
+  $effect(() => {
+    if (show && currentUser && channels.length === 0) {
+      loadChannels();
+    }
+  });
+
+  // Debug: Log channels changes
+  $effect(() => {
+    console.log("[ChatPopup] Channels changed:", channels.length, channels);
   });
 
   // Cleanup
@@ -291,6 +339,13 @@
     <div class="popup-header">
       <h2>Tin nhắn</h2>
       <div class="popup-header-actions">
+        <button
+          class="header-icon-btn debug-btn"
+          onclick={handleDebugCreateChannel}
+          title="Create Test Channel"
+        >
+          🔧
+        </button>
         <button class="header-icon-btn" onclick={handleExpand} title="Expand">
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
             <path
@@ -567,6 +622,15 @@
 
   .header-icon-btn:hover {
     background: #f6f7f8;
+  }
+
+  .header-icon-btn.debug-btn {
+    font-size: 16px;
+    color: var(--blue--);
+  }
+
+  .header-icon-btn.debug-btn:hover {
+    background: #e8f4fd;
   }
 
   /* Container */

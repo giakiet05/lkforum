@@ -51,6 +51,12 @@ func (c *UserController) GetUserByUsername(ctx *gin.Context) {
 
 	user, err := c.service.GetUserByUsername(username, requesterIDStr)
 	if err != nil {
+		// Special case: if profile is private, still return limited data
+		if err == apperror.ErrForbidden && user != nil {
+			user.Email = "" // Hide email
+			dto.SendError(ctx, http.StatusForbidden, apperror.Message(err), apperror.Code(err), user)
+			return
+		}
 		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
 	}

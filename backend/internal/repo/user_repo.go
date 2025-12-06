@@ -25,7 +25,7 @@ type UserRepo interface {
 	GetByUsername(ctx context.Context, username string) (*model.User, error)
 	GetByEmail(ctx context.Context, email string) (*model.User, error)
 	Find(ctx context.Context, filter Filter, opts *FindOptions) ([]*model.User, int64, error)
-	
+
 	// Stats methods
 	CountTotal(ctx context.Context) (int64, error)
 	CountActiveAfter(ctx context.Context, since time.Time) (int64, error)

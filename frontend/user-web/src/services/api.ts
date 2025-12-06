@@ -29,7 +29,7 @@ export async function handleApiResponse(res: Response): Promise<any> {
             });
             // Use the message from the API, or a default one
             const message = json.message || `Request failed with status ${res.status}`;
-            throw new ApiError(message, json.error_code as ApiErrorCode);
+            throw new ApiError(message, json.error_code as ApiErrorCode, json.data);
         }
         return json.data;
     } catch (error) {

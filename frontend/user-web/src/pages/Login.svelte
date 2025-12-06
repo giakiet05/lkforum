@@ -1,13 +1,14 @@
 <script lang="ts">
   import { createEventDispatcher } from "svelte";
   import Button from "../components/Button.svelte";
-  import type {CompleteRegistrationRequest, LoginRequest} from "../dtos/auth-dto";
-
-
+  import type {
+    CompleteRegistrationRequest,
+    LoginRequest,
+  } from "../dtos/auth-dto";
 
   export type Props = {
     mode?: "login" | "register";
-    onSubmit: (data: LoginRequest| CompleteRegistrationRequest) => void;
+    onSubmit: (data: LoginRequest | CompleteRegistrationRequest) => void;
     isLoading?: boolean;
     error?: string;
   };
@@ -55,10 +56,10 @@
   // Xử lý submit form
   async function handleSubmit() {
     if (!validate()) return;
-      onSubmit({
-        identifier: identifier,
-        password: password,
-      });
+    onSubmit({
+      identifier: identifier,
+      password: password,
+    });
   }
 
   function handleGoogleLogin() {

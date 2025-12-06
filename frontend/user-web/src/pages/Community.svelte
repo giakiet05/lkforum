@@ -109,6 +109,7 @@
         limit: postsPerPage,
       });
 
+      console.log("📦 Fetched posts response:", fetchedPosts);
       console.log(`✅ Loaded ${fetchedPosts.length} posts`);
       posts = fetchedPosts;
     } catch (error) {
@@ -343,19 +344,21 @@
             {/if}
           </button>
 
-          <!-- Create Post Button -->
-          <button
-            class="create-post-action-btn"
-            title="Create post"
-            onclick={() => (showCreatePostModal = true)}
-          >
-            <svg viewBox="0 0 20 20" fill="currentColor">
-              <path
-                d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
-              />
-            </svg>
-            Create post
-          </button>
+          <!-- Create Post Button - Only show if joined -->
+          {#if isJoined}
+            <button
+              class="create-post-action-btn"
+              title="Create post"
+              onclick={() => (showCreatePostModal = true)}
+            >
+              <svg viewBox="0 0 20 20" fill="currentColor">
+                <path
+                  d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
+                />
+              </svg>
+              Create post
+            </button>
+          {/if}
 
           <!-- Notification Bell Button -->
           <button class="action-btn" title="Notifications">
@@ -366,30 +369,32 @@
             </svg>
           </button>
 
-          <!-- Mod Tools Button -->
-          <button
-            class="mod-tools-btn"
-            title="Moderator tools"
-            onclick={handleModTools}
-          >
-            <svg viewBox="0 0 20 20" fill="currentColor">
-              <path
-                fill-rule="evenodd"
-                d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z"
-                clip-rule="evenodd"
-              />
-            </svg>
-            Mod tools
-          </button>
+          <!-- Mod Tools Button - Only show if creator or moderator -->
+          {#if isCreator()}
+            <button
+              class="mod-tools-btn"
+              title="Moderator tools"
+              onclick={handleModTools}
+            >
+              <svg viewBox="0 0 20 20" fill="currentColor">
+                <path
+                  fill-rule="evenodd"
+                  d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z"
+                  clip-rule="evenodd"
+                />
+              </svg>
+              Mod tools
+            </button>
 
-          <!-- More Options Button -->
-          <button class="action-btn" title="More options">
-            <svg viewBox="0 0 20 20" fill="currentColor">
-              <path
-                d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"
-              />
-            </svg>
-          </button>
+            <!-- More Options Button -->
+            <button class="action-btn" title="More options">
+              <svg viewBox="0 0 20 20" fill="currentColor">
+                <path
+                  d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"
+                />
+              </svg>
+            </button>
+          {/if}
         </div>
       </div>
     </div>
@@ -520,23 +525,25 @@
         <div class="moderators-card">
           <div class="moderators-header">
             <h3>Moderators</h3>
-            <button
-              class="invite-mod-btn"
-              title="Invite moderator"
-              onclick={handleOpenInviteModModal}
-            >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 20 20"
-                fill="currentColor"
+            {#if isCreator()}
+              <button
+                class="invite-mod-btn"
+                title="Invite moderator"
+                onclick={handleOpenInviteModModal}
               >
-                <path
-                  d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 016 6H2a6 6 0 016-6zm10-5a1 1 0 10-2 0v1h-1a1 1 0 100 2h1v1a1 1 0 102 0v-1h1a1 1 0 100-2h-1V6z"
-                />
-              </svg>
-              Invite Mod
-            </button>
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path
+                    d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 016 6H2a6 6 0 016-6zm10-5a1 1 0 10-2 0v1h-1a1 1 0 100 2h1v1a1 1 0 102 0v-1h1a1 1 0 100-2h-1V6z"
+                  />
+                </svg>
+                Invite Mod
+              </button>
+            {/if}
           </div>
           <div class="moderator-list">
             {#if community.moderators && community.moderators.length > 0}

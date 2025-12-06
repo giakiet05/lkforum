@@ -367,10 +367,30 @@ func (s *userService) GetUserByUsername(username string, requesterID string) (*d
 
 	// Check if profile is private
 	if user.Settings != nil && !user.Settings.Privacy.ShowProfile {
-		// Only allow user themselves to view their own private profile
-		if requesterID == "" || user.ID.Hex() != requesterID {
-			return nil, apperror.ErrForbidden
+		// Allow user to view their own private profile
+		if requesterID != "" && user.ID.Hex() == requesterID {
+			return dto.FromUser(user), nil
 		}
+
+		// Return limited profile info (username, avatar, cover only) for others
+		limitedProfile := &dto.UserResponse{
+			ID:       user.ID.Hex(),
+			Username: user.Username,
+			Profile:  dto.UserProfileResponse{},
+		}
+
+		// Include avatar and cover if they exist
+		if user.RoleContent.AsUser != nil {
+			if user.RoleContent.AsUser.Avatar != nil {
+				limitedProfile.Profile.Avatar = user.RoleContent.AsUser.Avatar
+			}
+			if user.RoleContent.AsUser.Cover != nil {
+				limitedProfile.Profile.Cover = user.RoleContent.AsUser.Cover
+			}
+		}
+
+		// Return error with limited data
+		return limitedProfile, apperror.ErrForbidden
 	}
 
 	return dto.FromUser(user), nil

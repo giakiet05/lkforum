@@ -171,3 +171,39 @@ export async function getGenders(): Promise<string[]> {
 
     return await handleApiResponse(res);
 }
+
+// --- Search ---
+
+export interface PaginatedUsersResponse {
+    users: UserResponse[];
+    pagination: {
+        page: number;
+        page_size: number;
+        total_items: number;
+        total_pages: number;
+    };
+}
+
+/**
+ * Search users (public endpoint)
+ * @param username - Optional username filter
+ * @param page - Page number (default: 1)
+ * @param pageSize - Page size (default: 10)
+ */
+export async function searchUsers(username?: string, page = 1, pageSize = 5): Promise<PaginatedUsersResponse> {
+    const params = new URLSearchParams({
+        page: page.toString(),
+        pageSize: pageSize.toString(),
+    });
+
+    // Add username filter if provided (backend now supports it!)
+    if (username) {
+        params.append('username', username);
+    }
+    
+    const res = await publicFetch(`/api/users?${params.toString()}`, {
+        method: "GET",
+    });
+
+    return await handleApiResponse(res);
+}
