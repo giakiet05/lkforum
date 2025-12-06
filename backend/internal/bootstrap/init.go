@@ -108,6 +108,8 @@ func initServices(repos *Repos, redisClient *redis.Client, emailSender email.Sen
 		MessageService:      service.NewMessageService(repos.MessageRepo, repos.ChannelRepo, repos.UserRepo, eventBus, redisClient),
 		PostHistoryService:  service.NewPostHistoryService(repos.PostHistoryRepo),
 		ReportService:       service.NewReportService(repos.ReportRepo),
+		CommentService:      service.NewCommentService(repos.CommentRepo, repos.UserRepo, repos.CommunityRepo, repos.PostRepo, eventBus),
+		CommunityService:    service.NewCommunityService(repos.CommunityRepo, repos.MembershipRepo, repos.PostRepo, repos.UserRepo, eventBus),
 	}
 
 	// VoteService needs to be created first as PostService and CommentService depend on it
@@ -115,10 +117,6 @@ func initServices(repos *Repos, redisClient *redis.Client, emailSender email.Sen
 
 	// PostService and CommentService need VoteService
 	services.PostService = service.NewPostService(repos.PostRepo, services.VoteService, repos.PollVoteRepo, repos.UserRepo, repos.CommunityRepo, repos.MembershipRepo, repos.SavedPostRepo, repos.ReportRepo, eventBus)
-	services.CommentService = service.NewCommentService(repos.CommentRepo, services.VoteService, repos.UserRepo, repos.CommunityRepo, repos.PostRepo, eventBus)
-
-	// CommunityService needs PostRepo and UserRepo for manual moderation
-	services.CommunityService = service.NewCommunityService(repos.CommunityRepo, repos.MembershipRepo, repos.PostRepo, repos.UserRepo, eventBus)
 
 	// DraftService needs PostService
 	services.DraftService = service.NewDraftService(repos.DraftRepo, repos.PostRepo, services.PostService)
@@ -136,22 +134,22 @@ func initServices(repos *Repos, redisClient *redis.Client, emailSender email.Sen
 
 func initControllers(services *Services, wsHub *ws.Hub) *Controllers {
 	return &Controllers{
-		AuthController:         *controller.NewAuthController(services.AuthService),
-		UserController:         *controller.NewUserController(services.UserService),
-		CommunityController:    *controller.NewCommunityController(services.CommunityService),
-		MembershipController:   *controller.NewMembershipController(services.MembershipService),
-		PostController:         *controller.NewPostController(services.PostService),
-		CommentController:      *controller.NewCommentController(services.CommentService),
-		NotificationController: *controller.NewNotificationController(services.NotificationService),
-		WebSocketController:    *controller.NewWebSocketController(wsHub),
-		ChannelController:      *controller.NewChannelController(services.ChannelService),
-		MessageController:      *controller.NewMessageController(services.MessageService),
-		PostHistoryController:  *controller.NewPostHistoryController(services.PostHistoryService),
-		DraftController:        *controller.NewDraftController(services.DraftService),
-		ReportController:       *controller.NewReportController(services.ReportService),
-		AdminUserController:    *controller.NewAdminUserController(services.AdminUserService),
+		AuthController:           *controller.NewAuthController(services.AuthService),
+		UserController:           *controller.NewUserController(services.UserService),
+		CommunityController:      *controller.NewCommunityController(services.CommunityService),
+		MembershipController:     *controller.NewMembershipController(services.MembershipService),
+		PostController:           *controller.NewPostController(services.PostService),
+		CommentController:        *controller.NewCommentController(services.CommentService),
+		NotificationController:   *controller.NewNotificationController(services.NotificationService),
+		WebSocketController:      *controller.NewWebSocketController(wsHub),
+		ChannelController:        *controller.NewChannelController(services.ChannelService),
+		MessageController:        *controller.NewMessageController(services.MessageService),
+		PostHistoryController:    *controller.NewPostHistoryController(services.PostHistoryService),
+		DraftController:          *controller.NewDraftController(services.DraftService),
+		ReportController:         *controller.NewReportController(services.ReportService),
+		AdminUserController:      *controller.NewAdminUserController(services.AdminUserService),
 		AdminCommunityController: *controller.NewAdminCommunityController(services.AdminCommunityService),
-		AdminStatsController:   *controller.NewAdminStatsController(services.AdminStatsService),
+		AdminStatsController:     *controller.NewAdminStatsController(services.AdminStatsService),
 	}
 }
 
