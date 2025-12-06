@@ -10,6 +10,7 @@ import (
 	time "time"
 
 	model "github.com/giakiet05/lkforum/internal/model"
+	repo "github.com/giakiet05/lkforum/internal/repo"
 	gomock "github.com/golang/mock/gomock"
 	bson "go.mongodb.org/mongo-driver/bson"
 )
@@ -35,6 +36,95 @@ func NewMockCommunityRepo(ctrl *gomock.Controller) *MockCommunityRepo {
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockCommunityRepo) EXPECT() *MockCommunityRepoMockRecorder {
 	return m.recorder
+}
+
+// BanUser mocks base method.
+func (m *MockCommunityRepo) BanUser(ctx context.Context, ban *model.CommunityBan) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "BanUser", ctx, ban)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// BanUser indicates an expected call of BanUser.
+func (mr *MockCommunityRepoMockRecorder) BanUser(ctx, ban interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BanUser", reflect.TypeOf((*MockCommunityRepo)(nil).BanUser), ctx, ban)
+}
+
+// CountActive mocks base method.
+func (m *MockCommunityRepo) CountActive(ctx context.Context) (int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CountActive", ctx)
+	ret0, _ := ret[0].(int64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CountActive indicates an expected call of CountActive.
+func (mr *MockCommunityRepoMockRecorder) CountActive(ctx interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CountActive", reflect.TypeOf((*MockCommunityRepo)(nil).CountActive), ctx)
+}
+
+// CountBanned mocks base method.
+func (m *MockCommunityRepo) CountBanned(ctx context.Context) (int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CountBanned", ctx)
+	ret0, _ := ret[0].(int64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CountBanned indicates an expected call of CountBanned.
+func (mr *MockCommunityRepoMockRecorder) CountBanned(ctx interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CountBanned", reflect.TypeOf((*MockCommunityRepo)(nil).CountBanned), ctx)
+}
+
+// CountCreatedAfter mocks base method.
+func (m *MockCommunityRepo) CountCreatedAfter(ctx context.Context, since time.Time) (int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CountCreatedAfter", ctx, since)
+	ret0, _ := ret[0].(int64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CountCreatedAfter indicates an expected call of CountCreatedAfter.
+func (mr *MockCommunityRepoMockRecorder) CountCreatedAfter(ctx, since interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CountCreatedAfter", reflect.TypeOf((*MockCommunityRepo)(nil).CountCreatedAfter), ctx, since)
+}
+
+// CountPrivate mocks base method.
+func (m *MockCommunityRepo) CountPrivate(ctx context.Context) (int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CountPrivate", ctx)
+	ret0, _ := ret[0].(int64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CountPrivate indicates an expected call of CountPrivate.
+func (mr *MockCommunityRepoMockRecorder) CountPrivate(ctx interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CountPrivate", reflect.TypeOf((*MockCommunityRepo)(nil).CountPrivate), ctx)
+}
+
+// CountTotal mocks base method.
+func (m *MockCommunityRepo) CountTotal(ctx context.Context) (int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CountTotal", ctx)
+	ret0, _ := ret[0].(int64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CountTotal indicates an expected call of CountTotal.
+func (mr *MockCommunityRepoMockRecorder) CountTotal(ctx interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CountTotal", reflect.TypeOf((*MockCommunityRepo)(nil).CountTotal), ctx)
 }
 
 // Create mocks base method.
@@ -66,11 +156,27 @@ func (mr *MockCommunityRepoMockRecorder) Delete(ctx, communityID interface{}) *g
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*MockCommunityRepo)(nil).Delete), ctx, communityID)
 }
 
+// FindCommunities mocks base method.
+func (m *MockCommunityRepo) FindCommunities(ctx context.Context, filter repo.Filter, findOptions *repo.FindOptions) ([]*model.Community, int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FindCommunities", ctx, filter, findOptions)
+	ret0, _ := ret[0].([]*model.Community)
+	ret1, _ := ret[1].(int64)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// FindCommunities indicates an expected call of FindCommunities.
+func (mr *MockCommunityRepoMockRecorder) FindCommunities(ctx, filter, findOptions interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindCommunities", reflect.TypeOf((*MockCommunityRepo)(nil).FindCommunities), ctx, filter, findOptions)
+}
+
 // GetAllPaginated mocks base method.
-func (m *MockCommunityRepo) GetAllPaginated(ctx context.Context, page, pageSize int) ([]model.Community, int64, error) {
+func (m *MockCommunityRepo) GetAllPaginated(ctx context.Context, page, pageSize int) ([]*model.Community, int64, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetAllPaginated", ctx, page, pageSize)
-	ret0, _ := ret[0].([]model.Community)
+	ret0, _ := ret[0].([]*model.Community)
 	ret1, _ := ret[1].(int64)
 	ret2, _ := ret[2].(error)
 	return ret0, ret1, ret2
@@ -80,6 +186,36 @@ func (m *MockCommunityRepo) GetAllPaginated(ctx context.Context, page, pageSize 
 func (mr *MockCommunityRepoMockRecorder) GetAllPaginated(ctx, page, pageSize interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAllPaginated", reflect.TypeOf((*MockCommunityRepo)(nil).GetAllPaginated), ctx, page, pageSize)
+}
+
+// GetBannedCommunityIDs mocks base method.
+func (m *MockCommunityRepo) GetBannedCommunityIDs(ctx context.Context, userID string, banType model.CommunityBanType, communityIDs []string) ([]string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetBannedCommunityIDs", ctx, userID, banType, communityIDs)
+	ret0, _ := ret[0].([]string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetBannedCommunityIDs indicates an expected call of GetBannedCommunityIDs.
+func (mr *MockCommunityRepoMockRecorder) GetBannedCommunityIDs(ctx, userID, banType, communityIDs interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBannedCommunityIDs", reflect.TypeOf((*MockCommunityRepo)(nil).GetBannedCommunityIDs), ctx, userID, banType, communityIDs)
+}
+
+// GetBannedUsers mocks base method.
+func (m *MockCommunityRepo) GetBannedUsers(ctx context.Context, communityID string, expired bool) ([]*model.User, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetBannedUsers", ctx, communityID, expired)
+	ret0, _ := ret[0].([]*model.User)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetBannedUsers indicates an expected call of GetBannedUsers.
+func (mr *MockCommunityRepoMockRecorder) GetBannedUsers(ctx, communityID, expired interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBannedUsers", reflect.TypeOf((*MockCommunityRepo)(nil).GetBannedUsers), ctx, communityID, expired)
 }
 
 // GetByID mocks base method.
@@ -113,10 +249,10 @@ func (mr *MockCommunityRepoMockRecorder) GetByIDs(ctx, ids interface{}) *gomock.
 }
 
 // GetByModeratorIDPaginated mocks base method.
-func (m *MockCommunityRepo) GetByModeratorIDPaginated(ctx context.Context, moderatorID string, page, pageSize int) ([]model.Community, int64, error) {
+func (m *MockCommunityRepo) GetByModeratorIDPaginated(ctx context.Context, moderatorID string, page, pageSize int) ([]*model.Community, int64, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetByModeratorIDPaginated", ctx, moderatorID, page, pageSize)
-	ret0, _ := ret[0].([]model.Community)
+	ret0, _ := ret[0].([]*model.Community)
 	ret1, _ := ret[1].(int64)
 	ret2, _ := ret[2].(error)
 	return ret0, ret1, ret2
@@ -129,10 +265,10 @@ func (mr *MockCommunityRepoMockRecorder) GetByModeratorIDPaginated(ctx, moderato
 }
 
 // GetFilter mocks base method.
-func (m *MockCommunityRepo) GetFilter(ctx context.Context, name, description string, is18Plus bool, createFrom time.Time, page, pageSize int) ([]model.Community, int64, error) {
+func (m *MockCommunityRepo) GetFilter(ctx context.Context, name, description string, is18Plus bool, createFrom time.Time, page, pageSize int) ([]*model.Community, int64, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetFilter", ctx, name, description, is18Plus, createFrom, page, pageSize)
-	ret0, _ := ret[0].([]model.Community)
+	ret0, _ := ret[0].([]*model.Community)
 	ret1, _ := ret[1].(int64)
 	ret2, _ := ret[2].(error)
 	return ret0, ret1, ret2
@@ -142,6 +278,36 @@ func (m *MockCommunityRepo) GetFilter(ctx context.Context, name, description str
 func (mr *MockCommunityRepoMockRecorder) GetFilter(ctx, name, description, is18Plus, createFrom, page, pageSize interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetFilter", reflect.TypeOf((*MockCommunityRepo)(nil).GetFilter), ctx, name, description, is18Plus, createFrom, page, pageSize)
+}
+
+// GetMutedUsers mocks base method.
+func (m *MockCommunityRepo) GetMutedUsers(ctx context.Context, communityID string, expired bool) ([]*model.User, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetMutedUsers", ctx, communityID, expired)
+	ret0, _ := ret[0].([]*model.User)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetMutedUsers indicates an expected call of GetMutedUsers.
+func (mr *MockCommunityRepoMockRecorder) GetMutedUsers(ctx, communityID, expired interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMutedUsers", reflect.TypeOf((*MockCommunityRepo)(nil).GetMutedUsers), ctx, communityID, expired)
+}
+
+// IsUserBanned mocks base method.
+func (m *MockCommunityRepo) IsUserBanned(ctx context.Context, userID string, banType model.CommunityBanType, communityID string) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IsUserBanned", ctx, userID, banType, communityID)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// IsUserBanned indicates an expected call of IsUserBanned.
+func (mr *MockCommunityRepoMockRecorder) IsUserBanned(ctx, userID, banType, communityID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsUserBanned", reflect.TypeOf((*MockCommunityRepo)(nil).IsUserBanned), ctx, userID, banType, communityID)
 }
 
 // IsUserExist mocks base method.
@@ -171,6 +337,34 @@ func (m *MockCommunityRepo) Replace(ctx context.Context, community *model.Commun
 func (mr *MockCommunityRepoMockRecorder) Replace(ctx, community interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Replace", reflect.TypeOf((*MockCommunityRepo)(nil).Replace), ctx, community)
+}
+
+// UnbanUser mocks base method.
+func (m *MockCommunityRepo) UnbanUser(ctx context.Context, userID, communityID string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UnbanUser", ctx, userID, communityID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UnbanUser indicates an expected call of UnbanUser.
+func (mr *MockCommunityRepoMockRecorder) UnbanUser(ctx, userID, communityID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UnbanUser", reflect.TypeOf((*MockCommunityRepo)(nil).UnbanUser), ctx, userID, communityID)
+}
+
+// UnmuteUser mocks base method.
+func (m *MockCommunityRepo) UnmuteUser(ctx context.Context, userID, communityID string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UnmuteUser", ctx, userID, communityID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UnmuteUser indicates an expected call of UnmuteUser.
+func (mr *MockCommunityRepoMockRecorder) UnmuteUser(ctx, userID, communityID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UnmuteUser", reflect.TypeOf((*MockCommunityRepo)(nil).UnmuteUser), ctx, userID, communityID)
 }
 
 // Update mocks base method.

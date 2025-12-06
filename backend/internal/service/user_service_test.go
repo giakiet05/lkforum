@@ -256,21 +256,21 @@ func TestUpdateProfile(t *testing.T) {
 
 			// ---- Bio ----
 			if (got.Bio == nil) != (want.Bio == nil) {
-				t.Errorf("Bio nil mismatch: want %v, got %v", want.Bio, got.Bio)
+				t.Errorf("Bio nil mismatch: want %v, got %v", want.Bio, *got.Bio)
 			} else if got.Bio != nil && *got.Bio != *want.Bio {
 				t.Errorf("Bio mismatch: want %v, got %v", *want.Bio, *got.Bio)
 			}
 
 			// ---- Gender ----
 			if (got.Gender == nil) != (want.Gender == nil) {
-				t.Errorf("Gender nil mismatch: want %v, got %v", want.Gender, got.Gender)
+				t.Errorf("Gender nil mismatch: want %v, got %v", want.Gender, *got.Gender)
 			} else if got.Gender != nil && *got.Gender != *want.Gender {
 				t.Errorf("Gender mismatch: want %v, got %v", *want.Gender, *got.Gender)
 			}
 
 			// ---- Location ----
 			if (got.Location == nil) != (want.Location == nil) {
-				t.Errorf("Location nil mismatch: want %v, got %v", want.Location, got.Location)
+				t.Errorf("Location nil mismatch: want %v, got %v", want.Location, *got.Location)
 			} else if got.Location != nil && *got.Location != *want.Location {
 				t.Errorf("Location mismatch: want %v, got %v", *want.Location, *got.Location)
 			}
@@ -282,33 +282,33 @@ func TestUpdateProfile(t *testing.T) {
 
 			// ---- SocialLinks ----
 			if (got.SocialLinks == nil) != (want.SocialLinks == nil) {
-				t.Errorf("SocialLinks nil mismatch: want %v, got %v", want.SocialLinks, got.SocialLinks)
+				t.Errorf("SocialLinks nil mismatch: want %v, got %v", want.SocialLinks, *got.SocialLinks)
 			} else if got.SocialLinks != nil && want.SocialLinks != nil {
 
 				// Website
 				if (got.SocialLinks.Website == nil) != (want.SocialLinks.Website == nil) {
-					t.Errorf("Website nil mismatch: want %v, got %v", want.SocialLinks.Website, got.SocialLinks.Website)
+					t.Errorf("Website nil mismatch: want %v, got %v", want.SocialLinks.Website, *got.SocialLinks.Website)
 				} else if got.SocialLinks.Website != nil && *got.SocialLinks.Website != *want.SocialLinks.Website {
 					t.Errorf("Website mismatch: want %v, got %v", *want.SocialLinks.Website, *got.SocialLinks.Website)
 				}
 
 				// Facebook
 				if (got.SocialLinks.Facebook == nil) != (want.SocialLinks.Facebook == nil) {
-					t.Errorf("Facebook nil mismatch: want %v, got %v", want.SocialLinks.Facebook, got.SocialLinks.Facebook)
+					t.Errorf("Facebook nil mismatch: want %v, got %v", want.SocialLinks.Facebook, *got.SocialLinks.Facebook)
 				} else if got.SocialLinks.Facebook != nil && *got.SocialLinks.Facebook != *want.SocialLinks.Facebook {
 					t.Errorf("Facebook mismatch: want %v, got %v", *want.SocialLinks.Facebook, *got.SocialLinks.Facebook)
 				}
 
 				// YouTube
 				if (got.SocialLinks.YouTube == nil) != (want.SocialLinks.YouTube == nil) {
-					t.Errorf("YouTube nil mismatch: want %v, got %v", want.SocialLinks.YouTube, got.SocialLinks.YouTube)
+					t.Errorf("YouTube nil mismatch: want %v, got %v", want.SocialLinks.YouTube, *got.SocialLinks.YouTube)
 				} else if got.SocialLinks.YouTube != nil && *got.SocialLinks.YouTube != *want.SocialLinks.YouTube {
 					t.Errorf("YouTube mismatch: want %v, got %v", *want.SocialLinks.YouTube, *got.SocialLinks.YouTube)
 				}
 
 				// GitHub
 				if (got.SocialLinks.GitHub == nil) != (want.SocialLinks.GitHub == nil) {
-					t.Errorf("GitHub nil mismatch: want %v, got %v", want.SocialLinks.GitHub, got.SocialLinks.GitHub)
+					t.Errorf("GitHub nil mismatch: want %v, got %v", want.SocialLinks.GitHub, *got.SocialLinks.GitHub)
 				} else if got.SocialLinks.GitHub != nil && *got.SocialLinks.GitHub != *want.SocialLinks.GitHub {
 					t.Errorf("GitHub mismatch: want %v, got %v", *want.SocialLinks.GitHub, *got.SocialLinks.GitHub)
 				}

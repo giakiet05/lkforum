@@ -7,8 +7,10 @@ package mocks
 import (
 	context "context"
 	reflect "reflect"
+	time "time"
 
 	model "github.com/giakiet05/lkforum/internal/model"
+	repo "github.com/giakiet05/lkforum/internal/repo"
 	gomock "github.com/golang/mock/gomock"
 )
 
@@ -33,6 +35,81 @@ func NewMockUserRepo(ctrl *gomock.Controller) *MockUserRepo {
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockUserRepo) EXPECT() *MockUserRepoMockRecorder {
 	return m.recorder
+}
+
+// CountActiveAfter mocks base method.
+func (m *MockUserRepo) CountActiveAfter(ctx context.Context, since time.Time) (int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CountActiveAfter", ctx, since)
+	ret0, _ := ret[0].(int64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CountActiveAfter indicates an expected call of CountActiveAfter.
+func (mr *MockUserRepoMockRecorder) CountActiveAfter(ctx, since interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CountActiveAfter", reflect.TypeOf((*MockUserRepo)(nil).CountActiveAfter), ctx, since)
+}
+
+// CountBanned mocks base method.
+func (m *MockUserRepo) CountBanned(ctx context.Context) (int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CountBanned", ctx)
+	ret0, _ := ret[0].(int64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CountBanned indicates an expected call of CountBanned.
+func (mr *MockUserRepoMockRecorder) CountBanned(ctx interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CountBanned", reflect.TypeOf((*MockUserRepo)(nil).CountBanned), ctx)
+}
+
+// CountCreatedAfter mocks base method.
+func (m *MockUserRepo) CountCreatedAfter(ctx context.Context, since time.Time) (int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CountCreatedAfter", ctx, since)
+	ret0, _ := ret[0].(int64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CountCreatedAfter indicates an expected call of CountCreatedAfter.
+func (mr *MockUserRepoMockRecorder) CountCreatedAfter(ctx, since interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CountCreatedAfter", reflect.TypeOf((*MockUserRepo)(nil).CountCreatedAfter), ctx, since)
+}
+
+// CountTotal mocks base method.
+func (m *MockUserRepo) CountTotal(ctx context.Context) (int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CountTotal", ctx)
+	ret0, _ := ret[0].(int64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CountTotal indicates an expected call of CountTotal.
+func (mr *MockUserRepoMockRecorder) CountTotal(ctx interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CountTotal", reflect.TypeOf((*MockUserRepo)(nil).CountTotal), ctx)
+}
+
+// CountVerified mocks base method.
+func (m *MockUserRepo) CountVerified(ctx context.Context) (int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CountVerified", ctx)
+	ret0, _ := ret[0].(int64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CountVerified indicates an expected call of CountVerified.
+func (mr *MockUserRepoMockRecorder) CountVerified(ctx interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CountVerified", reflect.TypeOf((*MockUserRepo)(nil).CountVerified), ctx)
 }
 
 // Create mocks base method.
@@ -62,6 +139,22 @@ func (m *MockUserRepo) Delete(ctx context.Context, id string) error {
 func (mr *MockUserRepoMockRecorder) Delete(ctx, id interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*MockUserRepo)(nil).Delete), ctx, id)
+}
+
+// Find mocks base method.
+func (m *MockUserRepo) Find(ctx context.Context, filter repo.Filter, opts *repo.FindOptions) ([]*model.User, int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Find", ctx, filter, opts)
+	ret0, _ := ret[0].([]*model.User)
+	ret1, _ := ret[1].(int64)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// Find indicates an expected call of Find.
+func (mr *MockUserRepoMockRecorder) Find(ctx, filter, opts interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Find", reflect.TypeOf((*MockUserRepo)(nil).Find), ctx, filter, opts)
 }
 
 // GetByEmail mocks base method.

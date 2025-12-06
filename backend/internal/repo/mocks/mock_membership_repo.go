@@ -156,6 +156,21 @@ func (mr *MockMembershipRepoMockRecorder) IsCommunityExist(ctx, communityID inte
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsCommunityExist", reflect.TypeOf((*MockMembershipRepo)(nil).IsCommunityExist), ctx, communityID)
 }
 
+// IsMember mocks base method.
+func (m *MockMembershipRepo) IsMember(ctx context.Context, userID, communityID string) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IsMember", ctx, userID, communityID)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// IsMember indicates an expected call of IsMember.
+func (mr *MockMembershipRepoMockRecorder) IsMember(ctx, userID, communityID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsMember", reflect.TypeOf((*MockMembershipRepo)(nil).IsMember), ctx, userID, communityID)
+}
+
 // IsUserExist mocks base method.
 func (m *MockMembershipRepo) IsUserExist(ctx context.Context, userID string) (bool, error) {
 	m.ctrl.T.Helper()
