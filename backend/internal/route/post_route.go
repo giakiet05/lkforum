@@ -49,9 +49,10 @@ func RegisterPostRoutes(rg *gin.RouterGroup, c *controller.PostController) {
 		private.DELETE("/:id/poll/options", c.RemovePollOptions) // Body: { "option_ids": [...] }
 		private.PUT("/:id/poll/options/:optionID", c.UpdatePollOption)
 
-		// Voting
-		private.POST("/:id/vote", c.VoteOnPost)
+		// Poll voting (kept in post controller since it's poll-specific)
 		private.POST("/:id/poll/vote", c.VoteOnPoll)
 		private.DELETE("/:id/poll/vote", c.RemovePollVote)
+
+		// Note: Post voting moved to /api/votes/post/:id (use VoteController)
 	}
 }

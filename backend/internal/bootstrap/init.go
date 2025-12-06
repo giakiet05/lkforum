@@ -64,6 +64,7 @@ type Controllers struct {
 	controller.CommunityController
 	controller.MembershipController
 	controller.PostController
+	controller.VoteController // Added VoteController
 	controller.CommentController
 	controller.NotificationController
 	controller.WebSocketController
@@ -139,6 +140,7 @@ func initControllers(services *Services, wsHub *ws.Hub) *Controllers {
 		CommunityController:      *controller.NewCommunityController(services.CommunityService),
 		MembershipController:     *controller.NewMembershipController(services.MembershipService),
 		PostController:           *controller.NewPostController(services.PostService),
+		VoteController:           *controller.NewVoteController(services.VoteService), // Added VoteController
 		CommentController:        *controller.NewCommentController(services.CommentService),
 		NotificationController:   *controller.NewNotificationController(services.NotificationService),
 		WebSocketController:      *controller.NewWebSocketController(wsHub),
@@ -168,6 +170,7 @@ func initRoutes(controllers *Controllers, r *gin.Engine) {
 	route.RegisterCommunityRoutes(api, &controllers.CommunityController)
 	route.RegisterMembershipRoutes(api, &controllers.MembershipController)
 	route.RegisterPostRoutes(api, &controllers.PostController)
+	route.RegisterVoteRoutes(api, &controllers.VoteController) // Added VoteRoutes
 	route.RegisterCommentRoutes(api, &controllers.CommentController)
 	route.RegisterNotificationRoutes(api, &controllers.NotificationController)
 	route.RegisterWebSocketRoutes(api, &controllers.WebSocketController)
