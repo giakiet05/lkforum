@@ -23,8 +23,8 @@ func TestUpdateProfile(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockRepo := mocks.NewMockUserRepo(ctrl)
-	svc := NewUserService(mockRepo, nil, nil)
+	mockUserRepo := mocks.NewMockUserRepo(ctrl)
+	svc := NewUserService(mockUserRepo, nil, nil)
 
 	// Helpers
 	ptrStr := func(s string) *string { return &s }
@@ -214,7 +214,7 @@ func TestUpdateProfile(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			//Setup mock with deep copy
-			mockRepo.EXPECT().
+			mockUserRepo.EXPECT().
 				GetByID(gomock.Any(), tt.userID).
 				DoAndReturn(func(ctx context.Context, id string) (*model.User, error) {
 					return model.CloneUser(tt.repoGetUser), tt.repoGetErr
@@ -222,14 +222,14 @@ func TestUpdateProfile(t *testing.T) {
 
 			// Update expectations
 			if tt.repoGetUser != nil && tt.updateReq != nil && tt.repoUpdateErr == nil {
-				mockRepo.EXPECT().
+				mockUserRepo.EXPECT().
 					Update(gomock.Any(), gomock.AssignableToTypeOf(&model.User{})).
 					DoAndReturn(func(ctx context.Context, user *model.User) (*model.User, error) {
 						// Return the modified user object that was passed in
 						return user, nil
 					})
 			} else if tt.repoUpdateErr != nil {
-				mockRepo.EXPECT().
+				mockUserRepo.EXPECT().
 					Update(gomock.Any(), gomock.AssignableToTypeOf(&model.User{})).
 					Return(nil, tt.repoUpdateErr)
 			}
@@ -324,9 +324,9 @@ func TestUpdateAvatarAndCover(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockRepo := mocks.NewMockUserRepo(ctrl)
+	mockUserRepo := mocks.NewMockUserRepo(ctrl)
 	mockEventBus := bus.NewMockEventBus(ctrl) // Create mock event bus
-	svc := NewUserService(mockRepo, mockEventBus, nil)
+	svc := NewUserService(mockUserRepo, mockEventBus, nil)
 
 	userID := primitive.NewObjectID()
 	notFoundID := primitive.NewObjectID()
@@ -465,7 +465,7 @@ func TestUpdateAvatarAndCover(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Setup GetByID mock with deep copy
-			mockRepo.EXPECT().
+			mockUserRepo.EXPECT().
 				GetByID(gomock.Any(), tt.userID).
 				DoAndReturn(func(ctx context.Context, id string) (*model.User, error) {
 					return model.CloneUser(tt.repoGetUser), tt.repoGetErr
@@ -476,12 +476,12 @@ func TestUpdateAvatarAndCover(t *testing.T) {
 			if shouldCallUpdate {
 				if tt.repoUpdateErr != nil {
 					// Update returns error
-					mockRepo.EXPECT().
+					mockUserRepo.EXPECT().
 						Update(gomock.Any(), gomock.Any()).
 						Return(nil, tt.repoUpdateErr)
 				} else {
 					// Update succeeds
-					mockRepo.EXPECT().
+					mockUserRepo.EXPECT().
 						Update(gomock.Any(), gomock.Any()).
 						DoAndReturn(func(ctx context.Context, user *model.User) (*model.User, error) {
 							return user, nil
@@ -557,8 +557,8 @@ func TestChangePassword(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockRepo := mocks.NewMockUserRepo(ctrl)
-	svc := NewUserService(mockRepo, nil, nil)
+	mockUserRepo := mocks.NewMockUserRepo(ctrl)
+	svc := NewUserService(mockUserRepo, nil, nil)
 
 	oldPwd := "OLD_PASSWORD"
 	oldHashBytes, err := bcrypt.GenerateFromPassword([]byte(oldPwd), bcrypt.DefaultCost)
@@ -655,13 +655,13 @@ func TestChangePassword(t *testing.T) {
 		tt := tt // capture range variable
 
 		t.Run(tt.name, func(t *testing.T) {
-			mockRepo.EXPECT().
+			mockUserRepo.EXPECT().
 				GetByID(gomock.Any(), tt.userID).
 				Return(tt.repoGetUser, tt.repoGetErr)
 
 			if tt.repoGetErr == nil && tt.repoGetUser != nil {
 				if tt.wantErr == nil || (tt.wantErr != nil && tt.wantErr.Error() == "db update failed") {
-					mockRepo.EXPECT().
+					mockUserRepo.EXPECT().
 						Update(gomock.Any(), gomock.AssignableToTypeOf(&model.User{})).
 						Return(tt.repoGetUser, tt.repoUpdateErr)
 				}
@@ -688,9 +688,9 @@ func TestUpdateUserSetting(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockRepo := mocks.NewMockUserRepo(ctrl)
+	mockUserRepo := mocks.NewMockUserRepo(ctrl)
 	mockEventBus := bus.NewMockEventBus(ctrl)
-	svc := NewUserService(mockRepo, mockEventBus, nil)
+	svc := NewUserService(mockUserRepo, mockEventBus, nil)
 
 	userID := primitive.NewObjectID()
 	notFoundID := primitive.NewObjectID()
@@ -962,7 +962,7 @@ func TestUpdateUserSetting(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Setup GetByID mock with deep copy
-			mockRepo.EXPECT().
+			mockUserRepo.EXPECT().
 				GetByID(gomock.Any(), tt.userID).
 				DoAndReturn(func(ctx context.Context, id string) (*model.User, error) {
 					return model.CloneUser(tt.repoGetUser), tt.repoGetErr
@@ -973,12 +973,12 @@ func TestUpdateUserSetting(t *testing.T) {
 			if shouldCallUpdate {
 				if tt.repoUpdateErr != nil {
 					// Update returns error
-					mockRepo.EXPECT().
+					mockUserRepo.EXPECT().
 						Update(gomock.Any(), gomock.Any()).
 						Return(nil, tt.repoUpdateErr)
 				} else {
 					// Update succeeds
-					mockRepo.EXPECT().
+					mockUserRepo.EXPECT().
 						Update(gomock.Any(), gomock.Any()).
 						DoAndReturn(func(ctx context.Context, user *model.User) (*model.User, error) {
 							return user, nil
