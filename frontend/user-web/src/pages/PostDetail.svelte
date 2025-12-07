@@ -571,8 +571,8 @@
     </article>
 
     <!-- Comment Section -->
-    <CommentSection 
-      postId={post.id} 
+    <CommentSection
+      postId={post.id}
       onCommentAdded={() => {
         if (post) post.comments_count++;
       }}

@@ -123,7 +123,7 @@ export async function deleteCommunity(communityId: string): Promise<void> {
  * Ban or mute a user from a community (requires authentication)
  */
 export async function banUser(data: BanUserRequest): Promise<void> {
-    const res = await authenticatedFetch("/api/communities/ban", {
+    const res = await authenticatedFetch("/api/communities/ban/user", {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
@@ -138,8 +138,8 @@ export async function banUser(data: BanUserRequest): Promise<void> {
  * Unban a user from a community (requires authentication)
  */
 export async function unbanUser(data: UnbanUserRequest): Promise<void> {
-    const res = await authenticatedFetch("/api/communities/unban", {
-        method: "PUT",
+    const res = await authenticatedFetch("/api/communities/unban/user", {
+        method: "POST",
         headers: {
             "Content-Type": "application/json",
         },
@@ -153,8 +153,8 @@ export async function unbanUser(data: UnbanUserRequest): Promise<void> {
  * Unmute a user from a community (requires authentication)
  */
 export async function unmuteUser(data: UnbanUserRequest): Promise<void> {
-    const res = await authenticatedFetch("/api/communities/unmute", {
-        method: "PUT",
+    const res = await authenticatedFetch("/api/communities/unmute/user", {
+        method: "POST",
         headers: {
             "Content-Type": "application/json",
         },
@@ -168,9 +168,35 @@ export async function unmuteUser(data: UnbanUserRequest): Promise<void> {
  * Get banned or muted users in a community (requires authentication)
  */
 export async function getBannedUsers(communityId: string, banType: "ban" | "mute"): Promise<UserResponse[]> {
-    const res = await authenticatedFetch(`/api/communities/${communityId}/banned/${banType}`, {
+    const res = await authenticatedFetch(`/api/communities/banned_user?community_id=${communityId}&ban_type=${banType}`, {
         method: "GET",
     });
     
     return await handleApiResponse(res);
+}
+
+/**
+ * Get pending posts in a community (requires moderator authentication)
+ */
+export async function getPendingPosts(communityId: string, page: number = 1, pageSize: number = 10): Promise<any> {
+    const res = await authenticatedFetch(`/api/communities/${communityId}/posts/pending?page=${page}&page_size=${pageSize}`, {
+        method: "GET",
+    });
+    
+    return await handleApiResponse(res);
+}
+
+/**
+ * Moderate a post (approve or reject) (requires moderator authentication)
+ */
+export async function moderatePost(communityId: string, postId: string, approve: boolean, reason?: string): Promise<void> {
+    const res = await authenticatedFetch(`/api/communities/${communityId}/posts/${postId}/moderate`, {
+        method: "PUT",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ approve, reason }),
+    });
+    
+    await handleApiResponse(res);
 }

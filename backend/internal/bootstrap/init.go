@@ -113,7 +113,9 @@ func initServices(repos *Repos, redisClient *redis.Client, emailSender email.Sen
 	}
 
 	// Set MembershipService in CommunityService to get real-time member count
-	if communitySvc, ok := services.CommunityService.(interface{ SetMembershipService(service.MembershipService) }); ok {
+	if communitySvc, ok := services.CommunityService.(interface {
+		SetMembershipService(service.MembershipService)
+	}); ok {
 		communitySvc.SetMembershipService(services.MembershipService)
 	}
 

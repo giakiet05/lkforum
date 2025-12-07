@@ -14,7 +14,8 @@
     onTotalCommentsChange?: (total: number) => void;
   };
 
-  let { postId, onCommentAdded, onTotalCommentsChange }: CommentSectionProps = $props();
+  let { postId, onCommentAdded, onTotalCommentsChange }: CommentSectionProps =
+    $props();
 
   type SortType = "top" | "newest" | "oldest" | "controversial";
 
@@ -43,13 +44,18 @@
         post_id: postId,
         page: 1,
         page_size: 50,
+        depth: 2, // Backend allows max depth of 2
       });
       console.log("📥 loadComments response:", response);
+      console.log(
+        "📅 First comment created_at:",
+        response.comments?.[0]?.created_at
+      );
       // Force reactivity by creating new array reference
       comments = [...(response.comments || [])];
       console.log("📝 comments array:", comments);
       totalComments = response.pagination?.total || comments.length;
-      
+
       // Notify parent of total comments count
       if (onTotalCommentsChange) onTotalCommentsChange(totalComments);
     } catch (error) {
@@ -63,7 +69,10 @@
   const sortedComments = $derived(
     (() => {
       const commentsToSort = [...comments];
-      console.log("🔄 sortedComments recalculating, comments.length:", comments.length);
+      console.log(
+        "🔄 sortedComments recalculating, comments.length:",
+        comments.length
+      );
 
       switch (sortBy) {
         case "top":
@@ -109,12 +118,13 @@
       });
 
       console.log("✅ Comment created:", newComment);
-      
+      console.log("📅 New comment created_at:", newComment.created_at);
+
       // Optimistic UI update: add the new comment immediately
       comments = [newComment, ...comments];
       totalComments += 1;
       console.log("✅ Comment added to UI, total:", comments.length);
-      
+
       // Notify parent component
       if (onCommentAdded) onCommentAdded();
 
@@ -124,7 +134,8 @@
     } catch (error: any) {
       console.error("❌ Failed to submit comment:", error);
       // Show specific error message from backend
-      errorMessage = error?.message || "Failed to post comment. Please try again.";
+      errorMessage =
+        error?.message || "Failed to post comment. Please try again.";
     } finally {
       isSubmitting = false;
     }
@@ -171,6 +182,12 @@
       placeholder="What are your thoughts?"
       class="comment-textarea"
       rows="4"
+      onkeydown={(e) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
+          submitComment();
+        }
+      }}
     ></textarea>
 
     {#if imagePreview}

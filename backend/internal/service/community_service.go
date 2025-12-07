@@ -365,14 +365,6 @@ func (c *communityService) AddModerator(req *dto.AddModeratorRequest, requesterI
 			return apperror.ErrInvalidID
 		}
 
-		ok, err = c.membershipRepo.IsMember(ctx, modDTO.ModeratorID, requesterID)
-		if err != nil {
-			return err
-		}
-		if !ok {
-			return apperror.ErrUserNotMember
-		}
-
 		newModerators = append(
 			newModerators,
 			model.Moderator{

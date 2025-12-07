@@ -5,7 +5,10 @@
   import CreatePostModal from "../components/CreatePostModal.svelte";
   import type { PostResponse } from "../dtos/post-dto";
   import type { CommunityResponse } from "../dtos/community-dto";
-  import { getCommunityById } from "../services/community-service";
+  import {
+    getCommunityById,
+    addModerators,
+  } from "../services/community-service";
   import { getPosts } from "../services/post-service";
   import { authStore } from "../stores/auth-store";
   import {
@@ -13,6 +16,7 @@
     createMembership,
     deleteMembership,
   } from "../services/membership-service";
+  import { getUserByUsername } from "../services/user-service";
 
   type CommunityProps = {
     params?: { name: string };
@@ -56,6 +60,19 @@
     if (!currentUser || !community) return false;
     return community.create_by_id === currentUser.id;
   });
+
+  // Check if current user is a moderator of this community
+  const isModerator = $derived(() => {
+    const currentUser = $authStore.user;
+    if (!currentUser || !community) return false;
+    return (
+      community.moderators?.some((mod) => mod.user_id === currentUser.id) ||
+      false
+    );
+  });
+
+  // Check if current user can access mod tools (creator or moderator)
+  const canUseModeTools = $derived(() => isCreator() || isModerator());
 
   // Load community data
   async function loadCommunity() {
@@ -272,18 +289,46 @@
     inviteCanEdit = true;
   }
 
-  function handleInviteMod() {
-    if (!inviteUsername.trim()) {
+  async function handleInviteMod() {
+    if (!inviteUsername.trim() || !community) {
       alert("Please enter a username!");
       return;
     }
+
     console.log("Invite mod:", {
       username: inviteUsername,
       permission: invitePermission,
       canEdit: inviteCanEdit,
     });
-    alert(`Invitation sent to ${inviteUsername} to become moderator!`);
-    handleCloseInviteModModal();
+
+    try {
+      console.log("🔍 Looking up user:", inviteUsername.trim());
+      const user = await getUserByUsername(inviteUsername.trim());
+      console.log("✅ User found:", user);
+
+      console.log("📤 Adding moderator to community:", community.id);
+      await addModerators({
+        id: community.id,
+        added_moderator: [
+          {
+            id: user.id,
+            username: user.username,
+          },
+        ],
+      });
+
+      console.log("✅ Moderator added successfully!");
+      alert(`${inviteUsername} added as moderator!`);
+      handleCloseInviteModModal();
+
+      // Reload community to get updated moderators
+      await loadCommunity();
+    } catch (error) {
+      console.error("❌ Failed to add moderator:", error);
+      alert(
+        "Failed to add moderator. Please check the username and try again."
+      );
+    }
   }
 
   onMount(() => {
@@ -370,7 +415,7 @@
           </button>
 
           <!-- Mod Tools Button - Only show if creator or moderator -->
-          {#if isCreator()}
+          {#if canUseModeTools()}
             <button
               class="mod-tools-btn"
               title="Moderator tools"

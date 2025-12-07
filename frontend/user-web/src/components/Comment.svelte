@@ -84,6 +84,9 @@
       replyImagePreview = null;
       showReplyBox = false;
 
+      // Auto-expand to show the new reply
+      isCollapsed = false;
+
       // Reload comments to show the new reply
       if (onUpdate) {
         onUpdate();
@@ -91,7 +94,8 @@
     } catch (error: any) {
       console.error("Failed to submit reply:", error);
       // Show specific error message from backend
-      replyErrorMessage = error?.message || "Failed to post reply. Please try again.";
+      replyErrorMessage =
+        error?.message || "Failed to post reply. Please try again.";
     }
   };
 
@@ -115,16 +119,26 @@
   };
 
   const formatTime = (dateString: string) => {
-    const date = new Date(dateString);
+    // Backend sends: "2025-12-07 10:54:03" (local server time without timezone)
+    // Parse it as UTC to avoid timezone conversion issues
+    const date = new Date(dateString.replace(" ", "T") + "Z");
     const now = new Date();
+
     const diffMs = now.getTime() - date.getTime();
+    const diffSecs = Math.floor(diffMs / 1000);
     const diffMins = Math.floor(diffMs / 60000);
     const diffHours = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);
 
+    // Handle future dates or just posted (< 1 second)
+    if (diffSecs < 1) return `just now`;
+    if (diffSecs < 60) return `${diffSecs}s ago`;
     if (diffMins < 60) return `${diffMins}m ago`;
     if (diffHours < 24) return `${diffHours}h ago`;
-    return `${diffDays}d ago`;
+    if (diffDays < 30) return `${diffDays}d ago`;
+
+    // For older comments, show the actual date
+    return date.toLocaleDateString();
   };
 </script>
 
@@ -199,12 +213,15 @@
         <!-- Actions -->
         {#if !isEditing}
           <div class="comment-actions">
-            <button
-              class="action-btn"
-              onclick={() => (showReplyBox = !showReplyBox)}
-            >
-              Reply
-            </button>
+            <!-- Hide Reply button at max depth (backend limit is depth 0-2) -->
+            {#if depth < 2}
+              <button
+                class="action-btn"
+                onclick={() => (showReplyBox = !showReplyBox)}
+              >
+                Reply
+              </button>
+            {/if}
             {#if isOwnComment}
               <button class="action-btn" onclick={handleEdit}> Edit </button>
               <button class="action-btn delete" onclick={handleDelete}>
@@ -221,7 +238,10 @@
               <div class="reply-error-banner">
                 <img src="/error.svg" alt="Error" width="16" height="16" />
                 <span>{replyErrorMessage}</span>
-                <button class="error-close-btn" onclick={() => (replyErrorMessage = null)}>×</button>
+                <button
+                  class="error-close-btn"
+                  onclick={() => (replyErrorMessage = null)}>×</button
+                >
               </div>
             {/if}
             <textarea
@@ -229,6 +249,12 @@
               placeholder="What are your thoughts?"
               class="reply-textarea"
               rows="3"
+              onkeydown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  submitReply();
+                }
+              }}
             ></textarea>
 
             {#if replyImagePreview}

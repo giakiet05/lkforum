@@ -39,7 +39,7 @@
 
     try {
       isLoadingCommunities = true;
-      
+
       // Get user's memberships to find joined communities
       const memberships = await getMembershipsByUserId(user.id);
       console.log("User memberships:", memberships);
@@ -57,7 +57,7 @@
       const response = await getCommunities({ page: 1, limit: 100 });
       const allCommunities = response.communities || [];
 
-      userCommunities = allCommunities.filter((community: any) => 
+      userCommunities = allCommunities.filter((community: any) =>
         joinedCommunityIds.includes(community.id)
       );
 
