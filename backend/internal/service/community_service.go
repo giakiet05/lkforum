@@ -52,6 +52,7 @@ type communityService struct {
 	postRepo       repo.PostRepo
 	userRepo       repo.UserRepo
 	eventBus       bus.EventBus
+	membershipSvc  MembershipService
 }
 
 func NewCommunityService(
@@ -67,7 +68,13 @@ func NewCommunityService(
 		postRepo:       postRepo,
 		userRepo:       userRepo,
 		eventBus:       bus,
+		membershipSvc:  nil, // Will be set via SetMembershipService
 	}
+}
+
+// SetMembershipService sets the membership service (called after initialization to avoid circular dependency)
+func (c *communityService) SetMembershipService(svc MembershipService) {
+	c.membershipSvc = svc
 }
 
 func (c *communityService) Start() {
@@ -201,6 +208,9 @@ func (c *communityService) GetCommunitiesFilter(
 		}
 	}
 
+	// Enrich with real-time member count from Redis
+	c.enrichWithRealTimeMemberCount(communities)
+
 	communitiesResponses := dto.FromCommunities(communities)
 	var response = &dto.PaginatedCommunitiesResponse{
 		Communities: communitiesResponses,
@@ -222,6 +232,9 @@ func (c *communityService) GetCommunitiesByModeratorIDPaginated(moderatorID stri
 	if err != nil {
 		return nil, err
 	}
+
+	// Enrich with real-time member count from Redis
+	c.enrichWithRealTimeMemberCount(communities)
 
 	communitiesResponses := dto.FromCommunities(communities)
 	var response = &dto.PaginatedCommunitiesResponse{
@@ -250,6 +263,9 @@ func (c *communityService) GetAllCommunitiesPaginated(requesterID *string, page 
 			return nil, err
 		}
 	}
+
+	// Enrich with real-time member count from Redis
+	c.enrichWithRealTimeMemberCount(communities)
 
 	communitiesResponses := dto.FromCommunities(communities)
 	var response = &dto.PaginatedCommunitiesResponse{
@@ -347,14 +363,6 @@ func (c *communityService) AddModerator(req *dto.AddModeratorRequest, requesterI
 		}
 		if !existed {
 			return apperror.ErrInvalidID
-		}
-
-		ok, err = c.membershipRepo.IsMember(ctx, modDTO.ModeratorID, requesterID)
-		if err != nil {
-			return err
-		}
-		if !ok {
-			return apperror.ErrUserNotMember
 		}
 
 		newModerators = append(
@@ -620,6 +628,21 @@ func (c *communityService) filterOutBannedCommunities(
 	}
 
 	return filtered, nil
+}
+
+// enrichWithRealTimeMemberCount updates communities with real-time member count from Redis
+func (c *communityService) enrichWithRealTimeMemberCount(communities []*model.Community) {
+	if c.membershipSvc == nil || len(communities) == 0 {
+		return
+	}
+
+	for _, community := range communities {
+		count, err := c.membershipSvc.GetMembersCount(community.ID.Hex())
+		if err == nil {
+			community.MemberCount = count
+		}
+		// If error, keep the MongoDB value (which might be stale)
+	}
 }
 
 func (c *communityService) GetPendingPosts(communityID string, moderatorID string, page int, pageSize int) (*dto.PaginatedPostsResponse, error) {

@@ -26,7 +26,7 @@ export async function getCommentsByPostId(query: GetCommentByPostIDQuery): Promi
 }
 
 /**
- * Create a new comment
+ * Create a new comment or reply
  */
 export async function createComment(data: CreateCommentRequest): Promise<CommentResponse> {
     const res = await authenticatedFetch("/api/comments", {

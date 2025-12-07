@@ -112,6 +112,13 @@ func initServices(repos *Repos, redisClient *redis.Client, emailSender email.Sen
 		CommunityService:    service.NewCommunityService(repos.CommunityRepo, repos.MembershipRepo, repos.PostRepo, repos.UserRepo, eventBus),
 	}
 
+	// Set MembershipService in CommunityService to get real-time member count
+	if communitySvc, ok := services.CommunityService.(interface {
+		SetMembershipService(service.MembershipService)
+	}); ok {
+		communitySvc.SetMembershipService(services.MembershipService)
+	}
+
 	// VoteService needs to be created first as PostService and CommentService depend on it
 	services.VoteService = service.NewVoteService(repos.VoteRepo, repos.PostRepo, repos.CommentRepo, eventBus)
 
