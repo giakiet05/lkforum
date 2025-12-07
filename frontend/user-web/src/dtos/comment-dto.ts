@@ -3,7 +3,6 @@ import type { Image } from './post-dto';
 // --- Request DTOs ---
 
 export interface CreateCommentRequest {
-    user_id: string;
     post_id: string;
     parent_id?: string;
     content: string;

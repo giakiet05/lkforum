@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { CommentResponse } from "../dtos/comment-dto";
   import CommentComponent from "./Comment.svelte";
-  import { deleteComment } from "../services/comment-service";
+  import { deleteComment, createComment } from "../services/comment-service";
   import { authStore } from "../stores/auth-store";
 
   type CommentProps = {
@@ -25,6 +25,7 @@
   let userVote = $state<"up" | "down" | null>(null); // Track user's vote
   let replyImage = $state<File | null>(null);
   let replyImagePreview = $state<string | null>(null);
+  let replyErrorMessage = $state<string | null>(null);
 
   const toggleCollapse = () => {
     isCollapsed = !isCollapsed;
@@ -62,17 +63,39 @@
     console.log("Vote not implemented yet");
   };
 
-  const submitReply = () => {
-    if (replyContent.trim()) {
-      // Mock reply - in real app, would add to parent state
-      console.log("Replying to comment:", comment.id, replyContent);
-      if (replyImage) {
-        console.log("With image:", replyImage.name);
-      }
+  const submitReply = async () => {
+    if (!replyContent.trim()) return;
+    if (!currentUser) {
+      replyErrorMessage = "Please login to reply";
+      return;
+    }
+
+    try {
+      replyErrorMessage = null;
+      await createComment({
+        post_id: comment.post_id,
+        parent_id: comment.id,
+        content: replyContent,
+      });
+
+      // Clear reply form
       replyContent = "";
       replyImage = null;
       replyImagePreview = null;
       showReplyBox = false;
+
+      // Auto-expand to show the new reply
+      isCollapsed = false;
+
+      // Reload comments to show the new reply
+      if (onUpdate) {
+        onUpdate();
+      }
+    } catch (error: any) {
+      console.error("Failed to submit reply:", error);
+      // Show specific error message from backend
+      replyErrorMessage =
+        error?.message || "Failed to post reply. Please try again.";
     }
   };
 
@@ -96,16 +119,26 @@
   };
 
   const formatTime = (dateString: string) => {
-    const date = new Date(dateString);
+    // Backend sends: "2025-12-07 10:54:03" (local server time without timezone)
+    // Parse it as UTC to avoid timezone conversion issues
+    const date = new Date(dateString.replace(" ", "T") + "Z");
     const now = new Date();
+
     const diffMs = now.getTime() - date.getTime();
+    const diffSecs = Math.floor(diffMs / 1000);
     const diffMins = Math.floor(diffMs / 60000);
     const diffHours = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);
 
+    // Handle future dates or just posted (< 1 second)
+    if (diffSecs < 1) return `just now`;
+    if (diffSecs < 60) return `${diffSecs}s ago`;
     if (diffMins < 60) return `${diffMins}m ago`;
     if (diffHours < 24) return `${diffHours}h ago`;
-    return `${diffDays}d ago`;
+    if (diffDays < 30) return `${diffDays}d ago`;
+
+    // For older comments, show the actual date
+    return date.toLocaleDateString();
   };
 </script>
 
@@ -147,7 +180,7 @@
       <!-- Header -->
       <div class="comment-header">
         <img
-          src={comment.author.avatar || "https://i.pravatar.cc/150?img=1"}
+          src={comment.author.avatar?.url || "https://i.pravatar.cc/150?img=1"}
           alt={comment.author.username}
           class="author-avatar"
         />
@@ -180,12 +213,15 @@
         <!-- Actions -->
         {#if !isEditing}
           <div class="comment-actions">
-            <button
-              class="action-btn"
-              onclick={() => (showReplyBox = !showReplyBox)}
-            >
-              Reply
-            </button>
+            <!-- Hide Reply button at max depth (backend limit is depth 0-2) -->
+            {#if depth < 2}
+              <button
+                class="action-btn"
+                onclick={() => (showReplyBox = !showReplyBox)}
+              >
+                Reply
+              </button>
+            {/if}
             {#if isOwnComment}
               <button class="action-btn" onclick={handleEdit}> Edit </button>
               <button class="action-btn delete" onclick={handleDelete}>
@@ -198,11 +234,27 @@
         <!-- Reply Box -->
         {#if showReplyBox}
           <div class="reply-box">
+            {#if replyErrorMessage}
+              <div class="reply-error-banner">
+                <img src="/error.svg" alt="Error" width="16" height="16" />
+                <span>{replyErrorMessage}</span>
+                <button
+                  class="error-close-btn"
+                  onclick={() => (replyErrorMessage = null)}>×</button
+                >
+              </div>
+            {/if}
             <textarea
               bind:value={replyContent}
               placeholder="What are your thoughts?"
               class="reply-textarea"
               rows="3"
+              onkeydown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  submitReply();
+                }
+              }}
             ></textarea>
 
             {#if replyImagePreview}
@@ -505,6 +557,50 @@
   .reply-box {
     margin-top: 8px;
     margin-bottom: 12px;
+  }
+
+  .reply-error-banner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    margin-bottom: 8px;
+    background-color: #fee;
+    border: 1px solid #fcc;
+    border-radius: 4px;
+    color: #c00;
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  .reply-error-banner svg {
+    flex-shrink: 0;
+  }
+
+  .reply-error-banner span {
+    flex: 1;
+  }
+
+  .error-close-btn {
+    background: none;
+    border: none;
+    color: #c00;
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 2px;
+    transition: background 0.2s;
+  }
+
+  .error-close-btn:hover {
+    background: rgba(204, 0, 0, 0.1);
   }
 
   .reply-textarea {

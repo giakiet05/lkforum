@@ -16,7 +16,10 @@
     getBannedUsers,
     addModerators,
     removeModerators,
+    getPendingPosts,
+    moderatePost,
   } from "../services/community-service";
+  import { getUserByUsername } from "../services/user-service";
   import type {
     CommunityResponse,
     CommunityRule,
@@ -52,6 +55,13 @@
   let activeQueueTab = $state<QueueTab>("unmoderated");
   let sortBy = $state<SortOption>("newest");
 
+  // Queue/Pending Posts state
+  let pendingPosts = $state<any[]>([]);
+  let isLoadingPosts = $state(false);
+  let postsPage = $state(1);
+  let postsPageSize = $state(10);
+  let totalPendingPosts = $state(0);
+
   // Restricted Users state
   let activeRestrictedTab = $state<RestrictedTab>("banned");
   let showBanModal = $state(false);
@@ -85,6 +95,7 @@
     await loadCommunity();
     await loadRestrictedUsers();
     await loadModerators();
+    await loadPendingPosts();
   });
 
   async function loadCommunity() {
@@ -139,23 +150,46 @@
     }
   }
 
+  async function loadPendingPosts() {
+    if (!community) return;
+
+    try {
+      isLoadingPosts = true;
+      const response = await getPendingPosts(
+        community.id,
+        postsPage,
+        postsPageSize
+      );
+      pendingPosts = response.posts || [];
+      totalPendingPosts = response.pagination?.total_items || 0;
+    } catch (error) {
+      console.error("Failed to load pending posts:", error);
+      pendingPosts = [];
+    } finally {
+      isLoadingPosts = false;
+    }
+  }
+
   const filteredPosts = $derived(() => {
-    let posts = mockQueuePosts.filter((p) => p.queueType === activeQueueTab);
+    // For now, all pending posts are "unmoderated"
+    // Backend doesn't distinguish between edited/removed/reported yet
+    let posts = activeQueueTab === "unmoderated" ? pendingPosts : [];
 
     // Sort posts
     if (sortBy === "newest") {
       posts.sort(
         (a, b) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          new Date(b.created_at || b.createdAt).getTime() -
+          new Date(a.created_at || a.createdAt).getTime()
       );
     } else if (sortBy === "oldest") {
       posts.sort(
         (a, b) =>
-          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+          new Date(a.created_at || a.createdAt).getTime() -
+          new Date(b.created_at || b.createdAt).getTime()
       );
-    } else if (sortBy === "most-reported") {
-      posts.sort((a, b) => (b.reportCount || 0) - (a.reportCount || 0));
     }
+    // most-reported sorting not available yet from backend
 
     return posts;
   });
@@ -181,14 +215,37 @@
     return date.toLocaleDateString();
   }
 
-  function handleApprove(postId: string) {
-    console.log("Approve post:", postId);
-    // TODO: Implement approve functionality
+  async function handleApprove(postId: string) {
+    if (!community) return;
+
+    try {
+      await moderatePost(community.id, postId, true);
+      alert("Post approved successfully!");
+      await loadPendingPosts(); // Reload the list
+    } catch (error) {
+      console.error("Failed to approve post:", error);
+      alert("Failed to approve post. Please try again.");
+    }
   }
 
-  function handleRemove(postId: string) {
-    console.log("Remove post:", postId);
-    // TODO: Implement remove functionality
+  async function handleRemove(postId: string, reason?: string) {
+    if (!community) return;
+
+    const removalReason = reason || prompt("Reason for removal (optional):");
+
+    try {
+      await moderatePost(
+        community.id,
+        postId,
+        false,
+        removalReason || undefined
+      );
+      alert("Post removed successfully!");
+      await loadPendingPosts(); // Reload the list
+    } catch (error) {
+      console.error("Failed to remove post:", error);
+      alert("Failed to remove post. Please try again.");
+    }
   }
 
   function handleSaveRule() {
@@ -310,11 +367,12 @@
     const lengthDays = parseInt(banDuration) || 30;
 
     try {
-      // Note: You'll need to add a getUserByUsername API to get user_id from username
-      // For now, assuming banUsername is the user_id
+      // Get user ID from username
+      const user = await getUserByUsername(banUsername.trim());
+
       await banUser({
         community_id: community.id,
-        user_id: banUsername, // TODO: Should be user ID, not username
+        user_id: user.id,
         type: "ban",
         reason: banReason || "Violation of community rules",
         length_days: lengthDays,
@@ -325,7 +383,7 @@
       handleCloseBanModal();
     } catch (error) {
       console.error("Failed to ban user:", error);
-      alert("Failed to ban user. Please try again.");
+      alert("Failed to ban user. Please check the username and try again.");
     }
   }
 
@@ -338,9 +396,12 @@
     const lengthDays = parseInt(banDuration) || 30;
 
     try {
+      // Get user ID from username
+      const user = await getUserByUsername(banUsername.trim());
+
       await banUser({
         community_id: community.id,
-        user_id: banUsername, // TODO: Should be user ID, not username
+        user_id: user.id,
         type: "mute",
         reason: banReason || "Violation of community rules",
         length_days: lengthDays,
@@ -351,7 +412,7 @@
       handleCloseMuteModal();
     } catch (error) {
       console.error("Failed to mute user:", error);
-      alert("Failed to mute user. Please try again.");
+      alert("Failed to mute user. Please check the username and try again.");
     }
   }
 
@@ -415,25 +476,39 @@
       return;
     }
 
+    console.log("Invite mod:", {
+      username: inviteUsername,
+      permission: invitePermission,
+      canEdit: inviteCanEdit,
+    });
+
     if (inviteType === "mod") {
       try {
-        // TODO: Need to get user ID from username
+        console.log("🔍 Looking up user:", inviteUsername.trim());
+        // Get user ID from username
+        const user = await getUserByUsername(inviteUsername.trim());
+        console.log("✅ User found:", user);
+
+        console.log("📤 Adding moderator to community:", community.id);
         await addModerators({
           id: community.id,
           added_moderator: [
             {
-              id: inviteUsername, // TODO: Should be user ID
-              username: inviteUsername,
+              id: user.id,
+              username: user.username,
             },
           ],
         });
 
+        console.log("✅ Moderator added successfully!");
         alert(`${inviteUsername} added as moderator!`);
         await loadCommunity(); // Reload to get updated moderators
         handleCloseInviteModal();
       } catch (error) {
-        console.error("Failed to add moderator:", error);
-        alert("Failed to add moderator. Please try again.");
+        console.error("❌ Failed to add moderator:", error);
+        alert(
+          "Failed to add moderator. Please check the username and try again."
+        );
       }
     } else {
       // Approved users - not yet implemented in backend
@@ -848,7 +923,8 @@
                 <div class="col actions-col">
                   <button
                     class="icon-btn edit"
-                    onclick={() => handleEditMember(user.id, "approved")}
+                    onclick={() =>
+                      handleEditMember(String(user.id), "approved")}
                     title="Edit user"
                   >
                     <img
@@ -860,7 +936,8 @@
                   </button>
                   <button
                     class="icon-btn delete"
-                    onclick={() => handleDeleteMember(user.id, "approved")}
+                    onclick={() =>
+                      handleDeleteMember(String(user.id), "approved")}
                     title="Remove user"
                   >
                     <img

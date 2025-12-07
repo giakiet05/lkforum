@@ -330,8 +330,8 @@ func (c *CommunityController) BanUser(ctx *gin.Context) {
 }
 
 func (c *CommunityController) GetBanUsers(ctx *gin.Context) {
-	communityID := ctx.Param("community_id")
-	banType := ctx.Param("ban_type")
+	communityID := ctx.Query("community_id")
+	banType := ctx.Query("ban_type")
 
 	authUser, exists := ctx.Get("authUser")
 	if !exists {

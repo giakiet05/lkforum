@@ -32,7 +32,7 @@
     }
   }
 
-  onMount(() => {
+  onMount(async () => {
     // Đọc tokens từ query params trong hash
     // URL format: /#/auth/callback?access_token=...&refresh_token=...
     // window.location.hash = "#/auth/callback?access_token=...&refresh_token=..."
@@ -60,25 +60,30 @@
 
     if (accessToken && refreshToken) {
       try {
-        // Decode access token để lấy user info
+        // Decode access token để lấy user ID
         const payload = decodeJWT(accessToken);
-        if (!payload || !payload.user_id) {
+        if (!payload || !payload.sub) {
           throw new Error("Invalid token payload");
         }
 
-        // Construct user object từ JWT payload
-        const user = {
-          id: payload.user_id,
-          username: payload.username,
-          email: payload.email,
-          avatar_url: payload.avatar_url || "",
-          bio: payload.bio || "",
-          is_verified: true, // Google users are always verified
-        };
-
-        // Lưu vào localStorage
+        // Lưu tokens vào localStorage trước
         localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
         localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+
+        // Fetch user info từ backend
+        const response = await fetch("http://localhost:8080/api/users/me", {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch user info");
+        }
+
+        const user = await response.json();
+
+        // Lưu user vào localStorage
         localStorage.setItem(USER_KEY, JSON.stringify(user));
 
         // Update auth store
