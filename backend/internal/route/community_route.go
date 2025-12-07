@@ -26,6 +26,9 @@ func RegisterCommunityRoutes(rg *gin.RouterGroup, c *controller.CommunityControl
 		communities.POST("unban/user", c.UnbanUser)
 		communities.POST("unmute/user", c.UnbanUser)
 
+		communities.PUT("ban/post", c.BanPost)
+		communities.PUT("unban/post", c.UnbanPost)
+
 		// Manual moderation routes (moderator only)
 		communities.GET(":community_id/posts/pending", c.GetPendingPosts)
 		communities.PUT(":community_id/posts/:post_id/moderate", c.ModeratePost)

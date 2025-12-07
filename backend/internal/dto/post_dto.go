@@ -87,6 +87,12 @@ type GetPostsQuery struct {
 	Limit       int    `form:"limit"`
 }
 
+type GetBanPostsQuery struct {
+	CommunityID string `form:"community_id"`
+	Page        int    `form:"page"`
+	PageSize    int    `form:"page_size"`
+}
+
 // --- Response DTOs ---
 
 // PostResponse is the detailed post object returned to the client.

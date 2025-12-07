@@ -23,6 +23,9 @@ type Post struct {
 	Tags          []string           `bson:"tags,omitempty" json:"tags,omitempty"`
 	IsDraft       bool               `bson:"is_draft,omitempty" json:"is_draft,omitempty"`
 
+	IsBan     bool    `bson:"is_ban,omitempty" json:"is_ban,omitempty"`
+	BanReason *string `bson:"ban_reason,omitempty" json:"ban_reason,omitempty"`
+
 	// Moderation fields
 	ModerationStatus ModerationStatus  `bson:"moderation_status,omitempty" json:"moderation_status,omitempty"`
 	ModerationResult *ModerationResult `bson:"moderation_result,omitempty" json:"moderation_result,omitempty"`
@@ -81,9 +84,9 @@ const (
 // ModerationResult contains the result of AI moderation
 type ModerationResult struct {
 	IsViolation  bool     `bson:"is_violation" json:"is_violation"`
-	Confidence   float64  `bson:"confidence" json:"confidence"`         // 0.0 - 1.0
-	Categories   []string `bson:"categories" json:"categories"`         // ["hate_speech", "violence", ...]
-	Reason       string   `bson:"reason" json:"reason"`                 // Explanation in Vietnamese
-	CheckedText  bool     `bson:"checked_text" json:"checked_text"`     // Was text content checked
-	CheckedMedia bool     `bson:"checked_media" json:"checked_media"`   // Were images/videos checked
+	Confidence   float64  `bson:"confidence" json:"confidence"`       // 0.0 - 1.0
+	Categories   []string `bson:"categories" json:"categories"`       // ["hate_speech", "violence", ...]
+	Reason       string   `bson:"reason" json:"reason"`               // Explanation in Vietnamese
+	CheckedText  bool     `bson:"checked_text" json:"checked_text"`   // Was text content checked
+	CheckedMedia bool     `bson:"checked_media" json:"checked_media"` // Were images/videos checked
 }

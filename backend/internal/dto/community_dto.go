@@ -42,6 +42,17 @@ type RemoveModeratorRequest struct {
 	RemovedModerator []string `json:"removed_moderator" binding:"required"`
 }
 
+type CommunityBanPostRequest struct {
+	CommunityID string  `json:"community_id" binding:"required"`
+	PostID      string  `json:"post_id" binding:"required"`
+	Reason      *string `json:"reason,omitempty" binding:"max=500"`
+}
+
+type CommunityUnbanPostRequest struct {
+	CommunityID string `json:"community_id" binding:"required"`
+	PostID      string `json:"post_id" binding:"required"`
+}
+
 type CommunityBanUserRequest struct {
 	CommunityID string `json:"community_id" binding:"required"`
 	UserID      string `json:"user_id" binding:"required"`

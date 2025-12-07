@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log"
 	"time"
 
@@ -34,8 +33,10 @@ type CommunityService interface {
 	UpdateCommunity(req *dto.UpdateCommunityRequest, requesterID string) (*model.Community, error)
 	AddModerator(req *dto.AddModeratorRequest, requesterID string) error
 	RemoveModerator(req *dto.RemoveModeratorRequest, requesterID string) error
-	IsModerator(community *model.Community, requesterID string) (bool, error)
 	DeleteCommunityByID(communityID string, requesterID string) error
+
+	BanPost(req *dto.CommunityBanPostRequest, requesterID string) error
+	UnbanPost(req *dto.CommunityUnbanPostRequest, requesterID string) error
 
 	GetBannedUsers(communityID string, banTypeStr string, expired bool, requesterID string) ([]*model.User, error)
 	BanUser(req *dto.CommunityBanUserRequest, requesterID string) error
@@ -272,7 +273,7 @@ func (c *communityService) UpdateCommunity(req *dto.UpdateCommunityRequest, requ
 		return nil, err
 	}
 
-	ok, err := c.IsModerator(community, requesterID)
+	ok, err := c.communityRepo.IsModerator(ctx, req.CommunityID, requesterID)
 	if err != nil {
 		return nil, err
 	}
@@ -318,7 +319,7 @@ func (c *communityService) AddModerator(req *dto.AddModeratorRequest, requesterI
 		return err
 	}
 
-	ok, err := c.IsModerator(community, requesterID)
+	ok, err := c.communityRepo.IsModerator(ctx, req.CommunityID, requesterID)
 	if err != nil {
 		return err
 	}
@@ -328,7 +329,7 @@ func (c *communityService) AddModerator(req *dto.AddModeratorRequest, requesterI
 
 	var newModerators []model.Moderator
 	for _, modDTO := range req.AddedModerator {
-		ok, err := c.IsModerator(community, modDTO.ModeratorID)
+		ok, err := c.communityRepo.IsModerator(ctx, req.CommunityID, modDTO.ModeratorID)
 		if err != nil {
 			return err
 		}
@@ -383,7 +384,7 @@ func (c *communityService) RemoveModerator(req *dto.RemoveModeratorRequest, requ
 		return err
 	}
 
-	ok, err := c.IsModerator(community, requesterID)
+	ok, err := c.communityRepo.IsModerator(ctx, req.CommunityID, requesterID)
 	if err != nil {
 		return err
 	}
@@ -411,12 +412,7 @@ func (c *communityService) DeleteCommunityByID(communityID string, requesterID s
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
 
-	community, err := c.communityRepo.GetByID(ctx, communityID)
-	if err != nil {
-		return err
-	}
-
-	ok, err := c.IsModerator(community, requesterID)
+	ok, err := c.communityRepo.IsModerator(ctx, communityID, requesterID)
 	if err != nil {
 		return err
 	}
@@ -427,36 +423,41 @@ func (c *communityService) DeleteCommunityByID(communityID string, requesterID s
 	return c.communityRepo.Delete(ctx, communityID)
 }
 
-func (c *communityService) IsModerator(community *model.Community, requesterID string) (bool, error) {
-	objectID, err := primitive.ObjectIDFromHex(requesterID)
+func (c *communityService) BanPost(req *dto.CommunityBanPostRequest, requesterID string) error {
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
+
+	ok, err := c.communityRepo.IsModerator(ctx, req.CommunityID, requesterID)
 	if err != nil {
-		return false, fmt.Errorf("invalid user id: %s", requesterID)
+		return err
+	}
+	if !ok {
+		return apperror.ErrForbidden
 	}
 
-	// Check if user is the creator
-	if community.CreateByID == objectID {
-		return true, nil
+	return c.postRepo.BanPost(ctx, req.PostID, req.Reason)
+}
+
+func (c *communityService) UnbanPost(req *dto.CommunityUnbanPostRequest, requesterID string) error {
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
+
+	ok, err := c.communityRepo.IsModerator(ctx, req.CommunityID, requesterID)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return apperror.ErrForbidden
 	}
 
-	// Check if user is in moderators list
-	for _, m := range community.Moderators {
-		if m.UserID == objectID {
-			return true, nil
-		}
-	}
-	return false, nil
+	return c.postRepo.UnbanPost(ctx, req.PostID)
 }
 
 func (c *communityService) GetBannedUsers(communityID string, banTypeStr string, expired bool, requesterID string) ([]*model.User, error) {
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
 
-	community, err := c.communityRepo.GetByID(ctx, communityID)
-	if err != nil {
-		return nil, err
-	}
-
-	ok, err := c.IsModerator(community, requesterID)
+	ok, err := c.communityRepo.IsModerator(ctx, communityID, requesterID)
 	if err != nil {
 		return nil, err
 	}
@@ -484,12 +485,7 @@ func (c *communityService) BanUser(req *dto.CommunityBanUserRequest, requesterID
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
 
-	community, err := c.communityRepo.GetByID(ctx, req.CommunityID)
-	if err != nil {
-		return err
-	}
-
-	ok, err := c.IsModerator(community, requesterID)
+	ok, err := c.communityRepo.IsModerator(ctx, req.CommunityID, requesterID)
 	if err != nil {
 		return err
 	}
@@ -546,12 +542,7 @@ func (c *communityService) UnmuteUser(userID string, communityID string, request
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
 
-	community, err := c.communityRepo.GetByID(ctx, communityID)
-	if err != nil {
-		return err
-	}
-
-	ok, err := c.IsModerator(community, requesterID)
+	ok, err := c.communityRepo.IsModerator(ctx, communityID, requesterID)
 	if err != nil {
 		return err
 	}
@@ -566,12 +557,7 @@ func (c *communityService) UnbanUser(userID string, communityID string, requeste
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
 
-	community, err := c.communityRepo.GetByID(ctx, communityID)
-	if err != nil {
-		return err
-	}
-
-	ok, err := c.IsModerator(community, requesterID)
+	ok, err := c.communityRepo.IsModerator(ctx, communityID, requesterID)
 	if err != nil {
 		return err
 	}
@@ -636,7 +622,7 @@ func (c *communityService) GetPendingPosts(communityID string, moderatorID strin
 	}
 
 	// Check if requester is moderator
-	isMod, err := c.IsModerator(community, moderatorID)
+	isMod, err := c.communityRepo.IsModerator(ctx, communityID, moderatorID)
 	if err != nil {
 		return nil, err
 	}
@@ -728,17 +714,8 @@ func (c *communityService) ModeratePost(communityID string, postID string, moder
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
 
-	// Get community
-	community, err := c.communityRepo.GetByID(ctx, communityID)
-	if err != nil {
-		if errors.Is(err, mongo.ErrNoDocuments) {
-			return apperror.ErrCommunityNotFound
-		}
-		return err
-	}
-
 	// Check if requester is moderator
-	isMod, err := c.IsModerator(community, moderatorID)
+	isMod, err := c.communityRepo.IsModerator(ctx, communityID, moderatorID)
 	if err != nil {
 		return err
 	}

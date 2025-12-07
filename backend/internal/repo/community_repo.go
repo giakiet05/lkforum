@@ -30,7 +30,7 @@ type CommunityRepo interface {
 	GetByModeratorIDPaginated(ctx context.Context, moderatorID string, page int, pageSize int) ([]*model.Community, int64, error)
 	GetAllPaginated(ctx context.Context, page int, pageSize int) ([]*model.Community, int64, error)
 	FindCommunities(ctx context.Context, filter Filter, findOptions *FindOptions) ([]*model.Community, int64, error)
-	
+
 	// Stats methods
 	CountTotal(ctx context.Context) (int64, error)
 	CountActive(ctx context.Context) (int64, error)
@@ -50,6 +50,8 @@ type CommunityRepo interface {
 	IsUserBanned(ctx context.Context, userID string, banType model.CommunityBanType, communityID string) (bool, error)
 	UnmuteUser(ctx context.Context, userID string, communityID string) error
 	UnbanUser(ctx context.Context, userID string, communityID string) error
+
+	IsModerator(ctx context.Context, communityID string, userID string) (bool, error)
 }
 
 type communityRepo struct {
@@ -706,4 +708,26 @@ func (c *communityRepo) CountPrivate(ctx context.Context) (int64, error) {
 		"setting.is_private": true,
 	}
 	return c.communityCollection.CountDocuments(ctx, filter)
+}
+
+func (c *communityRepo) IsModerator(ctx context.Context, communityID string, userID string) (bool, error) {
+	userObjectID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return false, err
+	}
+
+	community, err := c.GetByID(ctx, communityID)
+	if err != nil {
+		return false, err
+	}
+
+	if community.CreateByID == userObjectID {
+		return true, nil
+	}
+	for _, m := range community.Moderators {
+		if m.UserID == userObjectID {
+			return true, nil
+		}
+	}
+	return false, nil
 }

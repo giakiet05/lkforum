@@ -46,6 +46,10 @@ type PostService interface {
 	UnhidePost(userID, postID string) error
 	GetHiddenPosts(userID string, query *dto.GetPostsQuery) (*dto.PaginatedPostsResponse, error)
 
+	BanPost(postID string, reason *string) error
+	UnbanPost(postID string) error
+	GetBanPosts(query *dto.GetBanPostsQuery, requesterID string) (*dto.PaginatedPostsResponse, error)
+
 	VoteOnPoll(userID, postID, optionID string) (*dto.PollResponse, error)
 	RemovePollVote(userID, postID string) (*dto.PollResponse, error)
 	AddPollOptions(userID, postID string, options []string) (*dto.PollResponse, error)
@@ -225,14 +229,14 @@ func (s *postService) GetPosts(userID string, query *dto.GetPostsQuery) (*dto.Pa
 	filter := s.buildFilter(query)
 	findOptions := s.buildFindOptions(query)
 
-	fmt.Printf("🔍 GetPosts filter: %+v\n", filter)
+	fmt.Printf("GetPosts filter: %+v\n", filter)
 
 	posts, totalPosts, err := s.postRepo.Find(ctx, filter, findOptions)
 	if err != nil {
 		return nil, err
 	}
 
-	fmt.Printf("📊 Found %d posts\n", totalPosts)
+	fmt.Printf("Found %d posts\n", totalPosts)
 
 	if totalPosts == 0 {
 		return &dto.PaginatedPostsResponse{Posts: []*dto.PostResponse{}}, nil
@@ -741,6 +745,76 @@ func (s *postService) UnhidePost(userID, postID string) error {
 	return s.postRepo.UpdateByID(ctx, postID, update)
 }
 
+func (s *postService) BanPost(postID string, reason *string) error {
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
+
+	_, err := s.postRepo.GetByID(ctx, postID)
+	if err != nil {
+		return apperror.ErrPostNotFound
+	}
+
+	return s.postRepo.BanPost(ctx, postID, reason)
+}
+
+func (s *postService) UnbanPost(postID string) error {
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
+
+	_, err := s.postRepo.GetByID(ctx, postID)
+	if err != nil {
+		return apperror.ErrPostNotFound
+	}
+
+	return s.postRepo.UnbanPost(ctx, postID)
+}
+
+func (s *postService) GetBanPosts(query *dto.GetBanPostsQuery, requesterID string) (*dto.PaginatedPostsResponse, error) {
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
+
+	ok, err := s.communityRepo.IsModerator(ctx, query.CommunityID, requesterID)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, apperror.ErrForbidden
+	}
+
+	posts, total, err := s.postRepo.GetBannedPosts(ctx, query.CommunityID, query.Page, query.PageSize)
+	if err != nil {
+		return nil, err
+	}
+
+	if total == 0 {
+		return &dto.PaginatedPostsResponse{Posts: []*dto.PostResponse{}}, nil
+	}
+
+	// Since the author is the user, we can fetch their details once
+	author, _ := s.userRepo.GetByID(ctx, requesterID)
+	authorsMap := map[string]*model.User{requesterID: author}
+
+	// Fetch communities
+	_, communityIDs := s.extractIDs(posts)
+	communities, _ := s.communityRepo.GetByIDs(ctx, communityIDs)
+	communitiesMap := s.mapCommunities(communities)
+
+	// No need to check for votes on one's own hidden posts
+	userVotes := make(map[string]string)
+	userPollVotes := make(map[string][]string)
+
+	responses := dto.FromPosts(posts, authorsMap, communitiesMap, userVotes, userPollVotes)
+
+	return &dto.PaginatedPostsResponse{
+		Posts: responses,
+		Pagination: dto.Pagination{
+			Page:     query.Page,
+			PageSize: query.PageSize,
+			Total:    total,
+		},
+	}, nil
+}
+
 func (s *postService) GetHiddenPosts(userID string, query *dto.GetPostsQuery) (*dto.PaginatedPostsResponse, error) {
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
@@ -933,6 +1007,7 @@ func (s *postService) buildFilter(query *dto.GetPostsQuery) repo.Filter {
 	filter := repo.Filter{
 		"is_hidden":         bson.M{"$ne": true},
 		"is_draft":          bson.M{"$ne": true},
+		"is_banned":         false,
 		"moderation_status": model.ModerationApproved,
 	}
 	if query.CommunityID != "" {
