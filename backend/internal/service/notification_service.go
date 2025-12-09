@@ -28,6 +28,7 @@ type notificationService struct {
 	userRepo         repo.UserRepo
 	postRepo         repo.PostRepo
 	commentRepo      repo.CommentRepo
+	communityRepo    repo.CommunityRepo
 	eventBus         bus.EventBus
 	redisClient      *redis.Client
 }
@@ -37,6 +38,7 @@ func NewNotificationService(
 	userRepo repo.UserRepo,
 	postRepo repo.PostRepo,
 	commentRepo repo.CommentRepo,
+	communityRepo repo.CommunityRepo,
 	bus bus.EventBus,
 	redis *redis.Client,
 ) NotificationService {
@@ -45,6 +47,7 @@ func NewNotificationService(
 		userRepo:         userRepo,
 		postRepo:         postRepo,
 		commentRepo:      commentRepo,
+		communityRepo:    communityRepo,
 		eventBus:         bus,
 		redisClient:      redis,
 	}
@@ -58,6 +61,7 @@ func (s *notificationService) Start() {
 	s.eventBus.Subscribe(bus.TopicCommentApproved, eventChannel)
 	s.eventBus.Subscribe(bus.TopicCommentUpvoted, eventChannel)
 	s.eventBus.Subscribe(bus.TopicBroadcast, eventChannel)
+	s.eventBus.Subscribe(bus.TopicModeratorAdded, eventChannel)
 
 	log.Println("NotificationService started and subscribed to events.")
 
@@ -76,6 +80,8 @@ func (s *notificationService) processEvents(ch bus.EventListener) {
 			s.handleCommentApprovedForPost(event)
 		case bus.TopicCommentUpvoted:
 			s.handleCommentUpvoted(event)
+		case bus.TopicModeratorAdded:
+			s.handleModeratorsAdded(event)
 		case bus.TopicBroadcast:
 			s.handleBroadcast(event)
 		}
@@ -393,6 +399,54 @@ func (s *notificationService) handleCommentApprovedForPost(event bus.Event) {
 
 	if count >= postCommentThreshold {
 		s.sendPostCommentBatchNotification(ctx, batchKey)
+	}
+}
+
+func (s *notificationService) handleModeratorsAdded(event bus.Event) {
+	payload := event.Payload()
+
+	communityID, _ := payload["community_id"].(string)
+	moderatorIDs, _ := payload["moderator_ids"].([]string)
+
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
+
+	community, err := s.communityRepo.GetByID(ctx, communityID)
+	if err != nil {
+		log.Printf("ERROR: NotificationService: failed to get community: %v", err)
+		return
+	}
+
+	communityObjID, _ := primitive.ObjectIDFromHex(communityID)
+
+	for _, moderatorID := range moderatorIDs {
+
+		recipientObjID, err := primitive.ObjectIDFromHex(moderatorID)
+		if err != nil {
+			log.Printf("ERROR: NotificationService: invalid moderatorID: %v", err)
+			continue
+		}
+
+		notification := &model.Notification{
+			RecipientID: recipientObjID,
+			ActorID:     communityObjID,
+			Type:        model.NotificationTypeComment,
+			Message:     fmt.Sprintf("Bạn được mời làm moderator của cộng đồng %s", community.Name),
+			Link:        fmt.Sprintf("/communities/%s", communityID),
+			IsRead:      false,
+			CreatedAt:   time.Now(),
+		}
+
+		createdNotification, err := s.notificationRepo.Create(ctx, notification)
+		if err != nil {
+			log.Printf("ERROR: NotificationService: failed to create notification: %v", err)
+			continue
+		}
+
+		s.eventBus.Publish(bus.NotificationCreatedEvent{
+			RecipientID:  moderatorID,
+			Notification: dto.FromNotification(createdNotification),
+		})
 	}
 }
 

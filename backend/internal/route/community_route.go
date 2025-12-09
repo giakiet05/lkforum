@@ -18,6 +18,7 @@ func RegisterCommunityRoutes(rg *gin.RouterGroup, c *controller.CommunityControl
 		communities.POST("", c.CreateCommunity)
 		communities.PUT("", c.UpdateCommunity)
 		communities.PUT("add_moderator", c.AddModerator)
+		communities.PUT("activate_moderator/:community_id", c.ActivateModerator)
 		communities.PUT("remove_moderator", c.RemoveModerator)
 		communities.DELETE(":community_id", c.DeleteCommunityByID)
 

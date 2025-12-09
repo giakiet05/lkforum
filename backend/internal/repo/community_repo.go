@@ -53,6 +53,7 @@ type CommunityRepo interface {
 
 	ActivateModerator(ctx context.Context, communityID string, userID string) error
 	IsModerator(ctx context.Context, communityID string, userID string) (bool, error)
+	IsCreator(ctx context.Context, communityID string, userID string) (bool, error)
 }
 
 type communityRepo struct {
@@ -776,4 +777,18 @@ func (c *communityRepo) IsModerator(ctx context.Context, communityID string, use
 		}
 	}
 	return false, nil
+}
+
+func (c *communityRepo) IsCreator(ctx context.Context, communityID string, userID string) (bool, error) {
+	userObjectID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return false, err
+	}
+
+	community, err := c.GetByID(ctx, communityID)
+	if err != nil {
+		return false, err
+	}
+
+	return community.CreateByID == userObjectID, nil
 }

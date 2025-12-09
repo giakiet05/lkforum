@@ -32,6 +32,7 @@ type CommunityService interface {
 	GetAllCommunitiesPaginated(requesterID *string, page int, pageSize int) (*dto.PaginatedCommunitiesResponse, error)
 	UpdateCommunity(req *dto.UpdateCommunityRequest, requesterID string) (*model.Community, error)
 	AddModerator(req *dto.AddModeratorRequest, requesterID string) error
+	ActivateModerator(communityID string, requesterID string) error
 	RemoveModerator(req *dto.RemoveModeratorRequest, requesterID string) error
 	DeleteCommunityByID(communityID string, requesterID string) error
 
@@ -83,7 +84,7 @@ func (c *communityService) Start() {
 
 	c.eventBus.Subscribe(bus.TopicUserChangeAvatar, eventChannel)
 
-	log.Println("ChannelService started and subscribed to events.")
+	log.Println("CommunityService started and subscribed to events.")
 
 	go c.processEvents(eventChannel)
 }
@@ -335,7 +336,7 @@ func (c *communityService) AddModerator(req *dto.AddModeratorRequest, requesterI
 		return err
 	}
 
-	ok, err := c.communityRepo.IsModerator(ctx, req.CommunityID, requesterID)
+	ok, err := c.communityRepo.IsCreator(ctx, req.CommunityID, requesterID)
 	if err != nil {
 		return err
 	}
@@ -344,33 +345,25 @@ func (c *communityService) AddModerator(req *dto.AddModeratorRequest, requesterI
 	}
 
 	var newModerators []model.Moderator
-	for _, modDTO := range req.AddedModerator {
-		ok, err := c.communityRepo.IsModerator(ctx, req.CommunityID, modDTO.ModeratorID)
-		if err != nil {
-			return err
-		}
-		if ok {
-			continue
+	for _, modID := range req.AddedModerator {
+		for _, existingMod := range community.Moderators {
+			if existingMod.UserID.Hex() == modID {
+				return apperror.ErrModeratorAlreadyExists
+			}
 		}
 
-		objectID, err := primitive.ObjectIDFromHex(modDTO.ModeratorID)
-		if err != nil {
-			return apperror.ErrInvalidID
-		}
-
-		existed, err := c.communityRepo.IsUserExist(ctx, modDTO.ModeratorID)
+		user, err := c.userRepo.GetByID(ctx, modID)
 		if err != nil {
 			return err
-		}
-		if !existed {
-			return apperror.ErrInvalidID
 		}
 
 		newModerators = append(
 			newModerators,
 			model.Moderator{
-				UserID:     objectID,
-				Username:   modDTO.Username,
+				UserID:     user.ID,
+				Username:   user.Username,
+				Avatar:     user.RoleContent.AsUser.Avatar,
+				IsActive:   false,
 				AssignedAt: time.Now(),
 			})
 	}
@@ -380,7 +373,24 @@ func (c *communityService) AddModerator(req *dto.AddModeratorRequest, requesterI
 	}
 
 	community.Moderators = append(community.Moderators, newModerators...)
-	return c.communityRepo.Replace(ctx, community)
+	err = c.communityRepo.Replace(ctx, community)
+	if err != nil {
+		return err
+	}
+
+	c.eventBus.Publish(bus.ModeratorAddedEvent{
+		CommunityID:  req.CommunityID,
+		ModeratorIDs: req.AddedModerator,
+	})
+
+	return nil
+}
+
+func (c *communityService) ActivateModerator(communityID string, requesterID string) error {
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
+
+	return c.communityRepo.ActivateModerator(ctx, communityID, requesterID)
 }
 
 func (c *communityService) RemoveModerator(req *dto.RemoveModeratorRequest, requesterID string) error {
@@ -392,7 +402,7 @@ func (c *communityService) RemoveModerator(req *dto.RemoveModeratorRequest, requ
 		return err
 	}
 
-	ok, err := c.communityRepo.IsModerator(ctx, req.CommunityID, requesterID)
+	ok, err := c.communityRepo.IsCreator(ctx, req.CommunityID, requesterID)
 	if err != nil {
 		return err
 	}
@@ -403,6 +413,10 @@ func (c *communityService) RemoveModerator(req *dto.RemoveModeratorRequest, requ
 	for _, modID := range req.RemovedModerator {
 		if requesterID == modID {
 			return apperror.ErrCannotRemoveModerator
+		}
+
+		if modID == community.CreateByID.Hex() {
+			return apperror.ErrCannotRemoveCreator
 		}
 
 		for i, mod := range community.Moderators {
@@ -420,7 +434,7 @@ func (c *communityService) DeleteCommunityByID(communityID string, requesterID s
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
 
-	ok, err := c.communityRepo.IsModerator(ctx, communityID, requesterID)
+	ok, err := c.communityRepo.IsCreator(ctx, communityID, requesterID)
 	if err != nil {
 		return err
 	}

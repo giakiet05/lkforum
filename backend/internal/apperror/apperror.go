@@ -122,6 +122,7 @@ var (
 	ErrCommunityNotFound         = AppError{Code: "COMMUNITY_NOT_FOUND", Message: "Không tìm thấy cộng đồng"}
 	ErrCommunityNameExists       = AppError{Code: "COMMUNITY_NAME_EXISTS", Message: "Tên cộng đồng đã tồn tại"}
 	ErrCommunityDeleted          = AppError{Code: "COMMUNITY_DELETED", Message: "Cộng đồng đã bị xóa"}
+	ErrModeratorAlreadyExists    = AppError{Code: "MODERATOR_ALREADY_EXISTS", Message: "Người dùng đã là moderator của cộng đồng."}
 	ErrCannotRemoveModerator     = AppError{Code: "CANNOT_REMOVE_MODERATOR", Message: "Không thể xóa moderator này."}
 	ErrCannotRemoveCreator       = AppError{Code: "CANNOT_REMOVE_CREATOR", Message: "Không thể xóa người tạo cộng đồng khỏi danh sách moderator."}
 	ErrUserIsBannedFromCommunity = AppError{Code: "BANNED_COMMUNITY", Message: "Người dùng đã bị ban khỏi cộng đồng."}
