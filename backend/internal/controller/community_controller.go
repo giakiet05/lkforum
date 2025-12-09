@@ -216,6 +216,28 @@ func (c *CommunityController) AddModerator(ctx *gin.Context) {
 	dto.SendSuccess(ctx, http.StatusOK, "Moderator added successfully", gin.H{"community_id": req.CommunityID})
 }
 
+func (c *CommunityController) ActivateModerator(ctx *gin.Context) {
+	communityID := ctx.Param("community_id")
+	if communityID == "" {
+		dto.SendError(ctx, http.StatusBadRequest, apperror.ErrBadRequest.Message, apperror.ErrBadRequest.Code)
+		return
+	}
+
+	authUser, exists := ctx.Get("authUser")
+	if !exists {
+		dto.SendError(ctx, http.StatusForbidden, apperror.ErrForbidden.Message, apperror.ErrForbidden.Code)
+		return
+	}
+
+	err := c.communityService.ActivateModerator(communityID, authUser.(auth.AuthUser).ID)
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
+		return
+	}
+
+	dto.SendSuccess(ctx, http.StatusOK, "Moderator activated successfully", gin.H{"community_id": communityID})
+}
+
 func (c *CommunityController) RemoveModerator(ctx *gin.Context) {
 	var req *dto.RemoveModeratorRequest
 	if err := ctx.ShouldBind(&req); err != nil {

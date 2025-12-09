@@ -27,14 +27,9 @@ type UpdateCommunityRequest struct {
 	Rules       *[]model.CommunityRule  `json:"rules,omitempty"`
 }
 
-type ModeratorDTO struct {
-	ModeratorID string `json:"id" binding:"required"`
-	Username    string `json:"username" binding:"required"`
-}
-
 type AddModeratorRequest struct {
-	CommunityID    string         `json:"id" binding:"required"`
-	AddedModerator []ModeratorDTO `json:"added_moderator" binding:"required"`
+	CommunityID    string   `json:"id" binding:"required"`
+	AddedModerator []string `json:"added_moderator" binding:"required"`
 }
 
 type RemoveModeratorRequest struct {

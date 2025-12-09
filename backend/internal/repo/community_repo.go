@@ -51,6 +51,7 @@ type CommunityRepo interface {
 	UnmuteUser(ctx context.Context, userID string, communityID string) error
 	UnbanUser(ctx context.Context, userID string, communityID string) error
 
+	ActivateModerator(ctx context.Context, communityID string, userID string) error
 	IsModerator(ctx context.Context, communityID string, userID string) (bool, error)
 }
 
@@ -710,6 +711,47 @@ func (c *communityRepo) CountPrivate(ctx context.Context) (int64, error) {
 	return c.communityCollection.CountDocuments(ctx, filter)
 }
 
+func (c *communityRepo) ActivateModerator(ctx context.Context, communityID string, userID string) error {
+	communityObjectID, err := primitive.ObjectIDFromHex(communityID)
+	if err != nil {
+		return err
+	}
+
+	userObjectID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return err
+	}
+
+	filter := bson.M{
+		"_id":                communityObjectID,
+		"moderators.user_id": userObjectID,
+	}
+
+	update := bson.M{
+		"$set": bson.M{
+			"moderators.$[m].is_active":   true,
+			"moderators.$[m].assigned_at": time.Now(),
+		},
+	}
+
+	opts := options.Update().SetArrayFilters(options.ArrayFilters{
+		Filters: []interface{}{
+			bson.M{"m.user_id": userObjectID},
+		},
+	})
+
+	res, err := c.communityCollection.UpdateOne(ctx, filter, update, opts)
+	if err != nil {
+		return err
+	}
+
+	if res.MatchedCount == 0 {
+		return apperror.ErrBadRequest
+	}
+
+	return nil
+}
+
 func (c *communityRepo) IsModerator(ctx context.Context, communityID string, userID string) (bool, error) {
 	userObjectID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
@@ -726,6 +768,10 @@ func (c *communityRepo) IsModerator(ctx context.Context, communityID string, use
 	}
 	for _, m := range community.Moderators {
 		if m.UserID == userObjectID {
+			if !m.IsActive {
+				return false, nil
+			}
+
 			return true, nil
 		}
 	}

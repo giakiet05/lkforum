@@ -295,6 +295,21 @@ func (mr *MockCommunityRepoMockRecorder) GetMutedUsers(ctx, communityID, expired
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMutedUsers", reflect.TypeOf((*MockCommunityRepo)(nil).GetMutedUsers), ctx, communityID, expired)
 }
 
+// IsModerator mocks base method.
+func (m *MockCommunityRepo) IsModerator(ctx context.Context, communityID, userID string) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IsModerator", ctx, communityID, userID)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// IsModerator indicates an expected call of IsModerator.
+func (mr *MockCommunityRepoMockRecorder) IsModerator(ctx, communityID, userID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsModerator", reflect.TypeOf((*MockCommunityRepo)(nil).IsModerator), ctx, communityID, userID)
+}
+
 // IsUserBanned mocks base method.
 func (m *MockCommunityRepo) IsUserBanned(ctx context.Context, userID string, banType model.CommunityBanType, communityID string) (bool, error) {
 	m.ctrl.T.Helper()
