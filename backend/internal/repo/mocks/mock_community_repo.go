@@ -38,6 +38,20 @@ func (m *MockCommunityRepo) EXPECT() *MockCommunityRepoMockRecorder {
 	return m.recorder
 }
 
+// ActivateModerator mocks base method.
+func (m *MockCommunityRepo) ActivateModerator(ctx context.Context, communityID, userID string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ActivateModerator", ctx, communityID, userID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ActivateModerator indicates an expected call of ActivateModerator.
+func (mr *MockCommunityRepoMockRecorder) ActivateModerator(ctx, communityID, userID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ActivateModerator", reflect.TypeOf((*MockCommunityRepo)(nil).ActivateModerator), ctx, communityID, userID)
+}
+
 // BanUser mocks base method.
 func (m *MockCommunityRepo) BanUser(ctx context.Context, ban *model.CommunityBan) error {
 	m.ctrl.T.Helper()
@@ -293,6 +307,21 @@ func (m *MockCommunityRepo) GetMutedUsers(ctx context.Context, communityID strin
 func (mr *MockCommunityRepoMockRecorder) GetMutedUsers(ctx, communityID, expired interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMutedUsers", reflect.TypeOf((*MockCommunityRepo)(nil).GetMutedUsers), ctx, communityID, expired)
+}
+
+// IsCreator mocks base method.
+func (m *MockCommunityRepo) IsCreator(ctx context.Context, communityID, userID string) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IsCreator", ctx, communityID, userID)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// IsCreator indicates an expected call of IsCreator.
+func (mr *MockCommunityRepoMockRecorder) IsCreator(ctx, communityID, userID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsCreator", reflect.TypeOf((*MockCommunityRepo)(nil).IsCreator), ctx, communityID, userID)
 }
 
 // IsModerator mocks base method.

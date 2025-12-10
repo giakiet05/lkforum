@@ -32,13 +32,12 @@ func TestCreateCommunity(t *testing.T) {
 	communityID := primitive.NewObjectID()
 
 	tests := []struct {
-		name              string
-		requesterID       string
-		req               *dto.CreateCommunityRequest
-		repoCommunityErr  error
-		repoMembershipErr error
-		wantErr           error
-		validate          func(t *testing.T, comm *model.Community)
+		name        string
+		requesterID string
+		req         *dto.CreateCommunityRequest
+		wantErr     error
+		setupMocks  func()
+		validate    func(t *testing.T, comm *model.Community)
 	}{
 		{
 			name:        "successfully create a community with valid inputs",
@@ -54,9 +53,18 @@ func TestCreateCommunity(t *testing.T) {
 				CreatorName:   "User1",
 				CreatorAvatar: "https://example.com/user1-avatar.png",
 			},
-			repoCommunityErr:  nil,
-			repoMembershipErr: nil,
-			wantErr:           nil,
+			wantErr: nil,
+			setupMocks: func() {
+				mockCommunityRepo.EXPECT().
+					Create(gomock.Any(), gomock.AssignableToTypeOf(&model.Community{})).
+					DoAndReturn(func(ctx context.Context, comm *model.Community) (*model.Community, error) {
+						comm.ID = communityID
+						return comm, nil
+					})
+				mockMembershipRepo.EXPECT().
+					Create(gomock.Any(), gomock.AssignableToTypeOf(&model.Membership{})).
+					Return(&model.Membership{}, nil)
+			},
 			validate: func(t *testing.T, comm *model.Community) {
 				if comm == nil {
 					t.Fatal("expected community, got nil")
@@ -82,7 +90,8 @@ func TestCreateCommunity(t *testing.T) {
 				Name:        "",
 				Description: ptrStr("No name comm"),
 			},
-			wantErr: apperror.ErrBadRequest,
+			wantErr:    apperror.ErrBadRequest,
+			setupMocks: func() {},
 		},
 		{
 			name:        "duplicate community name error",
@@ -91,8 +100,12 @@ func TestCreateCommunity(t *testing.T) {
 				Name:        "Existing Community",
 				Description: ptrStr("Already exists"),
 			},
-			repoCommunityErr: mockDuplicateKeyMongoError(),
-			wantErr:          apperror.ErrCommunityNameExists,
+			wantErr: apperror.ErrCommunityNameExists,
+			setupMocks: func() {
+				mockCommunityRepo.EXPECT().
+					Create(gomock.Any(), gomock.Any()).
+					Return(nil, mockDuplicateKeyMongoError())
+			},
 		},
 		{
 			name:        "repo community create error",
@@ -101,29 +114,18 @@ func TestCreateCommunity(t *testing.T) {
 				Name:        "Test Community",
 				Description: ptrStr("Test"),
 			},
-			repoCommunityErr: errors.New("db error"),
-			wantErr:          errors.New("db error"),
+			wantErr: errors.New("db error"),
+			setupMocks: func() {
+				mockCommunityRepo.EXPECT().
+					Create(gomock.Any(), gomock.Any()).
+					Return(nil, errors.New("db error"))
+			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.req != nil && tt.repoCommunityErr == nil && tt.repoMembershipErr == nil {
-				mockCommunityRepo.EXPECT().
-					Create(gomock.Any(), gomock.AssignableToTypeOf(&model.Community{})).
-					DoAndReturn(func(ctx context.Context, comm *model.Community) (*model.Community, error) {
-						comm.ID = communityID
-						return comm, tt.repoCommunityErr
-					})
-
-				mockMembershipRepo.EXPECT().
-					Create(gomock.Any(), gomock.AssignableToTypeOf(&model.Membership{})).
-					Return(&model.Membership{}, tt.repoMembershipErr)
-			} else if tt.repoCommunityErr != nil {
-				mockCommunityRepo.EXPECT().
-					Create(gomock.Any(), gomock.Any()).
-					Return(nil, tt.repoCommunityErr)
-			}
+			tt.setupMocks()
 
 			comm, err := svc.CreateCommunity(tt.req, tt.requesterID)
 
@@ -174,23 +176,23 @@ func TestGetCommunityByID(t *testing.T) {
 	}
 
 	tests := []struct {
-		name            string
-		communityID     string
-		requesterID     *string
-		repoGetErr      error
-		repoGetCom      *model.Community
-		repoIsBannedErr error
-		repoIsBanned    bool
-		wantErr         error
-		validate        func(t *testing.T, comm *model.Community)
+		name        string
+		communityID string
+		requesterID *string
+		wantErr     error
+		setupMocks  func()
+		validate    func(t *testing.T, comm *model.Community)
 	}{
 		{
 			name:        "retrieve community by valid ID",
 			communityID: communityID.Hex(),
 			requesterID: nil,
-			repoGetErr:  nil,
-			repoGetCom:  existingCommunity,
 			wantErr:     nil,
+			setupMocks: func() {
+				mockCommunityRepo.EXPECT().
+					GetByID(gomock.Any(), communityID.Hex()).
+					Return(existingCommunity, nil)
+			},
 			validate: func(t *testing.T, comm *model.Community) {
 				if comm.ID != communityID {
 					t.Errorf("expected community ID %s, got %s", communityID, comm.ID)
@@ -204,34 +206,29 @@ func TestGetCommunityByID(t *testing.T) {
 			name:        "attempt to retrieve non-existent community",
 			communityID: primitive.NewObjectID().Hex(),
 			requesterID: nil,
-			repoGetErr:  mongo.ErrNoDocuments,
 			wantErr:     apperror.ErrCommunityNotFound,
+			setupMocks: func() {
+				mockCommunityRepo.EXPECT().
+					GetByID(gomock.Any(), gomock.Any()).
+					Return(nil, mongo.ErrNoDocuments)
+			},
 		},
 		{
-			name:            "requester is banned from community",
-			communityID:     communityID.Hex(),
-			requesterID:     ptrStr(userID.Hex()),
-			repoGetErr:      nil,
-			repoGetCom:      existingCommunity,
-			repoIsBannedErr: nil,
-			repoIsBanned:    true,
-			wantErr:         apperror.ErrUserIsBannedFromCommunity,
+			name:        "requester is banned from community",
+			communityID: communityID.Hex(),
+			requesterID: ptrStr(userID.Hex()),
+			wantErr:     apperror.ErrUserIsBannedFromCommunity,
+			setupMocks: func() {
+				mockCommunityRepo.EXPECT().
+					IsUserBanned(gomock.Any(), userID.Hex(), model.Banned, communityID.Hex()).
+					Return(true, nil)
+			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.requesterID != nil {
-				mockCommunityRepo.EXPECT().
-					IsUserBanned(gomock.Any(), *tt.requesterID, model.Banned, tt.communityID).
-					Return(!tt.repoIsBanned, tt.repoIsBannedErr)
-			}
-
-			if (tt.repoGetErr == nil && !tt.repoIsBanned) || errors.Is(tt.repoGetErr, mongo.ErrNoDocuments) {
-				mockCommunityRepo.EXPECT().
-					GetByID(gomock.Any(), tt.communityID).
-					Return(tt.repoGetCom, tt.repoGetErr)
-			}
+			tt.setupMocks()
 
 			comm, err := svc.GetCommunityByID(tt.communityID, tt.requesterID)
 
@@ -294,10 +291,8 @@ func TestUpdateCommunity(t *testing.T) {
 		name        string
 		requesterID string
 		req         *dto.UpdateCommunityRequest
-		repoGetErr  error
-		repoGetCom  *model.Community
-		repoUpdErr  error
 		wantErr     error
+		setupMocks  func()
 		validate    func(t *testing.T, comm *model.Community)
 	}{
 		{
@@ -307,10 +302,18 @@ func TestUpdateCommunity(t *testing.T) {
 				CommunityID: communityID.Hex(),
 				Description: ptrStr("New Description"),
 			},
-			repoGetErr: nil,
-			repoGetCom: communityWithMod,
-			repoUpdErr: nil,
-			wantErr:    nil,
+			wantErr: nil,
+			setupMocks: func() {
+				mockCommunityRepo.EXPECT().
+					GetByID(gomock.Any(), communityID.Hex()).
+					Return(communityWithMod, nil)
+				mockCommunityRepo.EXPECT().
+					IsModerator(gomock.Any(), communityID.Hex(), moderatorID.Hex()).
+					Return(true, nil)
+				mockCommunityRepo.EXPECT().
+					Replace(gomock.Any(), gomock.AssignableToTypeOf(&model.Community{})).
+					Return(nil)
+			},
 			validate: func(t *testing.T, comm *model.Community) {
 				if comm == nil {
 					t.Fatal("expected community, got nil")
@@ -327,9 +330,15 @@ func TestUpdateCommunity(t *testing.T) {
 				CommunityID: communityID.Hex(),
 				Description: ptrStr("Hacked"),
 			},
-			repoGetErr: nil,
-			repoGetCom: communityWithoutMod,
-			wantErr:    apperror.ErrForbidden,
+			wantErr: apperror.ErrForbidden,
+			setupMocks: func() {
+				mockCommunityRepo.EXPECT().
+					GetByID(gomock.Any(), communityID.Hex()).
+					Return(communityWithoutMod, nil)
+				mockCommunityRepo.EXPECT().
+					IsModerator(gomock.Any(), communityID.Hex(), nonModeratorID.Hex()).
+					Return(false, nil)
+			},
 		},
 		{
 			name:        "community not found",
@@ -338,22 +347,18 @@ func TestUpdateCommunity(t *testing.T) {
 				CommunityID: communityID.Hex(),
 				Description: ptrStr("New"),
 			},
-			repoGetErr: mongo.ErrNoDocuments,
-			wantErr:    mongo.ErrNoDocuments,
+			wantErr: mongo.ErrNoDocuments,
+			setupMocks: func() {
+				mockCommunityRepo.EXPECT().
+					GetByID(gomock.Any(), communityID.Hex()).
+					Return(nil, mongo.ErrNoDocuments)
+			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockCommunityRepo.EXPECT().
-				GetByID(gomock.Any(), tt.req.CommunityID).
-				Return(tt.repoGetCom, tt.repoGetErr)
-
-			if tt.repoGetErr == nil && tt.repoGetCom != nil && tt.wantErr == nil {
-				mockCommunityRepo.EXPECT().
-					Replace(gomock.Any(), gomock.AssignableToTypeOf(&model.Community{})).
-					Return(tt.repoUpdErr)
-			}
+			tt.setupMocks()
 
 			comm, err := svc.UpdateCommunity(tt.req, tt.requesterID)
 
@@ -406,83 +411,59 @@ func TestAddModerator(t *testing.T) {
 	}
 
 	tests := []struct {
-		name             string
-		requesterID      string
-		req              *dto.AddModeratorRequest
-		repoGetErr       error
-		repoGetCom       *model.Community
-		repoUserExistErr error
-		repoUserExists   bool
-		repoMemberErr    error
-		repoIsMember     bool
-		repoUpdateErr    error
-		wantErr          error
+		name        string
+		requesterID string
+		req         *dto.AddModeratorRequest
+		wantErr     error
+		setupMocks  func()
 	}{
 		{
 			name:        "successfully add new moderator",
 			requesterID: creatorID.Hex(),
 			req: &dto.AddModeratorRequest{
-				CommunityID: communityID.Hex(),
-				AddedModerator: []dto.ModeratorDTO{
-					{
-						ModeratorID: newModID.Hex(),
-						Username:    "NewMod",
-					},
-				},
+				CommunityID:    communityID.Hex(),
+				AddedModerator: []string{newModID.Hex()},
 			},
-			repoGetErr:       nil,
-			repoGetCom:       communityWithMod,
-			repoUserExistErr: nil,
-			repoUserExists:   true,
-			repoMemberErr:    nil,
-			repoIsMember:     true,
-			repoUpdateErr:    nil,
-			wantErr:          nil,
+			wantErr: nil,
+			setupMocks: func() {
+				mockCommunityRepo.EXPECT().
+					GetByID(gomock.Any(), communityID.Hex()).
+					Return(communityWithMod, nil)
+				mockCommunityRepo.EXPECT().
+					IsCreator(gomock.Any(), communityID.Hex(), creatorID.Hex()).
+					Return(true, nil)
+				mockUserRepo.EXPECT().
+					GetByID(gomock.Any(), newModID.Hex()).
+					Return(&model.User{ID: primitive.NewObjectID(), Username: "NewMod", RoleContent: model.RoleContent{AsUser: &model.UserRoleContent{Avatar: &model.Image{URL: "https://example.com/avatar.png"}}}}, nil)
+				mockCommunityRepo.EXPECT().
+					Replace(gomock.Any(), gomock.Any()).
+					Return(nil)
+				mockEventBus.EXPECT().
+					Publish(gomock.Any())
+			},
 		},
 		{
 			name:        "attempt to add user already a moderator",
 			requesterID: creatorID.Hex(),
 			req: &dto.AddModeratorRequest{
-				CommunityID: communityID.Hex(),
-				AddedModerator: []dto.ModeratorDTO{
-					{
-						ModeratorID: existingModID.Hex(),
-						Username:    "ExistingMod",
-					},
-				},
+				CommunityID:    communityID.Hex(),
+				AddedModerator: []string{existingModID.Hex()},
 			},
-			repoGetErr: nil,
-			repoGetCom: communityWithMod,
-			wantErr:    apperror.ErrNoFieldsToUpdate,
+			wantErr: apperror.ErrModeratorAlreadyExists,
+			setupMocks: func() {
+				mockCommunityRepo.EXPECT().
+					GetByID(gomock.Any(), communityID.Hex()).
+					Return(communityWithMod, nil)
+				mockCommunityRepo.EXPECT().
+					IsCreator(gomock.Any(), communityID.Hex(), creatorID.Hex()).
+					Return(true, nil)
+			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockCommunityRepo.EXPECT().
-				GetByID(gomock.Any(), tt.req.CommunityID).
-				Return(tt.repoGetCom, tt.repoGetErr)
-
-			if tt.repoGetErr == nil && tt.repoGetCom != nil {
-				for _, modInput := range tt.req.AddedModerator {
-					if modInput.ModeratorID == existingModID.Hex() {
-						continue
-					}
-					mockCommunityRepo.EXPECT().
-						IsUserExist(gomock.Any(), modInput.ModeratorID).
-						Return(tt.repoUserExists, tt.repoUserExistErr)
-
-					mockMembershipRepo.EXPECT().
-						IsMember(gomock.Any(), modInput.ModeratorID, tt.requesterID).
-						Return(tt.repoIsMember, tt.repoMemberErr)
-
-					if tt.wantErr == nil {
-						mockCommunityRepo.EXPECT().
-							Replace(gomock.Any(), gomock.Any()).
-							Return(tt.repoUpdateErr)
-					}
-				}
-			}
+			tt.setupMocks()
 
 			err := svc.AddModerator(tt.req, tt.requesterID)
 
@@ -532,10 +513,8 @@ func TestRemoveModerator(t *testing.T) {
 		name        string
 		requesterID string
 		req         *dto.RemoveModeratorRequest
-		repoGetErr  error
-		repoGetCom  *model.Community
-		repoUpdErr  error
 		wantErr     error
+		setupMocks  func()
 	}{
 		{
 			name:        "successfully remove moderator",
@@ -544,10 +523,18 @@ func TestRemoveModerator(t *testing.T) {
 				CommunityID:      communityID.Hex(),
 				RemovedModerator: []string{modID.Hex()},
 			},
-			repoGetErr: nil,
-			repoGetCom: communityWithMod,
-			repoUpdErr: nil,
-			wantErr:    nil,
+			wantErr: nil,
+			setupMocks: func() {
+				mockCommunityRepo.EXPECT().
+					GetByID(gomock.Any(), communityID.Hex()).
+					Return(communityWithMod, nil)
+				mockCommunityRepo.EXPECT().
+					IsCreator(gomock.Any(), communityID.Hex(), creatorID.Hex()).
+					Return(true, nil)
+				mockCommunityRepo.EXPECT().
+					Replace(gomock.Any(), gomock.Any()).
+					Return(nil)
+			},
 		},
 		{
 			name:        "attempt to remove self",
@@ -556,23 +543,21 @@ func TestRemoveModerator(t *testing.T) {
 				CommunityID:      communityID.Hex(),
 				RemovedModerator: []string{modID.Hex()},
 			},
-			repoGetErr: nil,
-			repoGetCom: communityWithMod,
-			wantErr:    apperror.ErrCannotRemoveModerator,
+			wantErr: apperror.ErrCannotRemoveModerator,
+			setupMocks: func() {
+				mockCommunityRepo.EXPECT().
+					GetByID(gomock.Any(), communityID.Hex()).
+					Return(communityWithMod, nil)
+				mockCommunityRepo.EXPECT().
+					IsCreator(gomock.Any(), communityID.Hex(), modID.Hex()).
+					Return(true, nil)
+			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockCommunityRepo.EXPECT().
-				GetByID(gomock.Any(), tt.req.CommunityID).
-				Return(tt.repoGetCom, tt.repoGetErr)
-
-			if tt.repoGetErr == nil && tt.repoGetCom != nil && tt.wantErr == nil {
-				mockCommunityRepo.EXPECT().
-					Replace(gomock.Any(), gomock.Any()).
-					Return(tt.repoUpdErr)
-			}
+			tt.setupMocks()
 
 			err := svc.RemoveModerator(tt.req, tt.requesterID)
 
@@ -606,50 +591,43 @@ func TestDeleteCommunityByID(t *testing.T) {
 	creatorID := primitive.NewObjectID()
 	nonCreatorID := primitive.NewObjectID()
 
-	community := &model.Community{
-		ID:         communityID,
-		CreateByID: creatorID,
-	}
-
 	tests := []struct {
 		name        string
 		communityID string
 		requesterID string
-		repoGetErr  error
-		repoGetCom  *model.Community
-		repoDelErr  error
 		wantErr     error
+		setupMocks  func()
 	}{
 		{
 			name:        "successfully delete community",
 			communityID: communityID.Hex(),
 			requesterID: creatorID.Hex(),
-			repoGetErr:  nil,
-			repoGetCom:  community,
-			repoDelErr:  nil,
 			wantErr:     nil,
+			setupMocks: func() {
+				mockCommunityRepo.EXPECT().
+					IsCreator(gomock.Any(), communityID.Hex(), creatorID.Hex()).
+					Return(true, nil)
+				mockCommunityRepo.EXPECT().
+					Delete(gomock.Any(), communityID.Hex()).
+					Return(nil)
+			},
 		},
 		{
 			name:        "attempt to delete without ownership",
 			communityID: communityID.Hex(),
 			requesterID: nonCreatorID.Hex(),
-			repoGetErr:  nil,
-			repoGetCom:  community,
 			wantErr:     apperror.ErrForbidden,
+			setupMocks: func() {
+				mockCommunityRepo.EXPECT().
+					IsCreator(gomock.Any(), communityID.Hex(), nonCreatorID.Hex()).
+					Return(false, nil)
+			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockCommunityRepo.EXPECT().
-				GetByID(gomock.Any(), tt.communityID).
-				Return(tt.repoGetCom, tt.repoGetErr)
-
-			if tt.repoGetErr == nil && tt.repoGetCom != nil && tt.wantErr == nil {
-				mockCommunityRepo.EXPECT().
-					Delete(gomock.Any(), tt.communityID).
-					Return(tt.repoDelErr)
-			}
+			tt.setupMocks()
 
 			err := svc.DeleteCommunityByID(tt.communityID, tt.requesterID)
 
@@ -684,19 +662,12 @@ func TestBanUser(t *testing.T) {
 	nonModeratorID := primitive.NewObjectID()
 	userToBanID := primitive.NewObjectID()
 
-	community := &model.Community{
-		ID:         communityID,
-		CreateByID: moderatorID,
-	}
-
 	tests := []struct {
 		name        string
 		requesterID string
 		req         *dto.CommunityBanUserRequest
-		repoGetErr  error
-		repoGetCom  *model.Community
-		repoBanErr  error
 		wantErr     error
+		setupMocks  func()
 	}{
 		{
 			name:        "successfully ban user",
@@ -708,10 +679,15 @@ func TestBanUser(t *testing.T) {
 				Reason:      "Spam",
 				LengthDays:  30,
 			},
-			repoGetErr: nil,
-			repoGetCom: community,
-			repoBanErr: nil,
-			wantErr:    nil,
+			wantErr: nil,
+			setupMocks: func() {
+				mockCommunityRepo.EXPECT().
+					IsModerator(gomock.Any(), communityID.Hex(), moderatorID.Hex()).
+					Return(true, nil)
+				mockCommunityRepo.EXPECT().
+					BanUser(gomock.Any(), gomock.AssignableToTypeOf(&model.CommunityBan{})).
+					Return(nil)
+			},
 		},
 		{
 			name:        "attempt to ban without moderator permissions",
@@ -723,23 +699,18 @@ func TestBanUser(t *testing.T) {
 				Reason:      "Spam",
 				LengthDays:  30,
 			},
-			repoGetErr: nil,
-			repoGetCom: community,
-			wantErr:    apperror.ErrForbidden,
+			wantErr: apperror.ErrForbidden,
+			setupMocks: func() {
+				mockCommunityRepo.EXPECT().
+					IsModerator(gomock.Any(), communityID.Hex(), nonModeratorID.Hex()).
+					Return(false, nil)
+			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockCommunityRepo.EXPECT().
-				GetByID(gomock.Any(), tt.req.CommunityID).
-				Return(tt.repoGetCom, tt.repoGetErr)
-
-			if tt.repoGetErr == nil && tt.repoGetCom != nil && tt.wantErr == nil {
-				mockCommunityRepo.EXPECT().
-					BanUser(gomock.Any(), gomock.AssignableToTypeOf(&model.CommunityBan{})).
-					Return(tt.repoBanErr)
-			}
+			tt.setupMocks()
 
 			err := svc.BanUser(tt.req, tt.requesterID)
 
@@ -773,40 +744,36 @@ func TestGetBannedUsers(t *testing.T) {
 	moderatorID := primitive.NewObjectID()
 	bannedUserID := primitive.NewObjectID()
 
-	community := &model.Community{
-		ID:         communityID,
-		CreateByID: moderatorID,
-	}
-
 	bannedUser := &model.User{
 		ID:       bannedUserID,
 		Username: "BannedUser",
 	}
 
 	tests := []struct {
-		name         string
-		communityID  string
-		banTypeStr   string
-		expired      bool
-		requesterID  string
-		repoGetErr   error
-		repoGetCom   *model.Community
-		repoUsersErr error
-		repoUsers    []*model.User
-		wantErr      error
-		validate     func(t *testing.T, users []*model.User)
+		name        string
+		communityID string
+		banTypeStr  string
+		expired     bool
+		requesterID string
+		wantErr     error
+		setupMocks  func()
+		validate    func(t *testing.T, users []*model.User)
 	}{
 		{
-			name:         "retrieve banned users list",
-			communityID:  communityID.Hex(),
-			banTypeStr:   "banned",
-			expired:      false,
-			requesterID:  moderatorID.Hex(),
-			repoGetErr:   nil,
-			repoGetCom:   community,
-			repoUsersErr: nil,
-			repoUsers:    []*model.User{bannedUser},
-			wantErr:      nil,
+			name:        "retrieve banned users list",
+			communityID: communityID.Hex(),
+			banTypeStr:  "banned",
+			expired:     false,
+			requesterID: moderatorID.Hex(),
+			wantErr:     nil,
+			setupMocks: func() {
+				mockCommunityRepo.EXPECT().
+					IsModerator(gomock.Any(), communityID.Hex(), moderatorID.Hex()).
+					Return(true, nil)
+				mockCommunityRepo.EXPECT().
+					GetBannedUsers(gomock.Any(), communityID.Hex(), false).
+					Return([]*model.User{bannedUser}, nil)
+			},
 			validate: func(t *testing.T, users []*model.User) {
 				if len(users) != 1 {
 					t.Errorf("expected 1 user, got %d", len(users))
@@ -820,15 +787,7 @@ func TestGetBannedUsers(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockCommunityRepo.EXPECT().
-				GetByID(gomock.Any(), tt.communityID).
-				Return(tt.repoGetCom, tt.repoGetErr)
-
-			if tt.repoGetErr == nil && tt.repoGetCom != nil && tt.wantErr == nil {
-				mockCommunityRepo.EXPECT().
-					GetBannedUsers(gomock.Any(), tt.communityID, tt.expired).
-					Return(tt.repoUsers, tt.repoUsersErr)
-			}
+			tt.setupMocks()
 
 			users, err := svc.GetBannedUsers(tt.communityID, tt.banTypeStr, tt.expired, tt.requesterID)
 
@@ -866,44 +825,34 @@ func TestUnbanUser(t *testing.T) {
 	moderatorID := primitive.NewObjectID()
 	userID := primitive.NewObjectID()
 
-	community := &model.Community{
-		ID:         communityID,
-		CreateByID: moderatorID,
-	}
-
 	tests := []struct {
-		name         string
-		userID       string
-		communityID  string
-		requesterID  string
-		repoGetErr   error
-		repoGetCom   *model.Community
-		repoUnbanErr error
-		wantErr      error
+		name        string
+		userID      string
+		communityID string
+		requesterID string
+		wantErr     error
+		setupMocks  func()
 	}{
 		{
-			name:         "successfully unban user",
-			userID:       userID.Hex(),
-			communityID:  communityID.Hex(),
-			requesterID:  moderatorID.Hex(),
-			repoGetErr:   nil,
-			repoGetCom:   community,
-			repoUnbanErr: nil,
-			wantErr:      nil,
+			name:        "successfully unban user",
+			userID:      userID.Hex(),
+			communityID: communityID.Hex(),
+			requesterID: moderatorID.Hex(),
+			wantErr:     nil,
+			setupMocks: func() {
+				mockCommunityRepo.EXPECT().
+					IsModerator(gomock.Any(), communityID.Hex(), moderatorID.Hex()).
+					Return(true, nil)
+				mockCommunityRepo.EXPECT().
+					UnbanUser(gomock.Any(), userID.Hex(), communityID.Hex()).
+					Return(nil)
+			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockCommunityRepo.EXPECT().
-				GetByID(gomock.Any(), tt.communityID).
-				Return(tt.repoGetCom, tt.repoGetErr)
-
-			if tt.repoGetErr == nil && tt.repoGetCom != nil && tt.wantErr == nil {
-				mockCommunityRepo.EXPECT().
-					UnbanUser(gomock.Any(), tt.userID, tt.communityID).
-					Return(tt.repoUnbanErr)
-			}
+			tt.setupMocks()
 
 			err := svc.UnbanUser(tt.userID, tt.communityID, tt.requesterID)
 
@@ -957,35 +906,36 @@ func TestGetPendingPosts(t *testing.T) {
 	}
 
 	tests := []struct {
-		name          string
-		communityID   string
-		moderatorID   string
-		page          int
-		pageSize      int
-		repoGetComErr error
-		repoGetCom    *model.Community
-		repoFindErr   error
-		repoPosts     []*model.Post
-		repoTotal     int64
-		repoUsersErr  error
-		repoUsers     []*model.User
-		wantErr       error
-		validate      func(t *testing.T, resp *dto.PaginatedPostsResponse)
+		name        string
+		communityID string
+		moderatorID string
+		page        int
+		pageSize    int
+		wantErr     error
+		setupMocks  func()
+		validate    func(t *testing.T, resp *dto.PaginatedPostsResponse)
 	}{
 		{
-			name:          "retrieve pending posts queue",
-			communityID:   communityID.Hex(),
-			moderatorID:   moderatorID.Hex(),
-			page:          1,
-			pageSize:      20,
-			repoGetComErr: nil,
-			repoGetCom:    community,
-			repoFindErr:   nil,
-			repoPosts:     []*model.Post{pendingPost},
-			repoTotal:     1,
-			repoUsersErr:  nil,
-			repoUsers:     []*model.User{author},
-			wantErr:       nil,
+			name:        "retrieve pending posts queue",
+			communityID: communityID.Hex(),
+			moderatorID: moderatorID.Hex(),
+			page:        1,
+			pageSize:    20,
+			wantErr:     nil,
+			setupMocks: func() {
+				mockCommunityRepo.EXPECT().
+					GetByID(gomock.Any(), communityID.Hex()).
+					Return(community, nil)
+				mockCommunityRepo.EXPECT().
+					IsModerator(gomock.Any(), communityID.Hex(), moderatorID.Hex()).
+					Return(true, nil)
+				mockPostRepo.EXPECT().
+					Find(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return([]*model.Post{pendingPost}, int64(1), nil)
+				mockUserRepo.EXPECT().
+					GetByIDs(gomock.Any(), gomock.Any()).
+					Return([]*model.User{author}, nil)
+			},
 			validate: func(t *testing.T, resp *dto.PaginatedPostsResponse) {
 				if resp == nil {
 					t.Fatal("expected response, got nil")
@@ -1002,21 +952,7 @@ func TestGetPendingPosts(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockCommunityRepo.EXPECT().
-				GetByID(gomock.Any(), tt.communityID).
-				Return(tt.repoGetCom, tt.repoGetComErr)
-
-			if tt.repoGetComErr == nil && tt.repoGetCom != nil && tt.wantErr == nil {
-				mockPostRepo.EXPECT().
-					Find(gomock.Any(), gomock.Any(), gomock.Any()).
-					Return(tt.repoPosts, tt.repoTotal, tt.repoFindErr)
-
-				if tt.repoFindErr == nil && len(tt.repoPosts) > 0 {
-					mockUserRepo.EXPECT().
-						GetByIDs(gomock.Any(), gomock.Any()).
-						Return(tt.repoUsers, tt.repoUsersErr)
-				}
-			}
+			tt.setupMocks()
 
 			resp, err := svc.GetPendingPosts(tt.communityID, tt.moderatorID, tt.page, tt.pageSize)
 
@@ -1056,11 +992,6 @@ func TestModeratePost(t *testing.T) {
 	moderatorID := primitive.NewObjectID()
 	nonModeratorID := primitive.NewObjectID()
 
-	community := &model.Community{
-		ID:         communityID,
-		CreateByID: moderatorID,
-	}
-
 	pendingPost := &model.Post{
 		ID:               postID,
 		CommunityID:      communityID,
@@ -1069,80 +1000,78 @@ func TestModeratePost(t *testing.T) {
 	}
 
 	tests := []struct {
-		name           string
-		communityID    string
-		postID         string
-		moderatorID    string
-		approve        bool
-		reason         *string
-		repoGetComErr  error
-		repoGetCom     *model.Community
-		repoGetPostErr error
-		repoGetPost    *model.Post
-		repoUpdateErr  error
-		wantErr        error
+		name        string
+		communityID string
+		postID      string
+		moderatorID string
+		approve     bool
+		reason      *string
+		wantErr     error
+		setupMocks  func()
 	}{
 		{
-			name:           "UTC-020: approve pending post",
-			communityID:    communityID.Hex(),
-			postID:         postID.Hex(),
-			moderatorID:    moderatorID.Hex(),
-			approve:        true,
-			reason:         nil,
-			repoGetComErr:  nil,
-			repoGetCom:     community,
-			repoGetPostErr: nil,
-			repoGetPost:    pendingPost,
-			repoUpdateErr:  nil,
-			wantErr:        nil,
+			name:        "UTC-020: approve pending post",
+			communityID: communityID.Hex(),
+			postID:      postID.Hex(),
+			moderatorID: moderatorID.Hex(),
+			approve:     true,
+			reason:      nil,
+			wantErr:     nil,
+			setupMocks: func() {
+				mockCommunityRepo.EXPECT().
+					IsModerator(gomock.Any(), communityID.Hex(), moderatorID.Hex()).
+					Return(true, nil)
+				mockPostRepo.EXPECT().
+					GetByID(gomock.Any(), postID.Hex()).
+					Return(pendingPost, nil)
+				mockPostRepo.EXPECT().
+					UpdateByID(gomock.Any(), postID.Hex(), gomock.Any()).
+					Return(nil)
+				mockEventBus.EXPECT().
+					Publish(gomock.Any())
+			},
 		},
 		{
-			name:           "UTC-021: reject pending post with reason",
-			communityID:    communityID.Hex(),
-			postID:         postID.Hex(),
-			moderatorID:    moderatorID.Hex(),
-			approve:        false,
-			reason:         ptrStr("Inappropriate content"),
-			repoGetComErr:  nil,
-			repoGetCom:     community,
-			repoGetPostErr: nil,
-			repoGetPost:    pendingPost,
-			repoUpdateErr:  nil,
-			wantErr:        nil,
+			name:        "UTC-021: reject pending post with reason",
+			communityID: communityID.Hex(),
+			postID:      postID.Hex(),
+			moderatorID: moderatorID.Hex(),
+			approve:     false,
+			reason:      ptrStr("Inappropriate content"),
+			wantErr:     nil,
+			setupMocks: func() {
+				mockCommunityRepo.EXPECT().
+					IsModerator(gomock.Any(), communityID.Hex(), moderatorID.Hex()).
+					Return(true, nil)
+				mockPostRepo.EXPECT().
+					GetByID(gomock.Any(), postID.Hex()).
+					Return(pendingPost, nil)
+				mockPostRepo.EXPECT().
+					UpdateByID(gomock.Any(), postID.Hex(), gomock.Any()).
+					Return(nil)
+				mockEventBus.EXPECT().
+					Publish(gomock.Any())
+			},
 		},
 		{
-			name:          "UTC-022: attempt to moderate without permissions",
-			communityID:   communityID.Hex(),
-			postID:        postID.Hex(),
-			moderatorID:   nonModeratorID.Hex(),
-			approve:       true,
-			reason:        nil,
-			repoGetComErr: nil,
-			repoGetCom:    community,
-			wantErr:       apperror.ErrForbidden,
+			name:        "UTC-022: attempt to moderate without permissions",
+			communityID: communityID.Hex(),
+			postID:      postID.Hex(),
+			moderatorID: nonModeratorID.Hex(),
+			approve:     true,
+			reason:      nil,
+			wantErr:     apperror.ErrForbidden,
+			setupMocks: func() {
+				mockCommunityRepo.EXPECT().
+					IsModerator(gomock.Any(), communityID.Hex(), nonModeratorID.Hex()).
+					Return(false, nil)
+			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockCommunityRepo.EXPECT().
-				GetByID(gomock.Any(), tt.communityID).
-				Return(tt.repoGetCom, tt.repoGetComErr)
-
-			if tt.repoGetComErr == nil && tt.repoGetCom != nil && tt.wantErr == nil {
-				mockPostRepo.EXPECT().
-					GetByID(gomock.Any(), tt.postID).
-					Return(tt.repoGetPost, tt.repoGetPostErr)
-
-				if tt.repoGetPostErr == nil && tt.repoGetPost != nil {
-					mockPostRepo.EXPECT().
-						UpdateByID(gomock.Any(), tt.postID, gomock.Any()).
-						Return(tt.repoUpdateErr)
-
-					mockEventBus.EXPECT().
-						Publish(gomock.Any())
-				}
-			}
+			tt.setupMocks()
 
 			err := svc.ModeratePost(tt.communityID, tt.postID, tt.moderatorID, tt.approve, tt.reason)
 
@@ -1157,6 +1086,65 @@ func TestModeratePost(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 		})
+	}
+}
+
+func TestGetAllCommunitiesPaginated_FilterOutBanned(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockCommunityRepo := mocks.NewMockCommunityRepo(ctrl)
+	mockMembershipRepo := mocks.NewMockMembershipRepo(ctrl)
+	mockPostRepo := mocks.NewMockPostRepo(ctrl)
+	mockUserRepo := mocks.NewMockUserRepo(ctrl)
+	mockEventBus := bus.NewMockEventBus(ctrl)
+
+	svc := NewCommunityService(mockCommunityRepo, mockMembershipRepo, mockPostRepo, mockUserRepo, mockEventBus)
+
+	// Prepare communities
+	comm1ID := primitive.NewObjectID()
+	comm2ID := primitive.NewObjectID()
+
+	comm1 := &model.Community{ID: comm1ID, Name: "Comm1"}
+	comm2 := &model.Community{ID: comm2ID, Name: "Comm2"}
+
+	// Case A: requesterID is nil -> no filtering
+	mockCommunityRepo.EXPECT().
+		GetAllPaginated(gomock.Any(), 1, 10).
+		Return([]*model.Community{comm1, comm2}, int64(2), nil)
+
+	resp, err := svc.GetAllCommunitiesPaginated(nil, 1, 10)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.Pagination.Total != 2 {
+		t.Fatalf("expected total 2, got %d", resp.Pagination.Total)
+	}
+
+	// Case B: requesterID provided -> one community is banned for requester
+	requesterID := primitive.NewObjectID().Hex()
+
+	mockCommunityRepo.EXPECT().
+		GetAllPaginated(gomock.Any(), 1, 10).
+		Return([]*model.Community{comm1, comm2}, int64(2), nil)
+
+	// Return comm2 as banned for this requester
+	mockCommunityRepo.EXPECT().
+		GetBannedCommunityIDs(gomock.Any(), requesterID, model.Banned, gomock.Any()).
+		Return([]string{comm2ID.Hex()}, nil)
+
+	resp2, err := svc.GetAllCommunitiesPaginated(ptrStr(requesterID), 1, 10)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp2.Pagination.Total != 2 {
+		t.Fatalf("expected total 2 (unchanged), got %d", resp2.Pagination.Total)
+	}
+	if len(resp2.Communities) != 1 {
+		t.Fatalf("expected 1 community after filtering, got %d", len(resp2.Communities))
+	}
+	if resp2.Communities[0].Name != "Comm1" {
+		t.Fatalf("expected remaining community to be Comm1, got %s", resp2.Communities[0].Name)
 	}
 }
 
