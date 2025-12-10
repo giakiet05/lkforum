@@ -3,6 +3,7 @@
   import { push } from "svelte-spa-router";
   import Post from "../components/Post.svelte";
   import CreatePostModal from "../components/CreatePostModal.svelte";
+  import { toastStore } from "../stores/toast-store";
   import type { PostResponse } from "../dtos/post-dto";
   import type { CommunityResponse } from "../dtos/community-dto";
   import {
@@ -209,13 +210,13 @@
   async function toggleJoin() {
     const currentUser = $authStore.user;
     if (!currentUser || !community) {
-      alert("Please login to join communities");
+      toastStore.warning("Please login to join communities");
       return;
     }
 
     // Prevent creator from leaving their own community
     if (isCreator()) {
-      alert("You cannot leave a community you created!");
+      toastStore.warning("You cannot leave a community you created!");
       return;
     }
 
@@ -241,7 +242,7 @@
       }
     } catch (error) {
       console.error("❌ Failed to toggle membership:", error);
-      alert(
+      toastStore.error(
         error instanceof Error ? error.message : "Failed to update membership"
       );
     } finally {
@@ -262,6 +263,10 @@
     push(`/lk/${params.name}/mod`);
   }
 
+  function handleSettings() {
+    push(`/lk/${params.name}/settings`);
+  }
+
   function handleOpenInviteModModal() {
     showInviteModModal = true;
     inviteUsername = "";
@@ -278,7 +283,7 @@
 
   async function handleInviteMod() {
     if (!inviteUsername.trim() || !community) {
-      alert("Please enter a username!");
+      toastStore.warning("Please enter a username!");
       return;
     }
 
@@ -300,14 +305,14 @@
       });
 
       console.log("✅ Moderator added successfully!");
-      alert(`${inviteUsername} added as moderator!`);
+      toastStore.success(`${inviteUsername} added as moderator!`);
       handleCloseInviteModModal();
 
       // Reload community to get updated moderators
       await loadCommunity();
     } catch (error) {
       console.error("❌ Failed to add moderator:", error);
-      alert(
+      toastStore.error(
         "Failed to add moderator. Please check the username and try again."
       );
     }
@@ -414,7 +419,11 @@
             </button>
 
             <!-- More Options Button -->
-            <button class="action-btn" title="More options">
+            <button
+              class="action-btn"
+              title="More options"
+              onclick={handleSettings}
+            >
               <svg viewBox="0 0 20 20" fill="currentColor">
                 <path
                   d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"
@@ -847,6 +856,32 @@
 
   .mod-tools-btn:hover {
     background: var(--darkblue--);
+  }
+
+  .settings-btn {
+    background: white;
+    color: var(--blue--);
+    border: 1px solid var(--blue--);
+    padding: 8px 16px;
+    border-radius: 9999px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: "Roboto", sans-serif;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+  }
+
+  .settings-btn:hover {
+    background: #f6f7f8;
+  }
+
+  .settings-btn svg {
+    width: 16px;
+    height: 16px;
   }
 
   .community-icon {

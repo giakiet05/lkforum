@@ -3,6 +3,7 @@
   import { routes } from "./routes";
   import { isAuthenticated } from "./stores/auth-store";
   import { push } from "svelte-spa-router";
+  import ToastContainer from "./components/ToastContainer.svelte";
 
   // Redirect to login if not authenticated
   $effect(() => {
@@ -15,6 +16,7 @@
 </script>
 
 <Router {routes} />
+<ToastContainer />
 
 <style>
   :global(*) {

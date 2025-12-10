@@ -114,21 +114,7 @@ func (c *commentRepo) GetCommentsFilterPaginated(
 		filter["content"] = bson.M{"$regex": primitive.Regex{Pattern: *content, Options: "i"}}
 	}
 
-	// Moderation filter
-	if currentUserID == nil || *currentUserID == "" {
-		// Guest user: only see approved comments
-		filter["moderation_status"] = model.ModerationApproved
-	} else {
-		// Logged-in user: see approved + own comments (pending/rejected)
-		currentUserObjectID, err := primitive.ObjectIDFromHex(*currentUserID)
-		if err != nil {
-			return nil, 0, apperror.ErrInvalidID
-		}
-		filter["$or"] = []bson.M{
-			{"moderation_status": model.ModerationApproved},
-			{"author.id": currentUserObjectID}, // Fixed: use nested field path
-		}
-	}
+	// No moderation filter needed - all comments are visible
 
 	// Pagination and sorting
 	skip := (page - 1) * pageSize

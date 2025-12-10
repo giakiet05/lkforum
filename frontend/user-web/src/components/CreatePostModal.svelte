@@ -2,6 +2,7 @@
   import DraftsModal from "./DraftsModal.svelte";
   import { createPost, uploadPostImages } from "../services/post-service";
   import { getCommunities } from "../services/community-service";
+  import { toastStore } from "../stores/toast-store";
   import {
     createDraft,
     updateDraft,
@@ -173,7 +174,7 @@
       showDraftsModal = false;
     } catch (error) {
       console.error("Failed to load draft:", error);
-      alert("Failed to load draft. Please try again.");
+      toastStore.error("Failed to load draft. Please try again.");
     }
   }
 
@@ -224,7 +225,7 @@
 
       await createDraft(draftData);
 
-      alert("Draft saved successfully!");
+      toastStore.success("Draft saved successfully!");
       handleClose();
     } catch (error) {
       console.error("Failed to save draft:", error);

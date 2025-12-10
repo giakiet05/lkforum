@@ -8,6 +8,7 @@
     markAllAsRead,
   } from "../services/notification-service";
   import { activateModerator } from "../services/community-service";
+  import { toastStore } from "../stores/toast-store";
   import type { NotificationResponse } from "../dtos/notification-dto";
 
   type Props = {
@@ -104,19 +105,19 @@
           window.location.reload();
         }, 100);
       } else {
-        alert("Bạn đã chấp nhận làm moderator!");
+        toastStore.success("Bạn đã chấp nhận làm moderator!");
         loadNotifications();
       }
     } catch (err) {
       console.error("Failed to accept moderator invite:", err);
-      alert("Không thể chấp nhận lời mời");
+      toastStore.error("Không thể chấp nhận lời mời");
     }
   }
 
   async function handleDeclineModeratorInvite(notificationId: string) {
     try {
       await handleDelete(notificationId);
-      alert("Bạn đã từ chối lời mời");
+      toastStore.info("Bạn đã từ chối lời mời");
     } catch (err) {
       console.error("Failed to decline moderator invite:", err);
     }

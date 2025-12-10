@@ -17,9 +17,11 @@
     addModerators,
     removeModerators,
     getPendingPosts,
+    getEditedPosts,
     moderatePost,
   } from "../services/community-service";
   import { getUserByUsername } from "../services/user-service";
+  import { toastStore } from "../stores/toast-store";
   import type {
     CommunityResponse,
     CommunityRule,
@@ -57,10 +59,12 @@
 
   // Queue/Pending Posts state
   let pendingPosts = $state<any[]>([]);
+  let editedPosts = $state<any[]>([]);
   let isLoadingPosts = $state(false);
   let postsPage = $state(1);
   let postsPageSize = $state(10);
   let totalPendingPosts = $state(0);
+  let totalEditedPosts = $state(0);
 
   // Restricted Users state
   let activeRestrictedTab = $state<RestrictedTab>("banned");
@@ -96,6 +100,17 @@
     await loadRestrictedUsers();
     await loadModerators();
     await loadPendingPosts();
+  });
+
+  // Watch for tab changes and load appropriate posts
+  $effect(() => {
+    if (community) {
+      if (activeQueueTab === "unmoderated") {
+        loadPendingPosts();
+      } else if (activeQueueTab === "edited") {
+        loadEditedPosts();
+      }
+    }
   });
 
   async function loadCommunity() {
@@ -170,10 +185,33 @@
     }
   }
 
+  async function loadEditedPosts() {
+    if (!community) return;
+
+    try {
+      isLoadingPosts = true;
+      const response = await getEditedPosts(
+        community.id,
+        postsPage,
+        postsPageSize
+      );
+      editedPosts = response.posts || [];
+      totalEditedPosts = response.pagination?.total_items || 0;
+    } catch (error) {
+      console.error("Failed to load edited posts:", error);
+      editedPosts = [];
+    } finally {
+      isLoadingPosts = false;
+    }
+  }
+
   const filteredPosts = $derived(() => {
-    // For now, all pending posts are "unmoderated"
-    // Backend doesn't distinguish between edited/removed/reported yet
-    let posts = activeQueueTab === "unmoderated" ? pendingPosts : [];
+    let posts: any[] = [];
+    if (activeQueueTab === "unmoderated") {
+      posts = [...pendingPosts];
+    } else if (activeQueueTab === "edited") {
+      posts = [...editedPosts];
+    }
 
     // Sort posts
     if (sortBy === "newest") {
@@ -220,11 +258,11 @@
 
     try {
       await moderatePost(community.id, postId, true);
-      alert("Post approved successfully!");
+      toastStore.success("Post approved successfully!");
       await loadPendingPosts(); // Reload the list
     } catch (error) {
       console.error("Failed to approve post:", error);
-      alert("Failed to approve post. Please try again.");
+      toastStore.error("Failed to approve post. Please try again.");
     }
   }
 
@@ -240,11 +278,11 @@
         false,
         removalReason || undefined
       );
-      alert("Post removed successfully!");
+      toastStore.success("Post removed successfully!");
       await loadPendingPosts(); // Reload the list
     } catch (error) {
       console.error("Failed to remove post:", error);
-      alert("Failed to remove post. Please try again.");
+      toastStore.error("Failed to remove post. Please try again.");
     }
   }
 
@@ -273,12 +311,14 @@
     })
       .then(() => {
         communityRules = updatedRules;
-        alert(editingRuleIndex !== null ? "Rule updated!" : "Rule created!");
+        toastStore.success(
+          editingRuleIndex !== null ? "Rule updated!" : "Rule created!"
+        );
         handleBackToRulesList();
       })
       .catch((error) => {
         console.error("Failed to save rule:", error);
-        alert("Failed to save rule. Please try again.");
+        toastStore.error("Failed to save rule. Please try again.");
       });
   }
 
@@ -311,11 +351,11 @@
       })
         .then(() => {
           communityRules = updatedRules;
-          alert("Rule deleted!");
+          toastStore.success("Rule deleted!");
         })
         .catch((error) => {
           console.error("Failed to delete rule:", error);
-          alert("Failed to delete rule. Please try again.");
+          toastStore.error("Failed to delete rule. Please try again.");
         });
     }
   }
@@ -360,7 +400,7 @@
 
   async function handleBanUser() {
     if (!community || !banUsername.trim()) {
-      alert("Please enter a username!");
+      toastStore.warning("Please enter a username!");
       return;
     }
 
@@ -378,18 +418,20 @@
         length_days: lengthDays,
       });
 
-      alert("User banned successfully!");
+      toastStore.success("User banned successfully!");
       await loadRestrictedUsers(); // Reload the list
       handleCloseBanModal();
     } catch (error) {
       console.error("Failed to ban user:", error);
-      alert("Failed to ban user. Please check the username and try again.");
+      toastStore.error(
+        "Failed to ban user. Please check the username and try again."
+      );
     }
   }
 
   async function handleMuteUser() {
     if (!community || !banUsername.trim()) {
-      alert("Please enter a username!");
+      toastStore.warning("Please enter a username!");
       return;
     }
 
@@ -407,12 +449,14 @@
         length_days: lengthDays,
       });
 
-      alert("User muted successfully!");
+      toastStore.success("User muted successfully!");
       await loadRestrictedUsers(); // Reload the list
       handleCloseMuteModal();
     } catch (error) {
       console.error("Failed to mute user:", error);
-      alert("Failed to mute user. Please check the username and try again.");
+      toastStore.error(
+        "Failed to mute user. Please check the username and try again."
+      );
     }
   }
 
@@ -426,11 +470,11 @@
           user_id: userId,
         });
 
-        alert("User unbanned successfully!");
+        toastStore.success("User unbanned successfully!");
         await loadRestrictedUsers();
       } catch (error) {
         console.error("Failed to unban user:", error);
-        alert("Failed to unban user. Please try again.");
+        toastStore.error("Failed to unban user. Please try again.");
       }
     }
   }
@@ -445,11 +489,11 @@
           user_id: userId,
         });
 
-        alert("User unmuted successfully!");
+        toastStore.success("User unmuted successfully!");
         await loadRestrictedUsers();
       } catch (error) {
         console.error("Failed to unmute user:", error);
-        alert("Failed to unmute user. Please try again.");
+        toastStore.error("Failed to unmute user. Please try again.");
       }
     }
   }
@@ -472,7 +516,7 @@
 
   async function handleInviteUser() {
     if (!community || !inviteUsername.trim()) {
-      alert("Please enter a username!");
+      toastStore.warning("Please enter a username!");
       return;
     }
 
@@ -496,25 +540,25 @@
         });
 
         console.log("✅ Moderator added successfully!");
-        alert(`${inviteUsername} added as moderator!`);
+        toastStore.success(`${inviteUsername} added as moderator!`);
         await loadCommunity(); // Reload to get updated moderators
         handleCloseInviteModal();
       } catch (error) {
         console.error("❌ Failed to add moderator:", error);
-        alert(
+        toastStore.error(
           "Failed to add moderator. Please check the username and try again."
         );
       }
     } else {
       // Approved users - not yet implemented in backend
-      alert("Approved users feature coming soon!");
+      toastStore.info("Approved users feature coming soon!");
       handleCloseInviteModal();
     }
   }
 
   function handleEditMember(userId: string, type: "mod" | "approved") {
     console.log("Edit member:", userId, type);
-    alert("Edit member functionality coming soon!");
+    toastStore.info("Edit member functionality coming soon!");
   }
 
   async function handleDeleteMember(userId: string, type: "mod" | "approved") {
@@ -532,15 +576,15 @@
             removed_moderator: [userId],
           });
 
-          alert("Moderator removed!");
+          toastStore.success("Moderator removed!");
           await loadCommunity(); // Reload to get updated moderators
         } catch (error) {
           console.error("Failed to remove moderator:", error);
-          alert("Failed to remove moderator. Please try again.");
+          toastStore.error("Failed to remove moderator. Please try again.");
         }
       } else {
         // Approved users - not yet implemented
-        alert("Approved users feature coming soon!");
+        toastStore.info("Approved users feature coming soon!");
       }
     }
   }
@@ -647,20 +691,24 @@
             <div class="post-card">
               <div class="post-header">
                 <div class="post-author">
-                  {#if post.authorAvatar}
+                  {#if post.author?.avatar?.url}
                     <img
-                      src={post.authorAvatar}
-                      alt={post.author}
+                      src={post.author.avatar.url}
+                      alt={post.author.username}
                       class="author-avatar"
                     />
                   {:else}
                     <div class="author-avatar-placeholder">
-                      {post.author[0].toUpperCase()}
+                      {post.author?.username?.[0]?.toUpperCase() || "?"}
                     </div>
                   {/if}
                   <div class="author-info">
-                    <span class="author-name">u/{post.author}</span>
-                    <span class="post-time">{formatTime(post.createdAt)}</span>
+                    <span class="author-name"
+                      >u/{post.author?.username || "[deleted]"}</span
+                    >
+                    <span class="post-time"
+                      >{formatTime(post.created_at || post.createdAt)}</span
+                    >
                   </div>
                 </div>
                 {#if post.reportCount}
@@ -669,7 +717,7 @@
               </div>
 
               <h3 class="post-title">{post.title}</h3>
-              <p class="post-content">{post.content}</p>
+              <p class="post-content">{post.content?.text || ""}</p>
 
               {#if post.reportReason}
                 <div class="report-info">

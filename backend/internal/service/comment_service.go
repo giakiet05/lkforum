@@ -100,13 +100,12 @@ func (s *commentService) CreateComment(request *dto.CreateCommentRequest, userID
 	}
 
 	comment := &model.Comment{
-		Author:           author,
-		PostID:           postObjectID,
-		ParentID:         parentObjectID,
-		Content:          request.Content,
-		CreatedAt:        time.Now(),
-		IsDeleted:        false,
-		ModerationStatus: model.ModerationApproved, // Auto-approve comments (post already approved)
+		Author:    author,
+		PostID:    postObjectID,
+		ParentID:  parentObjectID,
+		Content:   request.Content,
+		CreatedAt: time.Now(),
+		IsDeleted: false,
 	}
 
 	createdComment, err := s.commentRepo.Create(ctx, comment)

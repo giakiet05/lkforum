@@ -10,6 +10,7 @@
   } from "../services/community-service";
   import type { UserResponse } from "../dtos/user-dto";
   import type { CommunityResponse } from "../dtos/community-dto";
+  import { toastStore } from "../stores/toast-store";
 
   let activeTab: "users" | "communities" = $state("users");
   let users = $state<UserResponse[]>([]);
@@ -45,8 +46,9 @@
     try {
       await banUser(userId);
       await loadUsers();
+      toastStore.success("User banned successfully");
     } catch (error) {
-      alert("Failed to ban user");
+      toastStore.error("Failed to ban user");
     }
   }
 
@@ -54,8 +56,9 @@
     try {
       await unbanUser(userId);
       await loadUsers();
+      toastStore.success("User unbanned successfully");
     } catch (error) {
-      alert("Failed to unban user");
+      toastStore.error("Failed to unban user");
     }
   }
 
@@ -64,8 +67,9 @@
     try {
       await deleteCommunity(communityId);
       await loadCommunities();
+      toastStore.success("Community deleted successfully");
     } catch (error) {
-      alert("Failed to delete community");
+      toastStore.error("Failed to delete community");
     }
   }
 

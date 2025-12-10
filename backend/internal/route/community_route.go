@@ -34,6 +34,7 @@ func RegisterCommunityRoutes(rg *gin.RouterGroup, c *controller.CommunityControl
 
 		// Manual moderation routes (moderator only)
 		communities.GET(":community_id/posts/pending", c.GetPendingPosts)
+		communities.GET(":community_id/posts/edited", c.GetEditedPosts)
 		communities.PUT(":community_id/posts/:post_id/moderate", c.ModeratePost)
 	}
 }

@@ -94,13 +94,11 @@ func (s *voteService) checkModerationStatus(ctx context.Context, targetID string
 			return apperror.ErrForbidden
 		}
 	case model.VoteTargetComment:
-		comment, err := s.commentRepo.GetByID(ctx, targetID)
+		_, err := s.commentRepo.GetByID(ctx, targetID)
 		if err != nil {
 			return err
 		}
-		if comment.ModerationStatus != model.ModerationApproved {
-			return apperror.ErrForbidden
-		}
+		// No moderation check - all comments are visible
 	}
 	return nil
 }

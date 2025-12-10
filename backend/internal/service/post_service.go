@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"mime/multipart"
 	"time"
 
@@ -108,6 +109,60 @@ func (s *postService) CreatePost(userID string, req *dto.CreatePostRequest) (*dt
 		return nil, apperror.ErrInvalidID
 	}
 
+	// Get community settings and author info
+	community, err := s.communityRepo.GetByID(ctx, req.CommunityID)
+	if err != nil {
+		return nil, err
+	}
+
+	author, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Determine initial moderation status
+	var initialStatus model.ModerationStatus
+
+	// Check if user is admin, creator, or moderator
+	isAdminOrMod := author.Role == model.AdminRole
+	log.Printf("🔍 User %s - Role: %s, IsAdmin: %v", author.Username, author.Role, author.Role == model.AdminRole)
+
+	if !isAdminOrMod {
+		// Check if user is creator of this community
+		if community.CreateByID.Hex() == userID {
+			isAdminOrMod = true
+			log.Printf("✅ User is creator of community %s", community.Name)
+		}
+	}
+
+	if !isAdminOrMod {
+		// Check if user is moderator in this community
+		for _, mod := range community.Moderators {
+			if mod.UserID.Hex() == userID {
+				isAdminOrMod = true
+				log.Printf("✅ User is moderator in community %s", community.Name)
+				break
+			}
+		}
+	}
+
+	log.Printf("📋 Community %s - PostRequireApproval: %v", community.Name, community.Setting.PostRequireApproval)
+	log.Printf("👤 User %s - IsAdminOrMod: %v", author.Username, isAdminOrMod)
+
+	if isAdminOrMod {
+		// Admin/Moderator posts are always approved
+		initialStatus = model.ModerationSkipped
+		log.Printf("✅ Post will be SKIPPED (admin/mod)")
+	} else if community.Setting.PostRequireApproval {
+		// Community requires manual approval -> pending for mod review
+		initialStatus = model.ModerationPending
+		log.Printf("⏳ Post will be PENDING (manual approval)")
+	} else {
+		// Community uses AI moderation -> pending for AI check
+		initialStatus = model.ModerationPending
+		log.Printf("🤖 Post will be PENDING (AI check)")
+	}
+
 	post := &model.Post{
 		AuthorID:         authorID,
 		CommunityID:      communityID,
@@ -122,7 +177,7 @@ func (s *postService) CreatePost(userID string, req *dto.CreatePostRequest) (*dt
 		IsBan:            false,
 		CreatedAt:        time.Now(),
 		Tags:             req.Tags,
-		ModerationStatus: model.ModerationApproved, // Auto-approve for now
+		ModerationStatus: initialStatus,
 	}
 
 	fmt.Printf("📝 Creating post with:\n")
@@ -157,6 +212,8 @@ func (s *postService) CreatePost(userID string, req *dto.CreatePostRequest) (*dt
 	if err != nil {
 		return nil, err
 	}
+
+	log.Printf("✅ Post created in DB - ID: %s, Status: %s, IsDeleted: %v", createdPost.ID.Hex(), createdPost.ModerationStatus, createdPost.IsDeleted)
 
 	go s.voteService.VoteOnTarget(userID, createdPost.ID.Hex(), model.VoteTargetPost, true)
 
@@ -391,15 +448,9 @@ func (s *postService) UpdatePost(postID string, userID string, req *dto.UpdatePo
 		return s.GetPostByID(postID, userID)
 	}
 
-	// Check if user is admin/moderator
-	author, _ := s.userRepo.GetByID(ctx, userID)
-	isAdminOrMod := author != nil && (author.Role == "admin" || author.Role == "moderator")
-
-	// Set moderation status to pending for normal users
-	if !isAdminOrMod {
-		update["$set"].(bson.M)["moderation_status"] = model.ModerationPending
-		update["$set"].(bson.M)["moderation_reason"] = nil
-		update["$set"].(bson.M)["moderated_at"] = nil
+	// Mark post as edited if it was previously approved
+	if post.ModerationStatus == model.ModerationApproved {
+		update["$set"].(bson.M)["is_edited"] = true
 	}
 
 	update["$set"].(bson.M)["updated_at"] = time.Now()
@@ -1022,14 +1073,14 @@ func (s *postService) buildFilter(query *dto.GetPostsQuery) repo.Filter {
 		"is_hidden":         bson.M{"$in": []interface{}{false, nil}},
 		"is_draft":          bson.M{"$in": []interface{}{false, nil}},
 		"is_ban":            bson.M{"$in": []interface{}{false, nil}},
-		"moderation_status": model.ModerationApproved,
+		"moderation_status": bson.M{"$in": []interface{}{model.ModerationApproved, model.ModerationSkipped}},
 	}
 
 	fmt.Printf("🔍 Building filter with base conditions:\n")
 	fmt.Printf("  - is_hidden: false or nil\n")
 	fmt.Printf("  - is_draft: false or nil\n")
 	fmt.Printf("  - is_ban: false or nil\n")
-	fmt.Printf("  - moderation_status: %s\n", model.ModerationApproved)
+	fmt.Printf("  - moderation_status: approved OR skipped\n")
 
 	if query.CommunityID != "" {
 		if id, err := primitive.ObjectIDFromHex(query.CommunityID); err == nil {

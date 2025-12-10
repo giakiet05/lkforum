@@ -3,6 +3,7 @@
   import CommentComponent from "./Comment.svelte";
   import { deleteComment, createComment } from "../services/comment-service";
   import { authStore } from "../stores/auth-store";
+  import { toastStore } from "../stores/toast-store";
 
   type CommentProps = {
     comment: CommentResponse;
@@ -54,7 +55,7 @@
       if (onUpdate) onUpdate();
     } catch (error) {
       console.error("Failed to delete comment:", error);
-      alert("Failed to delete comment. Please try again.");
+      toastStore.error("Failed to delete comment. Please try again.");
     }
   };
 

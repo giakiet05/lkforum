@@ -2,6 +2,7 @@
   import { onMount, onDestroy } from "svelte";
   import { push } from "svelte-spa-router";
   import { authStore } from "../stores/auth-store";
+  import { toastStore } from "../stores/toast-store";
   import {
     chatStore,
     activeChannel,
@@ -175,7 +176,7 @@
       setTimeout(scrollToBottom, 100);
     } catch (error) {
       console.error("Failed to send message:", error);
-      alert("Failed to send message. Please try again.");
+      toastStore.error("Failed to send message. Please try again.");
     }
   }
 

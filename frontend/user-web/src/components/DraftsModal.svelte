@@ -1,6 +1,7 @@
 <script lang="ts">
   import { getDrafts, deleteDraft } from "../services/draft-service";
   import type { DraftSummaryResponse } from "../dtos/draft-dto";
+  import { toastStore } from "../stores/toast-store";
 
   interface Props {
     show: boolean;
@@ -51,7 +52,7 @@
       await loadDrafts();
     } catch (error) {
       console.error("Failed to delete draft:", error);
-      alert("Failed to delete draft. Please try again.");
+      toastStore.error("Failed to delete draft. Please try again.");
     }
   }
 

@@ -12,6 +12,7 @@ import (
 	"github.com/giakiet05/lkforum/internal/platform/bus"
 	"github.com/giakiet05/lkforum/internal/repo"
 	"github.com/giakiet05/lkforum/internal/util"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -47,6 +48,7 @@ type CommunityService interface {
 	UnbanUser(userID string, communityID string, requesterID string) error
 
 	GetPendingPosts(communityID string, moderatorID string, page int, pageSize int) (*dto.PaginatedPostsResponse, error)
+	GetEditedPosts(communityID string, moderatorID string, page int, pageSize int) (*dto.PaginatedPostsResponse, error)
 	ModeratePost(communityID string, postID string, moderatorID string, approve bool, reason *string) error
 }
 
@@ -753,7 +755,9 @@ func (c *communityService) GetPendingPosts(communityID string, moderatorID strin
 	filter := repo.Filter{
 		"community_id":      communityObjID,
 		"moderation_status": model.ModerationPending,
-		"is_deleted":        false,
+		"is_deleted": bson.M{
+			"$in": []interface{}{false, nil},
+		},
 	}
 
 	// Build find options
@@ -777,6 +781,18 @@ func (c *communityService) GetPendingPosts(communityID string, moderatorID strin
 	posts, total, err := c.postRepo.Find(ctx, filter, findOptions)
 	if err != nil {
 		return nil, err
+	}
+
+	log.Printf("📋 GetPendingPosts - Community: %s, Moderator: %s", communityID, moderatorID)
+	log.Printf("🔍 Filter: %+v", filter)
+	log.Printf("📊 Found %d pending posts (page %d, size %d)", total, page, pageSize)
+
+	if len(posts) > 0 {
+		for i, post := range posts {
+			log.Printf("   Post %d: ID=%s, Title=%s, Status=%s, IsDeleted=%v", i+1, post.ID.Hex(), post.Title, post.ModerationStatus, post.IsDeleted)
+		}
+	} else {
+		log.Printf("   ⚠️ No posts in result array despite total=%d", total)
 	}
 
 	if total == 0 {
@@ -822,6 +838,117 @@ func (c *communityService) GetPendingPosts(communityID string, moderatorID strin
 			Total:    total,
 		},
 	}, nil
+}
+
+func (c *communityService) GetEditedPosts(communityID, moderatorID string, page, pageSize int) (*dto.PaginatedPostsResponse, error) {
+	ctx := context.Background()
+
+	// Check if user is a moderator
+	isMod, err := c.communityRepo.IsModerator(ctx, communityID, moderatorID)
+	if err != nil {
+		return nil, err
+	}
+	if !isMod {
+		return nil, apperror.ErrForbidden
+	}
+
+	// Build filter for edited posts in this community
+	communityObjID, err := primitive.ObjectIDFromHex(communityID)
+	if err != nil {
+		return nil, apperror.ErrInvalidID
+	}
+
+	filter := repo.Filter{
+		"community_id":      communityObjID,
+		"moderation_status": model.ModerationApproved,
+		"is_edited":         true,
+		"is_deleted": bson.M{
+			"$in": []interface{}{false, nil},
+		},
+	}
+
+	// Build find options
+	if page <= 0 {
+		page = 1
+	}
+	if pageSize <= 0 {
+		pageSize = 10
+	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
+
+	findOptions := &repo.FindOptions{
+		Skip:  int64((page - 1) * pageSize),
+		Limit: int64(pageSize),
+		Sort:  map[string]int{"updated_at": -1},
+	}
+
+	// Get edited posts
+	posts, total, err := c.postRepo.Find(ctx, filter, findOptions)
+	if err != nil {
+		return nil, err
+	}
+
+	log.Printf("📋 GetEditedPosts - Community: %s, Moderator: %s", communityID, moderatorID)
+	log.Printf("🔍 Filter: %+v", filter)
+	log.Printf("📊 Found %d edited posts (page %d, size %d)", total, page, pageSize)
+
+	if total == 0 {
+		return &dto.PaginatedPostsResponse{
+			Posts: []*dto.PostResponse{},
+			Pagination: dto.Pagination{
+				Page:     page,
+				PageSize: pageSize,
+				Total:    0,
+			},
+		}, nil
+	}
+
+	// Get authors
+	authorIDs := make([]string, 0, len(posts))
+	authorIDMap := make(map[string]bool)
+	for _, post := range posts {
+		authorIDStr := post.AuthorID.Hex()
+		if !authorIDMap[authorIDStr] {
+			authorIDs = append(authorIDs, authorIDStr)
+			authorIDMap[authorIDStr] = true
+		}
+	}
+
+	authors, err := c.userRepo.GetByIDs(ctx, authorIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	// Map authors by ID
+	authorMap := make(map[string]*model.User)
+	for _, author := range authors {
+		authorMap[author.ID.Hex()] = author
+	}
+
+	// Convert to DTOs
+	postResponses := make([]*dto.PostResponse, 0, len(posts))
+	for _, post := range posts {
+		author := authorMap[post.AuthorID.Hex()]
+		if author == nil {
+			continue
+		}
+
+		postResponse := dto.FromPost(post, author, nil, "", nil)
+		postResponses = append(postResponses, postResponse)
+	}
+
+	response := &dto.PaginatedPostsResponse{
+		Posts: postResponses,
+		Pagination: dto.Pagination{
+			Page:     page,
+			PageSize: pageSize,
+			Total:    total,
+		},
+	}
+
+	return response, nil
 }
 
 func (c *communityService) ModeratePost(communityID string, postID string, moderatorID string, approve bool, reason *string) error {

@@ -220,6 +220,17 @@ export async function getPendingPosts(communityId: string, page: number = 1, pag
 }
 
 /**
+ * Get edited posts in a community (requires moderator authentication)
+ */
+export async function getEditedPosts(communityId: string, page: number = 1, pageSize: number = 10): Promise<any> {
+    const res = await authenticatedFetch(`/api/communities/${communityId}/posts/edited?page=${page}&page_size=${pageSize}`, {
+        method: "GET",
+    });
+    
+    return await handleApiResponse(res);
+}
+
+/**
  * Moderate a post (approve or reject) (requires moderator authentication)
  */
 export async function moderatePost(communityId: string, postId: string, approve: boolean, reason?: string): Promise<void> {

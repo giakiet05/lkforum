@@ -1,6 +1,7 @@
 <script lang="ts">
   import { push } from "svelte-spa-router";
   import { createCommunity } from "../services/community-service";
+  import { toastStore } from "../stores/toast-store";
   import type {
     CreateCommunityRequest,
     CommunitySetting,
@@ -182,7 +183,7 @@
 
       const result = await createCommunity(requestData);
 
-      alert(`Community "lk/${result.name}" created successfully!`);
+      toastStore.success(`Community "lk/${result.name}" created successfully!`);
       handleClose();
       push(`/lk/${result.name}`);
     } catch (err: any) {

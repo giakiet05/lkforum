@@ -4,6 +4,7 @@
   import type { PostResponse } from "../dtos/post-dto";
   import { getPostById, updatePost } from "../services/post-service";
   import { authStore } from "../stores/auth-store";
+  import { toastStore } from "../stores/toast-store";
 
   type EditPostProps = {
     params?: { id: string };
@@ -32,7 +33,7 @@
 
       // Check if user owns the post
       if (post.author.id !== currentUser.id) {
-        alert("You don't have permission to edit this post");
+        toastStore.error("You don't have permission to edit this post");
         push(`/post/${params.id}`);
         return;
       }
@@ -50,7 +51,7 @@
 
   async function handleSave() {
     if (!title.trim()) {
-      alert("Title is required");
+      toastStore.warning("Title is required");
       return;
     }
 
@@ -63,11 +64,11 @@
         },
       });
 
-      alert("Post updated successfully");
+      toastStore.success("Post updated successfully");
       push(`/post/${params.id}`);
     } catch (err) {
       console.error("Failed to update post:", err);
-      alert("Failed to update post. Please try again.");
+      toastStore.error("Failed to update post. Please try again.");
     } finally {
       isSaving = false;
     }

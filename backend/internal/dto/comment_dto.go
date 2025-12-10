@@ -97,16 +97,6 @@ func FromComment(comment *model.Comment, currentUserID *string) *CommentResponse
 		IsDeleted: comment.IsDeleted,
 	}
 
-	// Add moderation info only for author's own comments
-	if currentUserID != nil && comment.Author.ID.Hex() == *currentUserID {
-		statusStr := string(comment.ModerationStatus)
-		resp.ModerationStatus = &statusStr
-		if comment.ModerationResult != nil {
-			resp.ModerationReason = &comment.ModerationResult.Reason
-		}
-		resp.ModeratedAt = comment.ModeratedAt
-	}
-
 	return resp
 }
 

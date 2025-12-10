@@ -13,6 +13,7 @@
     reportPost,
   } from "../services/post-service";
   import { authStore } from "../stores/auth-store";
+  import { toastStore } from "../stores/toast-store";
 
   type PostProps = {
     post: PostResponse;
@@ -104,7 +105,7 @@
   async function submitVote() {
     if (selectedOptions.length === 0) return;
     if (!currentUser) {
-      alert("Please login to vote on polls");
+      toastStore.warning("Please login to vote on polls");
       return;
     }
 
@@ -134,7 +135,7 @@
       selectedOptions = [];
     } catch (error) {
       console.error("Failed to vote on poll:", error);
-      alert("Failed to submit vote. Please try again.");
+      toastStore.error("Failed to submit vote. Please try again.");
     }
   }
 
@@ -151,7 +152,7 @@
   async function handleUnvote(e: MouseEvent) {
     e.stopPropagation();
     if (!currentUser) {
-      alert("Please login to manage votes");
+      toastStore.warning("Please login to manage votes");
       return;
     }
 
@@ -166,7 +167,7 @@
       }
     } catch (error) {
       console.error("Failed to remove poll vote:", error);
-      alert("Failed to remove vote. Please try again.");
+      toastStore.error("Failed to remove vote. Please try again.");
     }
   }
 
@@ -178,11 +179,11 @@
   async function handleUpvote(e: MouseEvent) {
     e.stopPropagation();
     if (!currentUser) {
-      alert("Please login to vote");
+      toastStore.warning("Please login to vote");
       return;
     }
     if (isOwnPost) {
-      alert("You cannot vote on your own post");
+      toastStore.warning("You cannot vote on your own post");
       return;
     }
     if (isVoting) return;
@@ -217,11 +218,11 @@
   async function handleDownvote(e: MouseEvent) {
     e.stopPropagation();
     if (!currentUser) {
-      alert("Please login to vote");
+      toastStore.warning("Please login to vote");
       return;
     }
     if (isOwnPost) {
-      alert("You cannot vote on your own post");
+      toastStore.warning("You cannot vote on your own post");
       return;
     }
     if (isVoting) return;
@@ -256,7 +257,7 @@
   async function handleSave(e: MouseEvent) {
     e.stopPropagation();
     if (!currentUser) {
-      alert("Please login to save posts");
+      toastStore.warning("Please login to save posts");
       return;
     }
     if (isSaving) return;
@@ -280,7 +281,7 @@
   async function handleHide(e: MouseEvent) {
     e.stopPropagation();
     if (!currentUser) {
-      alert("Please login to hide posts");
+      toastStore.warning("Please login to hide posts");
       return;
     }
 
@@ -315,10 +316,10 @@
     navigator.clipboard
       .writeText(text)
       .then(() => {
-        alert("Link copied to clipboard!");
+        toastStore.success("Link copied to clipboard!");
       })
       .catch(() => {
-        alert("Failed to copy link");
+        toastStore.error("Failed to copy link");
       });
   }
 
@@ -344,7 +345,7 @@
       if (onUpdate) onUpdate();
     } catch (error) {
       console.error("Failed to delete post:", error);
-      alert("Failed to delete post. Please try again.");
+      toastStore.error("Failed to delete post. Please try again.");
     }
   }
 
@@ -363,7 +364,7 @@
   async function handleReport(e: Event) {
     e.preventDefault();
     if (!reportReason.trim()) {
-      alert("Please select a reason");
+      toastStore.warning("Please select a reason");
       return;
     }
 
@@ -373,11 +374,11 @@
         reason: reportReason,
         details: reportDetails,
       });
-      alert("Report submitted successfully");
+      toastStore.success("Report submitted successfully");
       closeReportModal();
     } catch (error) {
       console.error("Failed to report post:", error);
-      alert("Failed to submit report. Please try again.");
+      toastStore.error("Failed to submit report. Please try again.");
     } finally {
       isReporting = false;
     }

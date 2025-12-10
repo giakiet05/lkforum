@@ -3,6 +3,7 @@
   import routes from "./routes";
   import Topbar from "./components/Topbar.svelte";
   import Sidebar from "./components/Sidebar.svelte";
+  import ToastContainer from "./components/ToastContainer.svelte";
   import { authStore, getInitialAuthState } from "./stores/auth-store";
   import { logout, validateAuth } from "./services/auth-service";
   import { push } from "svelte-spa-router";
@@ -115,6 +116,7 @@
       <Router {routes} />
     </main>
   </div>
+  <ToastContainer />
 {/if}
 
 <style>

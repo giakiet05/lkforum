@@ -502,6 +502,41 @@ func (c *CommunityController) GetPendingPosts(ctx *gin.Context) {
 	dto.SendSuccess(ctx, http.StatusOK, "Pending posts retrieved successfully", response)
 }
 
+func (c *CommunityController) GetEditedPosts(ctx *gin.Context) {
+	communityID := ctx.Param("community_id")
+	if communityID == "" {
+		dto.SendError(ctx, http.StatusBadRequest, "Community ID is required", apperror.ErrBadRequest.Code)
+		return
+	}
+
+	authUser, exists := ctx.Get("authUser")
+	if !exists {
+		dto.SendError(ctx, http.StatusForbidden, apperror.ErrForbidden.Message, apperror.ErrForbidden.Code)
+		return
+	}
+
+	pageStr := ctx.DefaultQuery("page", "1")
+	pageSizeStr := ctx.DefaultQuery("page_size", "10")
+
+	page, err := strconv.Atoi(pageStr)
+	if err != nil || page < 1 {
+		page = 1
+	}
+
+	pageSize, err := strconv.Atoi(pageSizeStr)
+	if err != nil || pageSize < 1 {
+		pageSize = 10
+	}
+
+	response, err := c.communityService.GetEditedPosts(communityID, authUser.(auth.AuthUser).ID, page, pageSize)
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
+		return
+	}
+
+	dto.SendSuccess(ctx, http.StatusOK, "Edited posts retrieved successfully", response)
+}
+
 func (c *CommunityController) ModeratePost(ctx *gin.Context) {
 	communityID := ctx.Param("community_id")
 	postID := ctx.Param("post_id")
@@ -513,9 +548,13 @@ func (c *CommunityController) ModeratePost(ctx *gin.Context) {
 
 	var req dto.ModeratePostRequest
 	if err := ctx.ShouldBind(&req); err != nil {
+		log.Printf("❌ ModeratePost binding error: %v", err)
+		log.Printf("   Request body: %+v", req)
 		dto.SendError(ctx, http.StatusBadRequest, apperror.Message(apperror.ErrBadRequest), apperror.ErrBadRequest.Code)
 		return
 	}
+
+	log.Printf("✅ ModeratePost request parsed successfully: approve=%v, reason=%v", req.Approve, req.Reason)
 
 	authUser, exists := ctx.Get("authUser")
 	if !exists {
