@@ -14,8 +14,9 @@ import (
 type NotificationRepo interface {
 	Create(ctx context.Context, notification *model.Notification) (*model.Notification, error)
 	GetByRecipientID(ctx context.Context, recipientID string, page, pageSize int) ([]*model.Notification, int64, error)
-	MarkAsRead(ctx context.Context, notificationID, recipientID string) error
+	MarkAsRead(ctx context.Context, notificationID primitive.ObjectID, recipientID string) error
 	MarkAllAsRead(ctx context.Context, recipientID string) (int64, error)
+	DeleteNotification(ctx context.Context, notificationID primitive.ObjectID, recipientID string) error
 	CountUnread(ctx context.Context, recipientID string) (int64, error)
 }
 
@@ -73,18 +74,14 @@ func (r *notificationRepo) GetByRecipientID(ctx context.Context, recipientID str
 	return notifications, total, nil
 }
 
-func (r *notificationRepo) MarkAsRead(ctx context.Context, notificationID, recipientID string) error {
-	notificationObjID, err := primitive.ObjectIDFromHex(notificationID)
-	if err != nil {
-		return err
-	}
+func (r *notificationRepo) MarkAsRead(ctx context.Context, notificationID primitive.ObjectID, recipientID string) error {
 	recipientObjID, err := primitive.ObjectIDFromHex(recipientID)
 	if err != nil {
 		return err
 	}
 
 	filter := bson.M{
-		"_id":          notificationObjID,
+		"_id":          notificationID,
 		"recipient_id": recipientObjID,
 	}
 	update := bson.M{
@@ -137,4 +134,27 @@ func (r *notificationRepo) CountUnread(ctx context.Context, recipientID string) 
 	}
 
 	return r.notificationCollection.CountDocuments(ctx, filter)
+}
+
+func (r *notificationRepo) DeleteNotification(ctx context.Context, notificationID primitive.ObjectID, recipientID string) error {
+	recipientObjID, err := primitive.ObjectIDFromHex(recipientID)
+	if err != nil {
+		return err
+	}
+
+	filter := bson.M{
+		"_id":          notificationID,
+		"recipient_id": recipientObjID,
+	}
+
+	result, err := r.notificationCollection.DeleteOne(ctx, filter)
+	if err != nil {
+		return err
+	}
+
+	if result.DeletedCount == 0 {
+		return mongo.ErrNoDocuments
+	}
+
+	return nil
 }

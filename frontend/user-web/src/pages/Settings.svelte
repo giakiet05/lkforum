@@ -15,6 +15,7 @@
   } from "../services/user-service";
   import { ApiError } from "../errors/api-error";
   import { setAuth } from "../stores/auth-store";
+  import { toastStore } from "../stores/toast-store";
 
   let activeTab = $state<
     "account" | "privacy" | "notifications" | "appearance"
@@ -281,12 +282,14 @@
     );
 
     if (verification !== "DELETE") {
-      alert("Account deletion cancelled. Verification text did not match.");
+      toastStore.warning(
+        "Account deletion cancelled. Verification text did not match."
+      );
       return;
     }
 
     // TODO: Call delete account API when available
-    alert(
+    toastStore.info(
       "Delete account feature is not yet implemented in backend.\n\nRequired API: DELETE /api/users/me"
     );
 

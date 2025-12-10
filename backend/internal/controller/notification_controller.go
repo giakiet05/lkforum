@@ -53,3 +53,47 @@ func (c *NotificationController) MarkAllAsRead(ctx *gin.Context) {
 
 	dto.SendSuccess(ctx, http.StatusOK, "All notifications marked as read", gin.H{"marked_count": modifiedCount})
 }
+
+func (c *NotificationController) MarkAsRead(ctx *gin.Context) {
+	notificationID := ctx.Param("notification_id")
+	if notificationID == "" {
+		dto.SendError(ctx, http.StatusBadRequest, "Notification ID is required", apperror.ErrBadRequest.Code)
+		return
+	}
+
+	authUser, exists := ctx.Get("authUser")
+	if !exists {
+		dto.SendError(ctx, http.StatusUnauthorized, apperror.ErrForbidden.Message, apperror.ErrForbidden.Code)
+		return
+	}
+
+	err := c.service.MarkAsRead(notificationID, authUser.(auth.AuthUser).ID)
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
+		return
+	}
+
+	dto.SendSuccess(ctx, http.StatusOK, "Notification marked as read", nil)
+}
+
+func (c *NotificationController) DeleteNotification(ctx *gin.Context) {
+	notificationID := ctx.Param("notification_id")
+	if notificationID == "" {
+		dto.SendError(ctx, http.StatusBadRequest, "Notification ID is required", apperror.ErrBadRequest.Code)
+		return
+	}
+
+	authUser, exists := ctx.Get("authUser")
+	if !exists {
+		dto.SendError(ctx, http.StatusUnauthorized, apperror.ErrForbidden.Message, apperror.ErrForbidden.Code)
+		return
+	}
+
+	err := c.service.DeleteNotification(notificationID, authUser.(auth.AuthUser).ID)
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
+		return
+	}
+
+	dto.SendSuccess(ctx, http.StatusOK, "Notification deleted", nil)
+}

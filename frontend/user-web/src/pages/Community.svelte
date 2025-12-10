@@ -3,10 +3,11 @@
   import { push } from "svelte-spa-router";
   import Post from "../components/Post.svelte";
   import CreatePostModal from "../components/CreatePostModal.svelte";
+  import { toastStore } from "../stores/toast-store";
   import type { PostResponse } from "../dtos/post-dto";
   import type { CommunityResponse } from "../dtos/community-dto";
   import {
-    getCommunityById,
+    getCommunityByName,
     addModerators,
   } from "../services/community-service";
   import { getPosts } from "../services/post-service";
@@ -80,20 +81,7 @@
       isLoadingCommunity = true;
       communityError = null;
 
-      // TODO: Backend needs endpoint to get community by name, not just by ID
-      // For now, we need to fetch all communities and find by name
-      // Or backend should add GET /api/communities/by-name/:name
-      const communities = await import("../services/community-service").then(
-        (m) => m.getCommunities({ limit: 100 })
-      );
-      const found = communities.communities.find((c) => c.name === params.name);
-
-      if (!found) {
-        communityError = "Community not found";
-        community = null;
-      } else {
-        community = found;
-      }
+      community = await getCommunityByName(params.name);
     } catch (error) {
       console.error("Failed to load community:", error);
       communityError =
@@ -222,13 +210,13 @@
   async function toggleJoin() {
     const currentUser = $authStore.user;
     if (!currentUser || !community) {
-      alert("Please login to join communities");
+      toastStore.warning("Please login to join communities");
       return;
     }
 
     // Prevent creator from leaving their own community
     if (isCreator()) {
-      alert("You cannot leave a community you created!");
+      toastStore.warning("You cannot leave a community you created!");
       return;
     }
 
@@ -254,7 +242,7 @@
       }
     } catch (error) {
       console.error("❌ Failed to toggle membership:", error);
-      alert(
+      toastStore.error(
         error instanceof Error ? error.message : "Failed to update membership"
       );
     } finally {
@@ -275,6 +263,10 @@
     push(`/lk/${params.name}/mod`);
   }
 
+  function handleSettings() {
+    push(`/lk/${params.name}/settings`);
+  }
+
   function handleOpenInviteModModal() {
     showInviteModModal = true;
     inviteUsername = "";
@@ -291,7 +283,7 @@
 
   async function handleInviteMod() {
     if (!inviteUsername.trim() || !community) {
-      alert("Please enter a username!");
+      toastStore.warning("Please enter a username!");
       return;
     }
 
@@ -309,23 +301,18 @@
       console.log("📤 Adding moderator to community:", community.id);
       await addModerators({
         id: community.id,
-        added_moderator: [
-          {
-            id: user.id,
-            username: user.username,
-          },
-        ],
+        added_moderator: [user.id], // Just send user ID
       });
 
       console.log("✅ Moderator added successfully!");
-      alert(`${inviteUsername} added as moderator!`);
+      toastStore.success(`${inviteUsername} added as moderator!`);
       handleCloseInviteModModal();
 
       // Reload community to get updated moderators
       await loadCommunity();
     } catch (error) {
       console.error("❌ Failed to add moderator:", error);
-      alert(
+      toastStore.error(
         "Failed to add moderator. Please check the username and try again."
       );
     }
@@ -432,7 +419,11 @@
             </button>
 
             <!-- More Options Button -->
-            <button class="action-btn" title="More options">
+            <button
+              class="action-btn"
+              title="More options"
+              onclick={handleSettings}
+            >
               <svg viewBox="0 0 20 20" fill="currentColor">
                 <path
                   d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"
@@ -591,11 +582,11 @@
             {/if}
           </div>
           <div class="moderator-list">
-            {#if community.moderators && community.moderators.length > 0}
-              {#each community.moderators as moderator}
+            {#if community.moderators && community.moderators.filter((m) => m.is_active).length > 0}
+              {#each community.moderators.filter((m) => m.is_active) as moderator}
                 <div class="moderator">
                   <img
-                    src={moderator.avatar || "/avatar.jpg"}
+                    src={moderator.avatar?.url || "/avatar.jpg"}
                     alt="Moderator"
                     class="mod-avatar"
                   />
@@ -606,7 +597,7 @@
               <p class="no-moderators">No moderators yet</p>
             {/if}
           </div>
-          {#if community.moderators && community.moderators.length > 3}
+          {#if community.moderators && community.moderators.filter((m) => m.is_active).length > 3}
             <button class="view-all-mods-btn">View all moderators</button>
           {/if}
         </div>
@@ -865,6 +856,32 @@
 
   .mod-tools-btn:hover {
     background: var(--darkblue--);
+  }
+
+  .settings-btn {
+    background: white;
+    color: var(--blue--);
+    border: 1px solid var(--blue--);
+    padding: 8px 16px;
+    border-radius: 9999px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: "Roboto", sans-serif;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+  }
+
+  .settings-btn:hover {
+    background: #f6f7f8;
+  }
+
+  .settings-btn svg {
+    width: 16px;
+    height: 16px;
   }
 
   .community-icon {

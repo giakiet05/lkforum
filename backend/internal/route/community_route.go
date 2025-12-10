@@ -10,6 +10,8 @@ func RegisterCommunityRoutes(rg *gin.RouterGroup, c *controller.CommunityControl
 	communities := rg.Group("/communities")
 
 	communities.GET("filter", c.GetCommunitiesFilter)
+	communities.GET("user/:user_id", c.GetCommunitiesByUserID)
+	communities.GET("name/:name", c.GetCommunityByName)
 	communities.GET(":community_id", c.GetCommunityByID)
 
 	// Protected routes (require authentication)
@@ -32,6 +34,7 @@ func RegisterCommunityRoutes(rg *gin.RouterGroup, c *controller.CommunityControl
 
 		// Manual moderation routes (moderator only)
 		communities.GET(":community_id/posts/pending", c.GetPendingPosts)
+		communities.GET(":community_id/posts/edited", c.GetEditedPosts)
 		communities.PUT(":community_id/posts/:post_id/moderate", c.ModeratePost)
 	}
 }

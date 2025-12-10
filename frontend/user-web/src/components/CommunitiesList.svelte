@@ -1,8 +1,7 @@
 <script lang="ts">
   import { push } from "svelte-spa-router";
   import CreateCommunityModal from "./CreateCommunityModal.svelte";
-  import { getCommunities } from "../services/community-service";
-  import { getMembershipsByUserId } from "../services/membership-service";
+  import { getCommunitiesByUserId } from "../services/community-service";
   import { authStore } from "../stores/auth-store";
   import type { CommunityResponse } from "../dtos/community-dto";
   import type { UserResponse } from "../dtos/user-dto";
@@ -40,28 +39,9 @@
     try {
       isLoadingCommunities = true;
 
-      // Get user's memberships to find joined communities
-      const memberships = await getMembershipsByUserId(user.id);
-      console.log("User memberships:", memberships);
-
-      if (memberships.length === 0) {
-        userCommunities = [];
-        return;
-      }
-
-      // Get community IDs from memberships
-      const joinedCommunityIds = memberships.map((m: any) => m.community_id);
-      console.log("Joined community IDs:", joinedCommunityIds);
-
-      // Get all communities and filter by joined ones
-      const response = await getCommunities({ page: 1, limit: 100 });
-      const allCommunities = response.communities || [];
-
-      userCommunities = allCommunities.filter((community: any) =>
-        joinedCommunityIds.includes(community.id)
-      );
-
-      console.log("Filtered joined communities:", userCommunities);
+      // Get communities directly from new endpoint
+      userCommunities = await getCommunitiesByUserId(user.id);
+      console.log("User communities:", userCommunities);
     } catch (error) {
       console.error("Failed to load user communities:", error);
       userCommunities = [];

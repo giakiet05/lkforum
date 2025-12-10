@@ -3,6 +3,7 @@ package repo
 import (
 	"context"
 	"errors"
+	"log"
 	"time"
 
 	"github.com/giakiet05/lkforum/internal/apperror"
@@ -100,11 +101,15 @@ func (r *postRepo) GetByIDs(ctx context.Context, ids []string) ([]*model.Post, e
 
 // Find fetches paginated data and total count using two separate queries for simplicity and robustness.
 func (r *postRepo) Find(ctx context.Context, filter Filter, opts *FindOptions) ([]*model.Post, int64, error) {
+	log.Printf("🔍 postRepo.Find - Filter: %+v", filter)
+
 	// 1. Get total count using an aggregation pipeline to avoid potential bugs in CountDocuments.
 	countPipeline := mongo.Pipeline{
 		{{"$match", bson.M(filter)}},
 		{{"$count", "total"}},
 	}
+
+	log.Printf("📊 Aggregation pipeline: %+v", countPipeline)
 	cursor, err := r.collection.Aggregate(ctx, countPipeline)
 	if err != nil {
 		return nil, 0, err
@@ -122,8 +127,11 @@ func (r *postRepo) Find(ctx context.Context, filter Filter, opts *FindOptions) (
 		total = countResult[0].Total
 	}
 
+	log.Printf("📊 Count result: %d documents", total)
+
 	// If there are no documents, return early
 	if total == 0 {
+		log.Printf("⚠️ No documents found with filter, returning empty array")
 		return []*model.Post{}, 0, nil
 	}
 

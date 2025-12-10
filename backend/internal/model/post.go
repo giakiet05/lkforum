@@ -20,6 +20,7 @@ type Post struct {
 	UpdatedAt     *time.Time         `bson:"updated_at,omitempty" json:"updated_at,omitempty"`
 	IsDeleted     bool               `bson:"is_deleted,omitempty" json:"is_deleted"`
 	IsHidden      bool               `bson:"is_hidden,omitempty" json:"is_hidden,omitempty"`
+	IsEdited      bool               `bson:"is_edited,omitempty" json:"is_edited,omitempty"`
 	Tags          []string           `bson:"tags,omitempty" json:"tags,omitempty"`
 	IsDraft       bool               `bson:"is_draft,omitempty" json:"is_draft,omitempty"`
 

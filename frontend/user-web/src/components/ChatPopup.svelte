@@ -2,6 +2,7 @@
   import { onMount, onDestroy } from "svelte";
   import { push } from "svelte-spa-router";
   import { authStore } from "../stores/auth-store";
+  import { toastStore } from "../stores/toast-store";
   import {
     chatStore,
     activeChannel,
@@ -237,7 +238,7 @@
   // DEBUG: Create test channel with hardcoded user
   async function handleDebugCreateChannel() {
     if (!currentUser) {
-      alert("Not logged in!");
+      toastStore.warning("Not logged in!");
       return;
     }
 
@@ -287,7 +288,7 @@
       await loadChannels();
     } catch (error) {
       console.error("[ChatPopup] Failed to create channel:", error);
-      alert("Failed to create channel: " + error);
+      toastStore.error("Failed to create channel: " + error);
     }
   }
 

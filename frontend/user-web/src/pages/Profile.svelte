@@ -17,6 +17,7 @@
   } from "../services/post-service";
   import { ApiError } from "../errors/api-error";
   import { setAuth } from "../stores/auth-store";
+  import { toastStore } from "../stores/toast-store";
 
   // Route params
   let { params = {} }: { params?: { username?: string } } = $props();
@@ -128,13 +129,13 @@
 
     // Validate file type
     if (!file.type.startsWith("image/")) {
-      alert("Please select an image file");
+      toastStore.warning("Please select an image file");
       return;
     }
 
     // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      alert("Image size must be less than 5MB");
+      toastStore.warning("Image size must be less than 5MB");
       return;
     }
 
@@ -148,9 +149,9 @@
     } catch (error) {
       console.error("Failed to upload avatar:", error);
       if (error instanceof ApiError) {
-        alert(error.message);
+        toastStore.error(error.message);
       } else {
-        alert("Failed to upload avatar. Please try again.");
+        toastStore.error("Failed to upload avatar. Please try again.");
       }
     } finally {
       isUploadingAvatar = false;
@@ -165,13 +166,13 @@
 
     // Validate file type
     if (!file.type.startsWith("image/")) {
-      alert("Please select an image file");
+      toastStore.warning("Please select an image file");
       return;
     }
 
     // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      alert("Image size must be less than 5MB");
+      toastStore.warning("Image size must be less than 5MB");
       return;
     }
 
@@ -185,9 +186,9 @@
     } catch (error) {
       console.error("Failed to upload cover:", error);
       if (error instanceof ApiError) {
-        alert(error.message);
+        toastStore.error(error.message);
       } else {
-        alert("Failed to upload cover. Please try again.");
+        toastStore.error("Failed to upload cover. Please try again.");
       }
     } finally {
       isUploadingCover = false;

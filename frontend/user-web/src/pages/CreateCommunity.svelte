@@ -207,7 +207,9 @@
     // Mock create report - sau này sẽ call API
     setTimeout(() => {
       isLoading = false;
-      alert(`Community "lk/${communityName}" created successfully!`);
+      toastStore.success(
+        `Community "lk/${communityName}" created successfully!`
+      );
       // Navigate to the new report page
       push(`/lk/${communityName}`);
     }, 1000);

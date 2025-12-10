@@ -62,8 +62,8 @@ type UnbanUserRequest struct {
 }
 
 type ModeratePostRequest struct {
-	Approve bool    `json:"approve" binding:"required"`
-	Reason  *string `json:"reason,omitempty" binding:"max=500"`
+	Approve bool    `json:"approve"`
+	Reason  *string `json:"reason,omitempty"`
 }
 
 type CommunityResponse struct {

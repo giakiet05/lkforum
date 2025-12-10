@@ -73,6 +73,7 @@
         "🔄 sortedComments recalculating, comments.length:",
         comments.length
       );
+      console.log("🔄 sortedComments array:", commentsToSort);
 
       switch (sortBy) {
         case "top":

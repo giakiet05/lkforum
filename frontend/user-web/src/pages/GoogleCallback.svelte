@@ -81,7 +81,12 @@
           throw new Error("Failed to fetch user info");
         }
 
-        const user = await response.json();
+        const result = await response.json();
+        console.log("API response from /api/users/me:", result);
+
+        // Extract user from response (API returns {data: user})
+        const user = result.data || result;
+        console.log("User data to save:", user);
 
         // Lưu user vào localStorage
         localStorage.setItem(USER_KEY, JSON.stringify(user));
