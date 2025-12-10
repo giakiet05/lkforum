@@ -18,6 +18,7 @@ import (
 type CommunityRepo interface {
 	Create(ctx context.Context, community *model.Community) (*model.Community, error)
 	GetByID(ctx context.Context, id string) (*model.Community, error)
+	GetByName(ctx context.Context, name string) (*model.Community, error)
 	GetByIDs(ctx context.Context, ids []string) ([]*model.Community, error)
 	GetFilter(
 		ctx context.Context,
@@ -92,6 +93,19 @@ func (c *communityRepo) GetByID(ctx context.Context, id string) (*model.Communit
 	var community model.Community
 	err = c.communityCollection.FindOne(ctx, bson.M{"_id": communityObjectID}).Decode(&community)
 	if err != nil {
+		return nil, err
+	}
+
+	return &community, nil
+}
+
+func (c *communityRepo) GetByName(ctx context.Context, name string) (*model.Community, error) {
+	var community model.Community
+	err := c.communityCollection.FindOne(ctx, bson.M{"name": name}).Decode(&community)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, apperror.ErrCommunityNotFound
+		}
 		return nil, err
 	}
 

@@ -492,12 +492,7 @@
         console.log("📤 Adding moderator to community:", community.id);
         await addModerators({
           id: community.id,
-          added_moderator: [
-            {
-              id: user.id,
-              username: user.username,
-            },
-          ],
+          added_moderator: [user.id], // Just send user ID
         });
 
         console.log("✅ Moderator added successfully!");

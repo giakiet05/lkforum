@@ -12,6 +12,17 @@ import type {
 } from "../dtos/community-dto";
 
 /**
+ * Get communities by user ID (joined communities)
+ */
+export async function getCommunitiesByUserId(userId: string): Promise<CommunityResponse[]> {
+    const res = await authenticatedFetch(`/api/communities/user/${userId}`, {
+        method: "GET",
+    });
+    
+    return await handleApiResponse(res);
+}
+
+/**
  * Get all communities with optional filters
  */
 export async function getCommunities(params?: {
@@ -42,6 +53,17 @@ export async function getCommunities(params?: {
  */
 export async function getCommunityById(communityId: string): Promise<CommunityResponse> {
     const res = await publicFetch(`/api/communities/${communityId}`, {
+        method: "GET",
+    });
+    
+    return await handleApiResponse(res);
+}
+
+/**
+ * Get a single community by name
+ */
+export async function getCommunityByName(name: string): Promise<CommunityResponse> {
+    const res = await publicFetch(`/api/communities/name/${name}`, {
         method: "GET",
     });
     
@@ -103,6 +125,17 @@ export async function removeModerators(data: RemoveModeratorRequest): Promise<Co
             "Content-Type": "application/json",
         },
         body: JSON.stringify(data),
+    });
+    
+    return await handleApiResponse(res);
+}
+
+/**
+ * Activate moderator status (accept moderator invitation)
+ */
+export async function activateModerator(communityId: string): Promise<void> {
+    const res = await authenticatedFetch(`/api/communities/activate_moderator/${communityId}`, {
+        method: "PUT",
     });
     
     return await handleApiResponse(res);

@@ -106,7 +106,7 @@ func (s *commentService) CreateComment(request *dto.CreateCommentRequest, userID
 		Content:          request.Content,
 		CreatedAt:        time.Now(),
 		IsDeleted:        false,
-		ModerationStatus: model.ModerationPending, // Set pending for moderation
+		ModerationStatus: model.ModerationApproved, // Auto-approve comments (post already approved)
 	}
 
 	createdComment, err := s.commentRepo.Create(ctx, comment)

@@ -11,6 +11,8 @@ func RegisterNotificationRoutes(rg *gin.RouterGroup, c *controller.NotificationC
 	notifications.Use(middleware.RequireAuth()) // All notification routes require authentication
 	{
 		notifications.GET("", c.GetNotifications)
+		notifications.PUT("/:notification_id/read", c.MarkAsRead)
+		notifications.DELETE("/:notification_id", c.DeleteNotification)
 		notifications.PUT("/read-all", c.MarkAllAsRead)
 	}
 }

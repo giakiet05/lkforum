@@ -1,12 +1,15 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import AuthModal from "./AuthModal.svelte";
   import CreatePostModal from "./CreatePostModal.svelte";
   import ChatPopup from "./ChatPopup.svelte";
+  import NotificationsDropdown from "./NotificationsDropdown.svelte";
   import { push } from "svelte-spa-router";
   import { getCommunities } from "../services/community-service";
   import type { CommunityResponse } from "../dtos/community-dto";
   import { searchUsers } from "../services/user-service";
   import type { UserResponse } from "../dtos/user-dto";
+  import { getNotifications } from "../services/notification-service";
 
   type TopbarProps = {
     user?: { name: string; avatar?: string; karma?: number };
@@ -28,10 +31,26 @@
 
   let searchQuery = $state("");
   let showUserMenu = $state(false);
+  let showNotifications = $state(false);
   let showAuthModal = $state(false);
   let showCreatePostModal = $state(false);
   let showChatPopup = $state(false);
   let dropdownElement = $state<HTMLDivElement | null>(null);
+  let unreadNotificationCount = $state(0);
+
+  // Load unread notification count on mount
+  onMount(async () => {
+    if (user) {
+      try {
+        const response = await getNotifications({ page: 1, limit: 1 });
+        const unreadCount =
+          response.notifications?.filter((n) => !n.is_read).length || 0;
+        unreadNotificationCount = unreadCount;
+      } catch (err) {
+        console.error("Failed to load initial notification count:", err);
+      }
+    }
+  });
 
   // Search dropdown state
   let showSearchDropdown = $state(false);
@@ -211,7 +230,7 @@
 <header class="topbar">
   <div class="topbar-container">
     <div class="topbar-left">
-      <div class="brand" role="button" tabindex="0" on:click={() => {}}>
+      <div class="brand" role="button" tabindex="0" onclick={() => {}}>
         <img src="/LKlogo.svg" alt="LKForum" class="brand-icon" />
         <span class="brand-name">LKForum</span>
       </div>
@@ -247,10 +266,10 @@
             type="text"
             placeholder="Search communities and users"
             bind:value={searchQuery}
-            on:input={handleSearchInput}
-            on:keydown={handleSearchKeydown}
-            on:focus={handleSearchFocus}
-            on:blur={handleSearchBlur}
+            oninput={handleSearchInput}
+            onkeydown={handleSearchKeydown}
+            onfocus={handleSearchFocus}
+            onblur={handleSearchBlur}
           />
 
           {#if showSearchDropdown && (communityResults.length > 0 || userResults.length > 0)}
@@ -260,7 +279,7 @@
                 {#each communityResults as community}
                   <button
                     class="search-result-item"
-                    on:click={() => handleCommunityClick(community.name)}
+                    onclick={() => handleCommunityClick(community.name)}
                   >
                     <img
                       src={community.avatar || "/default-community.png"}
@@ -285,7 +304,7 @@
                 {#each userResults as userResult}
                   <button
                     class="search-result-item"
-                    on:click={() => handleUserClick(userResult.username)}
+                    onclick={() => handleUserClick(userResult.username)}
                   >
                     {#if userResult.profile?.avatar?.url}
                       <img
@@ -322,7 +341,7 @@
         <button
           type="button"
           class="create-button"
-          on:click={handleCreatePostClick}
+          onclick={handleCreatePostClick}
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <path
@@ -337,8 +356,8 @@
 
         <button
           type="button"
-          class="icon-button"
-          on:click={onNotificationClick}
+          class="icon-button notification-btn"
+          onclick={() => (showNotifications = !showNotifications)}
           title="Notifications"
           aria-label="Notifications"
         >
@@ -357,15 +376,21 @@
               stroke-linecap="round"
             />
           </svg>
-          {#if notificationCount > 0}
-            <span class="notification-badge">{notificationCount}</span>
+          {#if unreadNotificationCount > 0}
+            <span class="notification-badge">{unreadNotificationCount}</span>
           {/if}
+
+          <NotificationsDropdown
+            show={showNotifications}
+            onClose={() => (showNotifications = false)}
+            onUnreadCountChange={(count) => (unreadNotificationCount = count)}
+          />
         </button>
 
         <!-- Messages Button -->
         <button
           class="icon-button"
-          on:click={() => (showChatPopup = true)}
+          onclick={() => (showChatPopup = true)}
           title="Messages"
         >
           <img src="/message_icon.svg" alt="Messages" width="24" height="24" />
@@ -377,8 +402,8 @@
               class="user-button"
               role="button"
               tabindex="0"
-              on:click={toggleUserMenu}
-              on:keydown={(e) =>
+              onclick={toggleUserMenu}
+              onkeydown={(e) =>
                 (e.key === "Enter" || e.key === " ") && toggleUserMenu()}
               aria-haspopup="true"
               aria-expanded={showUserMenu}
@@ -425,7 +450,7 @@
                 <div
                   class="dropdown-item"
                   role="menuitem"
-                  on:click={() => {
+                  onclick={() => {
                     console.log("Profile clicked!");
                     closeUserMenu();
                     push("/profile");
@@ -452,7 +477,7 @@
                 <div
                   class="dropdown-item"
                   role="menuitem"
-                  on:click={() => {
+                  onclick={() => {
                     console.log("Settings clicked!");
                     closeUserMenu();
                     push("/settings");
@@ -481,7 +506,7 @@
                 <div
                   class="dropdown-item"
                   role="menuitem"
-                  on:click={() => {
+                  onclick={() => {
                     console.log("Logout clicked!");
                     handleLogoutClick();
                   }}
@@ -501,7 +526,7 @@
             {/if}
           </div>
         {:else}
-          <button class="login-button" on:click={() => (showAuthModal = true)}
+          <button class="login-button" onclick={() => (showAuthModal = true)}
             >Log In</button
           >
           <AuthModal
@@ -803,9 +828,10 @@
     min-width: 18px;
     height: 18px;
     padding: 0 4px;
-    background: var(--topbar-accent);
+    background: #ff4444;
     color: white;
     font-size: 10px;
+    font-weight: 700;
     border-radius: 9px;
     display: flex;
     align-items: center;

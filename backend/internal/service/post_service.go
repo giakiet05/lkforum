@@ -117,10 +117,24 @@ func (s *postService) CreatePost(userID string, req *dto.CreatePostRequest) (*dt
 		VotesCount:       &model.VotesCount{Up: 0, Down: 0},
 		CommentsCount:    0,
 		IsDeleted:        false,
+		IsHidden:         false,
+		IsDraft:          false,
+		IsBan:            false,
 		CreatedAt:        time.Now(),
 		Tags:             req.Tags,
 		ModerationStatus: model.ModerationApproved, // Auto-approve for now
 	}
+
+	fmt.Printf("📝 Creating post with:\n")
+	fmt.Printf("  - Title: %s\n", post.Title)
+	fmt.Printf("  - Type: %s\n", post.Type)
+	fmt.Printf("  - CommunityID: %s\n", post.CommunityID.Hex())
+	fmt.Printf("  - AuthorID: %s\n", post.AuthorID.Hex())
+	fmt.Printf("  - IsDeleted: %v\n", post.IsDeleted)
+	fmt.Printf("  - IsHidden: %v\n", post.IsHidden)
+	fmt.Printf("  - IsDraft: %v\n", post.IsDraft)
+	fmt.Printf("  - IsBan: %v\n", post.IsBan)
+	fmt.Printf("  - ModerationStatus: %s\n", post.ModerationStatus)
 
 	if req.Type == model.PostTypePoll && req.Poll != nil {
 		pollOptions := make([]model.PollOption, len(req.Poll.Options))
@@ -1005,23 +1019,33 @@ func (s *postService) getPollResponse(ctx context.Context, postID, userID string
 
 func (s *postService) buildFilter(query *dto.GetPostsQuery) repo.Filter {
 	filter := repo.Filter{
-		"is_hidden":         bson.M{"$ne": true},
-		"is_draft":          bson.M{"$ne": true},
-		"is_banned":         false,
+		"is_hidden":         bson.M{"$in": []interface{}{false, nil}},
+		"is_draft":          bson.M{"$in": []interface{}{false, nil}},
+		"is_ban":            bson.M{"$in": []interface{}{false, nil}},
 		"moderation_status": model.ModerationApproved,
 	}
+
+	fmt.Printf("🔍 Building filter with base conditions:\n")
+	fmt.Printf("  - is_hidden: false or nil\n")
+	fmt.Printf("  - is_draft: false or nil\n")
+	fmt.Printf("  - is_ban: false or nil\n")
+	fmt.Printf("  - moderation_status: %s\n", model.ModerationApproved)
+
 	if query.CommunityID != "" {
 		if id, err := primitive.ObjectIDFromHex(query.CommunityID); err == nil {
 			filter["community_id"] = id
+			fmt.Printf("  - community_id: %s\n", query.CommunityID)
 		}
 	}
 	if query.AuthorID != "" {
 		if id, err := primitive.ObjectIDFromHex(query.AuthorID); err == nil {
 			filter["author_id"] = id
+			fmt.Printf("  - author_id: %s\n", query.AuthorID)
 		}
 	}
 	if query.Type != "" {
 		filter["type"] = query.Type
+		fmt.Printf("  - type: %s\n", query.Type)
 	}
 
 	return filter

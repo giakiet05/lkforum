@@ -21,6 +21,8 @@ type NotificationService interface {
 	Start()
 	GetNotifications(recipientID string, page, pageSize int) (*dto.PaginatedNotificationsResponse, error)
 	MarkAllAsRead(recipientID string) (int64, error)
+	MarkAsRead(notificationID, recipientID string) error
+	DeleteNotification(notificationID, recipientID string) error
 }
 
 type notificationService struct {
@@ -430,11 +432,15 @@ func (s *notificationService) handleModeratorsAdded(event bus.Event) {
 		notification := &model.Notification{
 			RecipientID: recipientObjID,
 			ActorID:     communityObjID,
-			Type:        model.NotificationTypeComment,
+			Type:        model.NotificationTypeSystem,
 			Message:     fmt.Sprintf("Bạn được mời làm moderator của cộng đồng %s", community.Name),
-			Link:        fmt.Sprintf("/communities/%s", communityID),
+			Link:        fmt.Sprintf("/communities/%s", community.Name),
 			IsRead:      false,
-			CreatedAt:   time.Now(),
+			Metadata: map[string]interface{}{
+				"community_id": communityID,
+				"action_type":  "moderator_invitation",
+			},
+			CreatedAt: time.Now(),
 		}
 
 		createdNotification, err := s.notificationRepo.Create(ctx, notification)
@@ -536,6 +542,30 @@ func (s *notificationService) MarkAllAsRead(recipientID string) (int64, error) {
 	defer cancel()
 
 	return s.notificationRepo.MarkAllAsRead(ctx, recipientID)
+}
+
+func (s *notificationService) MarkAsRead(notificationID, recipientID string) error {
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
+
+	objID, err := primitive.ObjectIDFromHex(notificationID)
+	if err != nil {
+		return fmt.Errorf("invalid notification ID: %w", err)
+	}
+
+	return s.notificationRepo.MarkAsRead(ctx, objID, recipientID)
+}
+
+func (s *notificationService) DeleteNotification(notificationID, recipientID string) error {
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
+
+	objID, err := primitive.ObjectIDFromHex(notificationID)
+	if err != nil {
+		return fmt.Errorf("invalid notification ID: %w", err)
+	}
+
+	return s.notificationRepo.DeleteNotification(ctx, objID, recipientID)
 }
 
 // ========== Redis Batching Helpers ==========

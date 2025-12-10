@@ -65,6 +65,44 @@ func (c *CommunityController) GetCommunityByID(ctx *gin.Context) {
 	dto.SendSuccess(ctx, http.StatusOK, "Community retrieved successfully", dto.FromCommunity(community))
 }
 
+func (c *CommunityController) GetCommunityByName(ctx *gin.Context) {
+	name := ctx.Param("name")
+	if name == "" {
+		dto.SendError(ctx, http.StatusBadRequest, "Community name is required", apperror.ErrBadRequest.Code)
+		return
+	}
+
+	var userID *string
+	authUser, exists := ctx.Get("authUser")
+	if exists {
+		userID = &authUser.(*auth.AuthUser).ID
+	}
+
+	community, err := c.communityService.GetCommunityByName(name, userID)
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
+		return
+	}
+
+	dto.SendSuccess(ctx, http.StatusOK, "Community retrieved successfully", dto.FromCommunity(community))
+}
+
+func (c *CommunityController) GetCommunitiesByUserID(ctx *gin.Context) {
+	userID := ctx.Param("user_id")
+	if userID == "" {
+		dto.SendError(ctx, http.StatusBadRequest, "User ID is required", apperror.ErrBadRequest.Code)
+		return
+	}
+
+	communities, err := c.communityService.GetCommunitiesByUserID(userID)
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
+		return
+	}
+
+	dto.SendSuccess(ctx, http.StatusOK, "Communities retrieved successfully", communities)
+}
+
 func (c *CommunityController) GetCommunitiesFilter(ctx *gin.Context) {
 	name := ctx.Query("name")
 	description := ctx.Query("description")
@@ -106,6 +144,7 @@ func (c *CommunityController) GetCommunitiesFilter(ctx *gin.Context) {
 
 	responses, err := c.communityService.GetCommunitiesFilter(userID, name, description, is18Plus, createFrom, page, pageSize)
 	if err != nil {
+		log.Printf("ERROR: GetCommunitiesFilter failed: %v", err)
 		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
 		return
 	}

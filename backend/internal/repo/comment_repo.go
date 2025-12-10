@@ -26,7 +26,7 @@ type CommentRepo interface {
 	GetAllChildren(ctx context.Context, commentID string) ([]model.Comment, error)
 	Delete(ctx context.Context, commentID string) error
 	UpdateByID(ctx context.Context, commentID string, update bson.M) error
-	
+
 	// Stats methods
 	CountTotal(ctx context.Context) (int64, error)
 	CountCreatedAfter(ctx context.Context, since time.Time) (int64, error)
@@ -126,7 +126,7 @@ func (c *commentRepo) GetCommentsFilterPaginated(
 		}
 		filter["$or"] = []bson.M{
 			{"moderation_status": model.ModerationApproved},
-			{"author.id": currentUserObjectID},
+			{"author.id": currentUserObjectID}, // Fixed: use nested field path
 		}
 	}
 
@@ -276,12 +276,12 @@ func (c *commentRepo) UpdateByID(ctx context.Context, commentID string, update b
 
 // Stats methods implementations
 func (c *commentRepo) CountTotal(ctx context.Context) (int64, error) {
-return c.commentCollection.CountDocuments(ctx, bson.M{})
+	return c.commentCollection.CountDocuments(ctx, bson.M{})
 }
 
 func (c *commentRepo) CountCreatedAfter(ctx context.Context, since time.Time) (int64, error) {
-filter := bson.M{
-"created_at": bson.M{"": since},
-}
-return c.commentCollection.CountDocuments(ctx, filter)
+	filter := bson.M{
+		"created_at": bson.M{"": since},
+	}
+	return c.commentCollection.CountDocuments(ctx, filter)
 }

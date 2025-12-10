@@ -10,6 +10,8 @@ func RegisterCommunityRoutes(rg *gin.RouterGroup, c *controller.CommunityControl
 	communities := rg.Group("/communities")
 
 	communities.GET("filter", c.GetCommunitiesFilter)
+	communities.GET("user/:user_id", c.GetCommunitiesByUserID)
+	communities.GET("name/:name", c.GetCommunityByName)
 	communities.GET(":community_id", c.GetCommunityByID)
 
 	// Protected routes (require authentication)

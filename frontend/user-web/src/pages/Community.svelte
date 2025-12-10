@@ -6,7 +6,7 @@
   import type { PostResponse } from "../dtos/post-dto";
   import type { CommunityResponse } from "../dtos/community-dto";
   import {
-    getCommunityById,
+    getCommunityByName,
     addModerators,
   } from "../services/community-service";
   import { getPosts } from "../services/post-service";
@@ -80,20 +80,7 @@
       isLoadingCommunity = true;
       communityError = null;
 
-      // TODO: Backend needs endpoint to get community by name, not just by ID
-      // For now, we need to fetch all communities and find by name
-      // Or backend should add GET /api/communities/by-name/:name
-      const communities = await import("../services/community-service").then(
-        (m) => m.getCommunities({ limit: 100 })
-      );
-      const found = communities.communities.find((c) => c.name === params.name);
-
-      if (!found) {
-        communityError = "Community not found";
-        community = null;
-      } else {
-        community = found;
-      }
+      community = await getCommunityByName(params.name);
     } catch (error) {
       console.error("Failed to load community:", error);
       communityError =
@@ -309,12 +296,7 @@
       console.log("📤 Adding moderator to community:", community.id);
       await addModerators({
         id: community.id,
-        added_moderator: [
-          {
-            id: user.id,
-            username: user.username,
-          },
-        ],
+        added_moderator: [user.id], // Just send user ID
       });
 
       console.log("✅ Moderator added successfully!");
@@ -591,11 +573,11 @@
             {/if}
           </div>
           <div class="moderator-list">
-            {#if community.moderators && community.moderators.length > 0}
-              {#each community.moderators as moderator}
+            {#if community.moderators && community.moderators.filter((m) => m.is_active).length > 0}
+              {#each community.moderators.filter((m) => m.is_active) as moderator}
                 <div class="moderator">
                   <img
-                    src={moderator.avatar || "/avatar.jpg"}
+                    src={moderator.avatar?.url || "/avatar.jpg"}
                     alt="Moderator"
                     class="mod-avatar"
                   />
@@ -606,7 +588,7 @@
               <p class="no-moderators">No moderators yet</p>
             {/if}
           </div>
-          {#if community.moderators && community.moderators.length > 3}
+          {#if community.moderators && community.moderators.filter((m) => m.is_active).length > 3}
             <button class="view-all-mods-btn">View all moderators</button>
           {/if}
         </div>

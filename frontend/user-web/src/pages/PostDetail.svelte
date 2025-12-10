@@ -332,7 +332,11 @@
   }
 
   function goBack() {
-    window.history.back();
+    if (post?.community) {
+      push(`/lk/${post.community.name}`);
+    } else {
+      push("/");
+    }
   }
 </script>
 
