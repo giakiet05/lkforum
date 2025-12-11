@@ -13,6 +13,7 @@ const (
 	MessageColName           = "messages"
 	PostHistoryColName       = "post_histories"
 	EmailVerificationColName = "email_verifications"
+	PasswordResetColName     = "password_resets"
 	SavedPostColName         = "saved_posts"
 	ReportColName            = "reports"
 	PollVoteColName          = "poll_votes"

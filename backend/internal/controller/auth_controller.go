@@ -252,3 +252,56 @@ func (c *AuthController) CompleteGoogleSetup(ctx *gin.Context) {
 	}
 	dto.SendSuccess(ctx, http.StatusOK, "Setup complete. You are now logged in.", data)
 }
+
+// --- Forgot Password Flow ---
+
+func (c *AuthController) ForgotPassword(ctx *gin.Context) {
+	var req dto.ForgotPasswordRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		dto.SendError(ctx, http.StatusBadRequest, apperror.Message(apperror.ErrBadRequest), apperror.ErrBadRequest.Code)
+		return
+	}
+
+	err := c.authService.ForgotPassword(req.Email)
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
+		return
+	}
+
+	dto.SendSuccess(ctx, http.StatusOK, "Password reset code sent to your email. Please check your inbox.", nil)
+}
+
+func (c *AuthController) VerifyResetPasswordOTP(ctx *gin.Context) {
+	var req dto.VerifyResetPasswordOTPRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		dto.SendError(ctx, http.StatusBadRequest, apperror.Message(apperror.ErrBadRequest), apperror.ErrBadRequest.Code)
+		return
+	}
+
+	resetToken, err := c.authService.VerifyResetPasswordOTP(req.Email, req.OTP)
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
+		return
+	}
+
+	data := dto.VerifyResetPasswordOTPResponse{
+		ResetToken: resetToken,
+	}
+	dto.SendSuccess(ctx, http.StatusOK, "OTP verified successfully. You can now reset your password.", data)
+}
+
+func (c *AuthController) ResetPassword(ctx *gin.Context) {
+	var req dto.ResetPasswordRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		dto.SendError(ctx, http.StatusBadRequest, apperror.Message(apperror.ErrBadRequest), apperror.ErrBadRequest.Code)
+		return
+	}
+
+	err := c.authService.ResetPassword(req.ResetToken, req.NewPassword)
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
+		return
+	}
+
+	dto.SendSuccess(ctx, http.StatusOK, "Password reset successfully. You can now login with your new password.", nil)
+}

@@ -32,6 +32,7 @@ type Repos struct {
 	repo.MessageRepo
 	repo.PostHistoryRepo
 	repo.EmailVerificationRepo
+	repo.PasswordResetRepo
 	repo.SavedPostRepo
 	repo.ReportRepo
 	repo.DraftRepo
@@ -64,6 +65,7 @@ type Controllers struct {
 	controller.CommunityController
 	controller.MembershipController
 	controller.PostController
+	controller.VoteController // Added VoteController
 	controller.CommentController
 	controller.NotificationController
 	controller.WebSocketController
@@ -91,15 +93,16 @@ func initRepos(client *mongo.Client, db *mongo.Database) *Repos {
 		MessageRepo:           repo.NewMessageRepo(db),
 		PostHistoryRepo:       repo.NewPostHistoryRepo(db),
 		EmailVerificationRepo: repo.NewEmailVerificationRepo(db),
+		PasswordResetRepo:     repo.NewPasswordResetRepo(db),
 		SavedPostRepo:         repo.NewSavedPostRepo(db),
 		ReportRepo:            repo.NewReportRepo(db),
 		DraftRepo:             repo.NewDraftRepo(db),
 	}
 }
 
-func initServices(repos *Repos, redisClient *redis.Client, emailSender email.Sender, eventBus bus.EventBus, geminiClient *gemini.GeminiClient) *Services {
+func initServices(repos *Repos, redisClient *redis.Client, emailSender email.Sender, eventBus bus.EventBus, geminiClient *gemini.GeminiClient, tokenService *auth.TokenService) *Services {
 	services := &Services{
-		AuthService:         service.NewAuthService(repos.UserRepo, repos.EmailVerificationRepo, emailSender, redisClient),
+		AuthService:         service.NewAuthService(repos.UserRepo, repos.EmailVerificationRepo, repos.PasswordResetRepo, emailSender, redisClient, tokenService),
 		UserService:         service.NewUserService(repos.UserRepo, eventBus, redisClient),
 		MembershipService:   service.NewMembershipService(repos.MembershipRepo, redisClient),
 		ReputationService:   service.NewReputationService(repos.UserRepo, eventBus),
@@ -146,6 +149,7 @@ func initControllers(services *Services, wsHub *ws.Hub) *Controllers {
 		CommunityController:      *controller.NewCommunityController(services.CommunityService),
 		MembershipController:     *controller.NewMembershipController(services.MembershipService),
 		PostController:           *controller.NewPostController(services.PostService),
+		VoteController:           *controller.NewVoteController(services.VoteService), // Added VoteController
 		CommentController:        *controller.NewCommentController(services.CommentService),
 		NotificationController:   *controller.NewNotificationController(services.NotificationService),
 		WebSocketController:      *controller.NewWebSocketController(wsHub),
@@ -175,6 +179,7 @@ func initRoutes(controllers *Controllers, r *gin.Engine) {
 	route.RegisterCommunityRoutes(api, &controllers.CommunityController)
 	route.RegisterMembershipRoutes(api, &controllers.MembershipController)
 	route.RegisterPostRoutes(api, &controllers.PostController)
+	route.RegisterVoteRoutes(api, &controllers.VoteController) // Added VoteRoutes
 	route.RegisterCommentRoutes(api, &controllers.CommentController)
 	route.RegisterNotificationRoutes(api, &controllers.NotificationController)
 	route.RegisterWebSocketRoutes(api, &controllers.WebSocketController)
@@ -195,7 +200,8 @@ func Init() (*gin.Engine, error) {
 
 	redisClient := config.NewRedisClient()
 
-	if err := InitializeTokenService(redisClient); err != nil {
+	tokenService, err := InitializeTokenService(redisClient)
+	if err != nil {
 		log.Printf("Warning: Token invalidation service not available: %v\n", err)
 	}
 
@@ -233,7 +239,7 @@ func Init() (*gin.Engine, error) {
 	}
 
 	repos := initRepos(client, db)
-	services := initServices(repos, redisClient, emailSender, eventBus, geminiClient)
+	services := initServices(repos, redisClient, emailSender, eventBus, geminiClient, tokenService)
 	controllers := initControllers(services, wsHub)
 
 	// Inject userRepo into middleware for settings caching

@@ -224,7 +224,10 @@ func TestUpdateProfile(t *testing.T) {
 			if tt.repoGetUser != nil && tt.updateReq != nil && tt.repoUpdateErr == nil {
 				mockUserRepo.EXPECT().
 					Update(gomock.Any(), gomock.AssignableToTypeOf(&model.User{})).
-					Return(tt.repoGetUser, nil)
+					DoAndReturn(func(ctx context.Context, user *model.User) (*model.User, error) {
+						// Return the modified user object that was passed in
+						return user, nil
+					})
 			} else if tt.repoUpdateErr != nil {
 				mockUserRepo.EXPECT().
 					Update(gomock.Any(), gomock.AssignableToTypeOf(&model.User{})).

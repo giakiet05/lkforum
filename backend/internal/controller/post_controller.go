@@ -236,29 +236,8 @@ func (c *PostController) RemoveVideosFromPost(ctx *gin.Context) {
 	dto.SendSuccess(ctx, http.StatusOK, "Videos removed successfully", nil)
 }
 
-func (c *PostController) VoteOnPost(ctx *gin.Context) {
-	authUser, exists := ctx.Get("authUser")
-	if !exists {
-		dto.SendError(ctx, http.StatusUnauthorized, apperror.ErrForbidden.Message, apperror.ErrForbidden.Code)
-		return
-	}
-
-	postID := ctx.Param("id")
-
-	var req dto.PostVoteRequest
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		dto.SendError(ctx, http.StatusBadRequest, "Invalid request: 'value' field is required", apperror.ErrBadRequest.Code)
-		return
-	}
-
-	votesCount, err := c.service.VoteOnPost(authUser.(auth.AuthUser).ID, postID, *req.Value)
-	if err != nil {
-		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
-		return
-	}
-
-	dto.SendSuccess(ctx, http.StatusOK, "Vote cast successfully", votesCount)
-}
+// VoteOnPost method removed - use VoteController instead
+// POST /api/votes/post/:id for voting on posts
 
 func (c *PostController) SavePost(ctx *gin.Context) {
 	authUser, exists := ctx.Get("authUser")

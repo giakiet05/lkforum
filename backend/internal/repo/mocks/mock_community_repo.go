@@ -278,6 +278,21 @@ func (mr *MockCommunityRepoMockRecorder) GetByModeratorIDPaginated(ctx, moderato
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByModeratorIDPaginated", reflect.TypeOf((*MockCommunityRepo)(nil).GetByModeratorIDPaginated), ctx, moderatorID, page, pageSize)
 }
 
+// GetByName mocks base method.
+func (m *MockCommunityRepo) GetByName(ctx context.Context, name string) (*model.Community, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetByName", ctx, name)
+	ret0, _ := ret[0].(*model.Community)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetByName indicates an expected call of GetByName.
+func (mr *MockCommunityRepoMockRecorder) GetByName(ctx, name interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByName", reflect.TypeOf((*MockCommunityRepo)(nil).GetByName), ctx, name)
+}
+
 // GetFilter mocks base method.
 func (m *MockCommunityRepo) GetFilter(ctx context.Context, name, description string, is18Plus bool, createFrom time.Time, page, pageSize int) ([]*model.Community, int64, error) {
 	m.ctrl.T.Helper()
