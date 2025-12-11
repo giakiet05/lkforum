@@ -55,14 +55,16 @@ type authService struct {
 	emailVerificationRepo repo.EmailVerificationRepo
 	emailSender           email.Sender
 	redisClient           *redis.Client
+	tokenService          auth.TokenServiceInterface
 }
 
-func NewAuthService(userRepo repo.UserRepo, emailVerificationRepo repo.EmailVerificationRepo, emailSender email.Sender, redisClient *redis.Client) AuthService {
+func NewAuthService(userRepo repo.UserRepo, emailVerificationRepo repo.EmailVerificationRepo, emailSender email.Sender, redisClient *redis.Client, tokenService auth.TokenServiceInterface) AuthService {
 	return &authService{
 		userRepo:              userRepo,
 		emailVerificationRepo: emailVerificationRepo,
 		emailSender:           emailSender,
 		redisClient:           redisClient,
+		tokenService:          tokenService,
 	}
 }
 
@@ -103,11 +105,13 @@ func (s *authService) SendEmailVerification(email string) error {
 	}
 
 	// Send OTP email
-	go func() {
-		if err := s.emailSender.SendVerificationEmail(email, otp); err != nil {
-			fmt.Printf("CRITICAL: Failed to send verification email to %s: %v\n", email, err)
-		}
-	}()
+	if s.emailSender != nil {
+		go func() {
+			if err := s.emailSender.SendVerificationEmail(email, otp); err != nil {
+				fmt.Printf("CRITICAL: Failed to send verification email to %s: %v\n", email, err)
+			}
+		}()
+	}
 
 	return nil
 }
@@ -264,11 +268,13 @@ func (s *authService) ResendOTP(email string) error {
 	}
 
 	// Send email
-	go func() {
-		if err := s.emailSender.SendVerificationEmail(email, otp); err != nil {
-			fmt.Printf("CRITICAL: Failed to resend verification email to %s: %v\n", email, err)
-		}
-	}()
+	if s.emailSender != nil {
+		go func() {
+			if err := s.emailSender.SendVerificationEmail(email, otp); err != nil {
+				fmt.Printf("CRITICAL: Failed to resend verification email to %s: %v\n", email, err)
+			}
+		}()
+	}
 
 	return nil
 }
@@ -366,7 +372,7 @@ func (s *authService) RefreshToken(refreshToken string) (string, string, error) 
 }
 
 func (s *authService) Logout(accessToken, refreshToken string) error {
-	if auth.TokenSvc == nil {
+	if s.tokenService == nil {
 		return apperror.ErrInternal
 	}
 
@@ -387,13 +393,13 @@ func (s *authService) Logout(accessToken, refreshToken string) error {
 
 	// Blacklist access token
 	accessTTL := time.Minute * time.Duration(config.Cfg.TokenTTL)
-	if err := auth.TokenSvc.InvalidateToken(ctx, accessJTI, accessTTL); err != nil {
+	if err := s.tokenService.InvalidateToken(ctx, accessJTI, accessTTL); err != nil {
 		return err
 	}
 
 	// Blacklist refresh token
 	refreshTTL := time.Hour * time.Duration(config.Cfg.RefreshTokenTTL)
-	if err := auth.TokenSvc.InvalidateToken(ctx, refreshJTI, refreshTTL); err != nil {
+	if err := s.tokenService.InvalidateToken(ctx, refreshJTI, refreshTTL); err != nil {
 		return err
 	}
 
@@ -524,12 +530,11 @@ func generateNonce() string {
 }
 
 func extractJTI(tokenStr string) (string, error) {
-	token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
-		return []byte(config.Cfg.JWTSecret), nil
-	})
-
+	// Use ParseUnverified to extract JTI without validating the token
+	// This is safe here because we only need the JTI for blacklisting
+	token, _, err := jwt.NewParser().ParseUnverified(tokenStr, jwt.MapClaims{})
 	if err != nil {
-		return "", err
+		return "", apperror.ErrInvalidToken
 	}
 
 	if claims, ok := token.Claims.(jwt.MapClaims); ok {
@@ -538,7 +543,7 @@ func extractJTI(tokenStr string) (string, error) {
 		}
 	}
 
-	return "", fmt.Errorf("jti not found in token")
+	return "", apperror.ErrInvalidToken
 }
 
 // invalidateUsernameCache removes the cached username availability check

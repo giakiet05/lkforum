@@ -62,10 +62,10 @@ func StatusFromError(err error) int {
 		ErrInvalidGender, ErrInvalidDateFormat, ErrAgeTooYoung, ErrInvalidBirthDate, ErrInvalidProvince, ErrTooManyInterests, ErrInvalidInterest):
 		return http.StatusBadRequest
 	// 401 Unauthorized
-	case isErrorType(err, ErrInvalidCredentials, ErrInvalidToken, ErrInvalidClaims, ErrInvalidIssuer, ErrInvalidAudience, ErrTokenInvalidated):
+	case isErrorType(err, ErrInvalidCredentials, ErrInvalidToken, ErrInvalidClaims, ErrInvalidIssuer, ErrInvalidAudience, ErrTokenInvalidated, ErrMissingAuthHeader, ErrInvalidAuthHeader, ErrMissingToken, ErrNotAuthenticated):
 		return http.StatusUnauthorized
 	// 403 Forbidden
-	case isErrorType(err, ErrForbidden, ErrUserInactive, ErrUserNotMember, ErrEmailNotVerified):
+	case isErrorType(err, ErrForbidden, ErrUserInactive, ErrUserNotMember, ErrEmailNotVerified, ErrAdminAccessRequired):
 		return http.StatusForbidden
 	// 404 Not Found
 	case isErrorType(err, ErrUserNotFound, ErrCommunityNotFound, ErrCommunityDeleted, ErrMembershipNotFound, ErrPostNotFound, ErrVoteNotFound, ErrDraftNotFound):
@@ -89,6 +89,12 @@ var (
 	ErrInvalidIssuer        = AppError{Code: "INVALID_ISSUER", Message: "Nguồn phát hành token không hợp lệ"}
 	ErrInvalidAudience      = AppError{Code: "INVALID_AUDIENCE", Message: "Đối tượng token không hợp lệ"}
 	ErrTokenInvalidated     = AppError{Code: "TOKEN_INVALIDATED", Message: "Token đã bị vô hiệu hóa"}
+	ErrMissingAuthHeader    = AppError{Code: "MISSING_AUTH_HEADER", Message: "Thiếu Authorization header"}
+	ErrInvalidAuthHeader    = AppError{Code: "INVALID_AUTH_HEADER", Message: "Định dạng Authorization header không hợp lệ"}
+	ErrMissingToken         = AppError{Code: "MISSING_TOKEN", Message: "Thiếu token xác thực"}
+	ErrNotAuthenticated     = AppError{Code: "NOT_AUTHENTICATED", Message: "Chưa xác thực"}
+	ErrInvalidAuthContext   = AppError{Code: "INVALID_AUTH_CONTEXT", Message: "Ngữ cảnh xác thực không hợp lệ"}
+	ErrAdminAccessRequired  = AppError{Code: "ADMIN_ACCESS_REQUIRED", Message: "Cần quyền quản trị viên"}
 	ErrForbidden            = AppError{Code: "FORBIDDEN", Message: "Bạn không có quyền thực hiện hành động này"}
 	ErrBadRequest           = AppError{Code: "BAD_REQUEST", Message: "Yêu cầu không hợp lệ"}
 	ErrEmailNotVerified     = AppError{Code: "EMAIL_NOT_VERIFIED", Message: "Email chưa được xác thực"}

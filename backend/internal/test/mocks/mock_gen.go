@@ -2,6 +2,7 @@
 package mocks
 
 //go:generate mockgen -source=../../platform/bus/bus.go -destination=../../platform/bus/mock_bus.go -package=bus
+//go:generate mockgen -source=../../auth/token_service.go -destination=../../auth/mock_token_service.go -package=auth
 
 // --------------------
 // Repo Mocks

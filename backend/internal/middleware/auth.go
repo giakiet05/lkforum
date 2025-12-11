@@ -4,7 +4,9 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/giakiet05/lkforum/internal/apperror"
 	"github.com/giakiet05/lkforum/internal/auth"
+	"github.com/giakiet05/lkforum/internal/dto"
 	"github.com/giakiet05/lkforum/internal/repo"
 	"github.com/giakiet05/lkforum/internal/util"
 	"github.com/gin-gonic/gin"
@@ -23,14 +25,14 @@ func RequireAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Missing Authorization header"})
+			dto.SendError(c, http.StatusUnauthorized, apperror.ErrMissingAuthHeader.Message, apperror.ErrMissingAuthHeader.Code)
 			c.Abort()
 			return
 		}
 
 		parts := strings.SplitN(authHeader, " ", 2)
 		if len(parts) != 2 || parts[0] != "Bearer" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid Authorization header format"})
+			dto.SendError(c, http.StatusUnauthorized, apperror.ErrInvalidAuthHeader.Message, apperror.ErrInvalidAuthHeader.Code)
 			c.Abort()
 			return
 		}
@@ -38,10 +40,7 @@ func RequireAuth() gin.HandlerFunc {
 		token := parts[1]
 		user, err := auth.ParseAccessToken(token)
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{
-				"error": "Invalid token",
-				"debug": err.Error(), // TEMP: Debug info
-			})
+			dto.SendError(c, http.StatusUnauthorized, apperror.Message(err), apperror.Code(err))
 			c.Abort()
 			return
 		} // Load user settings from DB once per request
@@ -65,17 +64,14 @@ func RequireAuthSocket() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token := c.Query("token")
 		if token == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Missing token in query parameter"})
+			dto.SendError(c, http.StatusUnauthorized, apperror.ErrMissingToken.Message, apperror.ErrMissingToken.Code)
 			c.Abort()
 			return
 		}
 
 		user, err := auth.ParseAccessToken(token)
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{
-				"error": "Invalid token",
-				"debug": err.Error(),
-			})
+			dto.SendError(c, http.StatusUnauthorized, apperror.Message(err), apperror.Code(err))
 			c.Abort()
 			return
 		}
@@ -140,20 +136,20 @@ func RequireAdmin() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		val, exists := c.Get("authUser")
 		if !exists {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Not authenticated"})
+			dto.SendError(c, http.StatusUnauthorized, apperror.ErrNotAuthenticated.Message, apperror.ErrNotAuthenticated.Code)
 			c.Abort()
 			return
 		}
 
 		user, ok := val.(auth.AuthUser)
 		if !ok {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid auth context"})
+			dto.SendError(c, http.StatusInternalServerError, apperror.ErrInvalidAuthContext.Message, apperror.ErrInvalidAuthContext.Code)
 			c.Abort()
 			return
 		}
 
 		if user.Role != "admin" {
-			c.JSON(http.StatusForbidden, gin.H{"error": "Admin access required"})
+			dto.SendError(c, http.StatusForbidden, apperror.ErrAdminAccessRequired.Message, apperror.ErrAdminAccessRequired.Code)
 			c.Abort()
 			return
 		}

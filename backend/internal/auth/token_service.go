@@ -9,6 +9,14 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+// TokenServiceInterface defines the contract for token operations
+type TokenServiceInterface interface {
+	InvalidateAllUserTokens(ctx context.Context, userID string) error
+	IsUserValid(ctx context.Context, userID string) bool
+	InvalidateToken(ctx context.Context, jti string, ttl time.Duration) error
+	IsTokenBlacklisted(ctx context.Context, jti string) bool
+}
+
 // TokenService handles token operations including invalidation
 type TokenService struct {
 	redisClient *redis.Client

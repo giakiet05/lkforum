@@ -6,9 +6,9 @@ import (
 )
 
 // InitializeTokenService sets up the token service for JWT authentication using a provided Redis client
-func InitializeTokenService(redisClient *redis.Client) error {
+func InitializeTokenService(redisClient *redis.Client) (*auth.TokenService, error) {
 	tokenService := auth.NewTokenService(redisClient)
 	auth.SetTokenService(tokenService)
 
-	return nil
+	return tokenService, nil
 }

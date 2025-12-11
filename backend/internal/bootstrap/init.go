@@ -98,9 +98,9 @@ func initRepos(client *mongo.Client, db *mongo.Database) *Repos {
 	}
 }
 
-func initServices(repos *Repos, redisClient *redis.Client, emailSender email.Sender, eventBus bus.EventBus, geminiClient *gemini.GeminiClient) *Services {
+func initServices(repos *Repos, redisClient *redis.Client, emailSender email.Sender, eventBus bus.EventBus, geminiClient *gemini.GeminiClient, tokenService *auth.TokenService) *Services {
 	services := &Services{
-		AuthService:         service.NewAuthService(repos.UserRepo, repos.EmailVerificationRepo, emailSender, redisClient),
+		AuthService:         service.NewAuthService(repos.UserRepo, repos.EmailVerificationRepo, emailSender, redisClient, tokenService),
 		UserService:         service.NewUserService(repos.UserRepo, eventBus, redisClient),
 		MembershipService:   service.NewMembershipService(repos.MembershipRepo, redisClient),
 		ReputationService:   service.NewReputationService(repos.UserRepo, eventBus),
@@ -198,7 +198,8 @@ func Init() (*gin.Engine, error) {
 
 	redisClient := config.NewRedisClient()
 
-	if err := InitializeTokenService(redisClient); err != nil {
+	tokenService, err := InitializeTokenService(redisClient)
+	if err != nil {
 		log.Printf("Warning: Token invalidation service not available: %v\n", err)
 	}
 
@@ -236,7 +237,7 @@ func Init() (*gin.Engine, error) {
 	}
 
 	repos := initRepos(client, db)
-	services := initServices(repos, redisClient, emailSender, eventBus, geminiClient)
+	services := initServices(repos, redisClient, emailSender, eventBus, geminiClient, tokenService)
 	controllers := initControllers(services, wsHub)
 
 	// Inject userRepo into middleware for settings caching
