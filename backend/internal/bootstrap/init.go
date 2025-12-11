@@ -32,6 +32,7 @@ type Repos struct {
 	repo.MessageRepo
 	repo.PostHistoryRepo
 	repo.EmailVerificationRepo
+	repo.PasswordResetRepo
 	repo.SavedPostRepo
 	repo.ReportRepo
 	repo.DraftRepo
@@ -92,6 +93,7 @@ func initRepos(client *mongo.Client, db *mongo.Database) *Repos {
 		MessageRepo:           repo.NewMessageRepo(db),
 		PostHistoryRepo:       repo.NewPostHistoryRepo(db),
 		EmailVerificationRepo: repo.NewEmailVerificationRepo(db),
+		PasswordResetRepo:     repo.NewPasswordResetRepo(db),
 		SavedPostRepo:         repo.NewSavedPostRepo(db),
 		ReportRepo:            repo.NewReportRepo(db),
 		DraftRepo:             repo.NewDraftRepo(db),
@@ -100,7 +102,7 @@ func initRepos(client *mongo.Client, db *mongo.Database) *Repos {
 
 func initServices(repos *Repos, redisClient *redis.Client, emailSender email.Sender, eventBus bus.EventBus, geminiClient *gemini.GeminiClient, tokenService *auth.TokenService) *Services {
 	services := &Services{
-		AuthService:         service.NewAuthService(repos.UserRepo, repos.EmailVerificationRepo, emailSender, redisClient, tokenService),
+		AuthService:         service.NewAuthService(repos.UserRepo, repos.EmailVerificationRepo, repos.PasswordResetRepo, emailSender, redisClient, tokenService),
 		UserService:         service.NewUserService(repos.UserRepo, eventBus, redisClient),
 		MembershipService:   service.NewMembershipService(repos.MembershipRepo, redisClient),
 		ReputationService:   service.NewReputationService(repos.UserRepo, eventBus),

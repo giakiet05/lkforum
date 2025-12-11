@@ -68,7 +68,7 @@ func StatusFromError(err error) int {
 	case isErrorType(err, ErrForbidden, ErrUserInactive, ErrUserNotMember, ErrEmailNotVerified, ErrAdminAccessRequired):
 		return http.StatusForbidden
 	// 404 Not Found
-	case isErrorType(err, ErrUserNotFound, ErrCommunityNotFound, ErrCommunityDeleted, ErrMembershipNotFound, ErrPostNotFound, ErrVoteNotFound, ErrDraftNotFound):
+	case isErrorType(err, ErrUserNotFound, ErrCommunityNotFound, ErrCommunityDeleted, ErrMembershipNotFound, ErrPostNotFound, ErrVoteNotFound, ErrDraftNotFound, ErrEmailNotRegistered):
 		return http.StatusNotFound
 	// 409 Conflict
 	case isErrorType(err, ErrUsernameExists, ErrEmailExists, ErrCommunityNameExists, ErrAlreadyMember, ErrEmailAlreadyVerified, ErrLoginMethodMismatch, ErrPollVoted, ErrPollCannotEdit, ErrAlreadyReported):
@@ -100,8 +100,9 @@ var (
 	ErrEmailNotVerified     = AppError{Code: "EMAIL_NOT_VERIFIED", Message: "Email chưa được xác thực"}
 	ErrEmailAlreadyVerified = AppError{Code: "EMAIL_ALREADY_VERIFIED", Message: "Email đã được xác thực"}
 	ErrInvalidOTP           = AppError{Code: "INVALID_OTP", Message: "Mã xác thực không đúng"}
-	ErrOTPExpired           = AppError{Code: "OTP_EXPIRED", Message: "Mã xác thực đã hết hạn"}
-	ErrLoginMethodMismatch  = AppError{Code: "LOGIN_METHOD_MISMATCH", Message: "Email này đã được đăng ký bằng phương thức khác. Vui lòng sử dụng phương thức đăng nhập ban đầu."}
+	ErrOTPExpired          = AppError{Code: "OTP_EXPIRED", Message: "Mã xác thực đã hết hạn"}
+	ErrLoginMethodMismatch = AppError{Code: "LOGIN_METHOD_MISMATCH", Message: "Email này đã được đăng ký bằng phương thức khác. Vui lòng sử dụng phương thức đăng nhập ban đầu."}
+	ErrEmailNotRegistered  = AppError{Code: "EMAIL_NOT_REGISTERED", Message: "Email chưa được đăng ký"}
 
 	// Generic
 	ErrInternal          = AppError{Code: "INTERNAL_ERROR", Message: "Lỗi hệ thống"}
