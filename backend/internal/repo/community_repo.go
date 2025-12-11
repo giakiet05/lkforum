@@ -18,6 +18,7 @@ import (
 type CommunityRepo interface {
 	Create(ctx context.Context, community *model.Community) (*model.Community, error)
 	GetByID(ctx context.Context, id string) (*model.Community, error)
+	GetByName(ctx context.Context, name string) (*model.Community, error)
 	GetByIDs(ctx context.Context, ids []string) ([]*model.Community, error)
 	GetFilter(
 		ctx context.Context,
@@ -30,7 +31,7 @@ type CommunityRepo interface {
 	GetByModeratorIDPaginated(ctx context.Context, moderatorID string, page int, pageSize int) ([]*model.Community, int64, error)
 	GetAllPaginated(ctx context.Context, page int, pageSize int) ([]*model.Community, int64, error)
 	FindCommunities(ctx context.Context, filter Filter, findOptions *FindOptions) ([]*model.Community, int64, error)
-	
+
 	// Stats methods
 	CountTotal(ctx context.Context) (int64, error)
 	CountActive(ctx context.Context) (int64, error)
@@ -50,6 +51,10 @@ type CommunityRepo interface {
 	IsUserBanned(ctx context.Context, userID string, banType model.CommunityBanType, communityID string) (bool, error)
 	UnmuteUser(ctx context.Context, userID string, communityID string) error
 	UnbanUser(ctx context.Context, userID string, communityID string) error
+
+	ActivateModerator(ctx context.Context, communityID string, userID string) error
+	IsModerator(ctx context.Context, communityID string, userID string) (bool, error)
+	IsCreator(ctx context.Context, communityID string, userID string) (bool, error)
 }
 
 type communityRepo struct {
@@ -88,6 +93,19 @@ func (c *communityRepo) GetByID(ctx context.Context, id string) (*model.Communit
 	var community model.Community
 	err = c.communityCollection.FindOne(ctx, bson.M{"_id": communityObjectID}).Decode(&community)
 	if err != nil {
+		return nil, err
+	}
+
+	return &community, nil
+}
+
+func (c *communityRepo) GetByName(ctx context.Context, name string) (*model.Community, error) {
+	var community model.Community
+	err := c.communityCollection.FindOne(ctx, bson.M{"name": name}).Decode(&community)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, apperror.ErrCommunityNotFound
+		}
 		return nil, err
 	}
 
@@ -706,4 +724,85 @@ func (c *communityRepo) CountPrivate(ctx context.Context) (int64, error) {
 		"setting.is_private": true,
 	}
 	return c.communityCollection.CountDocuments(ctx, filter)
+}
+
+func (c *communityRepo) ActivateModerator(ctx context.Context, communityID string, userID string) error {
+	communityObjectID, err := primitive.ObjectIDFromHex(communityID)
+	if err != nil {
+		return err
+	}
+
+	userObjectID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return err
+	}
+
+	filter := bson.M{
+		"_id":                communityObjectID,
+		"moderators.user_id": userObjectID,
+	}
+
+	update := bson.M{
+		"$set": bson.M{
+			"moderators.$[m].is_active":   true,
+			"moderators.$[m].assigned_at": time.Now(),
+		},
+	}
+
+	opts := options.Update().SetArrayFilters(options.ArrayFilters{
+		Filters: []interface{}{
+			bson.M{"m.user_id": userObjectID},
+		},
+	})
+
+	res, err := c.communityCollection.UpdateOne(ctx, filter, update, opts)
+	if err != nil {
+		return err
+	}
+
+	if res.MatchedCount == 0 {
+		return apperror.ErrBadRequest
+	}
+
+	return nil
+}
+
+func (c *communityRepo) IsModerator(ctx context.Context, communityID string, userID string) (bool, error) {
+	userObjectID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return false, err
+	}
+
+	community, err := c.GetByID(ctx, communityID)
+	if err != nil {
+		return false, err
+	}
+
+	if community.CreateByID == userObjectID {
+		return true, nil
+	}
+	for _, m := range community.Moderators {
+		if m.UserID == userObjectID {
+			if !m.IsActive {
+				return false, nil
+			}
+
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (c *communityRepo) IsCreator(ctx context.Context, communityID string, userID string) (bool, error) {
+	userObjectID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return false, err
+	}
+
+	community, err := c.GetByID(ctx, communityID)
+	if err != nil {
+		return false, err
+	}
+
+	return community.CreateByID == userObjectID, nil
 }

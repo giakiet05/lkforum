@@ -9,6 +9,9 @@ import (
 func RegisterUserRoutes(rg *gin.RouterGroup, c *controller.UserController) {
 	users := rg.Group("/users")
 
+	// Public search endpoint - anyone can search users
+	users.GET("", c.GetUsers)
+
 	// Public routes - anyone can view a user's profile
 	users.GET("/", c.GetUsers)
 	users.GET("/profile/:username", c.GetUserByUsername)

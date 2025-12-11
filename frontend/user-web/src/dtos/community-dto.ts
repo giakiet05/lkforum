@@ -11,6 +11,7 @@ export interface Moderator {
     user_id: string;
     username: string;
     avatar?: string;
+    is_active?: boolean;
 }
 
 export interface CommunityRule {
@@ -47,12 +48,12 @@ export interface ModeratorDTO {
 
 export interface AddModeratorRequest {
     id: string;
-    added_moderator: ModeratorDTO[];
+    added_moderator: string[]; // Array of user IDs
 }
 
 export interface RemoveModeratorRequest {
     id: string;
-    removed_moderator: string[];
+    removed_moderator: string[]; // Array of user IDs
 }
 
 export interface BanUserRequest {

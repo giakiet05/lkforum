@@ -26,7 +26,7 @@ type CommentRepo interface {
 	GetAllChildren(ctx context.Context, commentID string) ([]model.Comment, error)
 	Delete(ctx context.Context, commentID string) error
 	UpdateByID(ctx context.Context, commentID string, update bson.M) error
-	
+
 	// Stats methods
 	CountTotal(ctx context.Context) (int64, error)
 	CountCreatedAfter(ctx context.Context, since time.Time) (int64, error)
@@ -114,21 +114,7 @@ func (c *commentRepo) GetCommentsFilterPaginated(
 		filter["content"] = bson.M{"$regex": primitive.Regex{Pattern: *content, Options: "i"}}
 	}
 
-	// Moderation filter
-	if currentUserID == nil || *currentUserID == "" {
-		// Guest user: only see approved comments
-		filter["moderation_status"] = model.ModerationApproved
-	} else {
-		// Logged-in user: see approved + own comments (pending/rejected)
-		currentUserObjectID, err := primitive.ObjectIDFromHex(*currentUserID)
-		if err != nil {
-			return nil, 0, apperror.ErrInvalidID
-		}
-		filter["$or"] = []bson.M{
-			{"moderation_status": model.ModerationApproved},
-			{"author.id": currentUserObjectID},
-		}
-	}
+	// No moderation filter needed - all comments are visible
 
 	// Pagination and sorting
 	skip := (page - 1) * pageSize
@@ -276,12 +262,12 @@ func (c *commentRepo) UpdateByID(ctx context.Context, commentID string, update b
 
 // Stats methods implementations
 func (c *commentRepo) CountTotal(ctx context.Context) (int64, error) {
-return c.commentCollection.CountDocuments(ctx, bson.M{})
+	return c.commentCollection.CountDocuments(ctx, bson.M{})
 }
 
 func (c *commentRepo) CountCreatedAfter(ctx context.Context, since time.Time) (int64, error) {
-filter := bson.M{
-"created_at": bson.M{"": since},
-}
-return c.commentCollection.CountDocuments(ctx, filter)
+	filter := bson.M{
+		"created_at": bson.M{"": since},
+	}
+	return c.commentCollection.CountDocuments(ctx, filter)
 }

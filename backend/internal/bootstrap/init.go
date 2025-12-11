@@ -104,13 +104,20 @@ func initServices(repos *Repos, redisClient *redis.Client, emailSender email.Sen
 		UserService:         service.NewUserService(repos.UserRepo, eventBus, redisClient),
 		MembershipService:   service.NewMembershipService(repos.MembershipRepo, redisClient),
 		ReputationService:   service.NewReputationService(repos.UserRepo, eventBus),
-		NotificationService: service.NewNotificationService(repos.NotificationRepo, repos.UserRepo, repos.PostRepo, repos.CommentRepo, eventBus, redisClient),
+		NotificationService: service.NewNotificationService(repos.NotificationRepo, repos.UserRepo, repos.PostRepo, repos.CommentRepo, repos.CommunityRepo, eventBus, redisClient),
 		ChannelService:      service.NewChannelService(repos.ChannelRepo, eventBus),
 		MessageService:      service.NewMessageService(repos.MessageRepo, repos.ChannelRepo, repos.UserRepo, eventBus, redisClient),
 		PostHistoryService:  service.NewPostHistoryService(repos.PostHistoryRepo),
 		ReportService:       service.NewReportService(repos.ReportRepo),
 		CommentService:      service.NewCommentService(repos.CommentRepo, repos.UserRepo, repos.CommunityRepo, repos.PostRepo, eventBus),
 		CommunityService:    service.NewCommunityService(repos.CommunityRepo, repos.MembershipRepo, repos.PostRepo, repos.UserRepo, eventBus),
+	}
+
+	// Set MembershipService in CommunityService to get real-time member count
+	if communitySvc, ok := services.CommunityService.(interface {
+		SetMembershipService(service.MembershipService)
+	}); ok {
+		communitySvc.SetMembershipService(services.MembershipService)
 	}
 
 	// VoteService needs to be created first as PostService and CommentService depend on it
@@ -200,7 +207,14 @@ func Init() (*gin.Engine, error) {
 	router := gin.Default()
 
 	router.Use(func(c *gin.Context) {
-		c.Writer.Header().Set("Access-Control-Allow-Origin", config.Cfg.FrontendURL)
+		origin := c.Request.Header.Get("Origin")
+		allowedOrigins := []string{"http://localhost:5173", "http://localhost:5174"}
+		for _, allowedOrigin := range allowedOrigins {
+			if origin == allowedOrigin {
+				c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
+				break
+			}
+		}
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")

@@ -3,6 +3,8 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
+	"log"
 	"mime/multipart"
 	"time"
 
@@ -44,6 +46,10 @@ type PostService interface {
 	HidePost(userID, postID string) error
 	UnhidePost(userID, postID string) error
 	GetHiddenPosts(userID string, query *dto.GetPostsQuery) (*dto.PaginatedPostsResponse, error)
+
+	BanPost(postID string, reason *string) error
+	UnbanPost(postID string) error
+	GetBanPosts(query *dto.GetBanPostsQuery, requesterID string) (*dto.PaginatedPostsResponse, error)
 
 	VoteOnPoll(userID, postID, optionID string) (*dto.PollResponse, error)
 	RemovePollVote(userID, postID string) (*dto.PollResponse, error)
@@ -103,6 +109,60 @@ func (s *postService) CreatePost(userID string, req *dto.CreatePostRequest) (*dt
 		return nil, apperror.ErrInvalidID
 	}
 
+	// Get community settings and author info
+	community, err := s.communityRepo.GetByID(ctx, req.CommunityID)
+	if err != nil {
+		return nil, err
+	}
+
+	author, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Determine initial moderation status
+	var initialStatus model.ModerationStatus
+
+	// Check if user is admin, creator, or moderator
+	isAdminOrMod := author.Role == model.AdminRole
+	log.Printf("🔍 User %s - Role: %s, IsAdmin: %v", author.Username, author.Role, author.Role == model.AdminRole)
+
+	if !isAdminOrMod {
+		// Check if user is creator of this community
+		if community.CreateByID.Hex() == userID {
+			isAdminOrMod = true
+			log.Printf("✅ User is creator of community %s", community.Name)
+		}
+	}
+
+	if !isAdminOrMod {
+		// Check if user is moderator in this community
+		for _, mod := range community.Moderators {
+			if mod.UserID.Hex() == userID {
+				isAdminOrMod = true
+				log.Printf("✅ User is moderator in community %s", community.Name)
+				break
+			}
+		}
+	}
+
+	log.Printf("📋 Community %s - PostRequireApproval: %v", community.Name, community.Setting.PostRequireApproval)
+	log.Printf("👤 User %s - IsAdminOrMod: %v", author.Username, isAdminOrMod)
+
+	if isAdminOrMod {
+		// Admin/Moderator posts are always approved
+		initialStatus = model.ModerationSkipped
+		log.Printf("✅ Post will be SKIPPED (admin/mod)")
+	} else if community.Setting.PostRequireApproval {
+		// Community requires manual approval -> pending for mod review
+		initialStatus = model.ModerationPending
+		log.Printf("⏳ Post will be PENDING (manual approval)")
+	} else {
+		// Community uses AI moderation -> pending for AI check
+		initialStatus = model.ModerationPending
+		log.Printf("🤖 Post will be PENDING (AI check)")
+	}
+
 	post := &model.Post{
 		AuthorID:         authorID,
 		CommunityID:      communityID,
@@ -112,10 +172,24 @@ func (s *postService) CreatePost(userID string, req *dto.CreatePostRequest) (*dt
 		VotesCount:       &model.VotesCount{Up: 0, Down: 0},
 		CommentsCount:    0,
 		IsDeleted:        false,
+		IsHidden:         false,
+		IsDraft:          false,
+		IsBan:            false,
 		CreatedAt:        time.Now(),
 		Tags:             req.Tags,
-		ModerationStatus: model.ModerationPending, // Set pending for moderation
+		ModerationStatus: initialStatus,
 	}
+
+	fmt.Printf("📝 Creating post with:\n")
+	fmt.Printf("  - Title: %s\n", post.Title)
+	fmt.Printf("  - Type: %s\n", post.Type)
+	fmt.Printf("  - CommunityID: %s\n", post.CommunityID.Hex())
+	fmt.Printf("  - AuthorID: %s\n", post.AuthorID.Hex())
+	fmt.Printf("  - IsDeleted: %v\n", post.IsDeleted)
+	fmt.Printf("  - IsHidden: %v\n", post.IsHidden)
+	fmt.Printf("  - IsDraft: %v\n", post.IsDraft)
+	fmt.Printf("  - IsBan: %v\n", post.IsBan)
+	fmt.Printf("  - ModerationStatus: %s\n", post.ModerationStatus)
 
 	if req.Type == model.PostTypePoll && req.Poll != nil {
 		pollOptions := make([]model.PollOption, len(req.Poll.Options))
@@ -138,6 +212,8 @@ func (s *postService) CreatePost(userID string, req *dto.CreatePostRequest) (*dt
 	if err != nil {
 		return nil, err
 	}
+
+	log.Printf("✅ Post created in DB - ID: %s, Status: %s, IsDeleted: %v", createdPost.ID.Hex(), createdPost.ModerationStatus, createdPost.IsDeleted)
 
 	go s.voteService.VoteOnTarget(userID, createdPost.ID.Hex(), model.VoteTargetPost, true)
 
@@ -224,10 +300,14 @@ func (s *postService) GetPosts(userID string, query *dto.GetPostsQuery) (*dto.Pa
 	filter := s.buildFilter(query)
 	findOptions := s.buildFindOptions(query)
 
+	fmt.Printf("GetPosts filter: %+v\n", filter)
+
 	posts, totalPosts, err := s.postRepo.Find(ctx, filter, findOptions)
 	if err != nil {
 		return nil, err
 	}
+
+	fmt.Printf("Found %d posts\n", totalPosts)
 
 	if totalPosts == 0 {
 		return &dto.PaginatedPostsResponse{Posts: []*dto.PostResponse{}}, nil
@@ -289,8 +369,25 @@ func (s *postService) GetMyPosts(userID string, query *dto.GetPostsQuery) (*dto.
 	if err != nil {
 		return nil, err
 	}
+
+	limit := query.Limit
+	if limit <= 0 {
+		limit = 10
+	}
+	page := query.Page
+	if page <= 0 {
+		page = 1
+	}
+
 	if total == 0 {
-		return &dto.PaginatedPostsResponse{Posts: []*dto.PostResponse{}}, nil
+		return &dto.PaginatedPostsResponse{
+			Posts: []*dto.PostResponse{},
+			Pagination: dto.Pagination{
+				Page:     page,
+				PageSize: limit,
+				Total:    0,
+			},
+		}, nil
 	}
 
 	author, _ := s.userRepo.GetByID(ctx, userID)
@@ -310,15 +407,10 @@ func (s *postService) GetMyPosts(userID string, query *dto.GetPostsQuery) (*dto.
 
 	responses := dto.FromPostsWithModeration(posts, authorsMap, communitiesMap, userVotes, userPollVotes)
 
-	limit := query.Limit
-	if limit <= 0 {
-		limit = 10
-	}
-
 	return &dto.PaginatedPostsResponse{
 		Posts: responses,
 		Pagination: dto.Pagination{
-			Page:     query.Page,
+			Page:     page,
 			PageSize: limit,
 			Total:    total,
 		},
@@ -356,15 +448,9 @@ func (s *postService) UpdatePost(postID string, userID string, req *dto.UpdatePo
 		return s.GetPostByID(postID, userID)
 	}
 
-	// Check if user is admin/moderator
-	author, _ := s.userRepo.GetByID(ctx, userID)
-	isAdminOrMod := author != nil && (author.Role == "admin" || author.Role == "moderator")
-
-	// Set moderation status to pending for normal users
-	if !isAdminOrMod {
-		update["$set"].(bson.M)["moderation_status"] = model.ModerationPending
-		update["$set"].(bson.M)["moderation_reason"] = nil
-		update["$set"].(bson.M)["moderated_at"] = nil
+	// Mark post as edited if it was previously approved
+	if post.ModerationStatus == model.ModerationApproved {
+		update["$set"].(bson.M)["is_edited"] = true
 	}
 
 	update["$set"].(bson.M)["updated_at"] = time.Now()
@@ -724,6 +810,76 @@ func (s *postService) UnhidePost(userID, postID string) error {
 	return s.postRepo.UpdateByID(ctx, postID, update)
 }
 
+func (s *postService) BanPost(postID string, reason *string) error {
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
+
+	_, err := s.postRepo.GetByID(ctx, postID)
+	if err != nil {
+		return apperror.ErrPostNotFound
+	}
+
+	return s.postRepo.BanPost(ctx, postID, reason)
+}
+
+func (s *postService) UnbanPost(postID string) error {
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
+
+	_, err := s.postRepo.GetByID(ctx, postID)
+	if err != nil {
+		return apperror.ErrPostNotFound
+	}
+
+	return s.postRepo.UnbanPost(ctx, postID)
+}
+
+func (s *postService) GetBanPosts(query *dto.GetBanPostsQuery, requesterID string) (*dto.PaginatedPostsResponse, error) {
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
+
+	ok, err := s.communityRepo.IsModerator(ctx, query.CommunityID, requesterID)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, apperror.ErrForbidden
+	}
+
+	posts, total, err := s.postRepo.GetBannedPosts(ctx, query.CommunityID, query.Page, query.PageSize)
+	if err != nil {
+		return nil, err
+	}
+
+	if total == 0 {
+		return &dto.PaginatedPostsResponse{Posts: []*dto.PostResponse{}}, nil
+	}
+
+	// Since the author is the user, we can fetch their details once
+	author, _ := s.userRepo.GetByID(ctx, requesterID)
+	authorsMap := map[string]*model.User{requesterID: author}
+
+	// Fetch communities
+	_, communityIDs := s.extractIDs(posts)
+	communities, _ := s.communityRepo.GetByIDs(ctx, communityIDs)
+	communitiesMap := s.mapCommunities(communities)
+
+	// No need to check for votes on one's own hidden posts
+	userVotes := make(map[string]string)
+	userPollVotes := make(map[string][]string)
+
+	responses := dto.FromPosts(posts, authorsMap, communitiesMap, userVotes, userPollVotes)
+
+	return &dto.PaginatedPostsResponse{
+		Posts: responses,
+		Pagination: dto.Pagination{
+			Page:     query.Page,
+			PageSize: query.PageSize,
+			Total:    total,
+		},
+	}, nil
+}
+
 func (s *postService) GetHiddenPosts(userID string, query *dto.GetPostsQuery) (*dto.PaginatedPostsResponse, error) {
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
@@ -914,22 +1070,33 @@ func (s *postService) getPollResponse(ctx context.Context, postID, userID string
 
 func (s *postService) buildFilter(query *dto.GetPostsQuery) repo.Filter {
 	filter := repo.Filter{
-		"is_hidden":          bson.M{"$ne": true},
-		"is_draft":           bson.M{"$ne": true},
-		"moderation_status":  model.ModerationApproved,
+		"is_hidden":         bson.M{"$in": []interface{}{false, nil}},
+		"is_draft":          bson.M{"$in": []interface{}{false, nil}},
+		"is_ban":            bson.M{"$in": []interface{}{false, nil}},
+		"moderation_status": bson.M{"$in": []interface{}{model.ModerationApproved, model.ModerationSkipped}},
 	}
+
+	fmt.Printf("🔍 Building filter with base conditions:\n")
+	fmt.Printf("  - is_hidden: false or nil\n")
+	fmt.Printf("  - is_draft: false or nil\n")
+	fmt.Printf("  - is_ban: false or nil\n")
+	fmt.Printf("  - moderation_status: approved OR skipped\n")
+
 	if query.CommunityID != "" {
 		if id, err := primitive.ObjectIDFromHex(query.CommunityID); err == nil {
 			filter["community_id"] = id
+			fmt.Printf("  - community_id: %s\n", query.CommunityID)
 		}
 	}
 	if query.AuthorID != "" {
 		if id, err := primitive.ObjectIDFromHex(query.AuthorID); err == nil {
 			filter["author_id"] = id
+			fmt.Printf("  - author_id: %s\n", query.AuthorID)
 		}
 	}
 	if query.Type != "" {
 		filter["type"] = query.Type
+		fmt.Printf("  - type: %s\n", query.Type)
 	}
 
 	return filter

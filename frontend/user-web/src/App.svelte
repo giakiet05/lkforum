@@ -3,6 +3,7 @@
   import routes from "./routes";
   import Topbar from "./components/Topbar.svelte";
   import Sidebar from "./components/Sidebar.svelte";
+  import ToastContainer from "./components/ToastContainer.svelte";
   import { authStore, getInitialAuthState } from "./stores/auth-store";
   import { logout, validateAuth } from "./services/auth-service";
   import { push } from "svelte-spa-router";
@@ -23,7 +24,14 @@
       to: "/popular",
       icon: `<svg width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><g clip-path=\"url(#clip0_20_157)\"><path d=\"M23.2499 12.751L12.7769 23.25\" stroke=\"currentColor\" stroke-opacity=\"0.7\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M17.25 12.751H23.25V18.75\" stroke=\"currentColor\" stroke-opacity=\"0.7\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M18.75 0.75V5.25H12.75V11.25H6.75V17.25H0.75V23.25\" stroke=\"currentColor\" stroke-opacity=\"0.7\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></g><defs><clipPath id=\"clip0_20_157\"><rect width=\"24\" height=\"24\" fill=\"white\"/></clipPath></defs></svg>`,
     },
-    { id: "explore", label: "Explore", to: "/explore", icon: "🧭" },
+    {
+      id: "explore",
+      label: "Explore",
+      to: "/explore",
+      icon: `<svg width=\"20\" height=\"20\" viewBox=\"0 0 16 16\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">
+      <path fill-rule=\"evenodd\" clip-rule=\"evenodd\" d=\"M11.8957 3.33209L10.8016 4.06159L11.9615 6.9595L13.2837 6.57143L11.8957 3.33209ZM9.66815 4.81615L3.05234 9.2274L3.20634 9.53543L10.6762 7.3375L9.66815 4.81615ZM12.49 1.3335L15.1016 7.42709L10.1902 8.8715L12.1669 14.1267L10.9185 14.5949L8.9075 9.24884L8.0035 9.51415L6.13906 14.5954L4.91353 14.0702L6.4135 9.98215L2.51275 11.1297L1.3335 8.77118L12.49 1.3335Z\" fill=\"currentColor\"/>
+    </svg>`,
+    },
     {
       id: "all",
       label: "All",
@@ -68,11 +76,13 @@
   // Subscribe to authStore để update realtime khi login/logout
   authStore.subscribe((state) => {
     if (state.user) {
+      console.log("User data in authStore:", state.user);
       topbarUser = {
         name: state.user.username || state.user.email || "User",
-        avatar: state.user.profile?.avatar?.url, // Lấy avatar từ profile
-        karma: state.user.reputation, // Lấy reputation (karma) từ user
+        avatar: state.user.profile?.avatar?.url,
+        karma: state.user.reputation || 0,
       };
+      console.log("Topbar user:", topbarUser);
     } else {
       topbarUser = undefined;
     }
@@ -106,6 +116,7 @@
       <Router {routes} />
     </main>
   </div>
+  <ToastContainer />
 {/if}
 
 <style>

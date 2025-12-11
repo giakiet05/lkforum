@@ -3,6 +3,7 @@ package repo
 import (
 	"context"
 	"errors"
+	"log"
 	"time"
 
 	"github.com/giakiet05/lkforum/internal/apperror"
@@ -25,7 +26,11 @@ type PostRepo interface {
 	Delete(ctx context.Context, id string) error
 	SoftDelete(ctx context.Context, id string) error
 	Increment(ctx context.Context, id string, field string, value int) error
-	
+
+	BanPost(ctx context.Context, postID string, reason *string) error
+	UnbanPost(ctx context.Context, postID string) error
+	GetBannedPosts(ctx context.Context, communityID string, page int, pageSize int) ([]*model.Post, int64, error)
+
 	// Stats methods
 	CountTotal(ctx context.Context) (int64, error)
 	CountCreatedAfter(ctx context.Context, since time.Time) (int64, error)
@@ -96,11 +101,15 @@ func (r *postRepo) GetByIDs(ctx context.Context, ids []string) ([]*model.Post, e
 
 // Find fetches paginated data and total count using two separate queries for simplicity and robustness.
 func (r *postRepo) Find(ctx context.Context, filter Filter, opts *FindOptions) ([]*model.Post, int64, error) {
+	log.Printf("🔍 postRepo.Find - Filter: %+v", filter)
+
 	// 1. Get total count using an aggregation pipeline to avoid potential bugs in CountDocuments.
 	countPipeline := mongo.Pipeline{
 		{{"$match", bson.M(filter)}},
 		{{"$count", "total"}},
 	}
+
+	log.Printf("📊 Aggregation pipeline: %+v", countPipeline)
 	cursor, err := r.collection.Aggregate(ctx, countPipeline)
 	if err != nil {
 		return nil, 0, err
@@ -118,8 +127,11 @@ func (r *postRepo) Find(ctx context.Context, filter Filter, opts *FindOptions) (
 		total = countResult[0].Total
 	}
 
+	log.Printf("📊 Count result: %d documents", total)
+
 	// If there are no documents, return early
 	if total == 0 {
+		log.Printf("⚠️ No documents found with filter, returning empty array")
 		return []*model.Post{}, 0, nil
 	}
 
@@ -200,6 +212,46 @@ func (r *postRepo) SoftDelete(ctx context.Context, id string) error {
 func (r *postRepo) Increment(ctx context.Context, id string, field string, value int) error {
 	update := UpdateDocument{"$inc": bson.M{field: value}}
 	return r.UpdateByID(ctx, id, update)
+}
+
+func (r *postRepo) BanPost(ctx context.Context, postID string, reason *string) error {
+	update := UpdateDocument{"$set": bson.M{"is_ban": true, "ban_reason": &reason}}
+	return r.UpdateByID(ctx, postID, update)
+}
+
+func (r *postRepo) UnbanPost(ctx context.Context, postID string) error {
+	update := UpdateDocument{"$set": bson.M{"is_ban": false, "ban_reason": nil}}
+	return r.UpdateByID(ctx, postID, update)
+}
+
+func (r *postRepo) GetBannedPosts(ctx context.Context, communityID string, page int, pageSize int) ([]*model.Post, int64, error) {
+	filter := bson.M{"is_ban": true, "community_id": communityID}
+	skip := int64((page - 1) * pageSize)
+
+	findOptions := options.Find().
+		SetSkip(skip).
+		SetLimit(int64(pageSize)).
+		SetSort(bson.D{{Key: "created_at", Value: -1}}) // Sort by newest first
+
+	cursor, err := r.collection.Find(ctx, filter, findOptions)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer cursor.Close(ctx)
+
+	var posts []*model.Post
+	if err := cursor.All(ctx, &posts); err != nil {
+		return nil, 0, err
+	}
+
+	// Get total count of banned posts
+	total, err := r.collection.CountDocuments(ctx, filter)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return posts, total, nil
+
 }
 
 // Stats methods implementations

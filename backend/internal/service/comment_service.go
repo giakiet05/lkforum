@@ -64,11 +64,11 @@ func (s *commentService) CreateComment(request *dto.CreateCommentRequest, userID
 		return nil, err
 	}
 
-	ok, err := s.communityRepo.IsUserBanned(ctx, userID, model.Muted, post.CommunityID.Hex())
+	isBanned, err := s.communityRepo.IsUserBanned(ctx, userID, model.Muted, post.CommunityID.Hex())
 	if err != nil {
 		return nil, err
 	}
-	if !ok {
+	if isBanned {
 		return nil, apperror.ErrUserIsMuted
 	}
 
@@ -100,18 +100,23 @@ func (s *commentService) CreateComment(request *dto.CreateCommentRequest, userID
 	}
 
 	comment := &model.Comment{
-		Author:           author,
-		PostID:           postObjectID,
-		ParentID:         parentObjectID,
-		Content:          request.Content,
-		CreatedAt:        time.Now(),
-		IsDeleted:        false,
-		ModerationStatus: model.ModerationPending, // Set pending for moderation
+		Author:    author,
+		PostID:    postObjectID,
+		ParentID:  parentObjectID,
+		Content:   request.Content,
+		CreatedAt: time.Now(),
+		IsDeleted: false,
 	}
 
 	createdComment, err := s.commentRepo.Create(ctx, comment)
 	if err != nil {
 		return nil, err
+	}
+
+	// Increment post's comment count
+	if err := s.postRepo.Increment(ctx, request.PostID, "comments_count", 1); err != nil {
+		// Log error but don't fail the comment creation
+		// TODO: Add proper logging
 	}
 
 	// Publish event for moderation
@@ -237,5 +242,16 @@ func (s *commentService) DeleteCommentByID(commentID string, userID string) erro
 		return apperror.ErrForbidden
 	}
 
-	return s.commentRepo.Delete(ctx, commentID)
+	if err := s.commentRepo.Delete(ctx, commentID); err != nil {
+		return err
+	}
+
+	// Decrement post's comment count
+	postID := comment.PostID.Hex()
+	if err := s.postRepo.Increment(ctx, postID, "comments_count", -1); err != nil {
+		// Log error but don't fail the deletion
+		// TODO: Add proper logging
+	}
+
+	return nil
 }

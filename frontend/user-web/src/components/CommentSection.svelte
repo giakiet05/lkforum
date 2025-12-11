@@ -10,9 +10,12 @@
 
   type CommentSectionProps = {
     postId: string;
+    onCommentAdded?: () => void;
+    onTotalCommentsChange?: (total: number) => void;
   };
 
-  let { postId }: CommentSectionProps = $props();
+  let { postId, onCommentAdded, onTotalCommentsChange }: CommentSectionProps =
+    $props();
 
   type SortType = "top" | "newest" | "oldest" | "controversial";
 
@@ -25,6 +28,7 @@
   let isLoading = $state(true);
   let isSubmitting = $state(false);
   let totalComments = $state(0);
+  let errorMessage = $state<string | null>(null);
 
   const currentUser = $derived($authStore.user);
 
@@ -40,9 +44,20 @@
         post_id: postId,
         page: 1,
         page_size: 50,
+        depth: 2, // Backend allows max depth of 2
       });
-      comments = response.comments || [];
+      console.log("📥 loadComments response:", response);
+      console.log(
+        "📅 First comment created_at:",
+        response.comments?.[0]?.created_at
+      );
+      // Force reactivity by creating new array reference
+      comments = [...(response.comments || [])];
+      console.log("📝 comments array:", comments);
       totalComments = response.pagination?.total || comments.length;
+
+      // Notify parent of total comments count
+      if (onTotalCommentsChange) onTotalCommentsChange(totalComments);
     } catch (error) {
       console.error("Failed to load comments:", error);
     } finally {
@@ -54,6 +69,11 @@
   const sortedComments = $derived(
     (() => {
       const commentsToSort = [...comments];
+      console.log(
+        "🔄 sortedComments recalculating, comments.length:",
+        comments.length
+      );
+      console.log("🔄 sortedComments array:", commentsToSort);
 
       switch (sortBy) {
         case "top":
@@ -86,28 +106,37 @@
   const submitComment = async () => {
     if (!newCommentContent.trim()) return;
     if (!currentUser) {
-      alert("Please login to comment");
+      errorMessage = "Please login to comment";
       return;
     }
 
     try {
       isSubmitting = true;
-      await createComment({
-        user_id: currentUser.id,
-        username: currentUser.username,
-        user_avatar: currentUser.profile?.avatar?.url || "",
+      errorMessage = null;
+      const newComment = await createComment({
         post_id: postId,
         content: newCommentContent,
       });
 
-      await loadComments();
+      console.log("✅ Comment created:", newComment);
+      console.log("📅 New comment created_at:", newComment.created_at);
+
+      // Optimistic UI update: add the new comment immediately
+      comments = [newComment, ...comments];
+      totalComments += 1;
+      console.log("✅ Comment added to UI, total:", comments.length);
+
+      // Notify parent component
+      if (onCommentAdded) onCommentAdded();
 
       newCommentContent = "";
       selectedImage = null;
       imagePreview = null;
-    } catch (error) {
-      console.error("Failed to submit comment:", error);
-      alert("Failed to post comment. Please try again.");
+    } catch (error: any) {
+      console.error("❌ Failed to submit comment:", error);
+      // Show specific error message from backend
+      errorMessage =
+        error?.message || "Failed to post comment. Please try again.";
     } finally {
       isSubmitting = false;
     }
@@ -138,6 +167,15 @@
 </script>
 
 <div class="comment-section">
+  <!-- Error Message -->
+  {#if errorMessage}
+    <div class="error-banner">
+      <img src="/error.svg" alt="Error" width="20" height="20" />
+      <span>{errorMessage}</span>
+      <button class="close-btn" onclick={() => (errorMessage = null)}>×</button>
+    </div>
+  {/if}
+
   <!-- Comment Input Box -->
   <div class="add-comment">
     <textarea
@@ -145,6 +183,12 @@
       placeholder="What are your thoughts?"
       class="comment-textarea"
       rows="4"
+      onkeydown={(e) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
+          submitComment();
+        }
+      }}
     ></textarea>
 
     {#if imagePreview}
@@ -274,7 +318,7 @@
     {#if isLoading}
       <div class="loading">Loading comments...</div>
     {:else}
-      {#each sortedComments as comment}
+      {#each sortedComments as comment (comment.id)}
         <CommentComponent {comment} depth={0} onUpdate={loadComments} />
       {/each}
       {#if sortedComments.length === 0}
@@ -295,6 +339,50 @@
     border-radius: 4px;
     padding: 16px;
     margin-top: 16px;
+  }
+
+  .error-banner {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    background-color: #fee;
+    border: 1px solid #fcc;
+    border-radius: 4px;
+    color: #c00;
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  .error-banner svg {
+    flex-shrink: 0;
+  }
+
+  .error-banner span {
+    flex: 1;
+  }
+
+  .close-btn {
+    background: none;
+    border: none;
+    color: #c00;
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: background 0.2s;
+  }
+
+  .close-btn:hover {
+    background: rgba(204, 0, 0, 0.1);
   }
 
   /* Add Comment */

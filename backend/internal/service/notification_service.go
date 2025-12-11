@@ -21,6 +21,8 @@ type NotificationService interface {
 	Start()
 	GetNotifications(recipientID string, page, pageSize int) (*dto.PaginatedNotificationsResponse, error)
 	MarkAllAsRead(recipientID string) (int64, error)
+	MarkAsRead(notificationID, recipientID string) error
+	DeleteNotification(notificationID, recipientID string) error
 }
 
 type notificationService struct {
@@ -28,6 +30,7 @@ type notificationService struct {
 	userRepo         repo.UserRepo
 	postRepo         repo.PostRepo
 	commentRepo      repo.CommentRepo
+	communityRepo    repo.CommunityRepo
 	eventBus         bus.EventBus
 	redisClient      *redis.Client
 }
@@ -37,6 +40,7 @@ func NewNotificationService(
 	userRepo repo.UserRepo,
 	postRepo repo.PostRepo,
 	commentRepo repo.CommentRepo,
+	communityRepo repo.CommunityRepo,
 	bus bus.EventBus,
 	redis *redis.Client,
 ) NotificationService {
@@ -45,6 +49,7 @@ func NewNotificationService(
 		userRepo:         userRepo,
 		postRepo:         postRepo,
 		commentRepo:      commentRepo,
+		communityRepo:    communityRepo,
 		eventBus:         bus,
 		redisClient:      redis,
 	}
@@ -58,6 +63,7 @@ func (s *notificationService) Start() {
 	s.eventBus.Subscribe(bus.TopicCommentApproved, eventChannel)
 	s.eventBus.Subscribe(bus.TopicCommentUpvoted, eventChannel)
 	s.eventBus.Subscribe(bus.TopicBroadcast, eventChannel)
+	s.eventBus.Subscribe(bus.TopicModeratorAdded, eventChannel)
 
 	log.Println("NotificationService started and subscribed to events.")
 
@@ -76,6 +82,8 @@ func (s *notificationService) processEvents(ch bus.EventListener) {
 			s.handleCommentApprovedForPost(event)
 		case bus.TopicCommentUpvoted:
 			s.handleCommentUpvoted(event)
+		case bus.TopicModeratorAdded:
+			s.handleModeratorsAdded(event)
 		case bus.TopicBroadcast:
 			s.handleBroadcast(event)
 		}
@@ -396,6 +404,58 @@ func (s *notificationService) handleCommentApprovedForPost(event bus.Event) {
 	}
 }
 
+func (s *notificationService) handleModeratorsAdded(event bus.Event) {
+	payload := event.Payload()
+
+	communityID, _ := payload["community_id"].(string)
+	moderatorIDs, _ := payload["moderator_ids"].([]string)
+
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
+
+	community, err := s.communityRepo.GetByID(ctx, communityID)
+	if err != nil {
+		log.Printf("ERROR: NotificationService: failed to get community: %v", err)
+		return
+	}
+
+	communityObjID, _ := primitive.ObjectIDFromHex(communityID)
+
+	for _, moderatorID := range moderatorIDs {
+
+		recipientObjID, err := primitive.ObjectIDFromHex(moderatorID)
+		if err != nil {
+			log.Printf("ERROR: NotificationService: invalid moderatorID: %v", err)
+			continue
+		}
+
+		notification := &model.Notification{
+			RecipientID: recipientObjID,
+			ActorID:     communityObjID,
+			Type:        model.NotificationTypeSystem,
+			Message:     fmt.Sprintf("Bạn được mời làm moderator của cộng đồng %s", community.Name),
+			Link:        fmt.Sprintf("/communities/%s", community.Name),
+			IsRead:      false,
+			Metadata: map[string]interface{}{
+				"community_id": communityID,
+				"action_type":  "moderator_invitation",
+			},
+			CreatedAt: time.Now(),
+		}
+
+		createdNotification, err := s.notificationRepo.Create(ctx, notification)
+		if err != nil {
+			log.Printf("ERROR: NotificationService: failed to create notification: %v", err)
+			continue
+		}
+
+		s.eventBus.Publish(bus.NotificationCreatedEvent{
+			RecipientID:  moderatorID,
+			Notification: dto.FromNotification(createdNotification),
+		})
+	}
+}
+
 func (s *notificationService) handleBroadcast(event bus.Event) {
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
@@ -482,6 +542,30 @@ func (s *notificationService) MarkAllAsRead(recipientID string) (int64, error) {
 	defer cancel()
 
 	return s.notificationRepo.MarkAllAsRead(ctx, recipientID)
+}
+
+func (s *notificationService) MarkAsRead(notificationID, recipientID string) error {
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
+
+	objID, err := primitive.ObjectIDFromHex(notificationID)
+	if err != nil {
+		return fmt.Errorf("invalid notification ID: %w", err)
+	}
+
+	return s.notificationRepo.MarkAsRead(ctx, objID, recipientID)
+}
+
+func (s *notificationService) DeleteNotification(notificationID, recipientID string) error {
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
+
+	objID, err := primitive.ObjectIDFromHex(notificationID)
+	if err != nil {
+		return fmt.Errorf("invalid notification ID: %w", err)
+	}
+
+	return s.notificationRepo.DeleteNotification(ctx, objID, recipientID)
 }
 
 // ========== Redis Batching Helpers ==========

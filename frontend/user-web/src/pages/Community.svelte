@@ -3,9 +3,13 @@
   import { push } from "svelte-spa-router";
   import Post from "../components/Post.svelte";
   import CreatePostModal from "../components/CreatePostModal.svelte";
+  import { toastStore } from "../stores/toast-store";
   import type { PostResponse } from "../dtos/post-dto";
   import type { CommunityResponse } from "../dtos/community-dto";
-  import { getCommunityById } from "../services/community-service";
+  import {
+    getCommunityByName,
+    addModerators,
+  } from "../services/community-service";
   import { getPosts } from "../services/post-service";
   import { authStore } from "../stores/auth-store";
   import {
@@ -13,6 +17,7 @@
     createMembership,
     deleteMembership,
   } from "../services/membership-service";
+  import { getUserByUsername } from "../services/user-service";
 
   type CommunityProps = {
     params?: { name: string };
@@ -57,26 +62,26 @@
     return community.create_by_id === currentUser.id;
   });
 
+  // Check if current user is a moderator of this community
+  const isModerator = $derived(() => {
+    const currentUser = $authStore.user;
+    if (!currentUser || !community) return false;
+    return (
+      community.moderators?.some((mod) => mod.user_id === currentUser.id) ||
+      false
+    );
+  });
+
+  // Check if current user can access mod tools (creator or moderator)
+  const canUseModeTools = $derived(() => isCreator() || isModerator());
+
   // Load community data
   async function loadCommunity() {
     try {
       isLoadingCommunity = true;
       communityError = null;
 
-      // TODO: Backend needs endpoint to get community by name, not just by ID
-      // For now, we need to fetch all communities and find by name
-      // Or backend should add GET /api/communities/by-name/:name
-      const communities = await import("../services/community-service").then(
-        (m) => m.getCommunities({ limit: 100 })
-      );
-      const found = communities.communities.find((c) => c.name === params.name);
-
-      if (!found) {
-        communityError = "Community not found";
-        community = null;
-      } else {
-        community = found;
-      }
+      community = await getCommunityByName(params.name);
     } catch (error) {
       console.error("Failed to load community:", error);
       communityError =
@@ -109,6 +114,7 @@
         limit: postsPerPage,
       });
 
+      console.log("📦 Fetched posts response:", fetchedPosts);
       console.log(`✅ Loaded ${fetchedPosts.length} posts`);
       posts = fetchedPosts;
     } catch (error) {
@@ -204,13 +210,13 @@
   async function toggleJoin() {
     const currentUser = $authStore.user;
     if (!currentUser || !community) {
-      alert("Please login to join communities");
+      toastStore.warning("Please login to join communities");
       return;
     }
 
     // Prevent creator from leaving their own community
     if (isCreator()) {
-      alert("You cannot leave a community you created!");
+      toastStore.warning("You cannot leave a community you created!");
       return;
     }
 
@@ -236,7 +242,7 @@
       }
     } catch (error) {
       console.error("❌ Failed to toggle membership:", error);
-      alert(
+      toastStore.error(
         error instanceof Error ? error.message : "Failed to update membership"
       );
     } finally {
@@ -257,6 +263,10 @@
     push(`/lk/${params.name}/mod`);
   }
 
+  function handleSettings() {
+    push(`/lk/${params.name}/settings`);
+  }
+
   function handleOpenInviteModModal() {
     showInviteModModal = true;
     inviteUsername = "";
@@ -271,18 +281,41 @@
     inviteCanEdit = true;
   }
 
-  function handleInviteMod() {
-    if (!inviteUsername.trim()) {
-      alert("Please enter a username!");
+  async function handleInviteMod() {
+    if (!inviteUsername.trim() || !community) {
+      toastStore.warning("Please enter a username!");
       return;
     }
+
     console.log("Invite mod:", {
       username: inviteUsername,
       permission: invitePermission,
       canEdit: inviteCanEdit,
     });
-    alert(`Invitation sent to ${inviteUsername} to become moderator!`);
-    handleCloseInviteModModal();
+
+    try {
+      console.log("🔍 Looking up user:", inviteUsername.trim());
+      const user = await getUserByUsername(inviteUsername.trim());
+      console.log("✅ User found:", user);
+
+      console.log("📤 Adding moderator to community:", community.id);
+      await addModerators({
+        id: community.id,
+        added_moderator: [user.id], // Just send user ID
+      });
+
+      console.log("✅ Moderator added successfully!");
+      toastStore.success(`${inviteUsername} added as moderator!`);
+      handleCloseInviteModModal();
+
+      // Reload community to get updated moderators
+      await loadCommunity();
+    } catch (error) {
+      console.error("❌ Failed to add moderator:", error);
+      toastStore.error(
+        "Failed to add moderator. Please check the username and try again."
+      );
+    }
   }
 
   onMount(() => {
@@ -343,19 +376,21 @@
             {/if}
           </button>
 
-          <!-- Create Post Button -->
-          <button
-            class="create-post-action-btn"
-            title="Create post"
-            onclick={() => (showCreatePostModal = true)}
-          >
-            <svg viewBox="0 0 20 20" fill="currentColor">
-              <path
-                d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
-              />
-            </svg>
-            Create post
-          </button>
+          <!-- Create Post Button - Only show if joined -->
+          {#if isJoined}
+            <button
+              class="create-post-action-btn"
+              title="Create post"
+              onclick={() => (showCreatePostModal = true)}
+            >
+              <svg viewBox="0 0 20 20" fill="currentColor">
+                <path
+                  d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
+                />
+              </svg>
+              Create post
+            </button>
+          {/if}
 
           <!-- Notification Bell Button -->
           <button class="action-btn" title="Notifications">
@@ -366,30 +401,36 @@
             </svg>
           </button>
 
-          <!-- Mod Tools Button -->
-          <button
-            class="mod-tools-btn"
-            title="Moderator tools"
-            onclick={handleModTools}
-          >
-            <svg viewBox="0 0 20 20" fill="currentColor">
-              <path
-                fill-rule="evenodd"
-                d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z"
-                clip-rule="evenodd"
-              />
-            </svg>
-            Mod tools
-          </button>
+          <!-- Mod Tools Button - Only show if creator or moderator -->
+          {#if canUseModeTools()}
+            <button
+              class="mod-tools-btn"
+              title="Moderator tools"
+              onclick={handleModTools}
+            >
+              <svg viewBox="0 0 20 20" fill="currentColor">
+                <path
+                  fill-rule="evenodd"
+                  d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z"
+                  clip-rule="evenodd"
+                />
+              </svg>
+              Mod tools
+            </button>
 
-          <!-- More Options Button -->
-          <button class="action-btn" title="More options">
-            <svg viewBox="0 0 20 20" fill="currentColor">
-              <path
-                d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"
-              />
-            </svg>
-          </button>
+            <!-- More Options Button -->
+            <button
+              class="action-btn"
+              title="More options"
+              onclick={handleSettings}
+            >
+              <svg viewBox="0 0 20 20" fill="currentColor">
+                <path
+                  d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"
+                />
+              </svg>
+            </button>
+          {/if}
         </div>
       </div>
     </div>
@@ -520,30 +561,32 @@
         <div class="moderators-card">
           <div class="moderators-header">
             <h3>Moderators</h3>
-            <button
-              class="invite-mod-btn"
-              title="Invite moderator"
-              onclick={handleOpenInviteModModal}
-            >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 20 20"
-                fill="currentColor"
+            {#if isCreator()}
+              <button
+                class="invite-mod-btn"
+                title="Invite moderator"
+                onclick={handleOpenInviteModModal}
               >
-                <path
-                  d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 016 6H2a6 6 0 016-6zm10-5a1 1 0 10-2 0v1h-1a1 1 0 100 2h1v1a1 1 0 102 0v-1h1a1 1 0 100-2h-1V6z"
-                />
-              </svg>
-              Invite Mod
-            </button>
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path
+                    d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 016 6H2a6 6 0 016-6zm10-5a1 1 0 10-2 0v1h-1a1 1 0 100 2h1v1a1 1 0 102 0v-1h1a1 1 0 100-2h-1V6z"
+                  />
+                </svg>
+                Invite Mod
+              </button>
+            {/if}
           </div>
           <div class="moderator-list">
-            {#if community.moderators && community.moderators.length > 0}
-              {#each community.moderators as moderator}
+            {#if community.moderators && community.moderators.filter((m) => m.is_active).length > 0}
+              {#each community.moderators.filter((m) => m.is_active) as moderator}
                 <div class="moderator">
                   <img
-                    src={moderator.avatar || "/avatar.jpg"}
+                    src={moderator.avatar?.url || "/avatar.jpg"}
                     alt="Moderator"
                     class="mod-avatar"
                   />
@@ -554,7 +597,7 @@
               <p class="no-moderators">No moderators yet</p>
             {/if}
           </div>
-          {#if community.moderators && community.moderators.length > 3}
+          {#if community.moderators && community.moderators.filter((m) => m.is_active).length > 3}
             <button class="view-all-mods-btn">View all moderators</button>
           {/if}
         </div>
@@ -813,6 +856,32 @@
 
   .mod-tools-btn:hover {
     background: var(--darkblue--);
+  }
+
+  .settings-btn {
+    background: white;
+    color: var(--blue--);
+    border: 1px solid var(--blue--);
+    padding: 8px 16px;
+    border-radius: 9999px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: "Roboto", sans-serif;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+  }
+
+  .settings-btn:hover {
+    background: #f6f7f8;
+  }
+
+  .settings-btn svg {
+    width: 16px;
+    height: 16px;
   }
 
   .community-icon {

@@ -13,6 +13,7 @@ type NotificationResponse struct {
 	Message   string                 `json:"message"`
 	Link      string                 `json:"link"`
 	IsRead    bool                   `json:"is_read"`
+	Metadata  map[string]interface{} `json:"metadata,omitempty"`
 	CreatedAt time.Time              `json:"created_at"`
 	// We can add actor information here later if needed
 	// Actor     *ShortUserResponse `json:"actor,omitempty"`
@@ -32,6 +33,7 @@ func FromNotification(n *model.Notification) NotificationResponse {
 		Message:   n.Message,
 		Link:      n.Link,
 		IsRead:    n.IsRead,
+		Metadata:  n.Metadata,
 		CreatedAt: n.CreatedAt,
 	}
 }

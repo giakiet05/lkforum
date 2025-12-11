@@ -37,6 +37,20 @@ func (m *MockPostRepo) EXPECT() *MockPostRepoMockRecorder {
 	return m.recorder
 }
 
+// BanPost mocks base method.
+func (m *MockPostRepo) BanPost(ctx context.Context, postID string, reason *string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "BanPost", ctx, postID, reason)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// BanPost indicates an expected call of BanPost.
+func (mr *MockPostRepoMockRecorder) BanPost(ctx, postID, reason interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BanPost", reflect.TypeOf((*MockPostRepo)(nil).BanPost), ctx, postID, reason)
+}
+
 // CountCreatedAfter mocks base method.
 func (m *MockPostRepo) CountCreatedAfter(ctx context.Context, since time.Time) (int64, error) {
 	m.ctrl.T.Helper()
@@ -127,6 +141,22 @@ func (mr *MockPostRepoMockRecorder) Find(ctx, filter, opts interface{}) *gomock.
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Find", reflect.TypeOf((*MockPostRepo)(nil).Find), ctx, filter, opts)
 }
 
+// GetBannedPosts mocks base method.
+func (m *MockPostRepo) GetBannedPosts(ctx context.Context, communityID string, page, pageSize int) ([]*model.Post, int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetBannedPosts", ctx, communityID, page, pageSize)
+	ret0, _ := ret[0].([]*model.Post)
+	ret1, _ := ret[1].(int64)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// GetBannedPosts indicates an expected call of GetBannedPosts.
+func (mr *MockPostRepoMockRecorder) GetBannedPosts(ctx, communityID, page, pageSize interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBannedPosts", reflect.TypeOf((*MockPostRepo)(nil).GetBannedPosts), ctx, communityID, page, pageSize)
+}
+
 // GetByID mocks base method.
 func (m *MockPostRepo) GetByID(ctx context.Context, id string) (*model.Post, error) {
 	m.ctrl.T.Helper()
@@ -183,6 +213,20 @@ func (m *MockPostRepo) SoftDelete(ctx context.Context, id string) error {
 func (mr *MockPostRepoMockRecorder) SoftDelete(ctx, id interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SoftDelete", reflect.TypeOf((*MockPostRepo)(nil).SoftDelete), ctx, id)
+}
+
+// UnbanPost mocks base method.
+func (m *MockPostRepo) UnbanPost(ctx context.Context, postID string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UnbanPost", ctx, postID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UnbanPost indicates an expected call of UnbanPost.
+func (mr *MockPostRepoMockRecorder) UnbanPost(ctx, postID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UnbanPost", reflect.TypeOf((*MockPostRepo)(nil).UnbanPost), ctx, postID)
 }
 
 // Update mocks base method.

@@ -1,10 +1,15 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import AuthModal from "./AuthModal.svelte";
   import CreatePostModal from "./CreatePostModal.svelte";
   import ChatPopup from "./ChatPopup.svelte";
+  import NotificationsDropdown from "./NotificationsDropdown.svelte";
   import { push } from "svelte-spa-router";
   import { getCommunities } from "../services/community-service";
   import type { CommunityResponse } from "../dtos/community-dto";
+  import { searchUsers } from "../services/user-service";
+  import type { UserResponse } from "../dtos/user-dto";
+  import { getNotifications } from "../services/notification-service";
 
   type TopbarProps = {
     user?: { name: string; avatar?: string; karma?: number };
@@ -26,41 +31,76 @@
 
   let searchQuery = $state("");
   let showUserMenu = $state(false);
+  let showNotifications = $state(false);
   let showAuthModal = $state(false);
   let showCreatePostModal = $state(false);
   let showChatPopup = $state(false);
-  let dropdownElement: HTMLDivElement | null = null;
+  let dropdownElement = $state<HTMLDivElement | null>(null);
+  let unreadNotificationCount = $state(0);
+
+  // Load unread notification count on mount
+  onMount(async () => {
+    if (user) {
+      try {
+        const response = await getNotifications({ page: 1, limit: 1 });
+        const unreadCount =
+          response.notifications?.filter((n) => !n.is_read).length || 0;
+        unreadNotificationCount = unreadCount;
+      } catch (err) {
+        console.error("Failed to load initial notification count:", err);
+      }
+    }
+  });
 
   // Search dropdown state
   let showSearchDropdown = $state(false);
-  let searchResults = $state<CommunityResponse[]>([]);
+  let communityResults = $state<CommunityResponse[]>([]);
+  let userResults = $state<UserResponse[]>([]);
   let isSearching = $state(false);
   let searchTimeout: number | null = null;
 
   async function performSearch(query: string) {
     if (!query.trim()) {
-      searchResults = [];
+      communityResults = [];
+      userResults = [];
       showSearchDropdown = false;
       return;
     }
 
     try {
       isSearching = true;
-      // Remove c/ or lk/ prefix if user typed it
-      const cleanQuery = query.replace(/^(c\/|lk\/)/i, "").trim();
+      const cleanQuery = query.replace(/^(c\/|lk\/|u\/)/i, "").trim();
       if (!cleanQuery) {
-        searchResults = [];
+        communityResults = [];
+        userResults = [];
         showSearchDropdown = false;
         isSearching = false;
         return;
       }
 
-      const response = await getCommunities({ name: cleanQuery, limit: 5 });
-      searchResults = response.communities;
-      showSearchDropdown = searchResults.length > 0;
+      // Search both communities and users in parallel
+      const [communitiesResponse, usersResponse] = await Promise.all([
+        getCommunities({
+          name: cleanQuery,
+          limit: 3,
+        }).catch(() => ({
+          communities: [],
+          pagination: { page: 1, page_size: 0, total_items: 0, total_pages: 0 },
+        })),
+        searchUsers(cleanQuery, 1, 3).catch(() => ({
+          users: [],
+          pagination: { page: 1, page_size: 0, total_items: 0, total_pages: 0 },
+        })),
+      ]);
+
+      communityResults = communitiesResponse?.communities || [];
+      userResults = usersResponse?.users || [];
+      showSearchDropdown =
+        communityResults.length > 0 || userResults.length > 0;
     } catch (error) {
       console.error("Search failed:", error);
-      searchResults = [];
+      communityResults = [];
+      userResults = [];
       showSearchDropdown = false;
     } finally {
       isSearching = false;
@@ -95,14 +135,27 @@
   }
 
   function handleCommunityClick(communityName: string) {
-    push(`/c/${communityName}`);
+    console.log("🔍 Navigating to community:", communityName);
+    push(`/lk/${communityName}`);
     searchQuery = "";
-    searchResults = [];
+    communityResults = [];
+    userResults = [];
+    showSearchDropdown = false;
+  }
+
+  function handleUserClick(username: string) {
+    push(`/profile/${username}`);
+    searchQuery = "";
+    communityResults = [];
+    userResults = [];
     showSearchDropdown = false;
   }
 
   function handleSearchFocus() {
-    if (searchQuery.trim() && searchResults.length > 0) {
+    if (
+      searchQuery.trim() &&
+      (communityResults.length > 0 || userResults.length > 0)
+    ) {
       showSearchDropdown = true;
     }
   }
@@ -177,7 +230,7 @@
 <header class="topbar">
   <div class="topbar-container">
     <div class="topbar-left">
-      <div class="brand" role="button" tabindex="0" on:click={() => {}}>
+      <div class="brand" role="button" tabindex="0" onclick={() => {}}>
         <img src="/LKlogo.svg" alt="LKForum" class="brand-icon" />
         <span class="brand-name">LKForum</span>
       </div>
@@ -211,35 +264,68 @@
           <input
             class="search-input"
             type="text"
-            placeholder="Search communities"
+            placeholder="Search communities and users"
             bind:value={searchQuery}
-            on:input={handleSearchInput}
-            on:keydown={handleSearchKeydown}
-            on:focus={handleSearchFocus}
-            on:blur={handleSearchBlur}
+            oninput={handleSearchInput}
+            onkeydown={handleSearchKeydown}
+            onfocus={handleSearchFocus}
+            onblur={handleSearchBlur}
           />
 
-          {#if showSearchDropdown && searchResults.length > 0}
+          {#if showSearchDropdown && (communityResults.length > 0 || userResults.length > 0)}
             <div class="search-dropdown">
-              <div class="search-dropdown-header">Communities</div>
-              {#each searchResults as community}
-                <button
-                  class="search-result-item"
-                  on:click={() => handleCommunityClick(community.name)}
-                >
-                  <img
-                    src={community.avatar || "/default-community.png"}
-                    alt=""
-                    class="community-avatar"
-                  />
-                  <div class="community-info">
-                    <div class="community-name">c/{community.name}</div>
-                    <div class="community-members">
-                      {community.member_count} members
+              {#if communityResults.length > 0}
+                <div class="search-dropdown-header">Communities</div>
+                {#each communityResults as community}
+                  <button
+                    class="search-result-item"
+                    onclick={() => handleCommunityClick(community.name)}
+                  >
+                    <img
+                      src={community.avatar || "/default-community.png"}
+                      alt=""
+                      class="result-avatar"
+                    />
+                    <div class="result-info">
+                      <div class="result-name">c/{community.name}</div>
+                      <div class="result-meta">
+                        {community.member_count} members
+                      </div>
                     </div>
-                  </div>
-                </button>
-              {/each}
+                  </button>
+                {/each}
+              {/if}
+
+              {#if userResults.length > 0}
+                {#if communityResults.length > 0}
+                  <div class="search-dropdown-divider"></div>
+                {/if}
+                <div class="search-dropdown-header">Users</div>
+                {#each userResults as userResult}
+                  <button
+                    class="search-result-item"
+                    onclick={() => handleUserClick(userResult.username)}
+                  >
+                    {#if userResult.profile?.avatar?.url}
+                      <img
+                        src={userResult.profile.avatar.url}
+                        alt=""
+                        class="result-avatar"
+                      />
+                    {:else}
+                      <div class="result-avatar fallback">
+                        {userResult.username.charAt(0).toUpperCase()}
+                      </div>
+                    {/if}
+                    <div class="result-info">
+                      <div class="result-name">u/{userResult.username}</div>
+                      <div class="result-meta">
+                        {userResult.reputation} karma • {userResult.title}
+                      </div>
+                    </div>
+                  </button>
+                {/each}
+              {/if}
             </div>
           {/if}
 
@@ -255,7 +341,7 @@
         <button
           type="button"
           class="create-button"
-          on:click={handleCreatePostClick}
+          onclick={handleCreatePostClick}
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <path
@@ -270,8 +356,8 @@
 
         <button
           type="button"
-          class="icon-button"
-          on:click={onNotificationClick}
+          class="icon-button notification-btn"
+          onclick={() => (showNotifications = !showNotifications)}
           title="Notifications"
           aria-label="Notifications"
         >
@@ -290,15 +376,21 @@
               stroke-linecap="round"
             />
           </svg>
-          {#if notificationCount > 0}
-            <span class="notification-badge">{notificationCount}</span>
+          {#if unreadNotificationCount > 0}
+            <span class="notification-badge">{unreadNotificationCount}</span>
           {/if}
+
+          <NotificationsDropdown
+            show={showNotifications}
+            onClose={() => (showNotifications = false)}
+            onUnreadCountChange={(count) => (unreadNotificationCount = count)}
+          />
         </button>
 
         <!-- Messages Button -->
         <button
           class="icon-button"
-          on:click={() => (showChatPopup = true)}
+          onclick={() => (showChatPopup = true)}
           title="Messages"
         >
           <img src="/message_icon.svg" alt="Messages" width="24" height="24" />
@@ -310,8 +402,8 @@
               class="user-button"
               role="button"
               tabindex="0"
-              on:click={toggleUserMenu}
-              on:keydown={(e) =>
+              onclick={toggleUserMenu}
+              onkeydown={(e) =>
                 (e.key === "Enter" || e.key === " ") && toggleUserMenu()}
               aria-haspopup="true"
               aria-expanded={showUserMenu}
@@ -358,7 +450,7 @@
                 <div
                   class="dropdown-item"
                   role="menuitem"
-                  on:click={() => {
+                  onclick={() => {
                     console.log("Profile clicked!");
                     closeUserMenu();
                     push("/profile");
@@ -385,7 +477,7 @@
                 <div
                   class="dropdown-item"
                   role="menuitem"
-                  on:click={() => {
+                  onclick={() => {
                     console.log("Settings clicked!");
                     closeUserMenu();
                     push("/settings");
@@ -414,7 +506,7 @@
                 <div
                   class="dropdown-item"
                   role="menuitem"
-                  on:click={() => {
+                  onclick={() => {
                     console.log("Logout clicked!");
                     handleLogoutClick();
                   }}
@@ -434,7 +526,7 @@
             {/if}
           </div>
         {:else}
-          <button class="login-button" on:click={() => (showAuthModal = true)}
+          <button class="login-button" onclick={() => (showAuthModal = true)}
             >Log In</button
           >
           <AuthModal
@@ -576,33 +668,45 @@
     right: 0;
     background: var(--background);
     border: 1px solid var(--border);
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    z-index: 1000;
-    max-height: 400px;
+    border-radius: 12px;
+    box-shadow:
+      0 8px 24px rgba(0, 0, 0, 0.12),
+      0 2px 6px rgba(0, 0, 0, 0.08);
+    overflow: hidden;
+    max-height: 480px;
     overflow-y: auto;
+    z-index: 1000;
   }
 
   .search-dropdown-header {
-    padding: 8px 16px;
+    padding: 12px 16px 8px;
     font-size: 11px;
     font-weight: 600;
-    color: var(--muted-foreground);
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    border-bottom: 1px solid var(--border);
+    color: #000000;
+    background: var(--background);
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
+
+  .search-dropdown-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 8px 0;
   }
 
   .search-result-item {
-    width: 100%;
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 12px 16px;
+    width: 100%;
+    padding: 10px 16px;
     background: transparent;
     border: none;
     cursor: pointer;
-    transition: background-color 0.2s;
+    transition: background-color 0.15s ease;
     text-align: left;
   }
 
@@ -610,30 +714,51 @@
     background: var(--topbar-search-background);
   }
 
-  .community-avatar {
-    width: 32px;
-    height: 32px;
+  .result-avatar {
+    width: 36px;
+    height: 36px;
     border-radius: 50%;
     object-fit: cover;
     background: var(--topbar-search-background);
+    flex-shrink: 0;
+    border: 1px solid var(--border);
   }
 
-  .community-info {
+  .result-avatar.fallback {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--topbar-accent);
+    color: white;
+    font-weight: 700;
+    font-size: 15px;
+  }
+
+  .result-info {
     flex: 1;
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 3px;
+    min-width: 0;
   }
 
-  .community-name {
+  .result-name {
     font-size: 14px;
-    font-weight: 600;
+    font-weight: 500;
     color: var(--topbar-foreground);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.3;
   }
 
-  .community-members {
+  .result-meta {
     font-size: 12px;
     color: var(--muted-foreground);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.2;
   }
 
   .search-loading {
@@ -703,9 +828,10 @@
     min-width: 18px;
     height: 18px;
     padding: 0 4px;
-    background: var(--topbar-accent);
+    background: #ff4444;
     color: white;
     font-size: 10px;
+    font-weight: 700;
     border-radius: 9px;
     display: flex;
     align-items: center;
@@ -835,13 +961,6 @@
 
   .login-button:hover {
     opacity: 0.9;
-  }
-
-  .overlay {
-    position: fixed;
-    inset: 0;
-    z-index: 250;
-    background: rgba(0, 0, 0, 0.1);
   }
 
   @media (min-width: 640px) {

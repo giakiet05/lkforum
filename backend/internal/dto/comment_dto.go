@@ -7,10 +7,9 @@ import (
 )
 
 type CreateCommentRequest struct {
-	UserID   string  `json:"user_id"`
-	PostID   string  `json:"post_id"`
+	PostID   string  `json:"post_id" binding:"required"`
 	ParentID *string `json:"parent_id,omitempty"`
-	Content  string  `json:"content"`
+	Content  string  `json:"content" binding:"required"`
 }
 
 type GetCommentsFilterQuery struct {
@@ -35,7 +34,7 @@ type CommentResponse struct {
 	Author           model.CommentAuthor `json:"author"`
 	PostID           string              `json:"post_id"`
 	ParentID         *string             `json:"parent_id,omitempty"`
-	Children         []CommentResponse   `json:"children"`
+	Children         []*CommentResponse  `json:"children"`
 	Content          string              `json:"content"`
 	CreatedAt        string              `json:"created_at"`
 	IsDeleted        bool                `json:"is_deleted"`
@@ -60,9 +59,9 @@ func FromComments(comments []model.Comment, currentUserID *string) []*CommentRes
 			parentResp, ok := commentMap[c.ParentID.Hex()]
 			if ok {
 				if parentResp.Children == nil {
-					parentResp.Children = []CommentResponse{}
+					parentResp.Children = []*CommentResponse{}
 				}
-				parentResp.Children = append(parentResp.Children, *resp)
+				parentResp.Children = append(parentResp.Children, resp)
 				addedToParent[c.ID.Hex()] = true
 			} else {
 				// Parent not found, treat as root (orphaned comment)
@@ -98,14 +97,6 @@ func FromComment(comment *model.Comment, currentUserID *string) *CommentResponse
 		IsDeleted: comment.IsDeleted,
 	}
 
-	// Add moderation info only for author's own comments
-	if currentUserID != nil && comment.Author.ID.Hex() == *currentUserID {
-		statusStr := string(comment.ModerationStatus)
-		resp.ModerationStatus = &statusStr
-		resp.ModerationReason = &comment.ModerationResult.Reason
-		resp.ModeratedAt = comment.ModeratedAt
-	}
-
 	return resp
 }
 
@@ -127,9 +118,9 @@ func FromCommentWithChildren(comments []model.Comment, currentUserID *string) *C
 			parentResp, ok := commentMap[c.ParentID.Hex()]
 			if ok {
 				if parentResp.Children == nil {
-					parentResp.Children = []CommentResponse{}
+					parentResp.Children = []*CommentResponse{}
 				}
-				parentResp.Children = append(parentResp.Children, *resp)
+				parentResp.Children = append(parentResp.Children, resp)
 			}
 		} else {
 			root = resp

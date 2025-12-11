@@ -13,12 +13,7 @@
     reportPost,
   } from "../services/post-service";
   import { authStore } from "../stores/auth-store";
-  import {
-    savePollVote,
-    removePollVote as removeLocalPollVote,
-    hasVotedOnPoll,
-    getPollVotedOptions,
-  } from "../utils/poll-vote-storage";
+  import { toastStore } from "../stores/toast-store";
 
   type PostProps = {
     post: PostResponse;
@@ -28,10 +23,13 @@
   let { post, onUpdate }: PostProps = $props();
 
   let selectedOptions = $state<string[]>([]);
-
-  // TEMP FIX: Backend doesn't return user_vote_ids, use localStorage
-  let hasVoted = $state(post.type === "poll" ? hasVotedOnPoll(post.id) : false);
   let currentImageIndex = $state(0);
+
+  // Check if user has voted based on backend data
+  const hasVoted = $derived(
+    post.content.poll?.user_vote_ids &&
+      post.content.poll.user_vote_ids.length > 0
+  );
 
   // Vote state
   let userVote = $state<"up" | "down" | "">(
@@ -86,15 +84,11 @@
   }
 
   function handleVote(optionId: string) {
-    // TEMP FIX: Check localStorage since backend doesn't return user_vote_ids
-    const votedOptions = getPollVotedOptions(post.id);
+    const votedOptions = post.content.poll?.user_vote_ids || [];
     const alreadyVotedThisOption = votedOptions.includes(optionId);
 
     if (post.content.poll?.allow_multiple) {
-      // Multiple choice: toggle selection (but can't revote same option)
-      if (alreadyVotedThisOption) {
-        return; // Already voted this option, can't vote again
-      }
+      // Multiple choice: toggle selection
       const index = selectedOptions.indexOf(optionId);
       if (index > -1) {
         selectedOptions.splice(index, 1);
@@ -104,9 +98,6 @@
       selectedOptions = selectedOptions;
     } else {
       // Single choice: can change vote to different option
-      if (alreadyVotedThisOption) {
-        return; // Already voted this option, no need to vote again
-      }
       selectedOptions = [optionId];
     }
   }
@@ -114,7 +105,7 @@
   async function submitVote() {
     if (selectedOptions.length === 0) return;
     if (!currentUser) {
-      alert("Please login to vote on polls");
+      toastStore.warning("Please login to vote on polls");
       return;
     }
 
@@ -140,15 +131,11 @@
         post.content.poll.user_vote_ids = updatedPoll.user_vote_ids || [];
       }
 
-      // TEMP FIX: Save to localStorage since backend doesn't return user_vote_ids
-      savePollVote(post.id, optionId);
-
       // Clear selection
       selectedOptions = [];
-      hasVoted = true;
     } catch (error) {
       console.error("Failed to vote on poll:", error);
-      alert("Failed to submit vote. Please try again.");
+      toastStore.error("Failed to submit vote. Please try again.");
     }
   }
 
@@ -162,6 +149,28 @@
     submitVote();
   }
 
+  async function handleUnvote(e: MouseEvent) {
+    e.stopPropagation();
+    if (!currentUser) {
+      toastStore.warning("Please login to manage votes");
+      return;
+    }
+
+    try {
+      const updatedPoll = await removePollVote(post.id);
+
+      // Update poll with fresh data from backend
+      if (post.content.poll && updatedPoll) {
+        post.content.poll.options = updatedPoll.options;
+        post.content.poll.total_votes = updatedPoll.total_votes;
+        post.content.poll.user_vote_ids = updatedPoll.user_vote_ids || [];
+      }
+    } catch (error) {
+      console.error("Failed to remove poll vote:", error);
+      toastStore.error("Failed to remove vote. Please try again.");
+    }
+  }
+
   const getVotePercentage = (votes: number, total: number) => {
     if (total === 0) return 0;
     return (votes / total) * 100;
@@ -170,11 +179,11 @@
   async function handleUpvote(e: MouseEvent) {
     e.stopPropagation();
     if (!currentUser) {
-      alert("Please login to vote");
+      toastStore.warning("Please login to vote");
       return;
     }
     if (isOwnPost) {
-      alert("You cannot vote on your own post");
+      toastStore.warning("You cannot vote on your own post");
       return;
     }
     if (isVoting) return;
@@ -209,11 +218,11 @@
   async function handleDownvote(e: MouseEvent) {
     e.stopPropagation();
     if (!currentUser) {
-      alert("Please login to vote");
+      toastStore.warning("Please login to vote");
       return;
     }
     if (isOwnPost) {
-      alert("You cannot vote on your own post");
+      toastStore.warning("You cannot vote on your own post");
       return;
     }
     if (isVoting) return;
@@ -248,7 +257,7 @@
   async function handleSave(e: MouseEvent) {
     e.stopPropagation();
     if (!currentUser) {
-      alert("Please login to save posts");
+      toastStore.warning("Please login to save posts");
       return;
     }
     if (isSaving) return;
@@ -272,7 +281,7 @@
   async function handleHide(e: MouseEvent) {
     e.stopPropagation();
     if (!currentUser) {
-      alert("Please login to hide posts");
+      toastStore.warning("Please login to hide posts");
       return;
     }
 
@@ -307,10 +316,10 @@
     navigator.clipboard
       .writeText(text)
       .then(() => {
-        alert("Link copied to clipboard!");
+        toastStore.success("Link copied to clipboard!");
       })
       .catch(() => {
-        alert("Failed to copy link");
+        toastStore.error("Failed to copy link");
       });
   }
 
@@ -336,7 +345,7 @@
       if (onUpdate) onUpdate();
     } catch (error) {
       console.error("Failed to delete post:", error);
-      alert("Failed to delete post. Please try again.");
+      toastStore.error("Failed to delete post. Please try again.");
     }
   }
 
@@ -355,7 +364,7 @@
   async function handleReport(e: Event) {
     e.preventDefault();
     if (!reportReason.trim()) {
-      alert("Please select a reason");
+      toastStore.warning("Please select a reason");
       return;
     }
 
@@ -365,11 +374,11 @@
         reason: reportReason,
         details: reportDetails,
       });
-      alert("Report submitted successfully");
+      toastStore.success("Report submitted successfully");
       closeReportModal();
     } catch (error) {
       console.error("Failed to report post:", error);
-      alert("Failed to submit report. Please try again.");
+      toastStore.error("Failed to submit report. Please try again.");
     } finally {
       isReporting = false;
     }
@@ -488,47 +497,59 @@
           <h3 class="poll-question">{post.content.poll.question}</h3>
           <div class="poll-options">
             {#each post.content.poll.options as option}
+              {@const isVotedOption = post.content.poll.user_vote_ids?.includes(
+                option.id
+              )}
               <button
                 class="poll-option"
                 class:selected={selectedOptions.includes(option.id)}
+                class:voted={isVotedOption}
                 onclick={(e) => handlePollOptionClick(e, option.id)}
-                disabled={hasVoted}
+                disabled={hasVoted && !post.content.poll.allow_multiple}
               >
-                {#if hasVoted}
-                  <div
-                    class="poll-result-bar"
-                    style="width: {option.percentage}%;"
-                  ></div>
+                <div
+                  class="poll-result-bar"
+                  style="width: {option.percentage}%;"
+                ></div>
+                <div class="poll-option-content">
+                  {#if !hasVoted}
+                    <div class="radio-check">
+                      {#if post.content.poll.allow_multiple}
+                        <div
+                          class="checkbox"
+                          class:checked={selectedOptions.includes(option.id)}
+                        ></div>
+                      {:else}
+                        <div
+                          class="radio"
+                          class:checked={selectedOptions.includes(option.id)}
+                        ></div>
+                      {/if}
+                    </div>
+                  {/if}
                   <span class="poll-option-text">{option.text}</span>
-                  <span class="poll-option-votes">{option.votes} votes</span>
-                {:else}
-                  <div class="radio-check">
-                    {#if post.content.poll.allow_multiple}
-                      <div
-                        class="checkbox"
-                        class:checked={selectedOptions.includes(option.id)}
-                      ></div>
-                    {:else}
-                      <div
-                        class="radio"
-                        class:checked={selectedOptions.includes(option.id)}
-                      ></div>
-                    {/if}
-                  </div>
-                  <span class="poll-option-text">{option.text}</span>
-                {/if}
+                  <span class="poll-option-percentage"
+                    >{option.percentage.toFixed(1)}%</span
+                  >
+                </div>
               </button>
             {/each}
           </div>
-          {#if !hasVoted}
-            <button
-              class="vote-submit-btn"
-              onclick={handleVoteSubmit}
-              disabled={selectedOptions.length === 0}
-            >
-              Vote
-            </button>
-          {/if}
+          <div class="poll-actions">
+            {#if !hasVoted}
+              <button
+                class="vote-submit-btn"
+                onclick={handleVoteSubmit}
+                disabled={selectedOptions.length === 0}
+              >
+                Vote
+              </button>
+            {:else}
+              <button class="unvote-btn" onclick={handleUnvote}>
+                Remove Vote
+              </button>
+            {/if}
+          </div>
           <p class="poll-footer">
             {post.content.poll.total_votes} votes • {post.content.poll
               .allow_multiple
@@ -920,6 +941,7 @@
   .poll-question {
     font-size: 15px;
     margin: 0 0 10px;
+    font-weight: 600;
   }
   .poll-options {
     display: flex;
@@ -931,7 +953,7 @@
     display: flex;
     align-items: center;
     width: 100%;
-    padding: 8px 12px;
+    padding: 0;
     border: 1px solid #ccc;
     border-radius: 4px;
     background-color: white;
@@ -939,6 +961,7 @@
     cursor: pointer;
     text-align: left;
     overflow: hidden;
+    min-height: 40px;
   }
   .poll-option:not(:disabled):hover {
     border-color: #878a8c;
@@ -946,6 +969,10 @@
   .poll-option.selected {
     border-color: var(--primary-color);
     background-color: #f0f8ff;
+  }
+  .poll-option.voted {
+    border-color: var(--primary-color);
+    border-width: 2px;
   }
   .poll-option:disabled {
     cursor: not-allowed;
@@ -957,14 +984,80 @@
     left: 0;
     height: 100%;
     background-color: var(--primary-color);
-    opacity: 0.2;
+    opacity: 0.15;
     transition: width 0.5s ease-in-out;
   }
-  .poll-option-text {
+
+  .poll-option-content {
     position: relative;
     z-index: 1;
+    display: flex;
+    align-items: center;
+    width: 100%;
+    padding: 8px 12px;
+    gap: 8px;
+  }
+
+  .poll-option-text {
     flex-grow: 1;
   }
+
+  .poll-option-stats {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+  }
+
+  .poll-option-percentage {
+    font-weight: 600;
+    color: var(--primary-color);
+  }
+
+  .poll-option-votes {
+    color: #666;
+  }
+
+  .poll-actions {
+    margin-top: 12px;
+    display: flex;
+    gap: 8px;
+  }
+
+  .vote-submit-btn,
+  .unvote-btn {
+    padding: 8px 24px;
+    border: none;
+    border-radius: 20px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .vote-submit-btn {
+    background-color: var(--primary-color);
+    color: white;
+  }
+
+  .vote-submit-btn:hover:not(:disabled) {
+    background-color: var(--primary-color-dark);
+  }
+
+  .vote-submit-btn:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+  }
+
+  .unvote-btn {
+    background-color: #f0f0f0;
+    color: #333;
+    border: 1px solid #ddd;
+  }
+
+  .unvote-btn:hover {
+    background-color: #e0e0e0;
+  }
+
   .poll-option-votes {
     position: relative;
     z-index: 1;
@@ -994,20 +1087,6 @@
     background-color: var(--primary-color);
   }
 
-  .vote-submit-btn {
-    margin-top: 12px;
-    padding: 8px 16px;
-    border: 1px solid var(--primary-color);
-    background-color: var(--primary-color);
-    color: white;
-    border-radius: 20px;
-    font-weight: bold;
-    cursor: pointer;
-  }
-  .vote-submit-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
   .poll-footer {
     font-size: 12px;
     color: #878a8c;

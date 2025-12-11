@@ -4,6 +4,7 @@
   import { setAuth } from "../stores/auth-store";
   import { Role, AuthProvider } from "../dtos/user-dto";
   import { onDestroy } from "svelte";
+  import { toastStore } from "../stores/toast-store";
 
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
 
@@ -169,7 +170,7 @@
       setAuth(mockData.user);
 
       // Redirect về trang chính
-      alert("Đăng ký thành công! Chào mừng bạn đến với LKForum.");
+      toastStore.success("Đăng ký thành công! Chào mừng bạn đến với LKForum.");
       push("/");
     } catch (err: any) {
       console.error("Register error:", err);
@@ -197,7 +198,7 @@
 
       // Bắt đầu countdown timer sau khi gửi thành công
       startResendTimer();
-      alert("Mã OTP mới đã được gửi đến email của bạn!");
+      toastStore.success("Mã OTP mới đã được gửi đến email của bạn!");
       error = null;
     } catch (err: any) {
       console.error("Resend OTP error:", err);

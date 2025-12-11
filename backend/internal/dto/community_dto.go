@@ -27,19 +27,25 @@ type UpdateCommunityRequest struct {
 	Rules       *[]model.CommunityRule  `json:"rules,omitempty"`
 }
 
-type ModeratorDTO struct {
-	ModeratorID string `json:"id" binding:"required"`
-	Username    string `json:"username" binding:"required"`
-}
-
 type AddModeratorRequest struct {
-	CommunityID    string         `json:"id" binding:"required"`
-	AddedModerator []ModeratorDTO `json:"added_moderator" binding:"required"`
+	CommunityID    string   `json:"id" binding:"required"`
+	AddedModerator []string `json:"added_moderator" binding:"required"`
 }
 
 type RemoveModeratorRequest struct {
 	CommunityID      string   `json:"id" binding:"required"`
 	RemovedModerator []string `json:"removed_moderator" binding:"required"`
+}
+
+type CommunityBanPostRequest struct {
+	CommunityID string  `json:"community_id" binding:"required"`
+	PostID      string  `json:"post_id" binding:"required"`
+	Reason      *string `json:"reason,omitempty" binding:"max=500"`
+}
+
+type CommunityUnbanPostRequest struct {
+	CommunityID string `json:"community_id" binding:"required"`
+	PostID      string `json:"post_id" binding:"required"`
 }
 
 type CommunityBanUserRequest struct {
@@ -56,8 +62,8 @@ type UnbanUserRequest struct {
 }
 
 type ModeratePostRequest struct {
-	Approve bool    `json:"approve" binding:"required"`
-	Reason  *string `json:"reason,omitempty" binding:"max=500"`
+	Approve bool    `json:"approve"`
+	Reason  *string `json:"reason,omitempty"`
 }
 
 type CommunityResponse struct {

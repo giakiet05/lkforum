@@ -29,7 +29,32 @@ export async function getPosts(query?: GetPostsQuery): Promise<PostResponse[]> {
     const queryString = params.toString();
     const url = queryString ? `/api/posts?${queryString}` : "/api/posts";
 
-    const res = await publicFetch(url, {
+    const res = await authenticatedFetch(url, {
+        method: "GET",
+    });
+
+    const response: PaginatedPostsResponse = await handleApiResponse(res);
+    console.log("🔍 getPosts response:", response);
+    return response.posts;
+}
+
+/**
+ * Get current user's posts (requires authentication)
+ */
+export async function getMyPosts(query?: GetPostsQuery): Promise<PostResponse[]> {
+    const params = new URLSearchParams();
+    
+    if (query?.community_id) params.append("community_id", query.community_id);
+    if (query?.type) params.append("type", query.type);
+    if (query?.sort) params.append("sort", query.sort);
+    if (query?.time) params.append("time", query.time);
+    if (query?.page) params.append("page", query.page.toString());
+    if (query?.limit) params.append("limit", query.limit.toString());
+
+    const queryString = params.toString();
+    const url = queryString ? `/api/posts/me?${queryString}` : "/api/posts/me";
+
+    const res = await authenticatedFetch(url, {
         method: "GET",
     });
 

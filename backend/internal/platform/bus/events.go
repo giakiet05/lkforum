@@ -34,6 +34,8 @@ const (
 	TopicMessageError  = "message.error"
 	TopicTypingMessage = "message.typing"
 	TopicInChatMessage = "message.in_chat"
+
+	TopicModeratorAdded = "moderator.added"
 )
 
 type BroadcastEventType string
@@ -335,4 +337,14 @@ type InChatMessageEvent struct {
 func (e InChatMessageEvent) Topic() string { return TopicInChatMessage }
 func (e InChatMessageEvent) Payload() map[string]interface{} {
 	return map[string]interface{}{"channel_id": e.ChannelID, "user_id": e.UserID, "is_in_chat": e.IsInChat}
+}
+
+type ModeratorAddedEvent struct {
+	CommunityID  string   `json:"community_id"`
+	ModeratorIDs []string `json:"moderator_ids"`
+}
+
+func (e ModeratorAddedEvent) Topic() string { return TopicModeratorAdded }
+func (e ModeratorAddedEvent) Payload() map[string]interface{} {
+	return map[string]interface{}{"community_id": e.CommunityID, "moderator_ids": e.ModeratorIDs}
 }

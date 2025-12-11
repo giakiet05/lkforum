@@ -40,8 +40,9 @@ type CommunityRule struct {
 }
 
 type Moderator struct {
-	UserID     primitive.ObjectID `bson:"user_id,omitempty" json:"user_id,omitempty"`
-	Username   string             `bson:"username,omitempty" json:"username,omitempty"`
-	Avatar     string             `bson:"avatar,omitempty" json:"avatar,omitempty"`
-	AssignedAt time.Time          `bson:"assigned_at,omitempty" json:"assigned_at,omitempty"`
+	UserID     primitive.ObjectID `bson:"user_id" json:"user_id"`
+	Username   string             `bson:"username" json:"username"`
+	Avatar     *Image             `bson:"avatar" json:"avatar"`
+	IsActive   bool               `bson:"is_active" json:"is_active"`
+	AssignedAt time.Time          `bson:"assigned_at" json:"assigned_at"`
 }

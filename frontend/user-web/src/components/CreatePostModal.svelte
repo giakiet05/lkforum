@@ -1,8 +1,14 @@
 <script lang="ts">
   import DraftsModal from "./DraftsModal.svelte";
-  import { mockDraftsDetails } from "../mocks/drafts.mock";
   import { createPost, uploadPostImages } from "../services/post-service";
   import { getCommunities } from "../services/community-service";
+  import { toastStore } from "../stores/toast-store";
+  import {
+    createDraft,
+    updateDraft,
+    getDraftById,
+    getDrafts,
+  } from "../services/draft-service";
   import type { CommunityResponse } from "../dtos/community-dto";
 
   interface Props {
@@ -33,13 +39,17 @@
   let communitySearchQuery = $state("");
   let showDraftsModal = $state(false);
   let isSubmitting = $state(false);
+  let draftCount = $state(0);
   let errorMessage = $state<string | null>(null);
   let allCommunities = $state<CommunityResponse[]>([]);
 
-  // Load communities from API
+  // Load communities and draft count from API
   $effect(() => {
-    if (show && allCommunities.length === 0) {
-      loadCommunities();
+    if (show) {
+      if (allCommunities.length === 0) {
+        loadCommunities();
+      }
+      loadDraftCount();
     }
   });
 
@@ -49,6 +59,16 @@
       allCommunities = response.communities;
     } catch (error) {
       console.error("Failed to load communities:", error);
+    }
+  }
+
+  async function loadDraftCount() {
+    try {
+      const response = await getDrafts(1, 1); // Just get count, not all drafts
+      draftCount = response.pagination.total;
+    } catch (error) {
+      console.error("Failed to load draft count:", error);
+      draftCount = 0;
     }
   }
 
@@ -113,33 +133,107 @@
     showDraftsModal = false;
   }
 
-  function handleEditDraft(draftId: number) {
-    console.log("Edit draft:", draftId);
+  async function handleEditDraft(draftId: string) {
+    try {
+      const draft = await getDraftById(draftId);
 
-    // Load draft data from mockDraftsDetails
-    const draft = mockDraftsDetails[draftId];
-    if (draft) {
-      title = draft.title;
-      selectedCommunity = draft.community;
-      activeTab = draft.tab;
+      // Load draft data
+      title = draft.title || "";
       tags = draft.tags || [];
 
-      if (draft.tab === "text") {
-        bodyText = draft.bodyText || "";
-      } else if (draft.tab === "link") {
-        linkUrl = draft.linkUrl || "";
+      // Set community if available
+      if (draft.community_id) {
+        const community = allCommunities.find(
+          (c) => c.id === draft.community_id
+        );
+        if (community) {
+          selectedCommunity = community.name;
+        }
       }
 
-      console.log("Loaded draft:", draft);
-    }
+      // Set type and content
+      if (draft.type) {
+        if (draft.type === "text") {
+          activeTab = "text";
+          bodyText = draft.content?.text || "";
+        } else if (draft.type === "poll") {
+          activeTab = "poll";
+          bodyText = draft.content?.text || "";
+          if (draft.content?.poll) {
+            pollQuestion = draft.content.poll.question;
+            pollOptions = draft.content.poll.options;
+            allowMultiple = draft.content.poll.allow_multiple || false;
+          }
+        } else if (draft.type === "image") {
+          activeTab = "images";
+          bodyText = draft.content?.text || "";
+          // TODO: Load images from draft.content.images
+        }
+      }
 
-    showDraftsModal = false;
+      showDraftsModal = false;
+    } catch (error) {
+      console.error("Failed to load draft:", error);
+      toastStore.error("Failed to load draft. Please try again.");
+    }
   }
 
-  function handleSaveDraft() {
-    // TODO: Backend doesn't have drafts API yet
-    console.log("Save draft:", { title, bodyText, tags, selectedCommunity });
-    alert("Draft saved locally (backend API not available yet)");
+  async function handleSaveDraft() {
+    try {
+      isSubmitting = true;
+      errorMessage = null;
+
+      // Get community ID if selected
+      const communityId = selectedCommunityData?.id;
+
+      // Prepare draft data based on active tab
+      const draftData: any = {
+        community_id: communityId,
+        title: title || undefined,
+        tags: tags.length > 0 ? tags : undefined,
+      };
+
+      // Add type-specific content
+      if (activeTab === "text") {
+        draftData.type = "text";
+        draftData.text = bodyText || undefined;
+      } else if (activeTab === "poll") {
+        draftData.type = "poll";
+        draftData.text = bodyText || undefined;
+        if (pollQuestion) {
+          draftData.poll = {
+            question: pollQuestion,
+            options: pollOptions.filter((opt) => opt.trim() !== ""),
+            allow_multiple: allowMultiple,
+            expires_at: pollDuration
+              ? new Date(
+                  Date.now() + parseInt(pollDuration) * 24 * 60 * 60 * 1000
+                ).toISOString()
+              : undefined,
+          };
+        }
+      } else if (activeTab === "images") {
+        draftData.type = "image";
+        draftData.text = bodyText || undefined;
+        // Note: For now, we save without images. Full image upload can be added later
+      } else if (activeTab === "link") {
+        draftData.type = "text";
+        draftData.text = linkUrl
+          ? `${bodyText}\n\n${linkUrl}`
+          : bodyText || undefined;
+      }
+
+      await createDraft(draftData);
+
+      toastStore.success("Draft saved successfully!");
+      handleClose();
+    } catch (error) {
+      console.error("Failed to save draft:", error);
+      errorMessage =
+        error instanceof Error ? error.message : "Failed to save draft";
+    } finally {
+      isSubmitting = false;
+    }
   }
 
   function addPollOption() {
@@ -298,7 +392,9 @@
       <div class="modal-header">
         <h2>Create post</h2>
         <span class="drafts-indicator" onclick={handleOpenDrafts}>
-          Drafts <span class="draft-count">1</span>
+          Drafts {#if draftCount > 0}<span class="draft-count"
+              >{draftCount}</span
+            >{/if}
         </span>
       </div>
 

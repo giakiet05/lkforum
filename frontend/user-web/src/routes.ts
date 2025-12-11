@@ -8,6 +8,7 @@ import EditPost from './pages/EditPost.svelte';
 import Community from './pages/Community.svelte';
 import ManageCommunities from './pages/ManageCommunities.svelte';
 import ModTools from './pages/ModTools.svelte';
+import CommunitySettings from './pages/CommunitySettings.svelte';
 import Messages from './pages/Messages.svelte';
 import GoogleCallback from './pages/GoogleCallback.svelte';
 import GoogleSetup from './pages/GoogleSetup.svelte';
@@ -18,11 +19,13 @@ const routes = {
     '/login': Login,
     '/register': Register,
     '/profile': Profile,
+    '/profile/:username': Profile,
     '/settings': Settings,
     '/post/:id': PostDetail,
     '/post/:id/edit': EditPost,
     '/lk/:name': Community,
     '/lk/:name/mod': ModTools,
+    '/lk/:name/settings': CommunitySettings,
     '/communities/manage': ManageCommunities,
     '/messages': Messages,
     '/auth/callback': GoogleCallback,

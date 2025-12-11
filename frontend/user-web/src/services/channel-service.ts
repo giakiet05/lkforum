@@ -6,6 +6,7 @@ import type {
     PaginatedChannelsResponse
 } from "../dtos/channel-dto";
 import { authenticatedFetch, handleApiResponse } from "./api";
+import { USER_KEY } from "../constants/auth-constants";
 
 /**
  * Create a new channel (1-1 conversation)
@@ -16,7 +17,7 @@ export async function createChannel(
     member2_avatar: string
 ): Promise<ChannelResponse> {
     // Get current user info from localStorage
-    const userStr = localStorage.getItem("user_key");
+    const userStr = localStorage.getItem(USER_KEY);
     if (!userStr) {
         throw new Error("User not authenticated");
     }

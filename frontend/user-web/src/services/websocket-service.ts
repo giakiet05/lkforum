@@ -1,6 +1,7 @@
 import type { MessageResponse, MessageType } from "../dtos/message-dto";
 import { getValidAccessToken } from "../auth/token";
 import { API_BASE_URL } from "./api";
+import { USER_KEY } from "../constants/auth-constants";
 
 type MessageCallback = (message: MessageResponse) => void;
 type ErrorCallback = (error: Event) => void;
@@ -25,44 +26,69 @@ class WebSocketService {
         try {
             const token = await getValidAccessToken();
             if (!token) {
+                console.error("❌ WebSocket: No valid access token");
                 throw new Error("No valid access token");
             }
 
             // Convert http/https to ws/wss
             const wsUrl = API_BASE_URL.replace("http://", "ws://").replace("https://", "wss://");
             const url = `${wsUrl}/api/ws?token=${token}`;
+            
+            console.log("🔌 WebSocket: Connecting to:", wsUrl + "/api/ws");
+            console.log("🔑 WebSocket: Using token:", token.substring(0, 20) + "...");
 
             this.ws = new WebSocket(url);
 
             this.ws.onopen = () => {
-                console.log("WebSocket connected");
+                console.log("✅ WebSocket connected successfully");
                 this.reconnectAttempts = 0;
                 this.reconnectDelay = 1000;
             };
 
             this.ws.onmessage = (event) => {
+                console.log("📨 WebSocket: Raw message received:", event.data);
                 try {
-                    const message: MessageResponse = JSON.parse(event.data);
-                    this.messageCallbacks.forEach(callback => callback(message));
+                    const wsMessage: any = JSON.parse(event.data);
+                    console.log("📨 WebSocket: Parsed websocket message:", wsMessage);
+                    
+                    // Backend sends: { type: "send_message|ack_message|...", payload: {...} }
+                    const messageType = wsMessage.type;
+                    const payload = wsMessage.payload;
+
+                    if (messageType === "send_message" || messageType === "ack_message") {
+                        // Extract the actual message from payload
+                        const message: MessageResponse = messageType === "send_message" 
+                            ? payload.message 
+                            : payload.message;
+                        
+                        console.log("📨 WebSocket: Extracted message:", message);
+                        console.log("📨 WebSocket: Notifying", this.messageCallbacks.length, "callbacks");
+                        this.messageCallbacks.forEach(callback => callback(message));
+                    } else if (messageType === "typing") {
+                        console.log("📨 WebSocket: Typing indicator:", payload);
+                        // Handle typing indicator if needed
+                    } else {
+                        console.log("📨 WebSocket: Unhandled message type:", messageType, payload);
+                    }
                 } catch (error) {
-                    console.error("Failed to parse WebSocket message:", error);
+                    console.error("❌ WebSocket: Failed to parse message:", error, "Raw:", event.data);
                 }
             };
 
             this.ws.onerror = (event) => {
-                console.error("WebSocket error:", event);
+                console.error("❌ WebSocket error:", event);
                 this.errorCallbacks.forEach(callback => callback(event));
             };
 
             this.ws.onclose = (event) => {
-                console.log("WebSocket closed:", event.code, event.reason);
+                console.log("🔌 WebSocket closed:", event.code, event.reason);
                 this.closeCallbacks.forEach(callback => callback(event));
 
                 // Auto-reconnect if not a normal closure
                 if (event.code !== 1000 && this.reconnectAttempts < this.maxReconnectAttempts) {
                     setTimeout(() => {
                         this.reconnectAttempts++;
-                        console.log(`Reconnecting... Attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts}`);
+                        console.log(`🔄 Reconnecting... Attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts}`);
                         this.connect();
                     }, this.reconnectDelay);
 
@@ -71,7 +97,7 @@ class WebSocketService {
                 }
             };
         } catch (error) {
-            console.error("Failed to connect WebSocket:", error);
+            console.error("❌ Failed to connect WebSocket:", error);
             throw error;
         }
     }
@@ -81,23 +107,34 @@ class WebSocketService {
      */
     sendMessage(channelId: string, content: string, type: MessageType = "text"): void {
         if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+            console.error("❌ WebSocket: Cannot send message - not connected. State:", this.ws?.readyState);
             throw new Error("WebSocket is not connected");
         }
 
         // Get current user info
-        const userStr = localStorage.getItem("user_key");
+        const userStr = localStorage.getItem(USER_KEY);
         if (!userStr) {
+            console.error("❌ WebSocket: User not authenticated");
             throw new Error("User not authenticated");
         }
         const currentUser = JSON.parse(userStr);
 
+        // Generate temp message ID
+        const tempMessageId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+        // Backend expects: { type: "new_message", payload: { ... } }
         const message = {
-            channel_id: channelId,
-            sender_id: currentUser.id,
-            type,
-            content
+            type: "new_message",
+            payload: {
+                temp_message_id: tempMessageId,
+                channel_id: channelId,
+                sender_username: currentUser.username,
+                type,
+                content
+            }
         };
 
+        console.log("📤 WebSocket: Sending message:", message);
         this.ws.send(JSON.stringify(message));
     }
 

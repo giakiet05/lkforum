@@ -16,6 +16,10 @@ export interface NotificationResponse {
     link: string;
     is_read: boolean;
     created_at: string; // ISO 8601 format
+    metadata?: {
+        community_id?: string;
+        [key: string]: any;
+    };
 }
 
 export interface PaginatedNotificationsResponse {

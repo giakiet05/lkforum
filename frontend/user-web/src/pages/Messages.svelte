@@ -2,6 +2,7 @@
   import { onMount, onDestroy } from "svelte";
   import { push } from "svelte-spa-router";
   import { authStore } from "../stores/auth-store";
+  import { toastStore } from "../stores/toast-store";
   import {
     chatStore,
     activeChannel,
@@ -117,24 +118,29 @@
     if (!currentUser) return;
 
     try {
+      console.log("📋 Loading channels for user:", currentUser.id);
       setLoadingChannels(true);
-      const userChannels = await getChannelsByUser(currentUser.id);
-      setChannels(userChannels);
+      const response = await getChannelsByUser(currentUser.id);
+      console.log("✅ Channels loaded:", response);
+      setChannels(response.channels);
 
       // Auto-select first channel
-      if (userChannels.length > 0 && !$chatStore.activeChannelId) {
-        await handleSelectChannel(userChannels[0]);
+      if (response.channels.length > 0 && !$chatStore.activeChannelId) {
+        console.log("🎯 Auto-selecting first channel:", response.channels[0]);
+        await handleSelectChannel(response.channels[0]);
       }
     } catch (error) {
-      console.error("Failed to load channels:", error);
+      console.error("❌ Failed to load channels:", error);
     }
   }
 
   // Load reports for a channel
   async function loadMessagesForChannel(channelId: string) {
     try {
+      console.log("💬 Loading messages for channel:", channelId);
       setLoadingMessages(true);
       const channelMessages = await getMessages({ channel_id: channelId });
+      console.log("✅ Messages loaded:", channelMessages);
       setMessages(channelId, channelMessages);
 
       // Mark as read
@@ -143,7 +149,7 @@
       // Scroll to bottom
       setTimeout(scrollToBottom, 100);
     } catch (error) {
-      console.error("Failed to load reports:", error);
+      console.error("❌ Failed to load messages:", error);
       setLoadingMessages(false);
     }
   }
@@ -170,7 +176,7 @@
       setTimeout(scrollToBottom, 100);
     } catch (error) {
       console.error("Failed to send message:", error);
-      alert("Failed to send message. Please try again.");
+      toastStore.error("Failed to send message. Please try again.");
     }
   }
 
@@ -222,7 +228,11 @@
 
   // Initialize on mount
   onMount(async () => {
+    console.log("🚀 Messages page mounted");
+    console.log("👤 Current user:", currentUser);
+
     if (!currentUser) {
+      console.log("❌ No current user, redirecting to login");
       push("/login");
       return;
     }
@@ -232,10 +242,12 @@
 
     // Connect WebSocket
     try {
+      console.log("🔌 Attempting WebSocket connection...");
       await websocketService.connect();
       websocketService.onMessage(handleIncomingMessage);
+      console.log("✅ WebSocket handlers registered");
     } catch (error) {
-      console.error("Failed to connect WebSocket:", error);
+      console.error("❌ Failed to connect WebSocket:", error);
     }
   });
 

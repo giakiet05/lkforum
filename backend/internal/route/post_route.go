@@ -35,6 +35,9 @@ func RegisterPostRoutes(rg *gin.RouterGroup, c *controller.PostController) {
 		private.POST("/:id/hide", c.HidePost)
 		private.POST("/:id/unhide", c.UnhidePost)
 
+		// Get Ban Post Community
+		private.GET("/banned", c.GetBanPosts)
+
 		// Image Management
 		private.POST("/:id/images", c.AddImagesToPost)
 		private.DELETE("/:id/images", c.RemoveImagesFromPost) // Body: { "public_ids": [...] }

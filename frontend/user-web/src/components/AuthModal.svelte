@@ -1,11 +1,20 @@
 <script lang="ts">
   import Modal from "./Modal.svelte";
   import Login from "../pages/Login.svelte";
-  import { login, sendVerificationEmail, verifyEmail, completeRegistration } from "../services/auth-service";
-  import type { LoginRequest, CompleteRegistrationRequest } from "../dtos/auth-dto";
+  import {
+    login,
+    sendVerificationEmail,
+    verifyEmail,
+    completeRegistration,
+  } from "../services/auth-service";
+  import type {
+    LoginRequest,
+    CompleteRegistrationRequest,
+  } from "../dtos/auth-dto";
   import Button from "./Button.svelte";
   import { ApiError } from "../errors/api-error";
   import { ApiErrorCode } from "../errors/error-codes";
+  import { toastStore } from "../stores/toast-store";
 
   let { show = false, onClose }: { show: boolean; onClose: () => void } =
     $props();
@@ -51,7 +60,6 @@
     onClose();
   }
 
-
   function startCountdown() {
     countdown = 60;
     canResend = false;
@@ -80,7 +88,6 @@
 
       await login(data); // Gọi login, tự động lưu tokens và update authStore
       handleClose(); // Đóng modal, hoàn tất!
-
     } catch (err) {
       if (err instanceof ApiError) {
         // Hiển thị message từ backend (đã tiếng Việt)
@@ -189,7 +196,7 @@
       const registrationData: CompleteRegistrationRequest = {
         username,
         password,
-        verification_token: verificationToken
+        verification_token: verificationToken,
       };
 
       await completeRegistration(registrationData);
@@ -218,7 +225,7 @@
 
     try {
       await sendVerificationEmail(email);
-      alert("Mã OTP mới đã được gửi đến email của bạn!");
+      toastStore.success("Mã OTP mới đã được gửi đến email của bạn!");
       startCountdown(); // Bắt đầu đếm ngược lại
     } catch (err) {
       if (err instanceof ApiError) {

@@ -87,13 +87,15 @@ func (s *moderationService) handlePostCreated(event bus.Event) {
 		}
 	}
 
+	log.Printf("📬 ModerationService received PostCreated event for post: %s", postID)
+
 	// Run moderation in background
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 
 		if err := s.ModeratePost(ctx, postID); err != nil {
-			log.Printf("Post moderation failed for %s: %v", postID, err)
+			log.Printf("❌ Post moderation failed for %s: %v", postID, err)
 		}
 	}()
 }
@@ -163,23 +165,30 @@ func (s *moderationService) ModeratePost(ctx context.Context, postID string) err
 		return fmt.Errorf("failed to get post: %w", err)
 	}
 
+	// Skip if already skipped (admin/mod posts)
+	if post.ModerationStatus == model.ModerationSkipped {
+		log.Printf("Post %s moderation skipped (admin/moderator post)", postID)
+		return s.approvePost(ctx, postID, model.ModerationSkipped, nil)
+	}
+
 	// Get community to check settings
 	community, err := s.communityRepo.GetByID(ctx, post.CommunityID.Hex())
 	if err != nil {
 		return fmt.Errorf("failed to get community: %w", err)
 	}
 
+	log.Printf("🤖 ModeratePost - Post: %s, Community: %s", postID, community.Name)
+	log.Printf("   - Current Status: %s", post.ModerationStatus)
+	log.Printf("   - PostRequireApproval: %v", community.Setting.PostRequireApproval)
+
 	// If community requires manual approval, skip automated moderation
 	if community.Setting.PostRequireApproval {
-		log.Printf("Post %s requires manual approval in community %s, skipping automated moderation", postID, community.Name)
+		log.Printf("⏸️  Post %s requires manual approval in community %s, waiting for moderator", postID, community.Name)
 		return nil
 	}
 
-	// Check if moderation should be skipped
-	author, _ := s.userRepo.GetByID(ctx, post.AuthorID.Hex())
-	if s.shouldSkipModeration(author) {
-		return s.approvePost(ctx, postID, model.ModerationSkipped, nil)
-	}
+	// Community uses AI moderation - proceed with AI check
+	log.Printf("🔍 Post %s using AI moderation in community %s", postID, community.Name)
 
 	// Build moderation request
 	req := &gemini.ContentCheckRequest{

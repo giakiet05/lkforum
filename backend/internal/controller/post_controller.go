@@ -517,3 +517,25 @@ func (c *PostController) UpdatePollOption(ctx *gin.Context) {
 
 	dto.SendSuccess(ctx, http.StatusOK, "Poll option updated successfully", poll)
 }
+
+func (c *PostController) GetBanPosts(ctx *gin.Context) {
+	var query dto.GetBanPostsQuery
+	if err := ctx.ShouldBindQuery(&query); err != nil {
+		dto.SendError(ctx, http.StatusBadRequest, "Invalid query parameters", apperror.ErrBadRequest.Code)
+		return
+	}
+
+	authUser, exists := ctx.Get("authUser")
+	if !exists {
+		dto.SendError(ctx, http.StatusUnauthorized, apperror.ErrForbidden.Message, apperror.ErrForbidden.Code)
+		return
+	}
+
+	responses, err := c.service.GetBanPosts(&query, authUser.(auth.AuthUser).ID)
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
+		return
+	}
+
+	dto.SendSuccess(ctx, http.StatusOK, "Banned posts retrieved successfully", responses)
+}
