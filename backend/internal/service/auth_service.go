@@ -45,6 +45,11 @@ type AuthService interface {
 	RefreshToken(refreshToken string) (string, string, error)
 	Logout(accessToken, refreshToken string) error
 
+	// Forgot Password Flow
+	ForgotPassword(email string) error
+	VerifyResetPasswordOTP(email, otp string) (string, error) // Returns reset_token
+	ResetPassword(resetToken, newPassword string) error
+
 	// Google OAuth
 	ProcessGoogleCallback(code string) (*GoogleAuthResult, error)
 	CompleteGoogleSetup(setupToken, username string) (*model.User, string, string, error)
@@ -53,16 +58,20 @@ type AuthService interface {
 type authService struct {
 	userRepo              repo.UserRepo
 	emailVerificationRepo repo.EmailVerificationRepo
+	passwordResetRepo     repo.PasswordResetRepo
 	emailSender           email.Sender
 	redisClient           *redis.Client
+	tokenService          auth.TokenServiceInterface
 }
 
-func NewAuthService(userRepo repo.UserRepo, emailVerificationRepo repo.EmailVerificationRepo, emailSender email.Sender, redisClient *redis.Client) AuthService {
+func NewAuthService(userRepo repo.UserRepo, emailVerificationRepo repo.EmailVerificationRepo, passwordResetRepo repo.PasswordResetRepo, emailSender email.Sender, redisClient *redis.Client, tokenService auth.TokenServiceInterface) AuthService {
 	return &authService{
 		userRepo:              userRepo,
 		emailVerificationRepo: emailVerificationRepo,
+		passwordResetRepo:     passwordResetRepo,
 		emailSender:           emailSender,
 		redisClient:           redisClient,
+		tokenService:          tokenService,
 	}
 }
 
@@ -103,11 +112,13 @@ func (s *authService) SendEmailVerification(email string) error {
 	}
 
 	// Send OTP email
-	go func() {
-		if err := s.emailSender.SendVerificationEmail(email, otp); err != nil {
-			fmt.Printf("CRITICAL: Failed to send verification email to %s: %v\n", email, err)
-		}
-	}()
+	if s.emailSender != nil {
+		go func() {
+			if err := s.emailSender.SendVerificationEmail(email, otp); err != nil {
+				fmt.Printf("CRITICAL: Failed to send verification email to %s: %v\n", email, err)
+			}
+		}()
+	}
 
 	return nil
 }
@@ -205,7 +216,7 @@ func (s *authService) CompleteRegistration(verificationToken, username, password
 		Provider:   model.ProviderLocal,
 		Role:       model.UserRole,
 		Settings:   model.NewDefaultSettings(),
-		IsVerified: true, // Always true since we verified email first
+		IsVerified: true,  // Always true since we verified email first
 		IsBanned:   false, // Initialize ban status
 		CreatedAt:  time.Now(),
 		RoleContent: model.RoleContent{
@@ -264,11 +275,13 @@ func (s *authService) ResendOTP(email string) error {
 	}
 
 	// Send email
-	go func() {
-		if err := s.emailSender.SendVerificationEmail(email, otp); err != nil {
-			fmt.Printf("CRITICAL: Failed to resend verification email to %s: %v\n", email, err)
-		}
-	}()
+	if s.emailSender != nil {
+		go func() {
+			if err := s.emailSender.SendVerificationEmail(email, otp); err != nil {
+				fmt.Printf("CRITICAL: Failed to resend verification email to %s: %v\n", email, err)
+			}
+		}()
+	}
 
 	return nil
 }
@@ -366,7 +379,7 @@ func (s *authService) RefreshToken(refreshToken string) (string, string, error) 
 }
 
 func (s *authService) Logout(accessToken, refreshToken string) error {
-	if auth.TokenSvc == nil {
+	if s.tokenService == nil {
 		return apperror.ErrInternal
 	}
 
@@ -387,15 +400,169 @@ func (s *authService) Logout(accessToken, refreshToken string) error {
 
 	// Blacklist access token
 	accessTTL := time.Minute * time.Duration(config.Cfg.TokenTTL)
-	if err := auth.TokenSvc.InvalidateToken(ctx, accessJTI, accessTTL); err != nil {
+	if err := s.tokenService.InvalidateToken(ctx, accessJTI, accessTTL); err != nil {
 		return err
 	}
 
 	// Blacklist refresh token
 	refreshTTL := time.Hour * time.Duration(config.Cfg.RefreshTokenTTL)
-	if err := auth.TokenSvc.InvalidateToken(ctx, refreshJTI, refreshTTL); err != nil {
+	if err := s.tokenService.InvalidateToken(ctx, refreshJTI, refreshTTL); err != nil {
 		return err
 	}
+
+	return nil
+}
+
+// --- Forgot Password Flow ---
+
+// ForgotPassword initiates password reset by sending OTP to email
+func (s *authService) ForgotPassword(email string) error {
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
+
+	// Check if email is registered and user uses local auth
+	user, err := s.userRepo.GetByEmail(ctx, email)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return apperror.ErrEmailNotRegistered
+		}
+		return err
+	}
+
+	// Only allow password reset for local auth users
+	if user.Provider != model.ProviderLocal {
+		return apperror.ErrLoginMethodMismatch
+	}
+
+	// Check if there's an existing reset request (delete it first to allow resend)
+	if existing, err := s.passwordResetRepo.GetByEmail(ctx, email); err == nil {
+		_ = s.passwordResetRepo.Delete(ctx, existing.Email)
+	}
+
+	// Create new password reset record
+	otp := generateOTP()
+	nonce := generateNonce()
+	otpExpiresAt := time.Now().Add(time.Duration(config.Cfg.OTPExpirationMinutes) * time.Minute)
+
+	reset := &model.PasswordReset{
+		Email:        email,
+		OTP:          otp,
+		OTPExpiresAt: otpExpiresAt,
+		IsVerified:   false,
+		Nonce:        nonce,
+		CreatedAt:    time.Now(),
+	}
+
+	_, err = s.passwordResetRepo.Create(ctx, reset)
+	if err != nil {
+		return err
+	}
+
+	// Send OTP email
+	if s.emailSender != nil {
+		go func() {
+			if err := s.emailSender.SendPasswordResetEmail(email, otp); err != nil {
+				fmt.Printf("CRITICAL: Failed to send password reset email to %s: %v\n", email, err)
+			}
+		}()
+	}
+
+	return nil
+}
+
+// VerifyResetPasswordOTP verifies the OTP and returns a reset_token
+func (s *authService) VerifyResetPasswordOTP(email, otp string) (string, error) {
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
+
+	reset, err := s.passwordResetRepo.GetByEmail(ctx, email)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return "", apperror.ErrInvalidOTP
+		}
+		return "", err
+	}
+
+	if reset.IsVerified {
+		return "", apperror.ErrEmailAlreadyVerified
+	}
+
+	if reset.OTP != otp {
+		return "", apperror.ErrInvalidOTP
+	}
+
+	if reset.OTPExpiresAt.Before(time.Now()) {
+		return "", apperror.ErrOTPExpired
+	}
+
+	// Mark as verified
+	reset.IsVerified = true
+	_, err = s.passwordResetRepo.Update(ctx, reset)
+	if err != nil {
+		return "", err
+	}
+
+	// Generate reset token (valid 15 min) - reuse verification token logic
+	resetToken, err := auth.CreateVerificationToken(email, reset.Nonce)
+	if err != nil {
+		return "", err
+	}
+
+	return resetToken, nil
+}
+
+// ResetPassword changes the user's password using reset token
+func (s *authService) ResetPassword(resetToken, newPassword string) error {
+	// Parse reset token
+	claims, err := auth.ParseVerificationToken(resetToken)
+	if err != nil {
+		return err
+	}
+
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
+
+	// Verify the nonce matches (prevent replay)
+	reset, err := s.passwordResetRepo.GetByEmail(ctx, claims.Email)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return apperror.ErrInvalidToken
+		}
+		return err
+	}
+
+	if !reset.IsVerified {
+		return apperror.ErrInvalidOTP
+	}
+
+	if reset.Nonce != claims.Nonce {
+		return apperror.ErrInvalidToken
+	}
+
+	// Get user
+	user, err := s.userRepo.GetByEmail(ctx, claims.Email)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return apperror.ErrUserNotFound
+		}
+		return err
+	}
+
+	// Hash new password
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+
+	// Update user password
+	user.Password = string(hashedPassword)
+	_, err = s.userRepo.Update(ctx, user)
+	if err != nil {
+		return err
+	}
+
+	// Delete reset record (cleanup)
+	_ = s.passwordResetRepo.Delete(ctx, claims.Email)
 
 	return nil
 }
@@ -524,12 +691,11 @@ func generateNonce() string {
 }
 
 func extractJTI(tokenStr string) (string, error) {
-	token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
-		return []byte(config.Cfg.JWTSecret), nil
-	})
-
+	// Use ParseUnverified to extract JTI without validating the token
+	// This is safe here because we only need the JTI for blacklisting
+	token, _, err := jwt.NewParser().ParseUnverified(tokenStr, jwt.MapClaims{})
 	if err != nil {
-		return "", err
+		return "", apperror.ErrInvalidToken
 	}
 
 	if claims, ok := token.Claims.(jwt.MapClaims); ok {
@@ -538,7 +704,7 @@ func extractJTI(tokenStr string) (string, error) {
 		}
 	}
 
-	return "", fmt.Errorf("jti not found in token")
+	return "", apperror.ErrInvalidToken
 }
 
 // invalidateUsernameCache removes the cached username availability check

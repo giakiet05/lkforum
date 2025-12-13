@@ -10,6 +10,7 @@ import (
 
 	model "github.com/giakiet05/lkforum/internal/model"
 	gomock "github.com/golang/mock/gomock"
+	primitive "go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // MockNotificationRepo is a mock of NotificationRepo interface.
@@ -65,6 +66,20 @@ func (mr *MockNotificationRepoMockRecorder) Create(ctx, notification interface{}
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockNotificationRepo)(nil).Create), ctx, notification)
 }
 
+// DeleteNotification mocks base method.
+func (m *MockNotificationRepo) DeleteNotification(ctx context.Context, notificationID primitive.ObjectID, recipientID string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteNotification", ctx, notificationID, recipientID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteNotification indicates an expected call of DeleteNotification.
+func (mr *MockNotificationRepoMockRecorder) DeleteNotification(ctx, notificationID, recipientID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteNotification", reflect.TypeOf((*MockNotificationRepo)(nil).DeleteNotification), ctx, notificationID, recipientID)
+}
+
 // GetByRecipientID mocks base method.
 func (m *MockNotificationRepo) GetByRecipientID(ctx context.Context, recipientID string, page, pageSize int) ([]*model.Notification, int64, error) {
 	m.ctrl.T.Helper()
@@ -97,7 +112,7 @@ func (mr *MockNotificationRepoMockRecorder) MarkAllAsRead(ctx, recipientID inter
 }
 
 // MarkAsRead mocks base method.
-func (m *MockNotificationRepo) MarkAsRead(ctx context.Context, notificationID, recipientID string) error {
+func (m *MockNotificationRepo) MarkAsRead(ctx context.Context, notificationID primitive.ObjectID, recipientID string) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "MarkAsRead", ctx, notificationID, recipientID)
 	ret0, _ := ret[0].(error)

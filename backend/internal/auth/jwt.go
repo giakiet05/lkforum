@@ -198,7 +198,9 @@ func ParseAccessToken(tokenStr string) (AuthUser, error) {
 	jti, _ := claims["jti"].(string)
 
 	if TokenSvc != nil {
-		ctx := context.Background()
+		// Use context with timeout for Redis operations
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
 
 		// Check if user is deleted/invalidated
 		if !TokenSvc.IsUserValid(ctx, userID) {
@@ -247,7 +249,9 @@ func ParseRefreshToken(tokenStr string) (string, error) {
 	jti, _ := claims["jti"].(string)
 
 	if TokenSvc != nil {
-		ctx := context.Background()
+		// Use context with timeout for Redis operations
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
 
 		// Check if user is deleted/invalidated
 		if !TokenSvc.IsUserValid(ctx, userID) {
