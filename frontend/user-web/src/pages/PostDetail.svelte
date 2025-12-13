@@ -194,7 +194,6 @@
     }
 
     try {
-      const optionId = selectedOptions[0];
       const hasVotedBefore =
         post.content.poll?.user_vote_ids &&
         post.content.poll.user_vote_ids.length > 0;
@@ -204,10 +203,13 @@
         await removePollVote(post.id);
       }
 
-      // Submit new vote
-      const updatedPoll = await voteOnPoll(post.id, optionId);
+      // Submit votes for each selected option
+      let updatedPoll;
+      for (const optionId of selectedOptions) {
+        updatedPoll = await voteOnPoll(post.id, optionId);
+      }
 
-      // Update poll with fresh data from backend
+      // Update poll with fresh data from backend (last response)
       if (post.content.poll && updatedPoll) {
         post.content.poll.options = updatedPoll.options;
         post.content.poll.total_votes = updatedPoll.total_votes;

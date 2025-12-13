@@ -90,7 +90,7 @@ func (s *voteService) checkModerationStatus(ctx context.Context, targetID string
 		if err != nil {
 			return err
 		}
-		if post.ModerationStatus != model.ModerationApproved {
+		if post.ModerationStatus != model.ModerationApproved && post.ModerationStatus != model.ModerationSkipped {
 			return apperror.ErrForbidden
 		}
 	case model.VoteTargetComment:
