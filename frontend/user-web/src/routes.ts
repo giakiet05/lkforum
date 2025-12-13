@@ -13,11 +13,13 @@ import Messages from './pages/Messages.svelte';
 import GoogleCallback from './pages/GoogleCallback.svelte';
 import GoogleSetup from './pages/GoogleSetup.svelte';
 import AuthError from './pages/AuthError.svelte';
+import ForgotPassword from './pages/ForgotPassword.svelte';
 
 const routes = {
     '/': Home,
     '/login': Login,
     '/register': Register,
+    '/forgot-password': ForgotPassword,
     '/profile': Profile,
     '/profile/:username': Profile,
     '/settings': Settings,

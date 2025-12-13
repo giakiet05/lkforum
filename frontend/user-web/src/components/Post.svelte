@@ -110,7 +110,6 @@
     }
 
     try {
-      const optionId = selectedOptions[0];
       const hasVotedBefore =
         post.content.poll?.user_vote_ids &&
         post.content.poll.user_vote_ids.length > 0;
@@ -118,13 +117,15 @@
       // If single choice and already voted, remove old vote first
       if (!post.content.poll?.allow_multiple && hasVotedBefore) {
         await removePollVote(post.id);
-        // Backend returns updated poll, but we'll fetch fresh data
       }
 
-      // Submit new vote
-      const updatedPoll = await voteOnPoll(post.id, optionId);
+      // Submit votes for each selected option
+      let updatedPoll;
+      for (const optionId of selectedOptions) {
+        updatedPoll = await voteOnPoll(post.id, optionId);
+      }
 
-      // Update poll with fresh data from backend
+      // Update poll with fresh data from backend (last response)
       if (post.content.poll && updatedPoll) {
         post.content.poll.options = updatedPoll.options;
         post.content.poll.total_votes = updatedPoll.total_votes;
@@ -178,6 +179,7 @@
 
   async function handleUpvote(e: MouseEvent) {
     e.stopPropagation();
+    console.log("⬆️ Upvote clicked for post:", post.id);
     if (!currentUser) {
       toastStore.warning("Please login to vote");
       return;
@@ -191,6 +193,7 @@
     try {
       isVoting = true;
       const newVote = userVote === "up" ? null : true; // Toggle or set upvote
+      console.log("⬆️ Current vote:", userVote, "New vote:", newVote);
 
       await voteOnPost(post.id, newVote!);
 

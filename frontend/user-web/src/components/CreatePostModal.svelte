@@ -311,7 +311,7 @@
         community_id: community.id,
         title: title.trim(),
         type: activeTab === "poll" ? "poll" : "text",
-        text: bodyText.trim() || undefined,
+        text: bodyText.trim() || "",
       };
 
       // Add poll data if poll type

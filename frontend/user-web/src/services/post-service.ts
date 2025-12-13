@@ -91,12 +91,16 @@ export async function createPost(data: CreatePostRequest): Promise<PostResponse>
  * Vote on a post (upvote or downvote)
  */
 export async function voteOnPost(postId: string, value: boolean): Promise<void> {
+    console.log("🗳️ Voting on post:", postId, "value:", value);
     const res = await authenticatedFetch(`/api/posts/${postId}/vote`, {
         method: "POST",
         body: JSON.stringify({ value }),
     });
 
-    await handleApiResponse(res);
+    console.log("🗳️ Vote response status:", res.status);
+    const result = await handleApiResponse(res);
+    console.log("🗳️ Vote result:", result);
+    return result;
 }
 
 /**

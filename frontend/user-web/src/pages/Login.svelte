@@ -160,6 +160,18 @@
     <div class="error" role="alert">{error}</div>
   {/if}
 
+  {#if mode === "login"}
+    <div class="forgot-password-link">
+      <button
+        type="button"
+        class="text-button"
+        onclick={() => dispatch("forgotPassword")}
+      >
+        Quên mật khẩu?
+      </button>
+    </div>
+  {/if}
+
   <Button
     type="submit"
     label={isLoading
@@ -304,10 +316,22 @@
     font-weight: 600;
     cursor: pointer;
     font-size: inherit;
+    text-decoration: none;
   }
 
   .text-button:hover {
     text-decoration: underline;
+  }
+
+  .forgot-password-link {
+    text-align: right;
+    margin-top: -0.5rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .forgot-password-link .text-button {
+    font-size: 12px;
+    color: #787c7e;
   }
 
   .error {

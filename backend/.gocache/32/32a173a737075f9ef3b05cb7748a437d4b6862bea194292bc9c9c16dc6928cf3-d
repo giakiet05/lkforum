@@ -1,0 +1,16 @@
+./channel_repo.go
+./comment_repo.go
+./community_repo.go
+./draft_repo.go
+./email_verification_repo.go
+./membership_repo.go
+./message_repo.go
+./notification_repo.go
+./options.go
+./poll_vote_repo.go
+./post_history_repo.go
+./post_repo.go
+./report_repo.go
+./saved_post_repo.go
+./user_repo.go
+./vote_repo.go
