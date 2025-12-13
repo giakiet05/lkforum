@@ -148,3 +148,42 @@ export async function completeGoogleSetup(setupToken: string, username: string):
     return data;
 }
 
+// --- Forgot Password Flow ---
+
+/**
+ * Gửi OTP để reset password
+ */
+export async function forgotPassword(email: string): Promise<void> {
+    const res = await publicFetch(`${API_BASE_URL}/api/auth/local/forgot-password`, {
+        method: "POST",
+        body: JSON.stringify({ email }),
+    });
+
+    await handleApiResponse(res);
+}
+
+/**
+ * Xác thực OTP và nhận reset token
+ */
+export async function verifyResetOTP(email: string, otp: string): Promise<{ reset_token: string }> {
+    const res = await publicFetch(`${API_BASE_URL}/api/auth/local/verify-reset-otp`, {
+        method: "POST",
+        body: JSON.stringify({ email, otp }),
+    });
+
+    const data = await handleApiResponse(res);
+    return data;
+}
+
+/**
+ * Reset password với reset token
+ */
+export async function resetPassword(resetToken: string, newPassword: string): Promise<void> {
+    const res = await publicFetch(`${API_BASE_URL}/api/auth/local/reset-password`, {
+        method: "POST",
+        body: JSON.stringify({ reset_token: resetToken, new_password: newPassword }),
+    });
+
+    await handleApiResponse(res);
+}
+

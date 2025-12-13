@@ -6,6 +6,9 @@
     sendVerificationEmail,
     verifyEmail,
     completeRegistration,
+    forgotPassword,
+    verifyResetOTP,
+    resetPassword,
   } from "../services/auth-service";
   import type {
     LoginRequest,
@@ -19,8 +22,8 @@
   let { show = false, onClose }: { show: boolean; onClose: () => void } =
     $props();
 
-  let activeTab = $state<"login" | "register">("login");
-  let step = $state<"email" | "otp" | "register">("email"); // Step 1: email → Step 2: otp → Step 3: register
+  let activeTab = $state<"login" | "register" | "forgotPassword">("login");
+  let step = $state<"email" | "otp" | "register" | "resetPassword">("email"); // Step 1: email → Step 2: otp → Step 3: register/resetPassword
   let isLoading = $state(false);
   let error = $state("");
 
@@ -32,6 +35,11 @@
   let otp = $state(["", "", "", "", "", ""]); // 6 ô OTP
   let verificationToken = $state(""); // Lưu verification token sau khi verify OTP
 
+  // Forgot password fields
+  let resetToken = $state(""); // Token để reset password
+  let newPassword = $state("");
+  let confirmNewPassword = $state("");
+
   // OTP countdown timer
   let countdown = $state(60);
   let canResend = $state(false);
@@ -42,6 +50,9 @@
     username = "";
     password = "";
     confirmPassword = "";
+    newPassword = "";
+    confirmNewPassword = "";
+    resetToken = "";
     otp = ["", "", "", "", "", ""];
     step = "email";
     activeTab = "login";
@@ -224,7 +235,11 @@
     error = "";
 
     try {
-      await sendVerificationEmail(email);
+      if (activeTab === "forgotPassword") {
+        await forgotPassword(email);
+      } else {
+        await sendVerificationEmail(email);
+      }
       toastStore.success("Mã OTP mới đã được gửi đến email của bạn!");
       startCountdown(); // Bắt đầu đếm ngược lại
     } catch (err) {
@@ -232,6 +247,108 @@
         error = err.message;
       } else {
         error = "Không thể gửi lại mã OTP";
+      }
+    } finally {
+      isLoading = false;
+    }
+  }
+
+  // --- Forgot Password Functions ---
+
+  function handleSwitchToForgotPassword() {
+    activeTab = "forgotPassword";
+    step = "email";
+    error = "";
+  }
+
+  async function handleForgotPasswordEmailSubmit(e: Event) {
+    e.preventDefault();
+
+    if (!email) {
+      error = "Vui lòng nhập email";
+      return;
+    }
+
+    isLoading = true;
+    error = "";
+
+    try {
+      await forgotPassword(email);
+      step = "otp";
+      error = "";
+      startCountdown();
+    } catch (err) {
+      if (err instanceof ApiError) {
+        if (err.error_code === "LOGIN_METHOD_MISMATCH") {
+          error =
+            "Tài khoản này đã đăng ký bằng Google. Vui lòng đăng nhập bằng Google hoặc liên hệ quản trị viên để hỗ trợ.";
+        } else {
+          error = err.message;
+        }
+      } else {
+        error = "Không thể gửi mã OTP. Vui lòng thử lại.";
+      }
+    } finally {
+      isLoading = false;
+    }
+  }
+
+  async function handleVerifyResetOTPStep(e: Event) {
+    e.preventDefault();
+
+    const otpCode = otp.join("");
+    if (otpCode.length !== 6) {
+      error = "Vui lòng nhập đầy đủ 6 chữ số";
+      return;
+    }
+
+    isLoading = true;
+    error = "";
+
+    try {
+      const response = await verifyResetOTP(email, otpCode);
+      resetToken = response.reset_token;
+      step = "resetPassword";
+      error = "";
+    } catch (err) {
+      if (err instanceof ApiError) {
+        error = err.message;
+      } else {
+        error = "Mã OTP không đúng. Vui lòng thử lại.";
+      }
+    } finally {
+      isLoading = false;
+    }
+  }
+
+  async function handleResetPasswordSubmit(e: Event) {
+    e.preventDefault();
+
+    if (!newPassword || !confirmNewPassword) {
+      error = "Vui lòng điền đầy đủ thông tin";
+      return;
+    }
+    if (newPassword.length < 8) {
+      error = "Mật khẩu phải có ít nhất 8 ký tự";
+      return;
+    }
+    if (newPassword !== confirmNewPassword) {
+      error = "Mật khẩu xác nhận không khớp!";
+      return;
+    }
+
+    isLoading = true;
+    error = "";
+
+    try {
+      await resetPassword(resetToken, newPassword);
+      toastStore.success("Đổi mật khẩu thành công! Vui lòng đăng nhập lại.");
+      handleClose();
+    } catch (err) {
+      if (err instanceof ApiError) {
+        error = err.message;
+      } else {
+        error = "Không thể đổi mật khẩu";
       }
     } finally {
       isLoading = false;
@@ -318,11 +435,17 @@
   onClose={handleClose}
   title={activeTab === "login"
     ? "Đăng nhập vào LKForum"
-    : step === "email"
-      ? "Tạo tài khoản mới"
-      : step === "otp"
-        ? "Xác thực Email"
-        : "Hoàn tất đăng ký"}
+    : activeTab === "forgotPassword" && step === "email"
+      ? "Quên mật khẩu"
+      : activeTab === "forgotPassword" && step === "otp"
+        ? "Xác thực OTP"
+        : activeTab === "forgotPassword" && step === "resetPassword"
+          ? "Đặt lại mật khẩu"
+          : step === "email"
+            ? "Tạo tài khoản mới"
+            : step === "otp"
+              ? "Xác thực Email"
+              : "Hoàn tất đăng ký"}
 >
   {#if activeTab === "login"}
     <Login
@@ -331,8 +454,9 @@
       {isLoading}
       {error}
       on:switchMode={handleSwitchToRegister}
+      on:forgotPassword={handleSwitchToForgotPassword}
     />
-  {:else if step === "email"}
+  {:else if activeTab === "register" && step === "email"}
     <!-- Step 1: Nhập Email -->
     <form on:submit={handleEmailSubmit} class="auth-form">
       <p class="form-description">
@@ -369,7 +493,7 @@
         </button>
       </div>
     </form>
-  {:else if step === "otp"}
+  {:else if activeTab === "register" && step === "otp"}
     <!-- Step 2: Verify OTP -->
     <form on:submit={handleVerifyOTPStep} class="auth-form otp-form">
       <p class="otp-instruction">
@@ -517,6 +641,165 @@
 
       <div class="switch-mode">
         Đã có tài khoản?
+        <button type="button" class="link-btn" on:click={handleSwitchToLogin}>
+          Đăng nhập
+        </button>
+      </div>
+    </form>
+  {:else if activeTab === "forgotPassword" && step === "email"}
+    <!-- Forgot Password: Step 1 - Email -->
+    <form on:submit={handleForgotPasswordEmailSubmit} class="auth-form">
+      <p class="form-description">
+        Nhập email đã đăng ký để nhận mã OTP khôi phục mật khẩu.
+      </p>
+
+      <div class="input-group">
+        <label for="email">Email</label>
+        <input
+          type="email"
+          id="email"
+          bind:value={email}
+          placeholder="Nhập email của bạn"
+          disabled={isLoading}
+          required
+        />
+      </div>
+
+      {#if error}
+        <div class="error" role="alert">{error}</div>
+      {/if}
+
+      <Button
+        type="submit"
+        label={isLoading ? "Đang gửi..." : "Gửi mã OTP"}
+        variant="primary"
+        disabled={isLoading}
+      />
+
+      <div class="switch-mode">
+        Nhớ mật khẩu?
+        <button type="button" class="link-btn" on:click={handleSwitchToLogin}>
+          Đăng nhập
+        </button>
+      </div>
+    </form>
+  {:else if activeTab === "forgotPassword" && step === "otp"}
+    <!-- Forgot Password: Step 2 - Verify OTP -->
+    <form on:submit={handleVerifyResetOTPStep} class="auth-form otp-form">
+      <p class="otp-instruction">
+        Chúng tôi đã gửi mã OTP đến email <strong>{email}</strong>
+      </p>
+      <p class="otp-hint">Vui lòng nhập mã gồm 6 chữ số</p>
+
+      <div class="otp-inputs">
+        {#each otp as _, i}
+          <div class="otp-box">
+            <input
+              type="text"
+              class="otp-input"
+              maxlength="1"
+              value={otp[i]}
+              on:input={(e) => handleOtpInput(i, e)}
+              on:keydown={(e) => handleOtpKeydown(i, e)}
+              on:paste={i === 0 ? handleOtpPaste : undefined}
+              disabled={isLoading}
+            />
+          </div>
+        {/each}
+      </div>
+
+      {#if error}
+        <div class="error" role="alert">{error}</div>
+      {/if}
+
+      <Button
+        type="submit"
+        label={isLoading ? "Đang xác thực..." : "Xác Nhận"}
+        variant="primary"
+        disabled={isLoading}
+      />
+
+      <div class="otp-timer">
+        {#if !canResend}
+          <span class="timer-text">{formatCountdown(countdown)}</span>
+        {/if}
+      </div>
+
+      <div class="otp-actions">
+        <p class="resend-text">
+          Chưa nhận được OTP?
+          <button
+            type="button"
+            class="back-btn"
+            on:click={() => {
+              step = "email";
+              otp = ["", "", "", "", "", ""];
+              error = "";
+            }}
+            disabled={isLoading}
+          >
+            Quay lại
+          </button>
+          <button
+            type="button"
+            class="resend-btn"
+            on:click={handleResendOTP}
+            disabled={!canResend || isLoading}
+          >
+            Gửi lại
+          </button>
+        </p>
+      </div>
+
+      <div class="switch-mode">
+        Nhớ mật khẩu?
+        <button type="button" class="link-btn" on:click={handleSwitchToLogin}>
+          Đăng nhập
+        </button>
+      </div>
+    </form>
+  {:else if activeTab === "forgotPassword" && step === "resetPassword"}
+    <!-- Forgot Password: Step 3 - Reset Password -->
+    <form on:submit={handleResetPasswordSubmit} class="auth-form">
+      <p class="form-description">Tạo mật khẩu mới cho tài khoản của bạn.</p>
+
+      <div class="input-group">
+        <label for="newPassword">Mật khẩu mới</label>
+        <input
+          type="password"
+          id="newPassword"
+          bind:value={newPassword}
+          placeholder="Nhập mật khẩu mới"
+          disabled={isLoading}
+          required
+        />
+      </div>
+
+      <div class="input-group">
+        <label for="confirmNewPassword">Xác nhận mật khẩu mới</label>
+        <input
+          type="password"
+          id="confirmNewPassword"
+          bind:value={confirmNewPassword}
+          placeholder="Nhập lại mật khẩu mới"
+          disabled={isLoading}
+          required
+        />
+      </div>
+
+      {#if error}
+        <div class="error" role="alert">{error}</div>
+      {/if}
+
+      <Button
+        type="submit"
+        label={isLoading ? "Đang xử lý..." : "Đặt lại mật khẩu"}
+        variant="primary"
+        disabled={isLoading}
+      />
+
+      <div class="switch-mode">
+        Nhớ mật khẩu?
         <button type="button" class="link-btn" on:click={handleSwitchToLogin}>
           Đăng nhập
         </button>
