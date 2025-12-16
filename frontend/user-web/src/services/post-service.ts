@@ -90,6 +90,7 @@ export async function createPost(data: CreatePostRequest): Promise<PostResponse>
 
 /**
  * Vote on a post (upvote or downvote)
+ * Backend tự động toggle: POST cùng giá trị sẽ remove vote
  */
 export async function voteOnPost(postId: string, value: boolean): Promise<void> {
     console.log("🗳️ Voting on post:", postId, "value:", value);

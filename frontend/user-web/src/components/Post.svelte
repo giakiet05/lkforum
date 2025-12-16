@@ -227,17 +227,17 @@
 
     try {
       isVoting = true;
-      const newVote = userVote === "up" ? null : true; // Toggle or set upvote
-      console.log("⬆️ Current vote:", userVote, "New vote:", newVote);
+      const previousVote = userVote;
+      console.log("⬆️ Current vote:", userVote);
 
-      await voteOnPost(post.id, newVote!);
+      // Backend tự động toggle: POST cùng giá trị sẽ remove vote
+      await voteOnPost(post.id, true);
 
-      // Update local state
-      if (userVote === "up") {
-        // Remove upvote
+      if (previousVote === "up") {
+        // Bấm lần 2 - remove upvote
         userVote = "";
         votesCount--;
-      } else if (userVote === "down") {
+      } else if (previousVote === "down") {
         // Change from downvote to upvote
         userVote = "up";
         votesCount += 2; // Remove -1 and add +1
@@ -267,16 +267,16 @@
 
     try {
       isVoting = true;
-      const newVote = userVote === "down" ? null : false; // Toggle or set downvote
+      const previousVote = userVote;
 
-      await voteOnPost(post.id, newVote!);
+      // Backend tự động toggle: POST cùng giá trị sẽ remove vote
+      await voteOnPost(post.id, false);
 
-      // Update local state
-      if (userVote === "down") {
-        // Remove downvote
+      if (previousVote === "down") {
+        // Bấm lần 2 - remove downvote
         userVote = "";
         votesCount++;
-      } else if (userVote === "up") {
+      } else if (previousVote === "up") {
         // Change from upvote to downvote
         userVote = "down";
         votesCount -= 2; // Remove +1 and add -1
