@@ -1,4 +1,7 @@
 import Home from './pages/Home.svelte';
+import Popular from './pages/Popular.svelte';
+import Explore from './pages/Explore.svelte';
+import All from './pages/All.svelte';
 import Login from './pages/Login.svelte';
 import Register from './pages/Register.svelte';
 import Profile from './pages/Profile.svelte';
@@ -17,6 +20,9 @@ import ForgotPassword from './pages/ForgotPassword.svelte';
 
 const routes = {
     '/': Home,
+    '/popular': Popular,
+    '/explore': Explore,
+    '/all': All,
     '/login': Login,
     '/register': Register,
     '/forgot-password': ForgotPassword,

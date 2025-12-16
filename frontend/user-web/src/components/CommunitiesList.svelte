@@ -75,8 +75,8 @@
 </script>
 
 <div class="communities-section" class:compact>
-  <button class="section-header" onclick={toggleExpand}>
-    {#if !compact}
+  {#if !compact}
+    <button class="section-header" onclick={toggleExpand}>
       <span class="section-title">COMMUNITIES</span>
       <span class="expand-icon" class:expanded={isExpanded}>
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -89,10 +89,54 @@
           />
         </svg>
       </span>
-    {:else}
-      <span class="section-icon">👥</span>
-    {/if}
-  </button>
+    </button>
+  {:else}
+    <!-- Compact mode: Show community avatars -->
+    <div class="compact-communities">
+      {#if isLoadingCommunities}
+        <div class="compact-loading">⏳</div>
+      {:else if userCommunities.length > 0}
+        {#each userCommunities.slice(0, 4) as community (community.id)}
+          <button
+            class="compact-community-avatar"
+            onclick={() => navigateToCommunity(community.name)}
+            title="lk/{community.name}"
+          >
+            {#if community.avatar}
+              <img src={community.avatar} alt={community.name} />
+            {:else}
+              <span class="avatar-placeholder">
+                {community.name.charAt(0).toUpperCase()}
+              </span>
+            {/if}
+          </button>
+        {/each}
+        {#if userCommunities.length > 4}
+          <button
+            class="compact-more"
+            title="+{userCommunities.length - 4} more"
+          >
+            +{userCommunities.length - 4}
+          </button>
+        {/if}
+      {:else}
+        <button
+          class="compact-add"
+          onclick={handleCreateCommunity}
+          title="Tạo cộng đồng"
+        >
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <path
+              d="M10 4V16M4 10H16"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+            />
+          </svg>
+        </button>
+      {/if}
+    </div>
+  {/if}
 
   {#if isExpanded && !compact}
     <div class="communities-content">
@@ -108,14 +152,14 @@
             />
           </svg>
         </span>
-        <span class="action-label">Create Community</span>
+        <span class="action-label">Tạo cộng đồng</span>
       </button>
 
       <!-- User's Communities -->
       {#if isLoadingCommunities}
         <div class="loading-message">
           <span class="loading-spinner">⏳</span>
-          <span>Loading...</span>
+          <span>Đang tải...</span>
         </div>
       {:else if userCommunities.length > 0}
         <div class="user-communities-list">
@@ -144,7 +188,7 @@
         <span class="action-icon">
           <img src="/setting_icon.svg" alt="Settings" width="20" height="20" />
         </span>
-        <span class="action-label">Manage Communities</span>
+        <span class="action-label">Quản lý cộng đồng</span>
       </button>
     </div>
   {/if}
@@ -324,5 +368,92 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     text-align: left;
+  }
+
+  /* Compact mode styles */
+  .compact-communities {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 4px;
+  }
+
+  .compact-community-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    overflow: hidden;
+    transition: all 0.2s ease;
+    position: relative;
+  }
+
+  .compact-community-avatar:hover {
+    transform: scale(1.1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  }
+
+  .compact-community-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .avatar-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    font-weight: 600;
+    font-size: 16px;
+  }
+
+  .compact-loading {
+    font-size: 20px;
+    animation: spin 1s linear infinite;
+  }
+
+  .compact-more {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 2px dashed #d0d0d0;
+    background: #f5f5f5;
+    color: #666;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .compact-more:hover {
+    background: #e8e8e8;
+    border-color: #b0b0b0;
+    transform: scale(1.05);
+  }
+
+  .compact-add {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 2px dashed var(--blue--);
+    background: rgba(21, 48, 96, 0.05);
+    color: var(--blue--);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+  }
+
+  .compact-add:hover {
+    background: rgba(21, 48, 96, 0.1);
+    transform: scale(1.05);
   }
 </style>

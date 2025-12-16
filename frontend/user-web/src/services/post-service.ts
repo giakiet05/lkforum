@@ -23,6 +23,7 @@ export async function getPosts(query?: GetPostsQuery): Promise<PostResponse[]> {
     if (query?.type) params.append("type", query.type);
     if (query?.sort) params.append("sort", query.sort);
     if (query?.time) params.append("time", query.time);
+    if (query?.feed_type) params.append("feed_type", query.feed_type);
     if (query?.page) params.append("page", query.page.toString());
     if (query?.limit) params.append("limit", query.limit.toString());
 

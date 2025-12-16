@@ -63,6 +63,7 @@ export interface GetPostsQuery {
     type?: string;
     sort?: string;
     time?: string;
+    feed_type?: "home" | "popular" | "explore" | "all"; // Feed filtering
     page?: number;
     limit?: number;
 }

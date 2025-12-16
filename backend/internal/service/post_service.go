@@ -276,6 +276,85 @@ func (s *postService) GetPosts(userID string, query *dto.GetPostsQuery) (*dto.Pa
 	ctx, cancel := util.NewDefaultDBContext()
 	defer cancel()
 
+	// Handle feed type filtering
+	if query.FeedType == "home" {
+		// Home feed: only posts from communities user joined
+		if userID == "" {
+			// If not logged in, return empty or redirect to explore
+			return &dto.PaginatedPostsResponse{Posts: []*dto.PostResponse{}}, nil
+		}
+
+		// Get user's joined communities
+		memberships, err := s.membershipRepo.GetByUserID(ctx, userID)
+		if err != nil {
+			return nil, err
+		}
+
+		if len(memberships) == 0 {
+			// User hasn't joined any communities yet
+			return &dto.PaginatedPostsResponse{Posts: []*dto.PostResponse{}}, nil
+		}
+
+		// Extract community IDs
+		var communityIDs []primitive.ObjectID
+		for _, m := range memberships {
+			communityIDs = append(communityIDs, m.CommunityID)
+		}
+
+		// Filter posts from these communities only
+		filter := s.buildFilter(query)
+		filter["community_id"] = bson.M{"$in": communityIDs}
+		findOptions := s.buildFindOptions(query)
+
+		posts, totalPosts, err := s.postRepo.Find(ctx, filter, findOptions)
+		if err != nil {
+			return nil, err
+		}
+
+		if totalPosts == 0 {
+			return &dto.PaginatedPostsResponse{Posts: []*dto.PostResponse{}}, nil
+		}
+
+		authorIDs, communityIDs2 := s.extractIDs(posts)
+		authors, _ := s.userRepo.GetByIDs(ctx, authorIDs)
+		communities, _ := s.communityRepo.GetByIDs(ctx, communityIDs2)
+
+		authorsMap := s.mapUsers(authors)
+		communitiesMap := s.mapCommunities(communities)
+
+		postIDs := make([]string, len(posts))
+		for i, p := range posts {
+			postIDs[i] = p.ID.Hex()
+		}
+
+		var userVotes map[string]string
+		var userPollVotes map[string][]string
+		if userID != "" {
+			userVotes, _ = s.voteService.FindUserVotes(userID, postIDs, model.VoteTargetPost)
+			userPollVotes, _ = s.pollVoteRepo.FindUserVotes(ctx, userID, postIDs)
+		}
+
+		postResponses := dto.FromPosts(posts, authorsMap, communitiesMap, userVotes, userPollVotes)
+
+		limit := query.Limit
+		if limit <= 0 {
+			limit = 10
+		}
+
+		return &dto.PaginatedPostsResponse{
+			Posts: postResponses,
+			Pagination: dto.Pagination{
+				Page:     query.Page,
+				PageSize: limit,
+				Total:    totalPosts,
+			},
+		}, nil
+	} else if query.FeedType == "popular" {
+		// Popular feed: sort by score (up - down votes)
+		query.Sort = "top"
+	}
+	// explore and all: no special filtering, show all public posts
+
 	// Check if filtering by community and if it's private
 	if query.CommunityID != "" {
 		community, err := s.communityRepo.GetByID(ctx, query.CommunityID)
