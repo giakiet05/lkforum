@@ -160,7 +160,26 @@ func (m *membershipService) DeleteMembership(req *dto.DeleteMembershipRequest, u
 		return apperror.ErrForbidden
 	}
 
-	err := m.membershipRepo.Delete(ctx, req.CommunityID)
+	// Find membership by userID and communityID first
+	memberships, err := m.membershipRepo.GetByUserID(ctx, userID)
+	if err != nil {
+		return err
+	}
+
+	var membershipID string
+	for _, membership := range memberships {
+		if membership.CommunityID.Hex() == req.CommunityID {
+			membershipID = membership.ID.Hex()
+			break
+		}
+	}
+
+	if membershipID == "" {
+		return fmt.Errorf("membership not found")
+	}
+
+	// Delete membership by ID
+	err = m.membershipRepo.Delete(ctx, membershipID)
 	if err != nil {
 		return err
 	}

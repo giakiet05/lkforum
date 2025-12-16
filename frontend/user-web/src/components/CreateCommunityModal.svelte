@@ -87,6 +87,14 @@
         "Community name can only contain letters, numbers, and underscores";
       return false;
     }
+    if (!description.trim()) {
+      error = "Mô tả cộng đồng là bắt buộc";
+      return false;
+    }
+    if (description.length > 500) {
+      error = "Mô tả không được vượt quá 500 ký tự";
+      return false;
+    }
     error = "";
     return true;
   }
@@ -172,7 +180,7 @@
 
       const requestData: CreateCommunityRequest = {
         name: communityName,
-        description: description || undefined,
+        description: description, // Now required, not optional
         avatar: iconImage || undefined,
         banner: bannerImage || undefined,
         setting: getCommunitySettings(),

@@ -16,6 +16,7 @@ type CreateCommunityRequest struct {
 	Moderators    []model.Moderator      `json:"moderators,omitempty"`
 	CreatorName   string                 `json:"creator_name,omitempty"`
 	CreatorAvatar string                 `json:"creator_avatar,omitempty"`
+	Is18Plus      bool                   `json:"is_18_plus"`
 }
 
 type UpdateCommunityRequest struct {

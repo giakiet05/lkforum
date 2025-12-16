@@ -145,6 +145,7 @@ func (c *communityService) CreateCommunity(req *dto.CreateCommunityRequest, requ
 		CreateByAvatar: req.CreatorAvatar,
 		IsDeleted:      false,
 		IsBanned:       false,
+		Is18Plus:       req.Is18Plus,
 	}
 	community, err = c.communityRepo.Create(ctx, community)
 	if err != nil {

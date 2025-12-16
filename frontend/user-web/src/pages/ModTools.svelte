@@ -22,6 +22,7 @@
   } from "../services/community-service";
   import { getUserByUsername } from "../services/user-service";
   import { toastStore } from "../stores/toast-store";
+  import { authStore } from "../stores/auth-store";
   import type {
     CommunityResponse,
     CommunityRule,
@@ -36,6 +37,12 @@
   let { params }: Props = $props();
 
   const communityName = params?.name || "";
+
+  const currentUser = $derived($authStore.user);
+  const isCreator = $derived(() => {
+    if (!community || !currentUser) return false;
+    return community.create_by_id === currentUser.id;
+  });
 
   // Community data
   let community = $state<CommunityResponse | null>(null);
@@ -139,8 +146,8 @@
     try {
       isLoadingRestricted = true;
       const [banned, muted] = await Promise.all([
-        getBannedUsers(community.id, "ban"),
-        getBannedUsers(community.id, "mute"),
+        getBannedUsers(community.id, "banned"),
+        getBannedUsers(community.id, "muted"),
       ]);
       bannedUsers = banned;
       mutedUsers = muted;
@@ -413,7 +420,7 @@
       await banUser({
         community_id: community.id,
         user_id: user.id,
-        type: "ban",
+        type: "banned",
         reason: banReason || "Violation of community rules",
         length_days: lengthDays,
       });
@@ -444,7 +451,7 @@
       await banUser({
         community_id: community.id,
         user_id: user.id,
-        type: "mute",
+        type: "muted",
         reason: banReason || "Violation of community rules",
         length_days: lengthDays,
       });
@@ -930,18 +937,20 @@
                       height="20"
                     />
                   </button>
-                  <button
-                    class="icon-btn delete"
-                    onclick={() => handleDeleteMember(mod.user_id, "mod")}
-                    title="Remove moderator"
-                  >
-                    <img
-                      src="/bin_icon.svg"
-                      alt="Delete"
-                      width="20"
-                      height="20"
-                    />
-                  </button>
+                  {#if isCreator()}
+                    <button
+                      class="icon-btn delete"
+                      onclick={() => handleDeleteMember(mod.user_id, "mod")}
+                      title="Remove moderator"
+                    >
+                      <img
+                        src="/bin_icon.svg"
+                        alt="Delete"
+                        width="20"
+                        height="20"
+                      />
+                    </button>
+                  {/if}
                 </div>
               </div>
             {:else}

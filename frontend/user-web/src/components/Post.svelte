@@ -12,8 +12,10 @@
     deletePost,
     reportPost,
   } from "../services/post-service";
+  import { getCommunityById } from "../services/community-service";
   import { authStore } from "../stores/auth-store";
   import { toastStore } from "../stores/toast-store";
+  import type { CommunityResponse } from "../dtos/community-dto";
 
   type PostProps = {
     post: PostResponse;
@@ -48,9 +50,42 @@
   let reportReason = $state("");
   let reportDetails = $state("");
   let isReporting = $state(false);
+  let communityData = $state<CommunityResponse | null>(null);
 
   const currentUser = $derived($authStore.user);
   const isOwnPost = $derived(currentUser && post.author.id === currentUser.id);
+  const isAdmin = $derived(currentUser?.role === "admin");
+  const isCreator = $derived(communityData?.create_by_id === currentUser?.id);
+  const isModerator = $derived(
+    communityData?.moderators?.some((mod) => mod.user_id === currentUser?.id) ||
+      false
+  );
+  const canDelete = $derived(isOwnPost || isAdmin || isCreator || isModerator);
+
+  // Load community data to check moderator status
+  $effect(() => {
+    if (currentUser && post.community.id) {
+      loadCommunityData();
+    }
+  });
+
+  async function loadCommunityData() {
+    try {
+      communityData = await getCommunityById(post.community.id);
+      console.log("🔍 Post moderation check:", {
+        postId: post.id,
+        currentUserId: currentUser?.id,
+        communityCreatorId: communityData.create_by_id,
+        isAdmin,
+        isCreator,
+        moderators: communityData.moderators,
+        isModerator,
+        canDelete,
+      });
+    } catch (error) {
+      console.error("Failed to load community data:", error);
+    }
+  }
 
   function handlePostClick() {
     push(`/post/${post.id}`);
@@ -434,6 +469,24 @@
                   <span>Delete Post</span>
                 </button>
               {:else}
+                {#if canDelete}
+                  <button class="menu-item delete" onclick={handleDelete}>
+                    <img
+                      src="/delete_icon.svg"
+                      alt="Delete"
+                      width="16"
+                      height="16"
+                    />
+                    <span
+                      >Remove Post {isAdmin
+                        ? "(Admin)"
+                        : isCreator
+                          ? "(Creator)"
+                          : "(Mod)"}</span
+                    >
+                  </button>
+                  <div class="menu-divider"></div>
+                {/if}
                 <button class="menu-item" onclick={openReportModal}>
                   <span>⚠️ Report</span>
                 </button>
@@ -1159,6 +1212,12 @@
 
   .menu-item.delete:hover {
     background-color: #fef1f0;
+  }
+
+  .menu-divider {
+    height: 1px;
+    background-color: #edeff1;
+    margin: 4px 0;
   }
 
   /* Report Modal */

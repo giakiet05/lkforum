@@ -1,6 +1,7 @@
 package service
 
 import (
+	"log"
 	"time"
 
 	"github.com/giakiet05/lkforum/internal/apperror"
@@ -64,12 +65,26 @@ func (s *commentService) CreateComment(request *dto.CreateCommentRequest, userID
 		return nil, err
 	}
 
-	isBanned, err := s.communityRepo.IsUserBanned(ctx, userID, model.Muted, post.CommunityID.Hex())
+	// Check if user is muted from this community
+	isMuted, err := s.communityRepo.IsUserBanned(ctx, userID, model.Muted, post.CommunityID.Hex())
 	if err != nil {
+		log.Printf("❌ Error checking if user is muted: %v", err)
 		return nil, err
 	}
-	if isBanned {
+	log.Printf("🔍 User %s muted status in community %s: %v", userID, post.CommunityID.Hex(), isMuted)
+	if isMuted {
 		return nil, apperror.ErrUserIsMuted
+	}
+
+	// Also check if user is banned from this community
+	isBanned, err := s.communityRepo.IsUserBanned(ctx, userID, model.Banned, post.CommunityID.Hex())
+	if err != nil {
+		log.Printf("❌ Error checking if user is banned: %v", err)
+		return nil, err
+	}
+	log.Printf("🔍 User %s banned status in community %s: %v", userID, post.CommunityID.Hex(), isBanned)
+	if isBanned {
+		return nil, apperror.ErrUserIsBannedFromCommunity
 	}
 
 	var parentAuthorID string

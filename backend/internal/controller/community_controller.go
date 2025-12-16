@@ -24,6 +24,7 @@ func NewCommunityController(communityService service.CommunityService) *Communit
 func (c *CommunityController) CreateCommunity(ctx *gin.Context) {
 	var req dto.CreateCommunityRequest
 	if err := ctx.ShouldBind(&req); err != nil {
+		log.Printf("[CreateCommunity] ShouldBind error: %v", err)
 		dto.SendError(ctx, http.StatusBadRequest, apperror.Message(apperror.ErrBadRequest), apperror.ErrBadRequest.Code)
 		return
 	}

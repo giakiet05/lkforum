@@ -28,6 +28,11 @@
   let isPrivate = $state(false);
   let maxPostLength = $state(40000);
 
+  // Appearance state
+  let description = $state("");
+  let avatarImage = $state<string>("");
+  let bannerImage = $state<string>("");
+
   const currentUser = $derived($authStore.user);
 
   onMount(async () => {
@@ -50,6 +55,11 @@
         joinRequireApproval = found.setting?.join_require_approval ?? false;
         isPrivate = found.setting?.is_private ?? false;
         maxPostLength = found.setting?.max_post_length ?? 40000;
+
+        // Load appearance
+        description = found.description || "";
+        avatarImage = found.avatar || "";
+        bannerImage = found.banner || "";
         console.log(
           "🔄 Local state - postRequireApproval:",
           postRequireApproval
@@ -81,6 +91,40 @@
     );
   }
 
+  function handleAvatarUpload(e: Event) {
+    const input = e.target as HTMLInputElement;
+    if (input.files && input.files[0]) {
+      const file = input.files[0];
+      if (file.size > 2 * 1024 * 1024) {
+        error = "Avatar image must be less than 2MB";
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        avatarImage = e.target?.result as string;
+        error = null;
+      };
+      reader.readAsDataURL(file);
+    }
+  }
+
+  function handleBannerUpload(e: Event) {
+    const input = e.target as HTMLInputElement;
+    if (input.files && input.files[0]) {
+      const file = input.files[0];
+      if (file.size > 5 * 1024 * 1024) {
+        error = "Banner image must be less than 5MB";
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        bannerImage = e.target?.result as string;
+        error = null;
+      };
+      reader.readAsDataURL(file);
+    }
+  }
+
   async function handleSaveSettings() {
     if (!community) return;
 
@@ -91,6 +135,9 @@
 
       const updateData = {
         id: community.id,
+        description: description || undefined,
+        avatar: avatarImage || undefined,
+        banner: bannerImage || undefined,
         setting: {
           post_require_approval: postRequireApproval,
           join_require_approval: joinRequireApproval,
@@ -158,6 +205,79 @@
         {#if error}
           <div class="error-message">{error}</div>
         {/if}
+
+        <!-- Appearance Section -->
+        <div class="settings-section">
+          <h2>Appearance</h2>
+
+          <div class="setting-item-column">
+            <label>
+              <strong>Description</strong>
+              <textarea
+                bind:value={description}
+                placeholder="Describe your community..."
+                maxlength="500"
+                rows="4"
+                class="textarea-input"
+              ></textarea>
+              <span class="hint">{description.length}/500 characters</span>
+            </label>
+          </div>
+
+          <div class="setting-item-column">
+            <label>
+              <strong>Community Avatar</strong>
+              {#if avatarImage}
+                <div class="image-preview">
+                  <img
+                    src={avatarImage}
+                    alt="Avatar preview"
+                    class="avatar-preview"
+                  />
+                  <span
+                    class="remove-image-link"
+                    onclick={() => (avatarImage = "")}>Remove</span
+                  >
+                </div>
+              {/if}
+              <input
+                type="file"
+                accept="image/*"
+                onchange={handleAvatarUpload}
+                class="file-input"
+              />
+              <span class="hint">Max 2MB, square image recommended</span>
+            </label>
+          </div>
+
+          <div class="setting-item-column">
+            <label>
+              <strong>Community Banner</strong>
+              {#if bannerImage}
+                <div class="image-preview">
+                  <img
+                    src={bannerImage}
+                    alt="Banner preview"
+                    class="banner-preview"
+                  />
+                  <span
+                    class="remove-image-link"
+                    onclick={() => (bannerImage = "")}>Remove</span
+                  >
+                </div>
+              {/if}
+              <input
+                type="file"
+                accept="image/*"
+                onchange={handleBannerUpload}
+                class="file-input"
+              />
+              <span class="hint"
+                >Max 5MB, wide image recommended (1600x400)</span
+              >
+            </label>
+          </div>
+        </div>
 
         <div class="settings-section">
           <h2>Moderation Settings</h2>
@@ -378,6 +498,80 @@
 
   .setting-info p strong {
     color: #1c1c1c;
+  }
+
+  .setting-item-column {
+    display: flex;
+    flex-direction: column;
+    padding: 16px 0;
+    gap: 8px;
+  }
+
+  .setting-item-column label {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .textarea-input {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 14px;
+    font-family: inherit;
+    resize: vertical;
+    min-height: 100px;
+  }
+
+  .textarea-input:focus {
+    outline: none;
+    border-color: #0079d3;
+  }
+
+  .file-input {
+    padding: 8px 0;
+    font-size: 14px;
+  }
+
+  .hint {
+    font-size: 12px;
+    color: #7c7c7c;
+  }
+
+  .image-preview {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 8px 0;
+  }
+
+  .avatar-preview {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid #edeff1;
+  }
+
+  .banner-preview {
+    width: 200px;
+    height: 50px;
+    border-radius: 4px;
+    object-fit: cover;
+    border: 2px solid #edeff1;
+  }
+
+  .remove-image-link {
+    color: #ff4500;
+    font-size: 13px;
+    cursor: pointer;
+    font-weight: 600;
+    text-decoration: underline;
+  }
+
+  .remove-image-link:hover {
+    color: #d93900;
   }
 
   /* Toggle Switch */

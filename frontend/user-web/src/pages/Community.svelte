@@ -354,7 +354,12 @@
             class="community-icon"
           />
           <div class="community-title">
-            <h1>lk/{community.name}</h1>
+            <div class="title-row">
+              <h1>lk/{community.name}</h1>
+              {#if community.is_18_plus}
+                <span class="badge-18plus">18+</span>
+              {/if}
+            </div>
             <p class="community-name">{community.name}</p>
           </div>
         </div>
@@ -381,7 +386,13 @@
             <button
               class="create-post-action-btn"
               title="Create post"
-              onclick={() => (showCreatePostModal = true)}
+              onclick={() => {
+                if (!$authStore.user) {
+                  toastStore.error("Vui lòng đăng nhập để tạo bài viết");
+                  return;
+                }
+                showCreatePostModal = true;
+              }}
             >
               <svg viewBox="0 0 20 20" fill="currentColor">
                 <path
@@ -899,6 +910,27 @@
     font-weight: 700;
     margin: 0;
     color: #1c1c1c;
+  }
+
+  .title-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .badge-18plus {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px 12px;
+    background: linear-gradient(135deg, #ff4757 0%, #ff6348 100%);
+    color: white;
+    font-size: 13px;
+    font-weight: 700;
+    border-radius: 4px;
+    border: 2px solid #ff3838;
+    box-shadow: 0 2px 4px rgba(255, 69, 87, 0.3);
+    letter-spacing: 0.5px;
   }
 
   .community-name {
