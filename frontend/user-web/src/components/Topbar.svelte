@@ -269,7 +269,7 @@
           <input
             class="search-input"
             type="text"
-            placeholder="Search communities and users"
+            placeholder="Tìm cộng đồng và người dùng"
             bind:value={searchQuery}
             oninput={handleSearchInput}
             onkeydown={handleSearchKeydown}
@@ -280,7 +280,7 @@
           {#if showSearchDropdown && (communityResults.length > 0 || userResults.length > 0)}
             <div class="search-dropdown">
               {#if communityResults.length > 0}
-                <div class="search-dropdown-header">Communities</div>
+                <div class="search-dropdown-header">Cộng đồng</div>
                 {#each communityResults as community}
                   <button
                     class="search-result-item"
@@ -294,7 +294,7 @@
                     <div class="result-info">
                       <div class="result-name">c/{community.name}</div>
                       <div class="result-meta">
-                        {community.member_count} members
+                        {community.member_count} thành viên
                       </div>
                     </div>
                   </button>
@@ -305,7 +305,7 @@
                 {#if communityResults.length > 0}
                   <div class="search-dropdown-divider"></div>
                 {/if}
-                <div class="search-dropdown-header">Users</div>
+                <div class="search-dropdown-header">Người dùng</div>
                 {#each userResults as userResult}
                   <button
                     class="search-result-item"
@@ -335,7 +335,7 @@
           {/if}
 
           {#if isSearching}
-            <div class="search-loading">Searching...</div>
+            <div class="search-loading">Đang tìm kiếm...</div>
           {/if}
         </div>
       </div>
@@ -356,15 +356,15 @@
               stroke-linecap="round"
             />
           </svg>
-          <span class="button-text">Create</span>
+          <span class="button-text">Tạo</span>
         </button>
 
         <button
           type="button"
           class="icon-button notification-btn"
           onclick={() => (showNotifications = !showNotifications)}
-          title="Notifications"
-          aria-label="Notifications"
+          title="Thông báo"
+          aria-label="Thông báo"
         >
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
             <path
@@ -396,7 +396,7 @@
         <button
           class="icon-button"
           onclick={() => (showChatPopup = true)}
-          title="Messages"
+          title="Tin nhắn"
         >
           <img src="/message_icon.svg" alt="Messages" width="24" height="24" />
         </button>
@@ -476,7 +476,7 @@
                       stroke-linecap="round"
                     />
                   </svg>
-                  Profile
+                  Hồ sơ
                 </div>
 
                 <div
@@ -503,7 +503,7 @@
                       stroke-linecap="round"
                     />
                   </svg>
-                  Settings
+                  Cài đặt
                 </div>
 
                 <div class="dropdown-separator" role="separator"></div>
@@ -525,14 +525,14 @@
                       stroke-linejoin="round"
                     />
                   </svg>
-                  Log Out
+                  Đăng xuất
                 </div>
               </div>
             {/if}
           </div>
         {:else}
           <button class="login-button" onclick={() => (showAuthModal = true)}
-            >Log In</button
+            >Đăng nhập</button
           >
           <AuthModal
             show={showAuthModal}
@@ -559,8 +559,11 @@
     --topbar-foreground: #213547;
     --topbar-accent: #ff8a00;
     --topbar-accent-hover: #ff7a00;
-    --topbar-search-background: rgba(33, 37, 41, 0.04);
-    --topbar-search-border: rgba(33, 37, 41, 0.08);
+    --topbar-search-background: #8fabd4;
+    --topbar-search-border: #8fabd4;
+    --topbar-search-focus-border: #4a70a9;
+    --topbar-search-icon: #000000;
+    --topbar-search-text: #000000;
     --muted-foreground: #9aa4b2;
     --background: #ffffff;
     --border: #e6e9ee;
@@ -591,18 +594,24 @@
     display: flex;
     align-items: center;
     gap: 12px;
+    flex: 0 0 auto;
   }
 
   .topbar-center {
-    flex: 1;
-    display: flex;
-    justify-content: center;
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    max-width: 680px;
+    width: 100%;
+    padding: 0 16px;
   }
 
   .topbar-right {
     display: flex;
     align-items: center;
     gap: 8px;
+    flex: 0 0 auto;
+    margin-left: auto;
   }
 
   .brand {
@@ -641,7 +650,7 @@
     left: 12px;
     top: 50%;
     transform: translateY(-50%);
-    color: var(--muted-foreground);
+    color: var(--topbar-search-icon);
     pointer-events: none;
   }
 
@@ -653,17 +662,19 @@
     border-radius: 20px;
     height: 40px;
     font-size: 14px;
-    color: var(--topbar-foreground);
+    color: var(--topbar-search-text);
     outline: none;
   }
 
   .search-input:focus {
-    background: var(--background);
-    border-color: var(--topbar-accent);
+    background: var(--topbar-search-background);
+    border-color: var(--topbar-search-focus-border);
+    border-width: 2px;
   }
 
   .search-input::placeholder {
-    color: var(--muted-foreground);
+    color: var(--topbar-search-text);
+    opacity: 0.7;
   }
 
   .search-dropdown {

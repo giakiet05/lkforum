@@ -83,6 +83,7 @@ type GetPostsQuery struct {
 	Type        string `form:"type"`
 	Sort        string `form:"sort"`
 	TimeFrame   string `form:"time"`
+	FeedType    string `form:"feed_type"` // home, popular, explore, all
 	Page        int    `form:"page"`
 	Limit       int    `form:"limit"`
 }

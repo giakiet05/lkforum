@@ -1,89 +1,53 @@
 <script lang="ts">
   import { push } from "svelte-spa-router";
+  import { onMount } from "svelte";
+  import { getCommunitiesByUserId } from "../services/community-service";
+  import { authStore } from "../stores/auth-store";
+  import type { CommunityResponse } from "../dtos/community-dto";
 
   type Community = {
     id: string;
     name: string;
     description: string;
-    icon?: string;
-    isFavorite: boolean;
-    isJoined: boolean;
+    avatar?: string;
   };
 
-  // Mock data - sau này sẽ fetch từ API
-  let allCommunities = $state<Community[]>([
-    {
-      id: "1",
-      name: "3amjokes",
-      description:
-        "lk/3amjokes - for all the stupid humor of sleep deprivation. Have you been up for longer than a normal human being can operate? Good. Have you just laughed at a joke that wouldn't be funny otherwise? submit your insomniac dad jokes today",
-      icon: "🌙",
-      isFavorite: true,
-      isJoined: true,
-    },
-    {
-      id: "2",
-      name: "Animesuggest",
-      description:
-        "Subreddit for anime and manga fans which allows suggestions and requests for anything related to anime and manga subculture.",
-      icon: "💭",
-      isFavorite: true,
-      isJoined: true,
-    },
-    {
-      id: "3",
-      name: "acne",
-      description: "A subreddit for discussing acne and how to best treat it.",
-      icon: "🩺",
-      isFavorite: false,
-      isJoined: true,
-    },
-    {
-      id: "4",
-      name: "AdviceAnimals",
-      description: "Reddit's Gold Mine",
-      icon: "🦄",
-      isFavorite: false,
-      isJoined: true,
-    },
-    {
-      id: "5",
-      name: "AmItheAsshole",
-      description:
-        "A catharsis for the frustrated moral philosopher in all of us, and a place to finally find out if you were wrong in an argument that's been bothering you. Tell us about any non-violent conflict you have experienced; give us both sides of the story, and find out if you're right, or you're the asshole. See our ~~*Best Of*~~ \"Most Controversial\" at /r/AITAFiltered!",
-      icon: "🤔",
-      isFavorite: false,
-      isJoined: true,
-    },
-    {
-      id: "6",
-      name: "announcements",
-      description: "Official announcements from Reddit, Inc.",
-      icon: "📢",
-      isFavorite: false,
-      isJoined: true,
-    },
-    {
-      id: "7",
-      name: "apple",
-      description:
-        "An unofficial report about Apple and all of its devices and software.",
-      icon: "🍎",
-      isFavorite: false,
-      isJoined: true,
-    },
-  ]);
-
+  let allCommunities = $state<Community[]>([]);
+  let isLoading = $state(true);
+  let error = $state<string | null>(null);
   let searchQuery = $state("");
-  let activeTab = $state<"all" | "favorites">("all");
+
+  async function loadCommunities() {
+    try {
+      isLoading = true;
+      error = null;
+      const userId = $authStore.user?.id;
+      if (!userId) {
+        error = "Bạn cần đăng nhập để xem cộng đồng";
+        return;
+      }
+
+      const communities = await getCommunitiesByUserId(userId);
+      allCommunities = communities.map((c: CommunityResponse) => ({
+        id: c.id,
+        name: c.name,
+        description: c.description || "",
+        avatar: c.avatar,
+      }));
+    } catch (err) {
+      error = err instanceof Error ? err.message : "Không thể tải cộng đồng";
+      console.error("Error loading communities:", err);
+    } finally {
+      isLoading = false;
+    }
+  }
+
+  onMount(() => {
+    loadCommunities();
+  });
 
   let filteredCommunities = $derived(() => {
     let filtered = allCommunities;
-
-    // Filter by tab
-    if (activeTab === "favorites") {
-      filtered = filtered.filter((c) => c.isFavorite);
-    }
 
     // Filter by search
     if (searchQuery.trim()) {
@@ -98,17 +62,10 @@
     return filtered;
   });
 
-  function toggleFavorite(communityId: string) {
-    const report = allCommunities.find((c) => c.id === communityId);
-    if (report) {
-      report.isFavorite = !report.isFavorite;
-    }
-  }
-
   function leaveCommunity(communityId: string) {
-    const report = allCommunities.find((c) => c.id === communityId);
-    if (report && confirm(`Leave lk/${report.name}?`)) {
-      // TODO: Call API to leave report
+    const community = allCommunities.find((c) => c.id === communityId);
+    if (community && confirm(`Rời khỏi lk/${community.name}?`)) {
+      // TODO: Call API to leave community
       allCommunities = allCommunities.filter((c) => c.id !== communityId);
     }
   }
@@ -120,21 +77,29 @@
 
 <div class="manage-communities-page">
   <div class="page-header">
-    <h1>Manage communities</h1>
+    <h1>Quản lý cộng đồng</h1>
   </div>
 
   <div class="page-content">
     <!-- Search Bar -->
     <div class="search-bar">
       <svg
+        class="search-icon"
         width="20"
         height="20"
         viewBox="0 0 20 20"
         fill="none"
-        class="search-icon"
+        xmlns="http://www.w3.org/2000/svg"
       >
+        <circle
+          cx="8.5"
+          cy="8.5"
+          r="5.5"
+          stroke="currentColor"
+          stroke-width="2"
+        />
         <path
-          d="M9 17A8 8 0 1 0 9 1a8 8 0 0 0 0 16zM18 18l-4-4"
+          d="M12.5 12.5L17 17"
           stroke="currentColor"
           stroke-width="2"
           stroke-linecap="round"
@@ -142,101 +107,68 @@
       </svg>
       <input
         type="text"
-        placeholder="Filter your communities"
+        placeholder="Tìm kiếm cộng đồng"
         bind:value={searchQuery}
       />
     </div>
 
-    <!-- Tabs -->
-    <div class="tabs">
-      <button
-        class="tab"
-        class:active={activeTab === "all"}
-        onclick={() => (activeTab = "all")}
-      >
-        All Communities
-      </button>
-      <button
-        class="tab"
-        class:active={activeTab === "favorites"}
-        onclick={() => (activeTab = "favorites")}
-      >
-        Favorites
-      </button>
-    </div>
-
     <!-- Communities List -->
-    <div class="communities-list">
-      {#each filteredCommunities() as report (report.id)}
-        <div class="report-card">
-          <div class="report-main">
-            <button
-              class="report-info"
-              onclick={() => navigateToCommunity(report.name)}
-            >
-              <div class="report-avatar">{report.icon || "📁"}</div>
-              <div class="report-details">
-                <h3 class="report-name">lk/{report.name}</h3>
-                <p class="report-description">{report.description}</p>
-              </div>
-            </button>
-
-            <div class="report-actions">
+    {#if isLoading}
+      <div class="loading-state">
+        <div class="spinner"></div>
+        <p>Đang tải...</p>
+      </div>
+    {:else if error}
+      <div class="error-state">
+        <p>{error}</p>
+        <button onclick={loadCommunities}>Thử lại</button>
+      </div>
+    {:else}
+      <div class="communities-list">
+        {#each filteredCommunities() as community (community.id)}
+          <div class="community-card">
+            <div class="community-main">
               <button
-                class="favorite-btn"
-                class:active={report.isFavorite}
-                onclick={() => toggleFavorite(report.id)}
-                title={report.isFavorite
-                  ? "Remove from favorites"
-                  : "Add to favorites"}
+                class="community-info"
+                onclick={() => navigateToCommunity(community.name)}
               >
-                {#if report.isFavorite}
-                  <svg
-                    width="20"
-                    height="20"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                  >
-                    <path
-                      d="M10 2l2 6h6l-4.5 3.5 2 6L10 14l-5.5 3.5 2-6L2 8h6l2-6z"
-                    />
-                  </svg>
-                {:else}
-                  <svg
-                    width="20"
-                    height="20"
-                    viewBox="0 0 20 20"
-                    fill="none"
-                    stroke="currentColor"
-                  >
-                    <path
-                      d="M10 2l2 6h6l-4.5 3.5 2 6L10 14l-5.5 3.5 2-6L2 8h6l2-6z"
-                      stroke-width="1.5"
-                    />
-                  </svg>
-                {/if}
+                <div class="community-avatar">
+                  {#if community.avatar}
+                    <img src={community.avatar} alt={community.name} />
+                  {:else}
+                    <span class="avatar-placeholder"
+                      >{community.name.charAt(0).toUpperCase()}</span
+                    >
+                  {/if}
+                </div>
+                <div class="community-details">
+                  <h3 class="community-name">lk/{community.name}</h3>
+                  <p class="community-description">{community.description}</p>
+                </div>
               </button>
 
-              <button class="joined-btn">Joined</button>
+              <div class="community-actions">
+                <button class="joined-btn">Đã tham gia</button>
+              </div>
             </div>
+
+            <!-- Leave button (appears on hover) -->
+            <button
+              class="leave-btn"
+              onclick={() => leaveCommunity(community.id)}
+            >
+              Rời khỏi lk/{community.name}
+            </button>
           </div>
+        {/each}
 
-          <!-- Leave button (appears on hover) -->
-          <button
-            class="leave-btn"
-            onclick={() => leaveCommunity(report.id)}
-          >
-            Leave lk/{report.name}
-          </button>
-        </div>
-      {/each}
-
-      {#if filteredCommunities().length === 0}
-        <div class="empty-state">
-          <p>No communities found</p>
-        </div>
-      {/if}
-    </div>
+        {#if filteredCommunities().length === 0}
+          <div class="empty-state">
+            <p>Không tìm thấy cộng đồng nào</p>
+          </div>
+        {/if}
+      </div>
+    {/if}
   </div>
 </div>
 
@@ -297,36 +229,50 @@
     color: #878a8c;
   }
 
-  /* Tabs */
-  .tabs {
+  /* Loading & Error States */
+  .loading-state,
+  .error-state {
     display: flex;
-    gap: 0;
-    background: #f6f7f8;
-    border-radius: 8px;
-    padding: 4px;
-    width: fit-content;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 20px;
+    gap: 16px;
   }
 
-  .tab {
-    padding: 10px 24px;
-    background: transparent;
+  .spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #ff4500;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    0% {
+      transform: rotate(0deg);
+    }
+    100% {
+      transform: rotate(360deg);
+    }
+  }
+
+  .loading-state p,
+  .error-state p {
+    font-size: 16px;
+    color: #878a8c;
+    margin: 0;
+  }
+
+  .error-state button {
+    padding: 8px 16px;
+    background: var(--blue--);
+    color: white;
     border: none;
-    border-radius: 6px;
-    font-size: 14px;
-    font-weight: 500;
-    color: #1c1c1c;
+    border-radius: 20px;
     cursor: pointer;
-    transition: all 0.2s;
-  }
-
-  .tab:hover {
-    background: rgba(0, 0, 0, 0.05);
-  }
-
-  .tab.active {
-    background: white;
-    color: #1055c9;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    font-weight: 600;
   }
 
   /* Communities List */
@@ -336,7 +282,7 @@
     gap: 12px;
   }
 
-  .report-card {
+  .community-card {
     background: white;
     border: 1px solid #ccc;
     border-radius: 8px;
@@ -345,23 +291,23 @@
     position: relative;
   }
 
-  .report-card:hover {
+  .community-card:hover {
     border-color: #878a8c;
   }
 
-  .report-card:hover .leave-btn {
+  .community-card:hover .leave-btn {
     opacity: 1;
     pointer-events: auto;
   }
 
-  .report-main {
+  .community-main {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 16px;
   }
 
-  .report-info {
+  .community-info {
     flex: 1;
     display: flex;
     align-items: flex-start;
@@ -374,31 +320,43 @@
     min-width: 0;
   }
 
-  .report-avatar {
+  .community-avatar {
     width: 48px;
     height: 48px;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 28px;
     flex-shrink: 0;
-    background: #f6f7f8;
+    overflow: hidden;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   }
 
-  .report-details {
+  .community-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .avatar-placeholder {
+    color: white;
+    font-size: 20px;
+    font-weight: 700;
+  }
+
+  .community-details {
     flex: 1;
     min-width: 0;
   }
 
-  .report-name {
+  .community-name {
     font-size: 16px;
     font-weight: 600;
     color: #1c1c1c;
     margin: 0 0 4px 0;
   }
 
-  .report-description {
+  .community-description {
     font-size: 14px;
     color: #7c7c7c;
     margin: 0;
@@ -407,39 +365,15 @@
     text-overflow: ellipsis;
     display: -webkit-box;
     -webkit-line-clamp: 2;
+    line-clamp: 2;
     -webkit-box-orient: vertical;
   }
 
-  .report-actions {
+  .community-actions {
     display: flex;
     align-items: center;
     gap: 12px;
     flex-shrink: 0;
-  }
-
-  .favorite-btn {
-    width: 36px;
-    height: 36px;
-    padding: 0;
-    background: transparent;
-    border: 1px solid #edeff1;
-    border-radius: 50%;
-    cursor: pointer;
-    color: #d3d3d3;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s;
-  }
-
-  .favorite-btn:hover {
-    background: #f6f7f8;
-    color: #ffd700;
-  }
-
-  .favorite-btn.active {
-    color: #ffd700;
-    border-color: #ffd700;
   }
 
   .joined-btn {

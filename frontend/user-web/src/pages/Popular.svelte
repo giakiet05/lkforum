@@ -16,7 +16,7 @@
     error = null;
     try {
       posts = await getPosts({
-        feed_type: "home",
+        feed_type: "popular",
         sort: sortBy || undefined,
         limit: 20,
       });
@@ -40,7 +40,7 @@
 </script>
 
 <div class="page-container">
-  <h1 class="page-title">Trang chủ</h1>
+  <h1 class="page-title">Phổ biến</h1>
 
   <div class="sort-options">
     <select bind:value={sortBy}>
@@ -65,10 +65,7 @@
     </div>
   {:else if posts.length === 0}
     <div class="empty">
-      <p>
-        Trang chủ của bạn đang trống. Tham gia các cộng đồng để xem bài viết!
-      </p>
-      <a href="#/explore" class="explore-link">Khám phá cộng đồng</a>
+      <p>Không tìm thấy bài viết nào</p>
     </div>
   {:else}
     <div class="post-list">
@@ -163,9 +160,7 @@
     }
   }
 
-  .error button,
-  .empty .explore-link {
-    display: inline-block;
+  .error button {
     padding: 10px 20px;
     background-color: var(--blue--);
     color: white;
@@ -174,12 +169,10 @@
     font-size: 14px;
     font-weight: 600;
     cursor: pointer;
-    text-decoration: none;
     transition: background-color 0.2s ease;
   }
 
-  .error button:hover,
-  .empty .explore-link:hover {
+  .error button:hover {
     background-color: #0d2849;
   }
 
