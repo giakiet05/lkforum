@@ -208,6 +208,7 @@ func Init() (*gin.Engine, error) {
 	client := config.NewMongoClient()
 	db := client.Database(config.Cfg.DBName)
 	router := gin.Default()
+	router.MaxMultipartMemory = 10 << 20 // 10 MB
 
 	router.Use(func(c *gin.Context) {
 		origin := c.Request.Header.Get("Origin")

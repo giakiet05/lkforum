@@ -120,6 +120,15 @@ func (s *postService) CreatePost(userID string, req *dto.CreatePostRequest) (*dt
 		return nil, err
 	}
 
+	// Check if user is banned from this community
+	isBanned, err := s.communityRepo.IsUserBanned(ctx, userID, model.Banned, req.CommunityID)
+	if err != nil {
+		return nil, err
+	}
+	if isBanned {
+		return nil, apperror.ErrUserIsBannedFromCommunity
+	}
+
 	// Determine initial moderation status
 	var initialStatus model.ModerationStatus
 
@@ -475,9 +484,45 @@ func (s *postService) DeletePost(postID string, userID string) error {
 	if err != nil {
 		return err
 	}
-	if post.AuthorID.Hex() != userID {
-		return apperror.ErrForbidden
+
+	// Check if user is the post author
+	isAuthor := post.AuthorID.Hex() == userID
+
+	// If not the author, check if user has permission (admin/creator/moderator)
+	if !isAuthor {
+		// Get user to check if admin
+		user, err := s.userRepo.GetByID(ctx, userID)
+		if err != nil {
+			return err
+		}
+
+		isAdmin := user.Role == model.AdminRole
+		if !isAdmin {
+			// Get community to check if user is creator or moderator
+			community, err := s.communityRepo.GetByID(ctx, post.CommunityID.Hex())
+			if err != nil {
+				return err
+			}
+
+			// Check if user is community creator
+			isCreator := community.CreateByID.Hex() == userID
+
+			// Check if user is moderator
+			isModerator := false
+			for _, mod := range community.Moderators {
+				if mod.UserID.Hex() == userID {
+					isModerator = true
+					break
+				}
+			}
+
+			// If not creator and not moderator, deny access
+			if !isCreator && !isModerator {
+				return apperror.ErrForbidden
+			}
+		}
 	}
+
 	return s.postRepo.Delete(ctx, postID)
 }
 

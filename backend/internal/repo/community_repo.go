@@ -64,8 +64,25 @@ type communityRepo struct {
 }
 
 func NewCommunityRepo(db *mongo.Database) CommunityRepo {
+	communityCollection := db.Collection(config.CommunityColName)
+
+	// Create unique index on community name
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	indexModel := mongo.IndexModel{
+		Keys:    bson.D{{Key: "name", Value: 1}},
+		Options: options.Index().SetUnique(true),
+	}
+
+	_, err := communityCollection.Indexes().CreateOne(ctx, indexModel)
+	if err != nil {
+		// Log error but don't fail - index might already exist
+		fmt.Printf("Warning: Failed to create unique index on community.name: %v\n", err)
+	}
+
 	return &communityRepo{
-		communityCollection:    db.Collection(config.CommunityColName),
+		communityCollection:    communityCollection,
 		userCollection:         db.Collection(config.UserColName),
 		communityBanCollection: db.Collection(config.CommunityBanColName),
 	}

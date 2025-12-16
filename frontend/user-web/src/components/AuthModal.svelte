@@ -195,6 +195,14 @@
       error = "Vui lòng điền đầy đủ thông tin";
       return;
     }
+    if (username.length < 3 || username.length > 20) {
+      error = "Tên đăng nhập phải từ 3-20 ký tự";
+      return;
+    }
+    if (password.length < 6) {
+      error = "Mật khẩu phải có ít nhất 6 ký tự";
+      return;
+    }
     if (password !== confirmPassword) {
       error = "Mật khẩu xác nhận không khớp!";
       return;
@@ -210,6 +218,11 @@
         verification_token: verificationToken,
       };
 
+      console.log("🔍 Registration data:", {
+        username,
+        has_password: !!password,
+        has_token: !!verificationToken,
+      });
       await completeRegistration(registrationData);
 
       // Xóa pending verification
@@ -328,8 +341,8 @@
       error = "Vui lòng điền đầy đủ thông tin";
       return;
     }
-    if (newPassword.length < 8) {
-      error = "Mật khẩu phải có ít nhất 8 ký tự";
+    if (newPassword.length < 6) {
+      error = "Mật khẩu phải có ít nhất 6 ký tự";
       return;
     }
     if (newPassword !== confirmNewPassword) {

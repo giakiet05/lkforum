@@ -260,6 +260,11 @@
       return;
     }
 
+    if (title.trim().length < 3) {
+      errorMessage = "Title must be at least 3 characters!";
+      return;
+    }
+
     const targetCommunity = selectedCommunity || communityName;
     if (!targetCommunity) {
       errorMessage = "Please select a community!";

@@ -193,6 +193,11 @@
   }
 
   function handleCreatePostClick() {
+    if (!user) {
+      // Chưa đăng nhập - hiển thị modal đăng nhập
+      showAuthModal = true;
+      return;
+    }
     showCreatePostModal = true;
     onCreatePost?.();
   }
