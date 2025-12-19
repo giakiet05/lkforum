@@ -57,6 +57,7 @@ type Services struct {
 	service.AdminUserService
 	service.AdminCommunityService
 	service.AdminStatsService
+	service.AdminAuthService
 }
 
 type Controllers struct {
@@ -77,6 +78,8 @@ type Controllers struct {
 	controller.AdminUserController
 	controller.AdminCommunityController
 	controller.AdminStatsController
+	controller.AdminAuthController
+	controller.DebugController
 }
 
 func initRepos(client *mongo.Client, db *mongo.Database) *Repos {
@@ -138,11 +141,12 @@ func initServices(repos *Repos, redisClient *redis.Client, emailSender email.Sen
 	services.AdminUserService = service.NewAdminUserService(repos.UserRepo)
 	services.AdminCommunityService = service.NewAdminCommunityService(repos.CommunityRepo)
 	services.AdminStatsService = service.NewAdminStatsService(repos.UserRepo, repos.CommunityRepo, repos.PostRepo, repos.CommentRepo, repos.ReportRepo)
+	services.AdminAuthService = service.NewAdminAuthService(repos.UserRepo, redisClient, tokenService)
 
 	return services
 }
 
-func initControllers(services *Services, wsHub *ws.Hub) *Controllers {
+func initControllers(services *Services, wsHub *ws.Hub, db *mongo.Database) *Controllers {
 	return &Controllers{
 		AuthController:           *controller.NewAuthController(services.AuthService),
 		UserController:           *controller.NewUserController(services.UserService),
@@ -161,6 +165,8 @@ func initControllers(services *Services, wsHub *ws.Hub) *Controllers {
 		AdminUserController:      *controller.NewAdminUserController(services.AdminUserService),
 		AdminCommunityController: *controller.NewAdminCommunityController(services.AdminCommunityService),
 		AdminStatsController:     *controller.NewAdminStatsController(services.AdminStatsService),
+		AdminAuthController:      *controller.NewAdminAuthController(services.AdminAuthService),
+		DebugController:          *controller.NewDebugController(db),
 	}
 }
 
@@ -168,6 +174,9 @@ func initRoutes(controllers *Controllers, r *gin.Engine) {
 	r.GET("/ping", func(c *gin.Context) {
 		c.JSON(200, gin.H{"message": "pong"})
 	})
+
+	// ⚠️ DEBUG ONLY - Remove in production
+	r.POST("/debug/create-admin", controllers.DebugController.CreateAdminUser)
 
 	api := r.Group("/api")
 	api.GET("/", func(c *gin.Context) {
@@ -188,6 +197,7 @@ func initRoutes(controllers *Controllers, r *gin.Engine) {
 	route.RegisterPostHistoryRoutes(api, &controllers.PostHistoryController)
 	route.RegisterDraftRoutes(api, &controllers.DraftController)
 	route.RegisterReportRoutes(api, &controllers.ReportController)
+	route.RegisterAdminAuthRoutes(api, &controllers.AdminAuthController)
 	route.RegisterAdminUserRoutes(api, &controllers.AdminUserController)
 	route.RegisterAdminCommunityRoutes(api, &controllers.CommunityController, &controllers.AdminCommunityController)
 	route.RegisterAdminReportRoutes(api, &controllers.ReportController)
@@ -241,7 +251,7 @@ func Init() (*gin.Engine, error) {
 
 	repos := initRepos(client, db)
 	services := initServices(repos, redisClient, emailSender, eventBus, geminiClient, tokenService)
-	controllers := initControllers(services, wsHub)
+	controllers := initControllers(services, wsHub, db)
 
 	// Inject userRepo into middleware for settings caching
 	middleware.SetUserRepo(repos.UserRepo)

@@ -37,7 +37,12 @@
       <div class="error">{error}</div>
     {/if}
 
-    <form on:submit|preventDefault={handleLogin}>
+    <form
+      onsubmit={(e) => {
+        e.preventDefault();
+        handleLogin();
+      }}
+    >
       <div class="form-group">
         <label for="username">Username</label>
         <input

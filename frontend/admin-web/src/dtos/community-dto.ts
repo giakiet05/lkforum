@@ -5,6 +5,7 @@ export interface CommunityResponse {
   avatar?: string;
   member_count: number;
   created_at: string;
+  is_banned?: boolean;
 }
 
 export interface PaginatedCommunitiesResponse {

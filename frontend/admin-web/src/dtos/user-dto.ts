@@ -6,6 +6,9 @@ export interface UserResponse {
   bio?: string;
   created_at: string;
   is_banned?: boolean;
+  role?: string;
+  reputation?: number;
+  deleted_at?: string;
 }
 
 export interface PaginatedUsersResponse {
