@@ -3,7 +3,7 @@ import type { LoginRequest, LoginResponse } from "../dtos/auth-dto";
 import { tokenManager } from "../auth/token";
 
 export async function login(credentials: LoginRequest): Promise<LoginResponse> {
-  const res = await publicFetch("/api/auth/local/login", {
+  const res = await publicFetch("/api/admin/auth/login", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

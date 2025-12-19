@@ -1,11 +1,43 @@
 :root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
+  /* Layout sizes */
+  --topbar-height: 56px;
+  --sidebar-width: 256px;
+  --sidebar-compact-width: 64px;
 
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
+  /* Fonts */
+  --font-primary: "Nunito Sans", sans-serif;
+  --font-secondary: "Roboto", sans-serif;
+
+  /* Colors */
+  --primary-color: #646cff;
+  --primary-color-hover: #535bf2;
+
+  --text-color: #121213;
+  --text-color-secondary: #6b7280;
+
+  /* Global background */
+  --background: #f0f2f5;
+  --surface-color: #ffffff;
+  --border-color: #e6e9ee;
+
+  /* Sidebar theme */
+  --sidebar-background: #ffffff;
+  --sidebar-foreground: #0b1f2b;
+  --sidebar-border: #e6e9ee;
+  --sidebar-accent: #f5f7fb;
+
+  /* Topbar theme */
+  --topbar-background: #ffffff;
+  --topbar-foreground: #213547;
+  --topbar-border: #e6e9ee;
+  --topbar-hover: #f6f7f9;
+  --topbar-accent: #ff8a00;
+  --topbar-accent-hover: #ff7a00;
+
+  /* Other */
+  --muted-foreground: #9aa4b2;
+  --button-secondary-background: #d6d8de;
+  --button-secondary-background-hover: #b5b7bd;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -22,28 +54,48 @@ a:hover {
   color: #535bf2;
 }
 
-body {
+html, body {
   margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
+  padding: 0;
+  height: 100%;
+  background: var(--background);
+  color: var(--text-color);
+  font-family: var(--font-primary);
+  box-sizing: border-box;
 }
 
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
+*, *::before, *::after {
+  box-sizing: inherit;
 }
 
-.card {
-  padding: 2em;
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-secondary);
+  margin: 0;
 }
 
 #app {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+/* App layout */
+.app-layout {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.main-content {
+  margin-left: var(--sidebar-width);
+  margin-top: var(--topbar-height);
+  min-height: calc(100vh - var(--topbar-height));
+  padding: 24px;
+  transition: margin-left 0.2s ease;
+}
+
+.main-content[data-compact="true"] {
+  margin-left: var(--sidebar-compact-width);
 }
 
 button {
