@@ -104,20 +104,26 @@ export async function login(credentials: LoginRequest): Promise<AuthResponse> {
 }
 
 export async function logout() {
-    const req: LogoutRequest = {
-        access_token: localStorage.getItem(ACCESS_TOKEN_KEY) || "",
-        refresh_token: localStorage.getItem(REFRESH_TOKEN_KEY) || ""
-    }
+    const accessToken = localStorage.getItem(ACCESS_TOKEN_KEY);
+    const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
 
-    try {
-        const res = await publicFetch("/api/auth/logout", {
-            method: "POST",
-            body: JSON.stringify(req)
-        })
-        await handleApiResponse(res);
-    } catch (error) {
-        // Even if logout API fails, we still clear local auth
-        console.error("Logout API failed:", error);
+    // Only call logout API if we have valid tokens
+    if (accessToken && refreshToken) {
+        const req: LogoutRequest = {
+            access_token: accessToken,
+            refresh_token: refreshToken
+        }
+
+        try {
+            const res = await publicFetch("/api/auth/logout", {
+                method: "POST",
+                body: JSON.stringify(req)
+            })
+            await handleApiResponse(res);
+        } catch (error) {
+            // Even if logout API fails, we still clear local auth
+            console.error("Logout API failed:", error);
+        }
     }
 
     localStorage.removeItem(ACCESS_TOKEN_KEY);
@@ -125,8 +131,10 @@ export async function logout() {
     localStorage.removeItem(USER_KEY);
     clearAuth();
     
-    // Redirect to home instead of reload to avoid infinite loop on protected pages
-    window.location.href = "/";
+    // Redirect to home only if not already there
+    if (window.location.pathname !== "/" && !window.location.hash.includes("#/")) {
+        window.location.href = "/";
+    }
 }
 
 export async function completeGoogleSetup(setupToken: string, username: string): Promise<AuthResponse> {
