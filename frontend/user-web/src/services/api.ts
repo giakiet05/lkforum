@@ -86,6 +86,9 @@ export async function publicFetch(path: string, options: RequestInit = {}): Prom
  * @returns The raw Response object.
  * @throws {ApiError} If the request fails, token cannot be refreshed, or network error occurs.
  */
+
+let isUnauthorizedEventDispatched = false;
+
 export async function authenticatedFetch(path: string, options: RequestInit = {}): Promise<Response> {
     const url = path.startsWith("http") ? path : API_BASE_URL + path;
     const accessToken = await getValidAccessToken();
@@ -93,8 +96,13 @@ export async function authenticatedFetch(path: string, options: RequestInit = {}
     console.log("🔑 Access token:", accessToken ? "✅ Found" : "❌ Missing");
     
     if (!accessToken) {
-        // Dispatch event để App.svelte handle logout
-        window.dispatchEvent(new CustomEvent('auth:unauthorized'));
+        // Dispatch event only once to avoid infinite loops
+        if (!isUnauthorizedEventDispatched) {
+            isUnauthorizedEventDispatched = true;
+            window.dispatchEvent(new CustomEvent('auth:unauthorized'));
+            // Reset after 2 seconds to allow future logouts
+            setTimeout(() => { isUnauthorizedEventDispatched = false; }, 2000);
+        }
         throw new ApiError("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.", ApiErrorCode.FORBIDDEN);
     }
 

@@ -15,8 +15,10 @@ function addRefreshSubscriber(callback: (token: string) => void) {
 }
 
 async function refreshAccessToken(): Promise<string> {
+  console.log("[API] Attempting to refresh access token");
   const refreshToken = tokenManager.getRefreshToken();
   if (!refreshToken) {
+    console.log("[API] No refresh token available, redirecting to login");
     throw new Error("No refresh token available");
   }
 
@@ -29,6 +31,7 @@ async function refreshAccessToken(): Promise<string> {
   });
 
   if (!response.ok) {
+    console.log("[API] Refresh token failed, clearing tokens and redirecting");
     tokenManager.clearTokens();
     window.location.href = "/#/login";
     throw new Error("Failed to refresh token");
@@ -44,6 +47,7 @@ export async function authenticatedFetch(
   url: string,
   options: RequestInit = {}
 ): Promise<Response> {
+  console.log(`[API] authenticatedFetch: ${options.method || 'GET'} ${url}`);
   let accessToken = tokenManager.getAccessToken();
 
   if (!accessToken) {

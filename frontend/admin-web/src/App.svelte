@@ -1,5 +1,5 @@
 <script lang="ts">
-  import Router from "svelte-spa-router";
+  import Router, { location } from "svelte-spa-router";
   import { routes } from "./routes";
   import { isAuthenticated } from "./stores/auth-store";
   import { push } from "svelte-spa-router";
@@ -12,20 +12,11 @@
   let topbarUser = $state<{ name: string; avatar?: string } | undefined>(
     undefined
   );
-
-  // Redirect logic
-  $effect(() => {
-    if (!$isAuthenticated && window.location.hash !== "#/login") {
-      push("/login");
-    } else if ($isAuthenticated && window.location.hash === "#/login") {
-      push("/dashboard");
-    }
-  });
+  let showLayout = $derived($isAuthenticated && $location !== "/login");
 
   // Load user info
   $effect(() => {
     if ($isAuthenticated) {
-      // For now, just show "Admin" - you can fetch actual user info later
       topbarUser = { name: "Admin" };
     } else {
       topbarUser = undefined;
@@ -60,6 +51,8 @@
   ];
 
   function handleLogout() {
+    console.log("[App] handleLogout called");
+    console.trace("[App] handleLogout trace");
     tokenManager.clearTokens();
     isAuthenticated.set(false);
     push("/login");
@@ -70,7 +63,7 @@
   }
 </script>
 
-{#if $isAuthenticated && window.location.hash !== "#/login"}
+{#if showLayout}
   <div class="app-layout">
     <Topbar user={topbarUser} onLogout={handleLogout} />
     <Sidebar

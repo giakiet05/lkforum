@@ -1,12 +1,20 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import { login } from "../services/auth-service";
-  import { setAuthenticated } from "../stores/auth-store";
-  import { push } from "svelte-spa-router";
+  import { setAuthenticated, isAuthenticated } from "../stores/auth-store";
+  import { replace } from "svelte-spa-router";
 
   let username = $state("");
   let password = $state("");
   let error = $state("");
   let loading = $state(false);
+
+  // Redirect if already authenticated - only check once on mount
+  onMount(() => {
+    if ($isAuthenticated) {
+      replace("/dashboard");
+    }
+  });
 
   async function handleLogin() {
     if (!username || !password) {
@@ -20,7 +28,7 @@
     try {
       await login({ identifier: username, password });
       setAuthenticated(true);
-      push("/dashboard");
+      replace("/dashboard");
     } catch (err: any) {
       error = err.message || "Login failed";
     } finally {
