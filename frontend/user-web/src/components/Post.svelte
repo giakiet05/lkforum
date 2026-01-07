@@ -380,7 +380,13 @@
 
     try {
       await deletePost(post.id);
-      if (onUpdate) onUpdate();
+      toastStore.success("Post deleted successfully");
+      if (onUpdate) {
+        onUpdate();
+      } else {
+        // If no onUpdate callback, reload the page
+        window.location.reload();
+      }
     } catch (error) {
       console.error("Failed to delete post:", error);
       toastStore.error("Failed to delete post. Please try again.");
@@ -487,11 +493,18 @@
                   </button>
                   <div class="menu-divider"></div>
                 {/if}
-                <button class="menu-item" onclick={openReportModal}>
-                  <span>⚠️ Report</span>
+                <button class="menu-item report" onclick={openReportModal}>
+                  <img
+                    src="/report_icon.svg"
+                    alt="Report"
+                    width="16"
+                    height="16"
+                  />
+                  <span>Report</span>
                 </button>
                 <button class="menu-item" onclick={handleHide}>
-                  <span>🚫 Hide</span>
+                  <img src="/hide_icon.svg" alt="Hide" width="16" height="16" />
+                  <span>Hide</span>
                 </button>
               {/if}
             </div>
@@ -1211,6 +1224,14 @@
   }
 
   .menu-item.delete:hover {
+    background-color: #fef1f0;
+  }
+
+  .menu-item.report {
+    color: #d93025;
+  }
+
+  .menu-item.report:hover {
     background-color: #fef1f0;
   }
 

@@ -49,28 +49,40 @@
       return;
     }
 
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      error = "Email không hợp lệ";
+      return;
+    }
+
     loading = true;
     error = null;
 
     try {
-      // TODO: Gọi API backend để gửi OTP
-      // const res = await fetch(`${API_BASE_URL}/api/auth/send-otp`, {
-      //   method: "POST",
-      //   headers: { "Content-Type": "application/json" },
-      //   body: JSON.stringify({ email }),
-      // });
+      const res = await fetch(
+        `${API_BASE_URL}/api/auth/local/send-verification`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email }),
+        }
+      );
 
-      // Mock: Giả lập gửi OTP thành công
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      console.log("Mock: OTP sent to", email);
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || "Không thể gửi mã OTP");
+      }
 
       // Chuyển sang step nhập OTP và bắt đầu countdown timer
       step = "otp";
       startResendTimer();
+      toastStore.success("Mã OTP đã được gửi đến email của bạn!");
       error = null;
     } catch (err: any) {
       console.error("Send OTP error:", err);
-      error = "Không thể gửi mã OTP. Vui lòng thử lại.";
+      error = err.message || "Không thể gửi mã OTP. Vui lòng thử lại.";
     } finally {
       loading = false;
     }
@@ -87,23 +99,28 @@
     error = null;
 
     try {
-      // TODO: Gọi API backend để verify OTP
-      // const res = await fetch(`${API_BASE_URL}/api/auth/verify-otp`, {
-      //   method: "POST",
-      //   headers: { "Content-Type": "application/json" },
-      //   body: JSON.stringify({ email, otp }),
-      // });
+      const res = await fetch(`${API_BASE_URL}/api/auth/local/verify-email`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, otp }),
+      });
 
-      // Mock: Giả lập verify thành công
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      console.log("Mock: OTP verified for", email);
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || "Mã OTP không chính xác");
+      }
+
+      // Lưu verification token để dùng ở bước tiếp theo
+      localStorage.setItem("verification_token", data.data.verification_token);
 
       // Chuyển sang step đăng ký (username + password)
       step = "register";
+      toastStore.success("Xác thực email thành công!");
       error = null;
     } catch (err: any) {
       console.error("Verify OTP error:", err);
-      error = "Mã OTP không đúng. Vui lòng thử lại.";
+      error = err.message || "Mã OTP không đúng. Vui lòng thử lại.";
     } finally {
       loading = false;
     }
@@ -115,8 +132,30 @@
       error = "Vui lòng điền đầy đủ thông tin";
       return;
     }
+
+    // Validate username length (3-20 characters)
+    if (username.length < 3 || username.length > 20) {
+      error = "Username phải từ 3-20 ký tự";
+      return;
+    }
+
+    // Validate password length (minimum 8 characters)
+    if (password.length < 8) {
+      error = "Mật khẩu phải có ít nhất 8 ký tự";
+      return;
+    }
+
+    // Validate password strength (must contain uppercase, lowercase, number, special char)
+    const passwordRegex =
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+    if (!passwordRegex.test(password)) {
+      error =
+        "Mật khẩu phải chứa ít nhất 1 chữ hoa, 1 chữ thường, 1 số và 1 ký tự đặc biệt (@$!%*?&)";
+      return;
+    }
+
     if (password !== confirmPassword) {
-      error = "Mật khẩu xác nhận không khớp!";
+      error = "Mật khẩu xác nhận không khớp";
       return;
     }
 
@@ -124,57 +163,45 @@
     error = null;
 
     try {
-      // TODO: Gọi API backend để hoàn tất đăng ký
-      // const res = await fetch(`${API_BASE_URL}/api/auth/complete-register`, {
-      //   method: "POST",
-      //   headers: { "Content-Type": "application/json" },
-      //   body: JSON.stringify({ email, username, password }),
-      // });
+      const verificationToken = localStorage.getItem("verification_token");
+      if (!verificationToken) {
+        throw new Error("Session hết hạn. Vui lòng thử lại.");
+      }
 
-      // Mock: Giả lập đăng ký thành công với tokens
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      const mockData = {
-        user: {
-          id: "mock-user-id",
-          email: email,
-          username: username,
-          reputation: 0,
-          title: "Thành viên mới",
-          role: Role.User,
-          provider: AuthProvider.Local,
-          is_verified: true,
-          profile: {
-            avatar: undefined,
-            cover: undefined,
-            bio: undefined,
-            gender: undefined,
-            age: undefined,
-            location: undefined,
-            interests: [],
-            social_links: undefined,
-            stats: undefined,
-          },
-        },
-        access_token: "mock-access-token-" + Date.now(),
-        refresh_token: "mock-refresh-token-" + Date.now(),
-      };
+      const res = await fetch(
+        `${API_BASE_URL}/api/auth/local/complete-registration`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            verification_token: verificationToken,
+            username,
+            password,
+          }),
+        }
+      );
 
-      console.log("Mock: Register complete", mockData);
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || "Đăng ký thất bại");
+      }
 
       // Lưu tokens và user vào localStorage
-      localStorage.setItem("access_token", mockData.access_token);
-      localStorage.setItem("refresh_token", mockData.refresh_token);
-      localStorage.setItem("user", JSON.stringify(mockData.user));
+      localStorage.setItem("access_token", data.data.access_token);
+      localStorage.setItem("refresh_token", data.data.refresh_token);
+      localStorage.setItem("user", JSON.stringify(data.data.user));
+      localStorage.removeItem("verification_token"); // Cleanup
 
       // Update authStore
-      setAuth(mockData.user);
+      setAuth(data.data.user);
 
       // Redirect về trang chính
       toastStore.success("Đăng ký thành công! Chào mừng bạn đến với LKForum.");
       push("/");
     } catch (err: any) {
       console.error("Register error:", err);
-      error = "Lỗi khi đăng ký. Vui lòng thử lại.";
+      error = err.message || "Lỗi khi đăng ký. Vui lòng thử lại.";
     } finally {
       loading = false;
     }
@@ -185,16 +212,17 @@
     error = null;
 
     try {
-      // TODO: Gọi API backend để gửi lại OTP
-      // const res = await fetch(`${API_BASE_URL}/api/auth/resend-otp`, {
-      //   method: "POST",
-      //   headers: { "Content-Type": "application/json" },
-      //   body: JSON.stringify({ email }),
-      // });
+      const res = await fetch(`${API_BASE_URL}/api/auth/local/resend-otp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
 
-      // Mock: Giả lập gửi lại OTP
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      console.log("Mock: Resend OTP to", email);
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || "Không thể gửi lại OTP");
+      }
 
       // Bắt đầu countdown timer sau khi gửi thành công
       startResendTimer();

@@ -166,6 +166,21 @@ func (s *authService) VerifyEmailCode(email, otp string) (string, error) {
 
 // CompleteRegistration creates the user account after email verification
 func (s *authService) CompleteRegistration(verificationToken, username, password string) (*model.User, string, string, error) {
+	// Validate username length (3-20 characters)
+	if len(username) < 3 || len(username) > 20 {
+		return nil, "", "", apperror.ErrInvalidUsername
+	}
+
+	// Validate password length (minimum 8 characters)
+	if len(password) < 8 {
+		return nil, "", "", apperror.ErrPasswordTooShort
+	}
+
+	// Validate password strength (must contain uppercase, lowercase, number, special char)
+	if !isStrongPassword(password) {
+		return nil, "", "", apperror.ErrPasswordTooWeak
+	}
+
 	// Parse verification token
 	claims, err := auth.ParseVerificationToken(verificationToken)
 	if err != nil {
@@ -513,6 +528,16 @@ func (s *authService) VerifyResetPasswordOTP(email, otp string) (string, error) 
 
 // ResetPassword changes the user's password using reset token
 func (s *authService) ResetPassword(resetToken, newPassword string) error {
+	// Validate password length (minimum 8 characters)
+	if len(newPassword) < 8 {
+		return apperror.ErrPasswordTooShort
+	}
+
+	// Validate password strength
+	if !isStrongPassword(newPassword) {
+		return apperror.ErrPasswordTooWeak
+	}
+
 	// Parse reset token
 	claims, err := auth.ParseVerificationToken(resetToken)
 	if err != nil {
@@ -624,6 +649,11 @@ func (s *authService) ProcessGoogleCallback(code string) (*GoogleAuthResult, err
 }
 
 func (s *authService) CompleteGoogleSetup(setupToken, username string) (*model.User, string, string, error) {
+	// Validate username length (3-20 characters)
+	if len(username) < 3 || len(username) > 20 {
+		return nil, "", "", apperror.ErrInvalidUsername
+	}
+
 	claims, err := auth.ParseSetupToken(setupToken)
 	if err != nil {
 		return nil, "", "", err
@@ -688,6 +718,47 @@ func generateOTP() string {
 func generateNonce() string {
 	rand.Seed(time.Now().UnixNano())
 	return fmt.Sprintf("%032d", rand.Int63())
+}
+
+// isStrongPassword checks if password meets strength requirements:
+// - At least 8 characters
+// - Contains at least one uppercase letter
+// - Contains at least one lowercase letter
+// - Contains at least one digit
+// - Contains at least one special character (@$!%*?&)
+func isStrongPassword(password string) bool {
+	if len(password) < 8 {
+		return false
+	}
+
+	var (
+		hasUpper   = false
+		hasLower   = false
+		hasDigit   = false
+		hasSpecial = false
+	)
+
+	specialChars := "@$!%*?&"
+
+	for _, char := range password {
+		switch {
+		case 'A' <= char && char <= 'Z':
+			hasUpper = true
+		case 'a' <= char && char <= 'z':
+			hasLower = true
+		case '0' <= char && char <= '9':
+			hasDigit = true
+		default:
+			for _, special := range specialChars {
+				if char == special {
+					hasSpecial = true
+					break
+				}
+			}
+		}
+	}
+
+	return hasUpper && hasLower && hasDigit && hasSpecial
 }
 
 func extractJTI(tokenStr string) (string, error) {

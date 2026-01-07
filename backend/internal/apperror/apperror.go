@@ -59,7 +59,7 @@ func StatusFromError(err error) int {
 	switch {
 	// 400 Bad Request
 	case isErrorType(err, ErrBadRequest, ErrInvalidID, ErrInvalidMembershipData, ErrInvalidOTP, ErrOTPExpired,
-		ErrInvalidGender, ErrInvalidDateFormat, ErrAgeTooYoung, ErrInvalidBirthDate, ErrInvalidProvince, ErrTooManyInterests, ErrInvalidInterest):
+		ErrInvalidGender, ErrInvalidDateFormat, ErrAgeTooYoung, ErrInvalidBirthDate, ErrInvalidProvince, ErrTooManyInterests, ErrInvalidInterest, ErrInvalidUsername, ErrPasswordTooShort, ErrPasswordTooWeak):
 		return http.StatusBadRequest
 	// 401 Unauthorized
 	case isErrorType(err, ErrInvalidCredentials, ErrInvalidToken, ErrInvalidClaims, ErrInvalidIssuer, ErrInvalidAudience, ErrTokenInvalidated, ErrMissingAuthHeader, ErrInvalidAuthHeader, ErrMissingToken, ErrNotAuthenticated):
@@ -100,9 +100,12 @@ var (
 	ErrEmailNotVerified     = AppError{Code: "EMAIL_NOT_VERIFIED", Message: "Email chưa được xác thực"}
 	ErrEmailAlreadyVerified = AppError{Code: "EMAIL_ALREADY_VERIFIED", Message: "Email đã được xác thực"}
 	ErrInvalidOTP           = AppError{Code: "INVALID_OTP", Message: "Mã xác thực không đúng"}
-	ErrOTPExpired          = AppError{Code: "OTP_EXPIRED", Message: "Mã xác thực đã hết hạn"}
-	ErrLoginMethodMismatch = AppError{Code: "LOGIN_METHOD_MISMATCH", Message: "Email này đã được đăng ký bằng phương thức khác. Vui lòng sử dụng phương thức đăng nhập ban đầu."}
-	ErrEmailNotRegistered  = AppError{Code: "EMAIL_NOT_REGISTERED", Message: "Email chưa được đăng ký"}
+	ErrOTPExpired           = AppError{Code: "OTP_EXPIRED", Message: "Mã xác thực đã hết hạn"}
+	ErrLoginMethodMismatch  = AppError{Code: "LOGIN_METHOD_MISMATCH", Message: "Tài khoản này đã đăng ký bằng Google. Vui lòng đăng nhập bằng Google hoặc liên hệ quản trị viên để hỗ trợ."}
+	ErrEmailNotRegistered   = AppError{Code: "EMAIL_NOT_REGISTERED", Message: "Email không tồn tại trong hệ thống"}
+	ErrInvalidUsername      = AppError{Code: "INVALID_USERNAME", Message: "Username phải từ 3-20 ký tự"}
+	ErrPasswordTooShort     = AppError{Code: "PASSWORD_TOO_SHORT", Message: "Mật khẩu phải có ít nhất 8 ký tự"}
+	ErrPasswordTooWeak      = AppError{Code: "PASSWORD_TOO_WEAK", Message: "Mật khẩu phải chứa ít nhất 1 chữ hoa, 1 chữ thường, 1 số và 1 ký tự đặc biệt (@$!%*?&)"}
 
 	// Generic
 	ErrInternal          = AppError{Code: "INTERNAL_ERROR", Message: "Lỗi hệ thống"}
