@@ -559,8 +559,9 @@
     --topbar-foreground: #213547;
     --topbar-accent: #ff8a00;
     --topbar-accent-hover: #ff7a00;
-    --topbar-search-background: #8fabd4;
-    --topbar-search-border: #8fabd4;
+    --topbar-search-background: #ffffff;
+    --topbar-search-border: #e6e9ee;
+    --topbar-search-focus-background: #8fabd4;
     --topbar-search-focus-border: #4a70a9;
     --topbar-search-icon: #000000;
     --topbar-search-text: #000000;
@@ -598,11 +599,11 @@
   }
 
   .topbar-center {
-    position: absolute;
-    left: 50%;
-    transform: translateX(-50%);
-    max-width: 680px;
-    width: 100%;
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    max-width: 600px;
+    margin: 0 auto;
     padding: 0 16px;
   }
 
@@ -611,7 +612,6 @@
     align-items: center;
     gap: 8px;
     flex: 0 0 auto;
-    margin-left: auto;
   }
 
   .brand {
@@ -637,7 +637,7 @@
 
   .topbar-search {
     width: 100%;
-    max-width: 680px;
+    max-width: 500px;
   }
 
   .search-wrapper {
@@ -664,10 +664,13 @@
     font-size: 14px;
     color: var(--topbar-search-text);
     outline: none;
+    transition:
+      background 0.2s ease,
+      border-color 0.2s ease;
   }
 
   .search-input:focus {
-    background: var(--topbar-search-background);
+    background: var(--topbar-search-focus-background);
     border-color: var(--topbar-search-focus-border);
     border-width: 2px;
   }
