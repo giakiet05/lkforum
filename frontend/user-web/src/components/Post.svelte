@@ -1,6 +1,7 @@
 <script lang="ts">
   import { fade } from "svelte/transition";
   import { push } from "svelte-spa-router";
+  import { generatePostUrl } from "../utils/slug";
   import type { PostResponse } from "../dtos/post-dto";
   import {
     voteOnPost,
@@ -88,7 +89,7 @@
   }
 
   function handlePostClick() {
-    push(`/post/${post.id}`);
+    push(generatePostUrl(post.id, post.title || "post"));
   }
 
   function handleButtonClick(e: MouseEvent) {
@@ -333,7 +334,7 @@
 
   function handleShare(e: MouseEvent) {
     e.stopPropagation();
-    const url = `${window.location.origin}/#/post/${post.id}`;
+    const url = `${window.location.origin}/#${generatePostUrl(post.id, post.title || "post")}`;
 
     if (navigator.share) {
       navigator
@@ -369,7 +370,7 @@
   function handleEdit(e: MouseEvent) {
     e.stopPropagation();
     showMenu = false;
-    push(`/post/${post.id}/edit`);
+    push(`${generatePostUrl(post.id, post.title || "post")}/edit`);
   }
 
   async function handleDelete(e: MouseEvent) {
