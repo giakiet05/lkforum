@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import { push } from "svelte-spa-router";
   import CommentSection from "../components/CommentSection.svelte";
+  import { extractPostId, generatePostUrl } from "../utils/slug";
   import type { PostResponse } from "../dtos/post-dto";
   import {
     voteOnPost,
@@ -17,10 +18,13 @@
   import { toastStore } from "../stores/toast-store";
 
   type PostDetailProps = {
-    params?: { id: string };
+    params?: { slugId: string };
   };
 
-  let { params = { id: "1" } }: PostDetailProps = $props();
+  let { params = { slugId: "1" } }: PostDetailProps = $props();
+
+  // Extract actual ID from slug-id format
+  const postId = $derived(extractPostId(params.slugId));
 
   let post = $state<PostResponse | null>(null);
   let selectedOptions = $state<string[]>([]);
@@ -147,7 +151,7 @@
 
     // Fetch post from API
     try {
-      const fetchedPost = await getPostById(params.id);
+      const fetchedPost = await getPostById(postId);
       post = fetchedPost;
 
       // Initialize vote state from post data
@@ -252,7 +256,7 @@
 
   function handleShare() {
     if (!post) return;
-    const url = `${window.location.origin}/#/post/${post.id}`;
+    const url = `${window.location.origin}/#${generatePostUrl(post.id, post.title || "post")}`;
 
     if (navigator.share) {
       navigator
@@ -285,7 +289,7 @@
 
   function handleEdit() {
     showMenu = false;
-    push(`/post/${post!.id}/edit`);
+    push(`${generatePostUrl(post!.id, post!.title || "post")}/edit`);
   }
 
   async function handleDelete() {
