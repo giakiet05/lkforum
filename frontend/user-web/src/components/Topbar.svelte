@@ -292,7 +292,7 @@
                       class="result-avatar"
                     />
                     <div class="result-info">
-                      <div class="result-name">c/{community.name}</div>
+                      <div class="result-name">lk/{community.name}</div>
                       <div class="result-meta">
                         {community.member_count} thành viên
                       </div>
