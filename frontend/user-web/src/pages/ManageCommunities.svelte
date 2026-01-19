@@ -10,12 +10,14 @@
     name: string;
     description: string;
     avatar?: string;
+    isOwner: boolean;
   };
 
   let allCommunities = $state<Community[]>([]);
   let isLoading = $state(true);
   let error = $state<string | null>(null);
   let searchQuery = $state("");
+  let activeTab = $state<"owned" | "joined">("owned");
 
   async function loadCommunities() {
     try {
@@ -33,6 +35,7 @@
         name: c.name,
         description: c.description || "",
         avatar: c.avatar,
+        isOwner: c.create_by_id === userId,
       }));
     } catch (err) {
       error = err instanceof Error ? err.message : "Không thể tải cộng đồng";
@@ -49,18 +52,28 @@
   let filteredCommunities = $derived(() => {
     let filtered = allCommunities;
 
+    // Filter by tab
+    if (activeTab === "owned") {
+      filtered = filtered.filter((c) => c.isOwner);
+    } else {
+      filtered = filtered.filter((c) => !c.isOwner);
+    }
+
     // Filter by search
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(
         (c) =>
           c.name.toLowerCase().includes(query) ||
-          c.description.toLowerCase().includes(query)
+          c.description.toLowerCase().includes(query),
       );
     }
 
     return filtered;
   });
+
+  let ownedCount = $derived(allCommunities.filter((c) => c.isOwner).length);
+  let joinedCount = $derived(allCommunities.filter((c) => !c.isOwner).length);
 
   function leaveCommunity(communityId: string) {
     const community = allCommunities.find((c) => c.id === communityId);
@@ -81,6 +94,25 @@
   </div>
 
   <div class="page-content">
+    <!-- Tabs -->
+    <div class="tabs">
+      <button
+        class="tab"
+        class:active={activeTab === "owned"}
+        onclick={() => (activeTab = "owned")}
+      >
+        Cộng đồng của tôi
+        <span class="tab-count">{ownedCount}</span>
+      </button>
+      <button
+        class="tab"
+        class:active={activeTab === "joined"}
+        onclick={() => (activeTab = "joined")}
+      >
+        Đã tham gia
+        <span class="tab-count">{joinedCount}</span>
+      </button>
+    </div>
     <!-- Search Bar -->
     <div class="search-bar">
       <svg
@@ -194,6 +226,58 @@
     display: flex;
     flex-direction: column;
     gap: 16px;
+  }
+
+  /* Tabs */
+  .tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 2px solid #ededed;
+    margin-bottom: 8px;
+  }
+
+  .tab {
+    padding: 12px 24px;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    color: #7c7c7c;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .tab:hover {
+    color: #1c1c1c;
+  }
+
+  .tab.active {
+    color: var(--blue--);
+    border-bottom-color: var(--blue--);
+  }
+
+  .tab-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 24px;
+    height: 20px;
+    padding: 0 6px;
+    background: #f0f0f0;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #7c7c7c;
+  }
+
+  .tab.active .tab-count {
+    background: var(--blue--);
+    color: white;
   }
 
   /* Search Bar */

@@ -5,12 +5,13 @@
   import { getPostById, updatePost } from "../services/post-service";
   import { authStore } from "../stores/auth-store";
   import { toastStore } from "../stores/toast-store";
+  import { extractPostId } from "../utils/slug";
 
   type EditPostProps = {
-    params?: { id: string };
+    params?: { slugId: string };
   };
 
-  let { params = { id: "" } }: EditPostProps = $props();
+  let { params = { slugId: "" } }: EditPostProps = $props();
 
   let post = $state<PostResponse | null>(null);
   let title = $state("");
@@ -20,6 +21,7 @@
   let error = $state<string | null>(null);
 
   const currentUser = $derived($authStore.user);
+  const postId = $derived(extractPostId(params.slugId));
 
   onMount(async () => {
     if (!currentUser) {
@@ -29,12 +31,12 @@
 
     try {
       isLoading = true;
-      post = await getPostById(params.id);
+      post = await getPostById(postId);
 
       // Check if user owns the post
       if (post.author.id !== currentUser.id) {
         toastStore.error("You don't have permission to edit this post");
-        push(`/post/${params.id}`);
+        push(`/post/${params.slugId}`);
         return;
       }
 
@@ -57,7 +59,7 @@
 
     try {
       isSaving = true;
-      await updatePost(params.id, {
+      await updatePost(postId, {
         title: title.trim(),
         content: {
           text: content.trim(),
@@ -65,7 +67,7 @@
       });
 
       toastStore.success("Post updated successfully");
-      push(`/post/${params.id}`);
+      push(`/post/${params.slugId}`);
     } catch (err) {
       console.error("Failed to update post:", err);
       toastStore.error("Failed to update post. Please try again.");
@@ -76,7 +78,7 @@
 
   function handleCancel() {
     if (confirm("Discard changes?")) {
-      push(`/post/${params.id}`);
+      push(`/post/${params.slugId}`);
     }
   }
 </script>
