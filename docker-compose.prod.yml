@@ -1,0 +1,6 @@
+services:
+  frontend:
+    build:
+      context: ./frontend/user-web
+      args:
+        VITE_API_BASE_URL: https://lkforum.giakiet.io.vn

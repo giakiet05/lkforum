@@ -1,0 +1,7 @@
+./archive.go
+./context.go
+./creative.go
+./edit_asset.go
+./tag.go
+./upload.go
+./upload_asset.go

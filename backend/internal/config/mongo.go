@@ -2,18 +2,28 @@ package config
 
 import (
 	"context"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"fmt"
 	"log"
 	"os"
 	"time"
+
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
+)
+
+var (
+	Client *mongo.Client
+	db     *mongo.Database
 )
 
 // NewMongoClient creates and returns a new MongoDB client
 func NewMongoClient() *mongo.Client {
-	uri := os.Getenv("MONGO_URI") // ví dụ: mongodb://user:pass@localhost:27017/dbname
+	uri := os.Getenv("MONGO_URI") // e.g. mongodb://user:pass@localhost:27017
+	if uri == "" {
+		log.Fatal("MONGO_URI environment variable is not set")
+	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	client, err := mongo.Connect(ctx, options.Client().ApplyURI(uri))
@@ -21,11 +31,66 @@ func NewMongoClient() *mongo.Client {
 		log.Fatalf("Could not connect to MongoDB: %v", err)
 	}
 
-	// test connection
+	// Test connection
 	if err := client.Ping(ctx, nil); err != nil {
 		log.Fatalf("MongoDB ping failed: %v", err)
 	}
 
 	log.Println("Connected to MongoDB successfully!")
+
+	dbName := os.Getenv("DB_NAME")
+	if dbName == "" {
+		log.Fatal("DB_NAME environment variable is not set")
+	}
+
+	Client = client
+	db = client.Database(dbName)
+
+	// Verify required collections exist
+	if err := verifyCollections(ctx, db); err != nil {
+		log.Fatalf("Collection verification failed: %v", err)
+	}
+
+	log.Printf("Using database: %s\n", dbName)
 	return client
+}
+
+func verifyCollections(ctx context.Context, db *mongo.Database) error {
+	collections, err := db.ListCollectionNames(ctx, struct{}{})
+	if err != nil {
+		return fmt.Errorf("failed to list collections: %w", err)
+	}
+
+	required := []string{
+		UserColName,
+		PostColName,
+		CommunityColName,
+		CommunityBanColName,
+		CommentColName,
+		ChannelColName,
+		MessageColName,
+		VoteColName,
+		PollVoteColName,
+		NotificationColName,
+		ReportColName,
+		MembershipColName,
+		LikedPostColName,
+		SavedPostColName,
+		UserPostHistoryColName,
+		EmailVerificationColName,
+	}
+
+	existing := make(map[string]bool, len(collections))
+	for _, c := range collections {
+		existing[c] = true
+	}
+
+	for _, name := range required {
+		if !existing[name] {
+			return fmt.Errorf("required collection %q does not exist in database", name)
+		}
+	}
+
+	log.Println("All required collections verified")
+	return nil
 }

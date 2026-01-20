@@ -1,0 +1,17 @@
+./cache_service.pb.go
+./cached_content.pb.go
+./citation.pb.go
+./content.pb.go
+./discuss_service.pb.go
+./file.pb.go
+./file_service.pb.go
+./generative_service.pb.go
+./model.pb.go
+./model_service.pb.go
+./permission.pb.go
+./permission_service.pb.go
+./retriever.pb.go
+./retriever_service.pb.go
+./safety.pb.go
+./text_service.pb.go
+./tuned_model.pb.go

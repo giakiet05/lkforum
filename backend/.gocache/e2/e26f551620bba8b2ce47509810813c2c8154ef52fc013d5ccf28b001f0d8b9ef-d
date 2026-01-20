@@ -1,0 +1,17 @@
+./admin_community_route.go
+./admin_report_route.go
+./admin_stats_route.go
+./admin_user_route.go
+./auth_route.go
+./channel_route.go
+./comment_route.go
+./community_route.go
+./draft_route.go
+./membership_route.go
+./message_route.go
+./notification_route.go
+./post_history_route.go
+./post_route.go
+./report_route.go
+./user_route.go
+./websocket_route.go

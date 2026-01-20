@@ -1,0 +1,262 @@
+<script lang="ts">
+  import Post from "../components/Post.svelte";
+  import type { PostResponse } from "../dtos/post-dto";
+  import { getPosts } from "../services/post-service";
+  import { onMount } from "svelte";
+
+  type SortType = "best" | "hot" | "new" | "top" | "rising";
+
+  let posts = $state<PostResponse[]>([]);
+  let loading = $state(false);
+  let error = $state<string | null>(null);
+  let sortBy = $state<SortType | "">("");
+
+  async function loadPosts() {
+    loading = true;
+    error = null;
+    try {
+      posts = await getPosts({
+        feed_type: "home",
+        sort: sortBy || undefined,
+        limit: 20,
+      });
+    } catch (err) {
+      error = err instanceof Error ? err.message : "Failed to load posts";
+      console.error("Error loading posts:", err);
+    } finally {
+      loading = false;
+    }
+  }
+
+  $effect(() => {
+    // Reload when sort changes
+    if (sortBy !== "") {
+      loadPosts();
+    }
+  });
+
+  onMount(() => {
+    loadPosts();
+  });
+</script>
+
+<div class="home-container">
+  <!-- Feed Type Tabs -->
+  <div class="feed-tabs">
+    <button
+      class="feed-tab"
+      class:active={currentFeed === "home"}
+      onclick={() => changeFeed("home")}
+    >
+      <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+        <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z" />
+      </svg>
+      Home
+    </button>
+    <button
+      class="feed-tab"
+      class:active={currentFeed === "popular"}
+      onclick={() => changeFeed("popular")}
+    >
+      <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+        <path
+          d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z"
+        />
+      </svg>
+      Popular
+    </button>
+    <button
+      class="feed-tab"
+      class:active={currentFeed === "explore"}
+      onclick={() => changeFeed("explore")}
+    >
+      <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+        <path
+          d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"
+        />
+      </svg>
+      Explore
+    </button>
+    <button
+      class="feed-tab"
+      class:active={currentFeed === "all"}
+      onclick={() => changeFeed("all")}
+    >
+      <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+        <path
+          d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"
+        />
+      </svg>
+      All
+    </button>
+  </div>
+
+  <!-- Sort Options -->
+  <div class="sort-options">
+    <select bind:value={sortBy}>
+      <option value="" disabled selected hidden>Sort by</option>
+      <option value="best">Best</option>
+      <option value="hot">Hot</option>
+      <option value="new">New</option>
+      <option value="top">Top</option>
+      <option value="rising">Rising</option>
+    </select>
+  </div>
+
+  <!-- Posts List -->
+  {#if loading}
+    <div class="loading">
+      <div class="spinner"></div>
+      <p>Loading posts...</p>
+    </div>
+  {:else if error}
+    <div class="error">
+      <p>{error}</p>
+      <button onclick={() => loadPosts()}>Retry</button>
+    </div>
+  {:else if posts.length === 0}
+    <div class="empty">
+      {#if currentFeed === "home"}
+        <p>Your home feed is empty. Join some communities to see posts!</p>
+        <button onclick={() => changeFeed("explore")}
+          >Explore Communities</button
+        >
+      {:else}
+        <p>No posts found</p>
+      {/if}
+    </div>
+  {:else}
+    <div class="post-list">
+      {#each posts as post}
+        <Post {post} />
+      {/each}
+    </div>
+  {/if}
+</div>
+
+<style>
+  .home-container {
+    padding: 16px 24px;
+  }
+
+  .page-title {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--blue--);
+    margin-bottom: 20px;
+  }
+
+  /* Sort Options */
+  .sort-options {
+    margin-bottom: 16px;
+    display: inline-block;
+  }
+
+  .sort-options select {
+    padding: 8px 32px 8px 12px;
+    border: none;
+    border-radius: 4px;
+    background-color: transparent;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23153060' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    background-size: 16px;
+    color: var(--blue--);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    transition: all 0.2s ease;
+  }
+
+  .sort-options select:hover {
+    background-color: rgba(21, 48, 96, 0.08);
+  }
+
+  .sort-options select:focus {
+    outline: none;
+    background-color: rgba(21, 48, 96, 0.12);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    border-radius: 8px;
+  }
+
+  .sort-options select option {
+    padding: 12px 16px;
+    background-color: white;
+    color: #1a1a1b;
+    font-size: 14px;
+    font-weight: 400;
+    border: none;
+  }
+
+  .sort-options select option:first-child {
+    color: #878a8c;
+    font-weight: 500;
+  }
+
+  /* Loading, Error, Empty States */
+  .loading,
+  .error,
+  .empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 24px;
+    text-align: center;
+  }
+
+  .loading p,
+  .error p,
+  .empty p {
+    color: #5a5a5a;
+    font-size: 16px;
+    margin: 16px 0;
+  }
+
+  .spinner {
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid var(--blue--);
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    0% {
+      transform: rotate(0deg);
+    }
+    100% {
+      transform: rotate(360deg);
+    }
+  }
+
+  .error button,
+  .empty .explore-link {
+    display: inline-block;
+    padding: 10px 20px;
+    background-color: var(--blue--);
+    color: white;
+    border: none;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background-color 0.2s ease;
+  }
+
+  .error button:hover,
+  .empty .explore-link:hover {
+    background-color: #0d2849;
+  }
+
+  .post-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+</style>

@@ -1,0 +1,16 @@
+./admin_community_controller.go
+./admin_stats_controller.go
+./admin_user_controller.go
+./auth_controller.go
+./channel_controller.go
+./comment_controller.go
+./community_controller.go
+./draft_controller.go
+./membership_controller.go
+./message_controller.go
+./notification_controller.go
+./post_controller.go
+./post_history_controller.go
+./report_controller.go
+./user_controller.go
+./websocket_controller.go

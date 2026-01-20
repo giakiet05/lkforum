@@ -5,8 +5,8 @@ import (
 	"time"
 )
 
-const DefaultDBTimeout = 5 * time.Second
-const DefaultRedisTimeout = 2 * time.Second
+const DefaultDBTimeout = 500 * time.Second
+const DefaultRedisTimeout = 200 * time.Second
 
 // NewDefaultDBContext creates a new context with the default database timeout.
 func NewDefaultDBContext() (context.Context, context.CancelFunc) {

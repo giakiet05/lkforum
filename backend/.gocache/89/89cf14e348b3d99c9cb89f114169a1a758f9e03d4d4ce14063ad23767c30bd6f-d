@@ -1,0 +1,12 @@
+./auxiliary.go
+./cache_client.go
+./discuss_client.go
+./doc.go
+./file_client.go
+./generative_client.go
+./info.go
+./model_client.go
+./permission_client.go
+./retriever_client.go
+./text_client.go
+./version.go

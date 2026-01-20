@@ -1,0 +1,11 @@
+./caching.go
+./chat.go
+./client.go
+./content.go
+./debug.go
+./doc.go
+./embed.go
+./files.go
+./generativelanguagepb_veneer.gen.go
+./list_models.go
+./option.go

@@ -1,47 +1,189 @@
 <script lang="ts">
-  import svelteLogo from './assets/svelte.svg'
-  import viteLogo from '/vite.svg'
-  import Counter from './lib/Counter.svelte'
+  import Router from "svelte-spa-router";
+  import routes from "./routes";
+  import Topbar from "./components/Topbar.svelte";
+  import Sidebar from "./components/Sidebar.svelte";
+  import ToastContainer from "./components/ToastContainer.svelte";
+  import { authStore, getInitialAuthState } from "./stores/auth-store";
+  import { logout, validateAuth } from "./services/auth-service";
+  import { push } from "svelte-spa-router";
+  import { onMount } from "svelte";
+
+  const sidebarItems = [
+    {
+      id: "home",
+      label: "Trang chủ",
+      to: "/",
+      icon: `<svg viewBox=\"0 0 24 24\" width=\"20\" height=\"20\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">
+      <path d=\"M3 11.5L12 4l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-8.5z\" fill=\"currentColor\"/>
+    </svg>`,
+    },
+    {
+      id: "popular",
+      label: "Phổ biến",
+      to: "/popular",
+      icon: `<svg width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><g clip-path=\"url(#clip0_20_157)\"><path d=\"M23.2499 12.751L12.7769 23.25\" stroke=\"currentColor\" stroke-opacity=\"0.7\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M17.25 12.751H23.25V18.75\" stroke=\"currentColor\" stroke-opacity=\"0.7\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M18.75 0.75V5.25H12.75V11.25H6.75V17.25H0.75V23.25\" stroke=\"currentColor\" stroke-opacity=\"0.7\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></g><defs><clipPath id=\"clip0_20_157\"><rect width=\"24\" height=\"24\" fill=\"white\"/></clipPath></defs></svg>`,
+    },
+    {
+      id: "explore",
+      label: "Khám phá",
+      to: "/explore",
+      icon: `<svg width=\"20\" height=\"20\" viewBox=\"0 0 16 16\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">
+      <path fill-rule=\"evenodd\" clip-rule=\"evenodd\" d=\"M11.8957 3.33209L10.8016 4.06159L11.9615 6.9595L13.2837 6.57143L11.8957 3.33209ZM9.66815 4.81615L3.05234 9.2274L3.20634 9.53543L10.6762 7.3375L9.66815 4.81615ZM12.49 1.3335L15.1016 7.42709L10.1902 8.8715L12.1669 14.1267L10.9185 14.5949L8.9075 9.24884L8.0035 9.51415L6.13906 14.5954L4.91353 14.0702L6.4135 9.98215L2.51275 11.1297L1.3335 8.77118L12.49 1.3335Z\" fill=\"currentColor\"/>
+    </svg>`,
+    },
+    {
+      id: "all",
+      label: "Tất cả",
+      to: "/all",
+      icon: `<svg width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><g clip-path=\"url(#clip0_20_165)\"><path d=\"M23.25 21.25C23.25 22.35 22.35 23.25 21.25 23.25H2.75C1.65 23.25 0.75 22.35 0.75 21.25V2.75C0.75 1.65 1.65 0.75 2.75 0.75H21.25C22.35 0.75 23.25 1.65 23.25 2.75V21.25Z\" stroke=\"currentColor\" stroke-opacity=\"0.7\" stroke-width=\"1.5\" stroke-miterlimit=\"10\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M7.44971 18.4499C7.44971 19.0499 7.04971 19.4499 6.44971 19.4499H5.44971C4.84971 19.4499 4.44971 19.0499 4.44971 18.4499V15.6499C4.44971 15.0499 4.84971 14.6499 5.44971 14.6499H6.44971C7.04971 14.6499 7.44971 15.0499 7.44971 15.6499V18.4499Z\" stroke=\"currentColor\" stroke-opacity=\"0.7\" stroke-width=\"1.5\" stroke-miterlimit=\"10\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M13.4502 18.4499C13.4502 19.0499 13.0502 19.4499 12.4502 19.4499H11.4502C10.8502 19.4499 10.4502 19.0499 10.4502 18.4499V6.6499C10.4502 6.0499 10.8502 5.6499 11.4502 5.6499H12.4502C13.0502 5.6499 13.4502 6.0499 13.4502 6.6499V18.4499Z\" stroke=\"currentColor\" stroke-opacity=\"0.7\" stroke-width=\"1.5\" stroke-miterlimit=\"10\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M19.4502 18.4499C19.4502 19.0499 19.0502 19.4499 18.4502 19.4499H17.4502C16.8502 19.4499 16.4502 19.0499 16.4502 18.4499V11.6499C16.4502 11.0499 16.8502 10.6499 17.4502 10.6499H18.4502C19.0502 10.6499 19.4502 11.0499 19.4502 11.6499V18.4499Z\" stroke=\"currentColor\" stroke-opacity=\"0.7\" stroke-width=\"1.5\" stroke-miterlimit=\"10\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></g><defs><clipPath id=\"clip0_20_165\"><rect width=\"24\" height=\"24\" fill=\"white\"/></clipPath></defs></svg>`,
+    },
+  ];
+
+  let isSidebarCompact = false;
+
+  let topbarUser:
+    | { name: string; avatar?: string; karma?: number }
+    | undefined = undefined;
+
+  let isAuthChecking = true;
+
+  // Validate auth khi app khởi động
+  onMount(async () => {
+    await validateAuth();
+    isAuthChecking = false;
+  });
+
+  // Listen event từ token.ts khi refresh token thành công
+  onMount(() => {
+    const handleAuthRefreshed = () => {
+      authStore.set(getInitialAuthState());
+    };
+
+    const handleAuthUnauthorized = () => {
+      logout();
+    };
+
+    window.addEventListener("auth:refreshed", handleAuthRefreshed);
+    window.addEventListener("auth:unauthorized", handleAuthUnauthorized);
+
+    return () => {
+      window.removeEventListener("auth:refreshed", handleAuthRefreshed);
+      window.removeEventListener("auth:unauthorized", handleAuthUnauthorized);
+    };
+  });
+
+  // Subscribe to authStore để update realtime khi login/logout
+  authStore.subscribe((state) => {
+    if (state.user) {
+      console.log("User data in authStore:", state.user);
+      topbarUser = {
+        name: state.user.username || state.user.email || "User",
+        avatar: state.user.profile?.avatar?.url,
+        karma: state.user.reputation || 0,
+      };
+      console.log("Topbar user:", topbarUser);
+    } else {
+      topbarUser = undefined;
+    }
+  });
+
+  function handleLogout() {
+    logout();
+  }
+
+  function handleNavigate(item: any) {
+    push(item.to);
+  }
 </script>
 
-<main>
-  <div>
-    <a href="https://vite.dev" target="_blank" rel="noreferrer">
-      <img src={viteLogo} class="logo" alt="Vite Logo" />
-    </a>
-    <a href="https://svelte.dev" target="_blank" rel="noreferrer">
-      <img src={svelteLogo} class="logo svelte" alt="Svelte Logo" />
-    </a>
+{#if isAuthChecking}
+  <div class="loading-screen">
+    <div class="loading-spinner"></div>
+    <p>Đang kiểm tra đăng nhập...</p>
   </div>
-  <h1>Vite + Svelte</h1>
+{:else}
+  <div class="app-layout">
+    <Topbar user={topbarUser} onLogout={handleLogout} />
 
-  <div class="card">
-    <Counter />
+    <Sidebar
+      items={sidebarItems}
+      onNavigate={handleNavigate}
+      bind:compact={isSidebarCompact}
+    />
+
+    <main class="main-content" data-compact={isSidebarCompact}>
+      <Router {routes} />
+    </main>
   </div>
-
-  <p>
-    Check out <a href="https://github.com/sveltejs/kit#readme" target="_blank" rel="noreferrer">SvelteKit</a>, the official Svelte app framework powered by Vite!
-  </p>
-
-  <p class="read-the-docs">
-    Click on the Vite and Svelte logos to learn more
-  </p>
-</main>
+  <ToastContainer />
+{/if}
 
 <style>
-  .logo {
-    height: 6em;
-    padding: 1.5em;
-    will-change: filter;
-    transition: filter 300ms;
+  :root {
+    --sidebar-width: 256px;
+    --sidebar-compact-width: 64px;
+    --topbar-height: 56px;
   }
-  .logo:hover {
-    filter: drop-shadow(0 0 2em #646cffaa);
+
+  .loading-screen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    background-color: white;
   }
-  .logo.svelte:hover {
-    filter: drop-shadow(0 0 2em #ff3e00aa);
+
+  .loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #ff4500;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
   }
-  .read-the-docs {
-    color: #888;
+
+  @keyframes spin {
+    0% {
+      transform: rotate(0deg);
+    }
+    100% {
+      transform: rotate(360deg);
+    }
+  }
+
+  .loading-screen p {
+    margin-top: 16px;
+    color: #666;
+    font-size: 14px;
+  }
+
+  .app-layout {
+    position: relative;
+    min-height: 100vh;
+    background-color: white;
+  }
+
+  .main-content {
+    margin-left: var(--sidebar-width);
+    transition: margin-left 0.2s ease;
+    padding-top: var(--topbar-height);
+    padding-right: 0;
+    padding-left: 0;
+    padding-bottom: 0;
+    min-height: 100vh;
+    box-sizing: border-box;
+    overflow-y: auto;
+  }
+
+  .main-content[data-compact="true"] {
+    margin-left: var(--sidebar-compact-width);
+  }
+
+  @media (max-width: 768px) {
+    .main-content {
+      margin-left: 0;
+    }
   }
 </style>

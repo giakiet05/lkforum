@@ -1,0 +1,13 @@
+./analysis.go
+./api.go
+./asset.go
+./assets.go
+./folders.go
+./metadata_fields.go
+./misc.go
+./search.go
+./search_folders.go
+./streaming_profiles.go
+./transformations.go
+./upload_mappings.go
+./upload_presets.go
