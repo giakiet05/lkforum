@@ -17,12 +17,14 @@ import GoogleCallback from './pages/GoogleCallback.svelte';
 import GoogleSetup from './pages/GoogleSetup.svelte';
 import AuthError from './pages/AuthError.svelte';
 import ForgotPassword from './pages/ForgotPassword.svelte';
+import Search from './pages/Search.svelte';
 
 const routes = {
     '/': Home,
     '/popular': Popular,
     '/explore': Explore,
     '/all': All,
+    '/search': Search,
     '/login': Login,
     '/register': Register,
     '/forgot-password': ForgotPassword,

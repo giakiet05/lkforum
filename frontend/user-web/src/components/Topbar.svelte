@@ -268,6 +268,29 @@
         <img src="/LKlogo.svg" alt="LKForum" class="brand-icon" />
         <span class="brand-name">LKForum</span>
       </div>
+
+      <!-- Search icon for mobile -->
+      <button
+        class="search-icon-button"
+        onclick={() => push("/search")}
+        aria-label="Tìm kiếm"
+      >
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <circle
+            cx="8.5"
+            cy="8.5"
+            r="5.5"
+            stroke="currentColor"
+            stroke-width="2"
+          />
+          <path
+            d="M12.5 12.5L17 17"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+          />
+        </svg>
+      </button>
     </div>
 
     <div class="topbar-center">
@@ -893,6 +916,24 @@
     color: var(--topbar-foreground);
   }
 
+  .search-icon-button {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border: none;
+    background: transparent;
+    color: var(--topbar-foreground);
+    cursor: pointer;
+    border-radius: 8px;
+    transition: background 0.2s;
+  }
+
+  .search-icon-button:hover {
+    background: var(--topbar-search-background);
+  }
+
   .notification-badge {
     position: absolute;
     top: 4px;
@@ -1060,6 +1101,10 @@
     }
 
     .menu-button {
+      display: flex;
+    }
+
+    .search-icon-button {
       display: flex;
     }
 
