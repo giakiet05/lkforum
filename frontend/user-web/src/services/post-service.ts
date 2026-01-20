@@ -30,7 +30,7 @@ export async function getPosts(query?: GetPostsQuery): Promise<PostResponse[]> {
     const queryString = params.toString();
     const url = queryString ? `/api/posts?${queryString}` : "/api/posts";
 
-    const res = await authenticatedFetch(url, {
+    const res = await publicFetch(url, {
         method: "GET",
     });
 
