@@ -222,8 +222,7 @@ func Init() (*gin.Engine, error) {
 
 	router.Use(func(c *gin.Context) {
 		origin := c.Request.Header.Get("Origin")
-		allowedOrigins := []string{"http://localhost:5173", "http://localhost:5174"}
-		for _, allowedOrigin := range allowedOrigins {
+		for _, allowedOrigin := range config.Cfg.AllowedOrigins {
 			if origin == allowedOrigin {
 				c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
 				break

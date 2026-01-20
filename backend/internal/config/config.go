@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/joho/godotenv"
 )
@@ -19,6 +20,7 @@ type AppConfig struct {
 	TokenTTL             int
 	RefreshTokenTTL      int
 	FrontendURL          string
+	AllowedOrigins       []string
 	OTPExpirationMinutes int
 	SMTP                 SMTPConfig
 	Redis                RedisConfig
@@ -85,6 +87,7 @@ func LoadConfig() {
 	Cfg.MongoURI = getEnv("MONGO_URI", "mongodb://localhost:27017")
 	Cfg.DBName = getEnv("DB_NAME", "lkforum")
 	Cfg.FrontendURL = getEnv("FRONTEND_URL", "http://localhost:5173")
+	Cfg.AllowedOrigins = getEnvSlice("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:5174")
 
 	// JWT
 	Cfg.JWTSecret = getEnv("JWT_SECRET", "your-secret-key")
@@ -153,4 +156,18 @@ func getEnvFloat(key string, defaultValue float64) float64 {
 		}
 	}
 	return defaultValue
+}
+
+// Helper function to get comma-separated environment variable as slice
+func getEnvSlice(key, defaultValue string) []string {
+	value := getEnv(key, defaultValue)
+	parts := strings.Split(value, ",")
+	result := make([]string, 0, len(parts))
+	for _, part := range parts {
+		trimmed := strings.TrimSpace(part)
+		if trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+	return result
 }
