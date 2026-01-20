@@ -1172,4 +1172,71 @@
     font-size: 16px;
     color: #878a8c;
   }
+  
+  /* Mobile responsive */
+  @media (max-width: 768px) {
+    .post-detail-page {
+      padding: 0;
+      max-width: 100%;
+    }
+    
+    .back-btn {
+      margin: 8px;
+      padding: 6px 10px;
+      font-size: 13px;
+    }
+    
+    .post-detail-container {
+      border-radius: 0;
+      border-left: none;
+      border-right: none;
+    }
+    
+    .post-main {
+      padding: 12px 16px;
+    }
+    
+    .post-header {
+      font-size: 11px;
+      margin-bottom: 10px;
+    }
+    
+    .post-title {
+      font-size: 18px;
+    }
+    
+    .post-footer {
+      padding: 8px 16px;
+      gap: 4px;
+    }
+    
+    .action-button {
+      padding: 6px 8px;
+      font-size: 12px;
+      gap: 4px;
+    }
+  }
+  
+  @media (max-width: 480px) {
+    .post-main {
+      padding: 10px 12px;
+    }
+    
+    .post-title {
+      font-size: 16px;
+    }
+    
+    .text-content {
+      font-size: 13px;
+    }
+    
+    .action-button span {
+      display: none;
+    }
+    
+    .action-button {
+      padding: 6px;
+      min-width: 32px;
+    }
+  }
 </style>

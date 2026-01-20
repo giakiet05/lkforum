@@ -184,6 +184,11 @@
   @media (max-width: 768px) {
     .main-content {
       margin-left: 0;
+      padding-top: var(--topbar-height);
+    }
+    
+    .main-content[data-compact="true"] {
+      margin-left: 0;
     }
   }
 </style>

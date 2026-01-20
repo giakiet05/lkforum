@@ -81,7 +81,21 @@
 
 <style>
   .page-container {
-    padding: 16px 24px;
+    max-width: var(--max-width-content, 1280px);
+    margin: 0 auto;
+    padding: 20px;
+  }
+
+  @media (max-width: 1024px) {
+    .page-container {
+      padding: 16px;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .page-container {
+      padding: 12px;
+    }
   }
 
   .page-title {

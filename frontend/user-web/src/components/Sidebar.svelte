@@ -332,9 +332,27 @@
 
   @media (max-width: 768px) {
     .sidebar {
+      transform: translateX(-100%);
       top: var(--topbar-height);
-      width: 100%;
-      max-width: 320px;
+      width: 280px;
+      max-width: 80vw;
+      transition: transform 0.3s ease;
+      z-index: 190;
+      box-shadow: 2px 0 8px rgba(0,0,0,0.1);
+    }
+    
+    .sidebar.open {
+      transform: translateX(0);
+    }
+    
+    .sidebar.compact {
+      transform: translateX(-100%);
+    }
+  }
+  
+  @media (max-width: 480px) {
+    .sidebar {
+      width: 260px;
     }
   }
 </style>

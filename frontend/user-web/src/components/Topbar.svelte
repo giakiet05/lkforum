@@ -995,14 +995,57 @@
   }
 
   @media (max-width: 640px) {
+    .topbar-container {
+      padding: 0 8px;
+      gap: 8px;
+    }
+    
     .brand-name {
       display: none;
     }
-    .topbar-search {
-      max-width: none;
+    
+    .brand-icon {
+      width: 32px;
+      height: 32px;
     }
+    
+    .topbar-center {
+      display: none; /* Hide search on mobile */
+    }
+    
+    .topbar-right {
+      gap: 4px;
+    }
+    
     .button-text {
       display: none;
+    }
+    
+    .topbar-btn {
+      padding: 6px;
+      min-width: 36px;
+    }
+    
+    .user-avatar {
+      width: 32px;
+      height: 32px;
+    }
+  }
+  
+  @media (max-width: 480px) {
+    .topbar-container {
+      padding: 0 4px;
+      gap: 4px;
+    }
+    
+    .topbar-btn {
+      padding: 4px;
+      min-width: 32px;
+    }
+    
+    .create-post-btn {
+      padding: 6px 12px;
+      font-size: 13px;
     }
   }
 </style>
