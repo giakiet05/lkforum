@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+
+# Disallow admin pages (if any)
+Disallow: /admin
+Disallow: /#/settings
+
+# Sitemap location
+Sitemap: https://lkforum.giakiet.io.vn/sitemap.xml
