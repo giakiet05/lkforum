@@ -1,5 +1,5 @@
 <script lang="ts">
-  import Router from "svelte-spa-router";
+  import Router, { location } from "svelte-spa-router";
   import routes from "./routes";
   import Topbar from "./components/Topbar.svelte";
   import Sidebar from "./components/Sidebar.svelte";
@@ -43,10 +43,11 @@
   let isSidebarCompact = false;
   let isSidebarOpen = $state(false);
   let shouldShowAuthModal = $state(false);
+  let isSearchPage = $derived($location === "/search");
 
-  let topbarUser:
-    | { name: string; avatar?: string; karma?: number }
-    | undefined = undefined;
+  let topbarUser = $state<
+    { name: string; avatar?: string; karma?: number } | undefined
+  >(undefined);
 
   let isAuthChecking = $state(true);
 
@@ -114,24 +115,30 @@
     <p>Đang kiểm tra đăng nhập...</p>
   </div>
 {:else}
-  <div class="app-layout">
-    <Topbar
-      user={topbarUser}
-      onLogout={handleLogout}
-      onMenuClick={() => (isSidebarOpen = !isSidebarOpen)}
-      forceShowAuthModal={shouldShowAuthModal}
-      onAuthModalClose={() => (shouldShowAuthModal = false)}
-    />
+  <div class="app-layout" class:search-page={isSearchPage}>
+    {#if !isSearchPage}
+      <Topbar
+        user={topbarUser}
+        onLogout={handleLogout}
+        onMenuClick={() => (isSidebarOpen = !isSidebarOpen)}
+        forceShowAuthModal={shouldShowAuthModal}
+        onAuthModalClose={() => (shouldShowAuthModal = false)}
+      />
 
-    <Sidebar
-      items={sidebarItems}
-      onNavigate={handleNavigate}
-      bind:compact={isSidebarCompact}
-      isOpen={isSidebarOpen}
-      onClose={() => (isSidebarOpen = false)}
-    />
+      <Sidebar
+        items={sidebarItems}
+        onNavigate={handleNavigate}
+        bind:compact={isSidebarCompact}
+        isOpen={isSidebarOpen}
+        onClose={() => (isSidebarOpen = false)}
+      />
+    {/if}
 
-    <main class="main-content" data-compact={isSidebarCompact}>
+    <main
+      class="main-content"
+      data-compact={isSidebarCompact}
+      class:full-width={isSearchPage}
+    >
       <Router {routes} />
     </main>
   </div>
@@ -184,6 +191,10 @@
     background-color: white;
   }
 
+  .app-layout.search-page {
+    padding-top: 0;
+  }
+
   .main-content {
     margin-left: var(--sidebar-width);
     transition: margin-left 0.2s ease;
@@ -194,6 +205,11 @@
     min-height: 100vh;
     box-sizing: border-box;
     overflow-y: auto;
+  }
+
+  .main-content.full-width {
+    margin-left: 0;
+    padding-top: 0;
   }
 
   .main-content[data-compact="true"] {

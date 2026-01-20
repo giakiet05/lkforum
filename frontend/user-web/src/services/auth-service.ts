@@ -107,7 +107,13 @@ export async function logout() {
     const accessToken = localStorage.getItem(ACCESS_TOKEN_KEY);
     const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
 
-    // Only call logout API if we have valid tokens
+    // Clear local state immediately for instant UI update
+    localStorage.removeItem(ACCESS_TOKEN_KEY);
+    localStorage.removeItem(REFRESH_TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
+    clearAuth();
+
+    // Only call logout API if we have valid tokens (in background)
     if (accessToken && refreshToken) {
         const req: LogoutRequest = {
             access_token: accessToken,
@@ -121,19 +127,9 @@ export async function logout() {
             })
             await handleApiResponse(res);
         } catch (error) {
-            // Even if logout API fails, we still clear local auth
+            // Already cleared local auth above
             console.error("Logout API failed:", error);
         }
-    }
-
-    localStorage.removeItem(ACCESS_TOKEN_KEY);
-    localStorage.removeItem(REFRESH_TOKEN_KEY);
-    localStorage.removeItem(USER_KEY);
-    clearAuth();
-    
-    // Redirect to home only if not already there
-    if (window.location.pathname !== "/" && !window.location.hash.includes("#/")) {
-        window.location.href = "/";
     }
 }
 
