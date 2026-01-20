@@ -80,13 +80,13 @@
 
   const filteredCommunities = $derived(
     allCommunities.filter((c) =>
-      c.name.toLowerCase().includes(communitySearchQuery.toLowerCase())
-    )
+      c.name.toLowerCase().includes(communitySearchQuery.toLowerCase()),
+    ),
   );
 
   // Get selected community details
   const selectedCommunityData = $derived(
-    allCommunities.find((c) => c.name === selectedCommunity)
+    allCommunities.find((c) => c.name === selectedCommunity),
   );
 
   function handleClose() {
@@ -144,7 +144,7 @@
       // Set community if available
       if (draft.community_id) {
         const community = allCommunities.find(
-          (c) => c.id === draft.community_id
+          (c) => c.id === draft.community_id,
         );
         if (community) {
           selectedCommunity = community.name;
@@ -207,7 +207,7 @@
             allow_multiple: allowMultiple,
             expires_at: pollDuration
               ? new Date(
-                  Date.now() + parseInt(pollDuration) * 24 * 60 * 60 * 1000
+                  Date.now() + parseInt(pollDuration) * 24 * 60 * 60 * 1000,
                 ).toISOString()
               : undefined,
           };
@@ -379,7 +379,7 @@
 
     const files = Array.from(e.dataTransfer?.files || []);
     const imageFiles = files.filter(
-      (f) => f.type.startsWith("image/") || f.type.startsWith("video/")
+      (f) => f.type.startsWith("image/") || f.type.startsWith("video/"),
     );
     mediaFiles = [...mediaFiles, ...imageFiles];
   }
@@ -1289,53 +1289,53 @@
   .post-btn:hover:not(:disabled) {
     background: var(--darkblue--);
   }
-  
+
   /* Mobile responsive */
   @media (max-width: 768px) {
     .modal-overlay {
       padding: var(--topbar-height) 0 0;
       align-items: stretch;
     }
-    
+
     .modal-content {
       border-radius: 0;
       padding: 16px;
       max-width: 100%;
       min-height: 100vh;
     }
-    
+
     .modal-header h2 {
       font-size: 18px;
     }
-    
+
     .tab-button {
       padding: 8px 12px;
       font-size: 13px;
     }
-    
+
     .post-input {
       font-size: 16px; /* Prevent zoom on iOS */
     }
   }
-  
+
   @media (max-width: 480px) {
     .modal-content {
       padding: 12px;
     }
-    
+
     .modal-header {
       margin-bottom: 16px;
     }
-    
+
     .modal-header h2 {
       font-size: 16px;
     }
-    
+
     .modal-actions {
       margin-top: 16px;
       gap: 8px;
     }
-    
+
     .save-draft-btn,
     .post-btn {
       padding: 8px 16px;

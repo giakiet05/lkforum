@@ -101,7 +101,7 @@
 
     try {
       console.log(
-        `🔍 Loading posts for community: ${community.name} (${community.id})`
+        `🔍 Loading posts for community: ${community.name} (${community.id})`,
       );
       isLoadingPosts = true;
       postsError = null;
@@ -146,7 +146,7 @@
       isCheckingMembership = true;
       isJoined = await checkMembershipAPI(currentUser.id, community.id);
       console.log(
-        `✅ Membership status: ${isJoined ? "Joined" : "Not joined"}`
+        `✅ Membership status: ${isJoined ? "Joined" : "Not joined"}`,
       );
     } catch (error) {
       console.error("❌ Failed to check membership:", error);
@@ -243,7 +243,7 @@
     } catch (error) {
       console.error("❌ Failed to toggle membership:", error);
       toastStore.error(
-        error instanceof Error ? error.message : "Failed to update membership"
+        error instanceof Error ? error.message : "Failed to update membership",
       );
     } finally {
       isTogglingMembership = false;
@@ -313,7 +313,7 @@
     } catch (error) {
       console.error("❌ Failed to add moderator:", error);
       toastStore.error(
-        "Failed to add moderator. Please check the username and try again."
+        "Failed to add moderator. Please check the username and try again.",
       );
     }
   }
@@ -1444,84 +1444,85 @@
       order: -1;
     }
   }
-  
+
   @media (max-width: 768px) {
     .community-page {
       padding: 0;
     }
-    
+
     .community-banner {
       height: 120px;
     }
-    
+
     .community-header {
       padding: 12px 16px;
     }
-    
+
     .community-avatar {
       width: 60px;
       height: 60px;
       margin-top: -30px;
     }
-    
+
     .community-info {
       gap: 8px;
     }
-    
+
     .community-name {
       font-size: 18px;
     }
-    
+
     .community-description {
       font-size: 13px;
     }
-    
+
     .community-container {
-      padding: 12px 8px;
+      padding: 0;
       gap: 12px;
     }
-    
+
     .community-sidebar {
       display: none;
     }
-    
+
     .sort-tabs {
       gap: 8px;
-      padding: 0 8px;
+      padding: 0;
       overflow-x: auto;
       -webkit-overflow-scrolling: touch;
     }
-    
+
     .sort-tab {
       padding: 6px 12px;
       font-size: 13px;
       white-space: nowrap;
     }
   }
-  
+
   @media (max-width: 480px) {
     .community-banner {
       height: 100px;
     }
-    
+
     .community-header {
       padding: 8px 12px;
       flex-direction: column;
       align-items: flex-start;
       gap: 12px;
     }
-    
+
     .community-avatar {
       width: 50px;
       height: 50px;
       margin-top: -25px;
     }
-    
+
     .community-name {
       font-size: 16px;
     }
-    
-    .join-button, .settings-button {
+
+    .join-button,
+    .settings-button {
       padding: 6px 16px;
       font-size: 13px;
     }

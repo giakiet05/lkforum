@@ -41,17 +41,27 @@
   ];
 
   let isSidebarCompact = false;
+  let isSidebarOpen = $state(false);
+  let shouldShowAuthModal = $state(false);
 
   let topbarUser:
     | { name: string; avatar?: string; karma?: number }
     | undefined = undefined;
 
-  let isAuthChecking = true;
+  let isAuthChecking = $state(true);
 
   // Validate auth khi app khởi động
   onMount(async () => {
-    await validateAuth();
-    isAuthChecking = false;
+    console.log("App mounted - starting auth check");
+    try {
+      await validateAuth();
+      console.log("Auth validation completed");
+    } catch (error) {
+      console.error("Auth validation error:", error);
+    } finally {
+      isAuthChecking = false;
+      console.log("isAuthChecking set to false");
+    }
   });
 
   // Listen event từ token.ts khi refresh token thành công
@@ -62,6 +72,7 @@
 
     const handleAuthUnauthorized = () => {
       logout();
+      shouldShowAuthModal = true;
     };
 
     window.addEventListener("auth:refreshed", handleAuthRefreshed);
@@ -104,12 +115,20 @@
   </div>
 {:else}
   <div class="app-layout">
-    <Topbar user={topbarUser} onLogout={handleLogout} />
+    <Topbar
+      user={topbarUser}
+      onLogout={handleLogout}
+      onMenuClick={() => (isSidebarOpen = !isSidebarOpen)}
+      forceShowAuthModal={shouldShowAuthModal}
+      onAuthModalClose={() => (shouldShowAuthModal = false)}
+    />
 
     <Sidebar
       items={sidebarItems}
       onNavigate={handleNavigate}
       bind:compact={isSidebarCompact}
+      isOpen={isSidebarOpen}
+      onClose={() => (isSidebarOpen = false)}
     />
 
     <main class="main-content" data-compact={isSidebarCompact}>
@@ -181,12 +200,12 @@
     margin-left: var(--sidebar-compact-width);
   }
 
-  @media (max-width: 768px) {
+  @media (max-width: 1024px) {
     .main-content {
       margin-left: 0;
       padding-top: var(--topbar-height);
     }
-    
+
     .main-content[data-compact="true"] {
       margin-left: 0;
     }

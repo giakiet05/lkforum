@@ -169,6 +169,12 @@
     padding: 20px;
   }
 
+  @media (max-width: 768px) {
+    .edit-post-page {
+      padding: 12px;
+    }
+  }
+
   .loading,
   .error {
     text-align: center;

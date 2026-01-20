@@ -94,7 +94,15 @@
 
   @media (max-width: 768px) {
     .page-container {
-      padding: 12px;
+      padding: 0;
+    }
+
+    .page-title {
+      padding: 0 12px;
+    }
+
+    .sort-options {
+      margin-left: 12px;
     }
   }
 

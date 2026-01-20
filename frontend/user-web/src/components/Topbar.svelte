@@ -18,6 +18,9 @@
     onCreatePost?: () => void;
     onNotificationClick?: () => void;
     onLogout?: () => void;
+    onMenuClick?: () => void;
+    forceShowAuthModal?: boolean;
+    onAuthModalClose?: () => void;
   };
 
   let {
@@ -27,6 +30,9 @@
     onCreatePost,
     onNotificationClick,
     onLogout,
+    onMenuClick,
+    forceShowAuthModal = false,
+    onAuthModalClose,
   }: TopbarProps = $props();
 
   let searchQuery = $state("");
@@ -37,6 +43,13 @@
   let showChatPopup = $state(false);
   let dropdownElement = $state<HTMLDivElement | null>(null);
   let unreadNotificationCount = $state(0);
+
+  // Watch forceShowAuthModal prop and open modal when true
+  $effect(() => {
+    if (forceShowAuthModal) {
+      showAuthModal = true;
+    }
+  });
 
   // Load unread notification count on mount
   onMount(async () => {
@@ -235,6 +248,22 @@
 <header class="topbar">
   <div class="topbar-container">
     <div class="topbar-left">
+      <!-- Hamburger menu for mobile -->
+      <button
+        class="menu-button"
+        onclick={() => onMenuClick?.()}
+        aria-label="Menu"
+      >
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+          <path
+            d="M3 12H21M3 6H21M3 18H21"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+          />
+        </svg>
+      </button>
+
       <div class="brand" role="button" tabindex="0" onclick={() => {}}>
         <img src="/LKlogo.svg" alt="LKForum" class="brand-icon" />
         <span class="brand-name">LKForum</span>
@@ -343,63 +372,61 @@
 
     <div class="topbar-right">
       <div class="topbar-actions">
-        <button
-          type="button"
-          class="create-button"
-          onclick={handleCreatePostClick}
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path
-              d="M8 3V13M3 8H13"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-            />
-          </svg>
-          <span class="button-text">Tạo</span>
-        </button>
+        {#if user}
+          <button
+            type="button"
+            class="create-button"
+            onclick={handleCreatePostClick}
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path
+                d="M8 3V13M3 8H13"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+              />
+            </svg>
+            <span class="button-text">Tạo</span>
+          </button>
 
-        <button
-          type="button"
-          class="icon-button notification-btn"
-          onclick={() => (showNotifications = !showNotifications)}
-          title="Thông báo"
-          aria-label="Thông báo"
-        >
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-            <path
-              d="M10 3C7.79 3 6 4.79 6 7V10L4 12V13H16V12L14 10V7C14 4.79 12.21 3 10 3Z"
-              stroke="currentColor"
-              stroke-width="1.5"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-            <path
-              d="M8.5 16C8.5 16.8284 9.17157 17.5 10 17.5C10.8284 17.5 11.5 16.8284 11.5 16"
-              stroke="currentColor"
-              stroke-width="1.5"
-              stroke-linecap="round"
-            />
-          </svg>
-          {#if unreadNotificationCount > 0}
-            <span class="notification-badge">{unreadNotificationCount}</span>
-          {/if}
+          <button
+            type="button"
+            class="icon-button notification-btn"
+            onclick={() => (showNotifications = !showNotifications)}
+            title="Thông báo"
+            aria-label="Thông báo"
+          >
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+              <path
+                d="M10 3C7.79 3 6 4.79 6 7V10L4 12V13H16V12L14 10V7C14 4.79 12.21 3 10 3Z"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+              <path
+                d="M8.5 16C8.5 16.8284 9.17157 17.5 10 17.5C10.8284 17.5 11.5 16.8284 11.5 16"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+              />
+            </svg>
+            {#if unreadNotificationCount > 0}
+              <span class="notification-badge">{unreadNotificationCount}</span>
+            {/if}
 
-          <NotificationsDropdown
-            show={showNotifications}
-            onClose={() => (showNotifications = false)}
-            onUnreadCountChange={(count) => (unreadNotificationCount = count)}
-          />
-        </button>
-
-        <!-- Messages Button -->
-        <button
-          class="icon-button"
-          onclick={() => (showChatPopup = true)}
-          title="Tin nhắn"
-        >
-          <img src="/message_icon.svg" alt="Messages" width="24" height="24" />
-        </button>
+            <NotificationsDropdown
+              show={showNotifications}
+              onClose={() => (showNotifications = false)}
+              onUnreadCountChange={(count) => (unreadNotificationCount = count)}
+            />
+          </button>
+        {:else}
+          <!-- Login button -->
+          <button class="login-button" onclick={() => (showAuthModal = true)}>
+            Đăng nhập
+          </button>
+        {/if}
 
         {#if user}
           <div class="user-menu-wrapper">
@@ -530,19 +557,22 @@
               </div>
             {/if}
           </div>
-        {:else}
-          <button class="login-button" onclick={() => (showAuthModal = true)}
-            >Đăng nhập</button
-          >
-          <AuthModal
-            show={showAuthModal}
-            onClose={() => (showAuthModal = false)}
-          />
         {/if}
       </div>
     </div>
   </div>
 </header>
+
+<!-- Auth Modal for both authenticated and unauthenticated users -->
+<AuthModal
+  show={showAuthModal}
+  onClose={() => {
+    showAuthModal = false;
+    if (onAuthModalClose) {
+      onAuthModalClose();
+    }
+  }}
+/>
 
 <CreatePostModal
   show={showCreatePostModal}
@@ -594,8 +624,26 @@
   .topbar-left {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 8px;
     flex: 0 0 auto;
+  }
+
+  .menu-button {
+    display: none;
+    width: 40px;
+    height: 40px;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    color: var(--topbar-foreground);
+    transition: background 0.2s ease;
+  }
+
+  .menu-button:hover {
+    background: var(--topbar-search-background);
   }
 
   .topbar-center {
@@ -834,10 +882,15 @@
     border-radius: 8px;
     cursor: pointer;
     background: transparent;
+    color: var(--topbar-foreground);
   }
 
   .icon-button:hover {
     background: var(--topbar-search-background);
+  }
+
+  .menu-dots {
+    color: var(--topbar-foreground);
   }
 
   .notification-badge {
@@ -994,55 +1047,66 @@
     }
   }
 
+  @media (max-width: 1024px) {
+    .menu-button {
+      display: flex;
+    }
+  }
+
   @media (max-width: 640px) {
     .topbar-container {
       padding: 0 8px;
       gap: 8px;
     }
-    
+
+    .menu-button {
+      display: flex;
+    }
+
     .brand-name {
       display: none;
     }
-    
+
     .brand-icon {
       width: 32px;
       height: 32px;
     }
-    
+
     .topbar-center {
-      display: none; /* Hide search on mobile */
+      display: none;
     }
-    
+
     .topbar-right {
       gap: 4px;
+      margin-left: auto;
     }
-    
+
     .button-text {
       display: none;
     }
-    
+
     .topbar-btn {
       padding: 6px;
       min-width: 36px;
     }
-    
+
     .user-avatar {
       width: 32px;
       height: 32px;
     }
   }
-  
+
   @media (max-width: 480px) {
     .topbar-container {
       padding: 0 4px;
       gap: 4px;
     }
-    
+
     .topbar-btn {
       padding: 4px;
       min-width: 32px;
     }
-    
+
     .create-post-btn {
       padding: 6px 12px;
       font-size: 13px;

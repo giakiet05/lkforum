@@ -16,6 +16,8 @@
     activeRoute?: string;
     onNavigate?: (item: SidebarItem) => void;
     onToggleCompact?: () => void;
+    isOpen?: boolean;
+    onClose?: () => void;
   };
 
   let {
@@ -24,6 +26,8 @@
     activeRoute = "",
     onNavigate,
     onToggleCompact,
+    isOpen = false,
+    onClose,
   }: SidebarProps = $props();
 
   let expandedGroups = $state(new Set<string>());
@@ -55,9 +59,22 @@
     const current = activeRoute || derived || "";
     return item.to === current;
   }
+
+  function handleOverlayClick() {
+    onClose?.();
+  }
 </script>
 
-<aside class="sidebar" class:compact>
+<!-- Mobile overlay -->
+{#if isOpen}
+  <div
+    class="sidebar-overlay"
+    onclick={handleOverlayClick}
+    role="presentation"
+  ></div>
+{/if}
+
+<aside class="sidebar" class:compact class:open={isOpen}>
   <!-- header removed: brand/logo handled by topbar now -->
 
   <nav class="sidebar-nav">
@@ -330,7 +347,22 @@
     color: hsl(var(--sidebar-foreground));
   }
 
-  @media (max-width: 768px) {
+  .sidebar-overlay {
+    position: fixed;
+    top: var(--topbar-height);
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 189;
+    display: none;
+  }
+
+  @media (max-width: 1024px) {
+    .sidebar-overlay {
+      display: block;
+    }
+
     .sidebar {
       transform: translateX(-100%);
       top: var(--topbar-height);
@@ -338,18 +370,18 @@
       max-width: 80vw;
       transition: transform 0.3s ease;
       z-index: 190;
-      box-shadow: 2px 0 8px rgba(0,0,0,0.1);
+      box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
     }
-    
+
     .sidebar.open {
       transform: translateX(0);
     }
-    
+
     .sidebar.compact {
       transform: translateX(-100%);
     }
   }
-  
+
   @media (max-width: 480px) {
     .sidebar {
       width: 260px;

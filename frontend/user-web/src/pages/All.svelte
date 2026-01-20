@@ -81,6 +81,16 @@
     padding: 16px 24px;
   }
 
+  @media (max-width: 768px) {
+    .page-container {
+      padding: 0;
+    }
+
+    .page-title {
+      padding: 0 12px;
+    }
+  }
+
   .page-title {
     font-size: 24px;
     font-weight: 700;

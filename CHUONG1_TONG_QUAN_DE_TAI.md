@@ -34,6 +34,8 @@ Cần có một nền tảng diễn đàn cho phép:
 - Xác thực an toàn với email OTP và Google OAuth
 - Giao diện đơn giản, responsive trên mọi thiết bị
 - Tin nhắn real-time giữa người dùng
+- Không chèn quảng cáo
+- Phù hợp với cộng đồng nhỏ
 
 ## 1.2. NỘI DUNG VÀ PHẠM VI ĐỀ TÀI
 
