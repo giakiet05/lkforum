@@ -31,12 +31,12 @@
   // Check if user has voted based on backend data
   const hasVoted = $derived(
     post.content.poll?.user_vote_ids &&
-      post.content.poll.user_vote_ids.length > 0
+      post.content.poll.user_vote_ids.length > 0,
   );
 
   // Vote state
   let userVote = $state<"up" | "down" | "">(
-    (post.user_vote as "up" | "down" | "") || ""
+    (post.user_vote as "up" | "down" | "") || "",
   );
   let votesCount = $state(post.votes_count?.score || 0);
   let isVoting = $state(false);
@@ -59,7 +59,7 @@
   const isCreator = $derived(communityData?.create_by_id === currentUser?.id);
   const isModerator = $derived(
     communityData?.moderators?.some((mod) => mod.user_id === currentUser?.id) ||
-      false
+      false,
   );
   const canDelete = $derived(isOwnPost || isAdmin || isCreator || isModerator);
 
@@ -568,7 +568,7 @@
           <div class="poll-options">
             {#each post.content.poll.options as option}
               {@const isVotedOption = post.content.poll.user_vote_ids?.includes(
-                option.id
+                option.id,
               )}
               <button
                 class="poll-option"
@@ -755,7 +755,9 @@
     font-family: Arial, sans-serif;
     cursor: pointer;
     transition: border-color 0.2s;
+    max-width: 100%;
   }
+
   .post-container:hover {
     border-color: var(--button-secondary-background);
   }
@@ -1362,6 +1364,78 @@
 
   .btn-submit:disabled {
     opacity: 0.5;
-    cursor: not-allowed;
+    cursor: not-started;
+  }
+
+  /* Mobile responsive */
+  @media (max-width: 768px) {
+    .post-container {
+      margin-bottom: 8px;
+      border-radius: 0;
+      border-left: none;
+      border-right: none;
+    }
+
+    .post-main {
+      padding: 8px 12px;
+    }
+
+    .post-header {
+      font-size: 11px;
+    }
+
+    .author-avatar {
+      width: 20px;
+      height: 20px;
+      margin-right: 6px;
+    }
+
+    .join-btn {
+      padding: 3px 10px;
+      font-size: 11px;
+    }
+
+    .post-title {
+      font-size: 16px;
+      margin: 0 0 6px 0;
+    }
+
+    .text-content {
+      font-size: 13px;
+      line-height: 19px;
+    }
+
+    .post-footer {
+      gap: 4px;
+    }
+
+    .action-button {
+      padding: 6px 8px;
+      font-size: 12px;
+      gap: 4px;
+    }
+
+    .vote-count {
+      font-size: 11px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .post-main {
+      padding: 6px 8px;
+    }
+
+    .post-title {
+      font-size: 15px;
+    }
+
+    .action-button span {
+      display: none;
+    }
+
+    .action-button {
+      padding: 6px;
+      min-width: 32px;
+    }
   }
 </style>

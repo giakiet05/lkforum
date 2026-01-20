@@ -32,7 +32,7 @@
   // Check if user has voted based on backend data
   const hasVoted = $derived(
     post?.content.poll?.user_vote_ids &&
-      post.content.poll.user_vote_ids.length > 0
+      post.content.poll.user_vote_ids.length > 0,
   );
 
   // Vote state
@@ -53,7 +53,7 @@
 
   const currentUser = $derived($authStore.user);
   const isOwnPost = $derived(
-    currentUser && post && post.author.id === currentUser.id
+    currentUser && post && post.author.id === currentUser.id,
   );
 
   async function handleUpvote() {
@@ -467,14 +467,14 @@
                             <div
                               class="checkbox"
                               class:checked={selectedOptions.includes(
-                                option.id
+                                option.id,
                               )}
                             ></div>
                           {:else}
                             <div
                               class="radio"
                               class:checked={selectedOptions.includes(
-                                option.id
+                                option.id,
                               )}
                             ></div>
                           {/if}
@@ -1171,5 +1171,72 @@
     padding: 40px;
     font-size: 16px;
     color: #878a8c;
+  }
+
+  /* Mobile responsive */
+  @media (max-width: 768px) {
+    .post-detail-page {
+      padding: 0;
+      max-width: 100%;
+    }
+
+    .back-btn {
+      margin: 8px;
+      padding: 6px 10px;
+      font-size: 13px;
+    }
+
+    .post-detail-container {
+      border-radius: 0;
+      border-left: none;
+      border-right: none;
+    }
+
+    .post-main {
+      padding: 12px 16px;
+    }
+
+    .post-header {
+      font-size: 11px;
+      margin-bottom: 10px;
+    }
+
+    .post-title {
+      font-size: 18px;
+    }
+
+    .post-footer {
+      padding: 8px 16px;
+      gap: 4px;
+    }
+
+    .action-button {
+      padding: 6px 8px;
+      font-size: 12px;
+      gap: 4px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .post-main {
+      padding: 10px 12px;
+    }
+
+    .post-title {
+      font-size: 16px;
+    }
+
+    .text-content {
+      font-size: 13px;
+    }
+
+    .action-button span {
+      display: none;
+    }
+
+    .action-button {
+      padding: 6px;
+      min-width: 32px;
+    }
   }
 </style>

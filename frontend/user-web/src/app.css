@@ -8,6 +8,18 @@
   --topbar-height: 56px;
   --sidebar-width: 256px;
   --sidebar-compact-width: 64px;
+  
+  /* responsive breakpoints */
+  --breakpoint-mobile: 640px;
+  --breakpoint-tablet: 768px;
+  --breakpoint-laptop: 1024px;
+  --breakpoint-desktop: 1280px;
+  --breakpoint-wide: 1536px;
+  
+  /* max widths for content */
+  --max-width-content: 1280px;
+  --max-width-post: 680px;
+  --max-width-form: 800px;
 
   /* fonts */
   --font-primary: 'Nunito Sans', sans-serif;
