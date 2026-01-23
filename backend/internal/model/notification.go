@@ -13,7 +13,7 @@ type Notification struct {
 	Type        NotificationType       `bson:"type,omitempty" json:"type,omitempty"`
 	Message     string                 `bson:"message,omitempty" json:"message,omitempty"`
 	Link        string                 `bson:"link,omitempty" json:"link,omitempty"`
-	IsRead      bool                   `bson:"is_read,omitempty" json:"is_read,omitempty"`
+	IsRead      bool                   `bson:"is_read" json:"is_read"`
 	Metadata    map[string]interface{} `bson:"metadata,omitempty" json:"metadata,omitempty"`
 	CreatedAt   time.Time              `bson:"created_at,omitempty" json:"created_at,omitempty"`
 }

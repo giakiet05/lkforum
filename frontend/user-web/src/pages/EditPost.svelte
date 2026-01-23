@@ -6,6 +6,7 @@
   import { authStore } from "../stores/auth-store";
   import { toastStore } from "../stores/toast-store";
   import { extractPostId } from "../utils/slug";
+  import ConfirmModal from "../components/ConfirmModal.svelte";
 
   type EditPostProps = {
     params?: { slugId: string };
@@ -19,6 +20,7 @@
   let isLoading = $state(true);
   let isSaving = $state(false);
   let error = $state<string | null>(null);
+  let showCancelConfirm = $state(false);
 
   const currentUser = $derived($authStore.user);
   const postId = $derived(extractPostId(params.slugId));
@@ -77,9 +79,12 @@
   }
 
   function handleCancel() {
-    if (confirm("Bỏ thay đổi?")) {
-      push(`/post/${params.slugId}`);
-    }
+    showCancelConfirm = true;
+  }
+
+  function confirmCancel() {
+    showCancelConfirm = false;
+    push(`/post/${params.slugId}`);
   }
 </script>
 
@@ -155,6 +160,17 @@
     </div>
   {/if}
 </div>
+
+<ConfirmModal
+  show={showCancelConfirm}
+  title="Xác nhận hủy"
+  message="Bạn có chắc muốn bỏ các thay đổi? Các thay đổi chưa lưu sẽ bị mất."
+  confirmText="Bỏ thay đổi"
+  cancelText="Tiếp tục chỉnh sửa"
+  confirmVariant="danger"
+  onConfirm={confirmCancel}
+  onCancel={() => (showCancelConfirm = false)}
+/>
 
 <style>
   .edit-post-page {

@@ -25,6 +25,7 @@ export interface MembershipResponse {
     id: string;
     user_id: string;
     community_id: string;
+    status?: 'pending' | 'approved' | 'rejected';
     created_at?: string;
     user?: MembershipUserInfo;
 }

@@ -224,7 +224,10 @@ func (s *postService) CreatePost(userID string, req *dto.CreatePostRequest) (*dt
 
 	log.Printf("✅ Post created in DB - ID: %s, Status: %s, IsDeleted: %v", createdPost.ID.Hex(), createdPost.ModerationStatus, createdPost.IsDeleted)
 
-	go s.voteService.VoteOnTarget(userID, createdPost.ID.Hex(), model.VoteTargetPost, true)
+	// Auto-upvote for post creator (use VoteOnTargetByAuthor to skip moderation check)
+	if _, err := s.voteService.VoteOnTargetByAuthor(userID, createdPost.ID.Hex(), model.VoteTargetPost, true); err != nil {
+		log.Printf("⚠️ Failed to auto-upvote post %s: %v", createdPost.ID.Hex(), err)
+	}
 
 	// Publish event for moderation
 	s.bus.Publish(&bus.PostCreatedEvent{

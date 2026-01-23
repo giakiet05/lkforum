@@ -138,12 +138,13 @@ var (
 	ErrUserIsBannedFromCommunity = AppError{Code: "BANNED_COMMUNITY", Message: "Người dùng đã bị ban khỏi cộng đồng."}
 
 	// Membership-related
-	ErrUserNotMember          = AppError{Code: "USER_NOT_MEMBER", Message: "Bạn chưa tham gia cộng đồng này"}
-	ErrMembershipNotFound     = AppError{Code: "MEMBERSHIP_NOT_FOUND", Message: "Không tìm thấy thành viên"}
-	ErrAlreadyMember          = AppError{Code: "ALREADY_MEMBER", Message: "Bạn đã là thành viên của cộng đồng này"}
-	ErrMembershipCreateFailed = AppError{Code: "MEMBERSHIP_CREATE_FAILED", Message: "Không thể tạo thành viên"}
-	ErrMembershipDeleteFailed = AppError{Code: "MEMBERSHIP_DELETE_FAILED", Message: "Không thể xóa thành viên"}
-	ErrInvalidMembershipData  = AppError{Code: "INVALID_MEMBERSHIP_DATA", Message: "Dữ liệu thành viên không hợp lệ"}
+	ErrUserNotMember              = AppError{Code: "USER_NOT_MEMBER", Message: "Bạn chưa tham gia cộng đồng này"}
+	ErrMembershipNotFound         = AppError{Code: "MEMBERSHIP_NOT_FOUND", Message: "Không tìm thấy thành viên"}
+	ErrAlreadyMember              = AppError{Code: "ALREADY_MEMBER", Message: "Bạn đã là thành viên của cộng đồng này"}
+	ErrMembershipCreateFailed     = AppError{Code: "MEMBERSHIP_CREATE_FAILED", Message: "Không thể tạo thành viên"}
+	ErrMembershipDeleteFailed     = AppError{Code: "MEMBERSHIP_DELETE_FAILED", Message: "Không thể xóa thành viên"}
+	ErrInvalidMembershipData      = AppError{Code: "INVALID_MEMBERSHIP_DATA", Message: "Dữ liệu thành viên không hợp lệ"}
+	ErrMembershipAlreadyProcessed = AppError{Code: "MEMBERSHIP_ALREADY_PROCESSED", Message: "Yêu cầu tham gia đã được xử lý"}
 
 	// Post-related
 	ErrPostNotFound    = AppError{Code: "POST_NOT_FOUND", Message: "Không tìm thấy bài viết"}

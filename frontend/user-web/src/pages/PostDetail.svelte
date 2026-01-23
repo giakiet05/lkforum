@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import { push } from "svelte-spa-router";
   import CommentSection from "../components/CommentSection.svelte";
+  import ConfirmModal from "../components/ConfirmModal.svelte";
   import { extractPostId, generatePostUrl } from "../utils/slug";
   import type { PostResponse } from "../dtos/post-dto";
   import {
@@ -47,6 +48,7 @@
   // Menu state
   let showMenu = $state(false);
   let showReportModal = $state(false);
+  let showDeleteConfirm = $state(false);
   let reportReason = $state("");
   let reportDetails = $state("");
   let isReporting = $state(false);
@@ -292,9 +294,15 @@
     push(`${generatePostUrl(post!.id, post!.title || "post")}/edit`);
   }
 
-  async function handleDelete() {
+  function handleDelete() {
     showMenu = false;
-    if (!post || !confirm("Bạn có chắc chắn muốn xóa bài viết này?")) return;
+    if (!post) return;
+    showDeleteConfirm = true;
+  }
+
+  async function confirmDelete() {
+    showDeleteConfirm = false;
+    if (!post) return;
 
     try {
       await deletePost(post.id);
@@ -640,6 +648,17 @@
     </div>
   </div>
 {/if}
+
+<ConfirmModal
+  show={showDeleteConfirm}
+  title="Xác nhận xóa"
+  message="Bạn có chắc chắn muốn xóa bài viết này? Hành động này không thể hoàn tác."
+  confirmText="Xóa"
+  cancelText="Hủy"
+  confirmVariant="danger"
+  onConfirm={confirmDelete}
+  onCancel={() => (showDeleteConfirm = false)}
+/>
 
 <style>
   .post-detail-page {

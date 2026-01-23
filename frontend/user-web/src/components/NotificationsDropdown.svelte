@@ -34,7 +34,7 @@
     try {
       isLoading = true;
       error = null;
-      const response = await getNotifications({ page: 1, limit: 20 });
+      const response = await getNotifications({ page: 1, pageSize: 20 });
       notifications = response.notifications || [];
       // Notify parent of unread count
       const unreadCount = notifications.filter((n) => !n.is_read).length;
@@ -52,7 +52,7 @@
       await markNotificationAsRead(notificationId);
       // Update local state
       notifications = notifications.map((n) =>
-        n.id === notificationId ? { ...n, is_read: true } : n
+        n.id === notificationId ? { ...n, is_read: true } : n,
       );
       // Update parent unread count
       const unreadCount = notifications.filter((n) => !n.is_read).length;
@@ -77,20 +77,25 @@
 
   async function handleMarkAllAsRead() {
     try {
+      console.log("🔔 [NotificationsDropdown] Calling markAllAsRead API...");
       await markAllAsRead();
+      console.log("✅ [NotificationsDropdown] markAllAsRead API success");
       // Update all notifications as read
       notifications = notifications.map((n) => ({ ...n, is_read: true }));
       // Update parent unread count to 0
       onUnreadCountChange?.(0);
     } catch (err) {
-      console.error("Failed to mark all as read:", err);
+      console.error(
+        "❌ [NotificationsDropdown] Failed to mark all as read:",
+        err,
+      );
     }
   }
 
   async function handleAcceptModeratorInvite(
     notificationId: string,
     communityId: string,
-    notificationLink?: string
+    notificationLink?: string,
   ) {
     try {
       await activateModerator(communityId);
@@ -134,10 +139,25 @@
 
     // Navigate to link if exists
     if (notification.link) {
+      let frontendLink = notification.link;
+
+      // Handle message notification - link format: /channels/:channelId
+      if (
+        notification.type === "new_message" &&
+        notification.link.startsWith("/channels/")
+      ) {
+        const channelId = notification.link.replace("/channels/", "");
+        frontendLink = `/messages?channel=${channelId}`;
+        console.log("💬 Message notification - navigating to:", frontendLink);
+        onClose?.();
+        push(frontendLink);
+        return;
+      }
+
       // Convert backend link format to frontend routing
       // Backend: /posts/:id or /posts/:id#comment-:commentId
       // Frontend: /post/:id or /post/:id#comment-:commentId (no 's')
-      let frontendLink = notification.link.replace(/^\/posts\//, "/post/");
+      frontendLink = notification.link.replace(/^\/posts\//, "/post/");
 
       console.log("📍 Navigating to:", frontendLink);
 
@@ -149,7 +169,7 @@
         "🔍 Current post:",
         currentPostId,
         "Target post:",
-        targetPostId
+        targetPostId,
       );
 
       // Force reload if same post ID
@@ -167,7 +187,7 @@
   }
 
   function extractCommunityIdFromMetadata(
-    notification: NotificationResponse
+    notification: NotificationResponse,
   ): string | null {
     // Assuming metadata contains community_id
     try {
@@ -228,7 +248,7 @@
                       handleAcceptModeratorInvite(
                         notification.id,
                         communityId,
-                        notification.link
+                        notification.link,
                       )}
                   >
                     Chấp nhận

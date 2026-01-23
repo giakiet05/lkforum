@@ -12,6 +12,11 @@
   let loading = $state(false);
   let communities = $state<CommunityResponse[]>([]);
 
+  // Ban modal state
+  let showBanModal = $state(false);
+  let targetCommunityId = $state<string | null>(null);
+  let banReason = $state("");
+
   async function loadCommunities() {
     loading = true;
     try {
@@ -26,15 +31,24 @@
   }
 
   async function handleBanCommunity(communityId: string) {
-    const reason = prompt("Lý do cấm:");
-    if (!reason) return;
+    targetCommunityId = communityId;
+    banReason = "";
+    showBanModal = true;
+  }
+
+  async function confirmBanCommunity() {
+    if (!targetCommunityId || !banReason.trim()) return;
+    showBanModal = false;
 
     try {
-      await banCommunity(communityId, reason);
+      await banCommunity(targetCommunityId, banReason);
       await loadCommunities();
       toastStore.success("Đã cấm cộng đồng");
     } catch (error) {
       toastStore.error("Không thể cấm cộng đồng");
+    } finally {
+      targetCommunityId = null;
+      banReason = "";
     }
   }
 
@@ -71,6 +85,42 @@
   </div>
 </div>
 
+<!-- Ban Community Modal -->
+{#if showBanModal}
+  <div class="modal-overlay" onclick={() => (showBanModal = false)}>
+    <div class="modal-content" onclick={(e) => e.stopPropagation()}>
+      <div class="modal-header">
+        <h3>Cấm cộng đồng</h3>
+      </div>
+      <div class="modal-body">
+        <label for="ban-reason">Lý do cấm:</label>
+        <input
+          type="text"
+          id="ban-reason"
+          bind:value={banReason}
+          placeholder="Nhập lý do cấm..."
+        />
+      </div>
+      <div class="modal-actions">
+        <button
+          class="btn-cancel"
+          onclick={() => {
+            showBanModal = false;
+            targetCommunityId = null;
+          }}>Hủy</button
+        >
+        <button
+          class="btn-confirm"
+          onclick={confirmBanCommunity}
+          disabled={!banReason.trim()}
+        >
+          Cấm
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
+
 <style>
   .communities-page {
     height: 100%;
@@ -99,5 +149,82 @@
     text-align: center;
     color: #6c757d;
     font-size: 1rem;
+  }
+
+  /* Ban Modal Styles */
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+  }
+
+  .modal-content {
+    background: white;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 400px;
+    padding: 24px;
+  }
+
+  .modal-header h3 {
+    margin: 0 0 16px 0;
+    font-size: 18px;
+    font-weight: 600;
+  }
+
+  .modal-body {
+    margin-bottom: 20px;
+  }
+
+  .modal-body label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+  }
+
+  .modal-body input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 14px;
+  }
+
+  .modal-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+  }
+
+  .btn-cancel,
+  .btn-confirm {
+    padding: 10px 20px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+  }
+
+  .btn-cancel {
+    background: #f0f0f0;
+    color: #333;
+  }
+
+  .btn-confirm {
+    background: #ff4500;
+    color: white;
+  }
+
+  .btn-confirm:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 </style>

@@ -110,3 +110,75 @@ export async function kickMember(
 
     await handleApiResponse(res);
 }
+
+/**
+ * Get pending membership requests for a community (moderator/creator only)
+ */
+export async function getPendingMembers(
+    communityId: string,
+    page: number = 1,
+    pageSize: number = 20
+): Promise<PaginatedMembershipsResponse> {
+    const params = new URLSearchParams({
+        page: page.toString(),
+        page_size: pageSize.toString()
+    });
+
+    const res = await authenticatedFetch(
+        `/api/memberships/community/${communityId}/pending?${params.toString()}`,
+        { method: "GET" }
+    );
+
+    return await handleApiResponse(res);
+}
+
+/**
+ * Approve a pending membership request (moderator/creator only)
+ */
+export async function approveMember(
+    communityId: string,
+    membershipId: string
+): Promise<void> {
+    const res = await authenticatedFetch(
+        `/api/memberships/community/${communityId}/approve/${membershipId}`,
+        { method: "POST" }
+    );
+
+    await handleApiResponse(res);
+}
+
+/**
+ * Reject a pending membership request (moderator/creator only)
+ */
+export async function rejectMember(
+    communityId: string,
+    membershipId: string
+): Promise<void> {
+    const res = await authenticatedFetch(
+        `/api/memberships/community/${communityId}/reject/${membershipId}`,
+        { method: "POST" }
+    );
+
+    await handleApiResponse(res);
+}
+
+/**
+ * Get approved members for a community (moderator/creator only)
+ */
+export async function getApprovedMembers(
+    communityId: string,
+    page: number = 1,
+    pageSize: number = 20
+): Promise<PaginatedMembershipsResponse> {
+    const params = new URLSearchParams({
+        page: page.toString(),
+        page_size: pageSize.toString()
+    });
+
+    const res = await authenticatedFetch(
+        `/api/memberships/community/${communityId}/approved?${params.toString()}`,
+        { method: "GET" }
+    );
+
+    return await handleApiResponse(res);
+}

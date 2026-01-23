@@ -27,6 +27,12 @@ type MembershipService interface {
 	DeleteMembership(req *dto.DeleteMembershipRequest, userID string) error
 	KickMember(communityID string, targetUserID string, modUserID string) error
 
+	// Pending member approval
+	GetPendingMembers(communityID string, requesterID string, page int, pageSize int) (*dto.PaginatedMembershipsResponse, error)
+	GetApprovedMembers(communityID string, requesterID string, page int, pageSize int) (*dto.PaginatedMembershipsResponse, error)
+	ApproveMember(communityID string, membershipID string, requesterID string) error
+	RejectMember(communityID string, membershipID string, requesterID string) error
+
 	GetMembersCount(communityID string) (int64, error)
 	increaseMembersCount(communityID string) error
 	decreaseMembersCount(communityID string) error
@@ -66,17 +72,44 @@ func (m *membershipService) CreateMembership(req *dto.CreateMembershipRequest, u
 		return nil, err
 	}
 
-	exited, err := m.membershipRepo.IsCommunityExist(ctx, req.CommunityID)
+	// Check if user already has a membership (pending or approved)
+	existingMembership, err := m.membershipRepo.GetByUserIDAndCommunityID(ctx, req.UserID, req.CommunityID)
 	if err != nil {
 		return nil, err
 	}
-	if !exited {
-		return nil, apperror.ErrCommunityNotFound
+	if existingMembership != nil {
+		if existingMembership.Status == model.MembershipStatusPending {
+			return nil, apperror.NewError(nil, "MEMBERSHIP_PENDING", "Bạn đã gửi yêu cầu tham gia và đang chờ duyệt")
+		}
+		return nil, apperror.ErrAlreadyMember
+	}
+
+	// Check if community exists and get its settings
+	community, err := m.communityRepo.GetByID(ctx, req.CommunityID)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return nil, apperror.ErrCommunityNotFound
+		}
+		return nil, err
+	}
+
+	// Debug log
+	log.Printf("🔍 CreateMembership - Community: %s, JoinRequireApproval: %v", community.Name, community.Setting.JoinRequireApproval)
+
+	// Determine membership status based on community settings
+	status := model.MembershipStatusApproved
+	if community.Setting.JoinRequireApproval {
+		status = model.MembershipStatusPending
+		log.Printf("✅ Setting status to PENDING for user %s", req.UserID)
+	} else {
+		log.Printf("✅ Setting status to APPROVED for user %s", req.UserID)
 	}
 
 	membership := &model.Membership{
 		UserID:      userObjectID,
 		CommunityID: communityObjectID,
+		Status:      status,
+		CreatedAt:   time.Now(),
 	}
 
 	membership, err = m.membershipRepo.Create(ctx, membership)
@@ -84,9 +117,12 @@ func (m *membershipService) CreateMembership(req *dto.CreateMembershipRequest, u
 		return nil, err
 	}
 
-	err = m.increaseMembersCount(req.CommunityID)
-	if err != nil {
-		return nil, err
+	// Only increase member count if approved immediately
+	if status == model.MembershipStatusApproved {
+		err = m.increaseMembersCount(req.CommunityID)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return membership, nil
@@ -379,4 +415,182 @@ func (m *membershipService) syncMemberCounts() error {
 	}
 
 	return nil
+}
+
+// GetPendingMembers returns all pending membership requests for a community
+func (m *membershipService) GetPendingMembers(communityID string, requesterID string, page int, pageSize int) (*dto.PaginatedMembershipsResponse, error) {
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
+
+	// Check if requester is creator or moderator
+	community, err := m.communityRepo.GetByID(ctx, communityID)
+	if err != nil {
+		return nil, err
+	}
+
+	isAuthorized := community.CreateByID.Hex() == requesterID
+	if !isAuthorized {
+		for _, mod := range community.Moderators {
+			if mod.UserID.Hex() == requesterID {
+				isAuthorized = true
+				break
+			}
+		}
+	}
+
+	if !isAuthorized {
+		return nil, apperror.ErrForbidden
+	}
+
+	memberships, total, err := m.membershipRepo.GetPendingByCommunityID(ctx, communityID, page, pageSize)
+	if err != nil {
+		return nil, err
+	}
+
+	return &dto.PaginatedMembershipsResponse{
+		Memberships: memberships,
+		Pagination: dto.Pagination{
+			Page:     page,
+			PageSize: pageSize,
+			Total:    total,
+		},
+	}, nil
+}
+
+// GetApprovedMembers returns all approved members for a community
+func (m *membershipService) GetApprovedMembers(communityID string, requesterID string, page int, pageSize int) (*dto.PaginatedMembershipsResponse, error) {
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
+
+	// Check if requester is creator or moderator
+	community, err := m.communityRepo.GetByID(ctx, communityID)
+	if err != nil {
+		return nil, err
+	}
+
+	isAuthorized := community.CreateByID.Hex() == requesterID
+	if !isAuthorized {
+		for _, mod := range community.Moderators {
+			if mod.UserID.Hex() == requesterID {
+				isAuthorized = true
+				break
+			}
+		}
+	}
+
+	if !isAuthorized {
+		return nil, apperror.ErrForbidden
+	}
+
+	memberships, total, err := m.membershipRepo.GetApprovedByCommunityID(ctx, communityID, page, pageSize)
+	if err != nil {
+		return nil, err
+	}
+
+	return &dto.PaginatedMembershipsResponse{
+		Memberships: memberships,
+		Pagination: dto.Pagination{
+			Page:     page,
+			PageSize: pageSize,
+			Total:    total,
+		},
+	}, nil
+}
+
+// ApproveMember approves a pending membership request
+func (m *membershipService) ApproveMember(communityID string, membershipID string, requesterID string) error {
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
+
+	// Check if requester is creator or moderator
+	community, err := m.communityRepo.GetByID(ctx, communityID)
+	if err != nil {
+		return err
+	}
+
+	isAuthorized := community.CreateByID.Hex() == requesterID
+	if !isAuthorized {
+		for _, mod := range community.Moderators {
+			if mod.UserID.Hex() == requesterID {
+				isAuthorized = true
+				break
+			}
+		}
+	}
+
+	if !isAuthorized {
+		return apperror.ErrForbidden
+	}
+
+	// Get membership and verify it belongs to this community
+	membership, err := m.membershipRepo.GetByID(ctx, membershipID)
+	if err != nil {
+		return err
+	}
+	if membership == nil {
+		return apperror.ErrMembershipNotFound
+	}
+
+	if membership.CommunityID.Hex() != communityID {
+		return apperror.ErrForbidden
+	}
+
+	if membership.Status != model.MembershipStatusPending {
+		return apperror.ErrMembershipAlreadyProcessed
+	}
+
+	// Update status to approved
+	err = m.membershipRepo.UpdateStatus(ctx, membershipID, model.MembershipStatusApproved)
+	if err != nil {
+		return err
+	}
+
+	// Increase member count
+	return m.increaseMembersCount(communityID)
+}
+
+// RejectMember rejects a pending membership request
+func (m *membershipService) RejectMember(communityID string, membershipID string, requesterID string) error {
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
+
+	// Check if requester is creator or moderator
+	community, err := m.communityRepo.GetByID(ctx, communityID)
+	if err != nil {
+		return err
+	}
+
+	isAuthorized := community.CreateByID.Hex() == requesterID
+	if !isAuthorized {
+		for _, mod := range community.Moderators {
+			if mod.UserID.Hex() == requesterID {
+				isAuthorized = true
+				break
+			}
+		}
+	}
+
+	if !isAuthorized {
+		return apperror.ErrForbidden
+	}
+
+	// Get membership and verify it belongs to this community
+	membership, err := m.membershipRepo.GetByID(ctx, membershipID)
+	if err != nil {
+		return err
+	}
+	if membership == nil {
+		return apperror.ErrMembershipNotFound
+	}
+
+	if membership.CommunityID.Hex() != communityID {
+		return apperror.ErrForbidden
+	}
+
+	if membership.Status != model.MembershipStatusPending {
+		return apperror.ErrMembershipAlreadyProcessed
+	}
+
+	// Delete the membership request
+	return m.membershipRepo.Delete(ctx, membershipID)
 }

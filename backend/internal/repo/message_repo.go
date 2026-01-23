@@ -120,7 +120,7 @@ func (m *messageRepo) GetFilter(
 
 	// Fetch paginated results
 	opts := options.Find().
-		SetSort(bson.D{{Key: "created_at", Value: -1}}).
+		SetSort(bson.D{{Key: "created_at", Value: 1}}).
 		SetSkip(int64(skip)).
 		SetLimit(int64(pageSize))
 

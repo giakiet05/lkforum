@@ -136,3 +136,37 @@ export async function authenticatedFetch(path: string, options: RequestInit = {}
         );
     }
 }
+
+/**
+ * A wrapper for endpoints that can work with or without authentication.
+ * If token is available, it will be sent. Otherwise, request proceeds without auth.
+ * Useful for endpoints like getPosts where logged-in users get personalized results.
+ * @param path - API endpoint path.
+ * @param options - Fetch API options.
+ * @returns The raw Response object.
+ */
+export async function optionalAuthFetch(path: string, options: RequestInit = {}): Promise<Response> {
+    const url = path.startsWith("http") ? path : API_BASE_URL + path;
+    const accessToken = await getValidAccessToken();
+    
+    const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        ...((options.headers as Record<string, string>) || {}),
+    };
+
+    // Add auth header if token is available
+    if (accessToken) {
+        headers["Authorization"] = `Bearer ${accessToken}`;
+    }
+
+    try {
+        return await fetch(url, { ...options, headers });
+    } catch (error) {
+        // Network errors: mất mạng, timeout, CORS, DNS fail
+        console.error("Network error in optionalAuthFetch:", error);
+        throw new ApiError(
+            "Không thể kết nối đến server. Vui lòng kiểm tra kết nối mạng.",
+            ApiErrorCode.SERVICE_UNAVAILABLE
+        );
+    }
+}
