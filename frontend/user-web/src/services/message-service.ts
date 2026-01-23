@@ -35,7 +35,10 @@ export async function getMessages(query: GetMessageFilterQuery): Promise<Message
         method: "GET"
     });
 
-    return await handleApiResponse(res);
+    const response = await handleApiResponse(res);
+    
+    // Backend returns { messages: [], pagination: {} }, we only need messages array
+    return response.messages || [];
 }
 
 /**
@@ -44,6 +47,17 @@ export async function getMessages(query: GetMessageFilterQuery): Promise<Message
 export async function deleteMessage(messageId: string): Promise<void> {
     const res = await authenticatedFetch(`/api/messages/${messageId}`, {
         method: "DELETE"
+    });
+
+    await handleApiResponse(res);
+}
+
+/**
+ * Mark all messages in a channel as read
+ */
+export async function markChannelMessagesAsRead(channelId: string): Promise<void> {
+    const res = await authenticatedFetch(`/api/messages/channels/${channelId}/read`, {
+        method: "PUT"
     });
 
     await handleApiResponse(res);

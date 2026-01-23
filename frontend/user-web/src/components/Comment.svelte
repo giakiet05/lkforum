@@ -15,7 +15,7 @@
 
   const currentUser = $derived($authStore.user);
   const isOwnComment = $derived(
-    currentUser && comment.author.id === currentUser.id
+    currentUser && comment.author.id === currentUser.id,
   );
 
   let isCollapsed = $state(false);
@@ -48,14 +48,14 @@
   };
 
   const handleDelete = async () => {
-    if (!confirm("Are you sure you want to delete this comment?")) return;
+    if (!confirm("Bạn có chắc muốn xóa bình luận này?")) return;
 
     try {
       await deleteComment(comment.id);
       if (onUpdate) onUpdate();
     } catch (error) {
       console.error("Failed to delete comment:", error);
-      toastStore.error("Failed to delete comment. Please try again.");
+      toastStore.error("Không thể xóa bình luận. Vui lòng thử lại.");
     }
   };
 
@@ -67,7 +67,7 @@
   const submitReply = async () => {
     if (!replyContent.trim()) return;
     if (!currentUser) {
-      replyErrorMessage = "Please login to reply";
+      replyErrorMessage = "Vui lòng đăng nhập để trả lời";
       return;
     }
 
@@ -96,7 +96,7 @@
       console.error("Failed to submit reply:", error);
       // Show specific error message from backend
       replyErrorMessage =
-        error?.message || "Failed to post reply. Please try again.";
+        error?.message || "Không thể gửi trả lời. Vui lòng thử lại.";
     }
   };
 
@@ -132,11 +132,11 @@
     const diffDays = Math.floor(diffMs / 86400000);
 
     // Handle future dates or just posted (< 1 second)
-    if (diffSecs < 1) return `just now`;
-    if (diffSecs < 60) return `${diffSecs}s ago`;
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 30) return `${diffDays}d ago`;
+    if (diffSecs < 1) return `vừa xong`;
+    if (diffSecs < 60) return `${diffSecs} giây trước`;
+    if (diffMins < 60) return `${diffMins} phút trước`;
+    if (diffHours < 24) return `${diffHours} giờ trước`;
+    if (diffDays < 30) return `${diffDays} ngày trước`;
 
     // For older comments, show the actual date
     return date.toLocaleDateString();
@@ -181,7 +181,7 @@
       <!-- Header -->
       <div class="comment-header">
         <img
-          src={comment.author.avatar?.url || "https://i.pravatar.cc/150?img=1"}
+          src={comment.author.avatar?.url || "/user.jpg"}
           alt={comment.author.username}
           class="author-avatar"
         />
@@ -201,8 +201,8 @@
             <textarea bind:value={editContent} class="edit-textarea" rows="4"
             ></textarea>
             <div class="edit-actions">
-              <button class="save-btn" onclick={saveEdit}>Save</button>
-              <button class="cancel-btn" onclick={cancelEdit}>Cancel</button>
+              <button class="save-btn" onclick={saveEdit}>Lưu</button>
+              <button class="cancel-btn" onclick={cancelEdit}>Hủy</button>
             </div>
           </div>
         {:else}
@@ -220,13 +220,13 @@
                 class="action-btn"
                 onclick={() => (showReplyBox = !showReplyBox)}
               >
-                Reply
+                Trả lời
               </button>
             {/if}
             {#if isOwnComment}
-              <button class="action-btn" onclick={handleEdit}> Edit </button>
+              <button class="action-btn" onclick={handleEdit}> Sửa </button>
               <button class="action-btn delete" onclick={handleDelete}>
-                Delete
+                Xóa
               </button>
             {/if}
           </div>
@@ -247,7 +247,7 @@
             {/if}
             <textarea
               bind:value={replyContent}
-              placeholder="What are your thoughts?"
+              placeholder="Bạn nghĩ gì?"
               class="reply-textarea"
               rows="3"
               onkeydown={(e) => {
@@ -319,7 +319,8 @@
                 </button>
               </div>
               <div class="reply-action-buttons">
-                <button class="submit-btn" onclick={submitReply}>Comment</button
+                <button class="submit-btn" onclick={submitReply}
+                  >Bình luận</button
                 >
                 <button
                   class="cancel-btn"
@@ -330,7 +331,7 @@
                     replyImagePreview = null;
                   }}
                 >
-                  Cancel
+                  Hủy
                 </button>
               </div>
             </div>

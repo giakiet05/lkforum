@@ -9,6 +9,7 @@
   import {
     getCommunityByName,
     addModerators,
+    updateCommunity,
   } from "../services/community-service";
   import { getPosts } from "../services/post-service";
   import { authStore } from "../stores/auth-store";
@@ -74,6 +75,86 @@
 
   // Check if current user can access mod tools (creator or moderator)
   const canUseModeTools = $derived(() => isCreator() || isModerator());
+
+  // Upload state
+  let isUploadingBanner = $state(false);
+  let isUploadingAvatar = $state(false);
+  let bannerFileInput: HTMLInputElement | undefined = $state();
+  let avatarFileInput: HTMLInputElement | undefined = $state();
+
+  async function handleBannerChange(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file || !community) return;
+
+    if (!file.type.startsWith("image/")) {
+      toastStore.warning("Vui lòng chọn tệp hình ảnh");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toastStore.warning("Kích thước ảnh phải nhỏ hơn 5MB");
+      return;
+    }
+
+    try {
+      isUploadingBanner = true;
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const base64 = e.target?.result as string;
+        const updated = await updateCommunity({
+          id: community!.id,
+          banner: base64,
+        });
+        community = updated;
+        toastStore.success("Đã cập nhật ảnh bìa!");
+      };
+      reader.readAsDataURL(file);
+    } catch (error) {
+      console.error("Failed to upload banner:", error);
+      toastStore.error("Không thể tải ảnh bìa. Vui lòng thử lại.");
+    } finally {
+      isUploadingBanner = false;
+      input.value = "";
+    }
+  }
+
+  async function handleAvatarChange(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file || !community) return;
+
+    if (!file.type.startsWith("image/")) {
+      toastStore.warning("Vui lòng chọn tệp hình ảnh");
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      toastStore.warning("Kích thước ảnh phải nhỏ hơn 2MB");
+      return;
+    }
+
+    try {
+      isUploadingAvatar = true;
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const base64 = e.target?.result as string;
+        const updated = await updateCommunity({
+          id: community!.id,
+          avatar: base64,
+        });
+        community = updated;
+        toastStore.success("Đã cập nhật ảnh đại diện!");
+      };
+      reader.readAsDataURL(file);
+    } catch (error) {
+      console.error("Failed to upload avatar:", error);
+      toastStore.error("Không thể tải ảnh đại diện. Vui lòng thử lại.");
+    } finally {
+      isUploadingAvatar = false;
+      input.value = "";
+    }
+  }
 
   // Load community data
   async function loadCommunity() {
@@ -210,13 +291,13 @@
   async function toggleJoin() {
     const currentUser = $authStore.user;
     if (!currentUser || !community) {
-      toastStore.warning("Please login to join communities");
+      toastStore.warning("Vui lòng đăng nhập để tham gia cộng đồng");
       return;
     }
 
     // Prevent creator from leaving their own community
     if (isCreator()) {
-      toastStore.warning("You cannot leave a community you created!");
+      toastStore.warning("Bạn không thể rời khỏi cộng đồng do bạn tạo!");
       return;
     }
 
@@ -283,7 +364,7 @@
 
   async function handleInviteMod() {
     if (!inviteUsername.trim() || !community) {
-      toastStore.warning("Please enter a username!");
+      toastStore.warning("Vui lòng nhập tên người dùng!");
       return;
     }
 
@@ -305,7 +386,7 @@
       });
 
       console.log("✅ Moderator added successfully!");
-      toastStore.success(`${inviteUsername} added as moderator!`);
+      toastStore.success(`Đã thêm ${inviteUsername} làm quản trị viên!`);
       handleCloseInviteModModal();
 
       // Reload community to get updated moderators
@@ -313,7 +394,7 @@
     } catch (error) {
       console.error("❌ Failed to add moderator:", error);
       toastStore.error(
-        "Failed to add moderator. Please check the username and try again.",
+        "Không thể thêm quản trị viên. Vui lòng kiểm tra tên người dùng và thử lại.",
       );
     }
   }
@@ -327,14 +408,30 @@
 <div class="community-page">
   {#if isLoadingCommunity}
     <div class="loading-container">
-      <p>Loading community...</p>
+      <p>Đang tải cộng đồng...</p>
     </div>
   {:else if communityError || !community}
     <div class="error-container">
-      <p>{communityError || "Community not found"}</p>
-      <button onclick={() => push("/")}>Go back home</button>
+      <p>{communityError || "Không tìm thấy cộng đồng"}</p>
+      <button onclick={() => push("/")}>Quay về trang chủ</button>
     </div>
   {:else}
+    <!-- Hidden file inputs -->
+    <input
+      type="file"
+      accept="image/*"
+      bind:this={bannerFileInput}
+      onchange={handleBannerChange}
+      style="display: none;"
+    />
+    <input
+      type="file"
+      accept="image/*"
+      bind:this={avatarFileInput}
+      onchange={handleAvatarChange}
+      style="display: none;"
+    />
+
     <!-- Banner -->
     <div class="community-banner">
       {#if community.banner}
@@ -342,17 +439,47 @@
       {:else}
         <div class="banner-placeholder"></div>
       {/if}
+      {#if canUseModeTools()}
+        <button
+          class="change-banner-btn"
+          onclick={() => bannerFileInput?.click()}
+          disabled={isUploadingBanner}
+          title="Đổi ảnh bìa"
+        >
+          {#if isUploadingBanner}
+            <div class="mini-spinner"></div>
+          {:else}
+            <img src="/change_profile_image.png" alt="Change banner" />
+          {/if}
+        </button>
+      {/if}
     </div>
 
     <!-- Community Header -->
     <div class="community-header">
       <div class="community-header-content">
         <div class="community-info">
-          <img
-            src={community.avatar || "/community_logo.jpg"}
-            alt="Community icon"
-            class="community-icon"
-          />
+          <div class="community-icon-wrapper">
+            <img
+              src={community.avatar || "/community_logo.jpg"}
+              alt="Community icon"
+              class="community-icon"
+            />
+            {#if canUseModeTools()}
+              <button
+                class="change-avatar-btn"
+                onclick={() => avatarFileInput?.click()}
+                disabled={isUploadingAvatar}
+                title="Đổi ảnh đại diện"
+              >
+                {#if isUploadingAvatar}
+                  <div class="mini-spinner"></div>
+                {:else}
+                  <img src="/change_profile_image.png" alt="Change avatar" />
+                {/if}
+              </button>
+            {/if}
+          </div>
           <div class="community-title">
             <div class="title-row">
               <h1>lk/{community.name}</h1>
@@ -373,11 +500,11 @@
             onclick={toggleJoin}
           >
             {#if isTogglingMembership}
-              {isJoined ? "Leaving..." : "Joining..."}
+              {isJoined ? "Đang rời..." : "Đang tham gia..."}
             {:else if isJoined}
-              Joined
+              Đã tham gia
             {:else}
-              Join
+              Tham gia
             {/if}
           </button>
 
@@ -399,7 +526,7 @@
                   d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
                 />
               </svg>
-              Create post
+              Tạo bài viết
             </button>
           {/if}
 
@@ -426,7 +553,7 @@
                   clip-rule="evenodd"
                 />
               </svg>
-              Mod tools
+              Quản trị
             </button>
 
             <!-- More Options Button -->
@@ -456,21 +583,21 @@
             class:active={activeSort === "hot"}
             onclick={() => (activeSort = "hot")}
           >
-            Hot
+            Nổi bật
           </button>
           <button
             class="sort-btn"
             class:active={activeSort === "new"}
             onclick={() => (activeSort = "new")}
           >
-            New
+            Mới nhất
           </button>
           <button
             class="sort-btn"
             class:active={activeSort === "top"}
             onclick={() => (activeSort = "top")}
           >
-            Top
+            Hàng đầu
           </button>
         </div>
 
@@ -478,7 +605,7 @@
         <div class="post-list">
           {#if isLoadingPosts}
             <div class="loading-posts">
-              <p>Loading posts...</p>
+              <p>Đang tải bài viết...</p>
             </div>
           {:else if postsError}
             <div class="error-posts">
@@ -486,7 +613,7 @@
             </div>
           {:else if posts.length === 0}
             <div class="no-posts">
-              <p>No posts yet. Be the first to post!</p>
+              <p>Chưa có bài viết nào. Hãy là người đầu tiên đăng bài!</p>
             </div>
           {:else}
             {#each posts as post}
@@ -499,9 +626,9 @@
       <!-- Sidebar -->
       <div class="community-sidebar">
         <div class="about-card">
-          <h3>About Community</h3>
+          <h3>Giới thiệu cộng đồng</h3>
           <p class="about-description">
-            {community.description || "No description available"}
+            {community.description || "Chưa có mô tả"}
           </p>
 
           <div class="community-stats">
@@ -509,12 +636,12 @@
               <div class="stat-value">
                 {community.member_count?.toLocaleString() || "0"}
               </div>
-              <div class="stat-label">Members</div>
+              <div class="stat-label">Thành viên</div>
             </div>
             <div class="stat">
               <!-- TODO: Backend doesn't track online count yet -->
               <div class="stat-value">-</div>
-              <div class="stat-label">Online</div>
+              <div class="stat-label">Trực tuyến</div>
             </div>
           </div>
 
@@ -523,7 +650,7 @@
 
         <!-- Rules Card -->
         <div class="rules-card">
-          <h3>Community Rules</h3>
+          <h3>Nội quy cộng đồng</h3>
           {#if community.rules && community.rules.length > 0}
             <div class="rules-accordion">
               {#each community.rules as rule, index}
@@ -564,14 +691,14 @@
               {/each}
             </div>
           {:else}
-            <p class="no-rules">No rules available</p>
+            <p class="no-rules">Chưa có nội quy</p>
           {/if}
         </div>
 
         <!-- Moderators Card -->
         <div class="moderators-card">
           <div class="moderators-header">
-            <h3>Moderators</h3>
+            <h3>Quản trị viên</h3>
             {#if isCreator()}
               <button
                 class="invite-mod-btn"
@@ -588,7 +715,7 @@
                     d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 016 6H2a6 6 0 016-6zm10-5a1 1 0 10-2 0v1h-1a1 1 0 100 2h1v1a1 1 0 102 0v-1h1a1 1 0 100-2h-1V6z"
                   />
                 </svg>
-                Invite Mod
+                Mời quản trị
               </button>
             {/if}
           </div>
@@ -597,7 +724,7 @@
               {#each community.moderators.filter((m) => m.is_active) as moderator}
                 <div class="moderator">
                   <img
-                    src={moderator.avatar?.url || "/avatar.jpg"}
+                    src={moderator.avatar?.url || "/user.jpg"}
                     alt="Moderator"
                     class="mod-avatar"
                   />
@@ -605,11 +732,11 @@
                 </div>
               {/each}
             {:else}
-              <p class="no-moderators">No moderators yet</p>
+              <p class="no-moderators">Chưa có quản trị viên</p>
             {/if}
           </div>
           {#if community.moderators && community.moderators.filter((m) => m.is_active).length > 3}
-            <button class="view-all-mods-btn">View all moderators</button>
+            <button class="view-all-mods-btn">Xem tất cả quản trị viên</button>
           {/if}
         </div>
       </div>
@@ -631,7 +758,7 @@
 {#if showInviteModModal}
   <div class="modal-overlay" onclick={handleCloseInviteModModal}>
     <div class="modal-content" onclick={(e) => e.stopPropagation()}>
-      <h2>Invite Moderator</h2>
+      <h2>Mời quản trị viên</h2>
 
       <div class="form-group">
         <div class="search-input-wrapper">
@@ -644,39 +771,39 @@
           />
           <input
             type="text"
-            placeholder="Search for user"
+            placeholder="Tìm kiếm người dùng"
             bind:value={inviteUsername}
             class="search-input"
           />
         </div>
-        <p class="hint">Enter username to search</p>
+        <p class="hint">Nhập tên người dùng để tìm kiếm</p>
       </div>
 
       <div class="form-group">
-        <label>Permissions</label>
+        <label>Quyền hạn</label>
         <select bind:value={invitePermission} class="permission-select">
-          <option value="Everything">Everything</option>
+          <option value="Everything">Toàn bộ</option>
           <option value="Manage Posts & Comments"
-            >Manage Posts & Comments</option
+            >Quản lý bài viết & bình luận</option
           >
-          <option value="Manage Users">Manage Users</option>
-          <option value="Manage Settings">Manage Settings</option>
+          <option value="Manage Users">Quản lý người dùng</option>
+          <option value="Manage Settings">Quản lý cài đặt</option>
         </select>
       </div>
 
       <div class="form-group">
         <label class="checkbox-label">
           <input type="checkbox" bind:checked={inviteCanEdit} />
-          <span>You can edit this moderator</span>
+          <span>Bạn có thể chỉnh sửa quản trị viên này</span>
         </label>
       </div>
 
       <div class="modal-actions">
         <button class="btn-cancel" onclick={handleCloseInviteModModal}>
-          Cancel
+          Hủy
         </button>
         <button class="action-btn-primary" onclick={handleInviteMod}>
-          Invite
+          Mời
         </button>
       </div>
     </div>
@@ -895,6 +1022,10 @@
     height: 16px;
   }
 
+  .community-icon-wrapper {
+    position: relative;
+  }
+
   .community-icon {
     width: 120px;
     height: 120px;
@@ -903,6 +1034,77 @@
     background: white;
     margin-top: -60px;
     object-fit: cover;
+  }
+
+  .change-avatar-btn {
+    position: absolute;
+    bottom: 5px;
+    right: 5px;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: white;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    transition: transform 0.2s;
+  }
+
+  .change-avatar-btn:hover {
+    transform: scale(1.1);
+  }
+
+  .change-avatar-btn img {
+    width: 20px;
+    height: 20px;
+  }
+
+  .change-banner-btn {
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: white;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    transition: transform 0.2s;
+  }
+
+  .change-banner-btn:hover {
+    transform: scale(1.1);
+  }
+
+  .change-banner-btn img {
+    width: 22px;
+    height: 22px;
+  }
+
+  .mini-spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid #ccc;
+    border-top-color: #0079d3;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  .community-banner {
+    position: relative;
   }
 
   .community-title h1 {

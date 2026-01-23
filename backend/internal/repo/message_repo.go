@@ -23,6 +23,7 @@ type MessageRepo interface {
 	) ([]model.Message, int64, error)
 	Delete(ctx context.Context, messageID string) error
 	IsSendByUser(ctx context.Context, messageID string, userID string) (bool, error)
+	MarkChannelAsRead(ctx context.Context, channelID string, userID string) error
 }
 
 type messageRepo struct {
@@ -185,4 +186,32 @@ func (m *messageRepo) IsSendByUser(ctx context.Context, messageID string, userID
 	}
 
 	return count > 0, nil
+}
+
+func (m *messageRepo) MarkChannelAsRead(ctx context.Context, channelID string, userID string) error {
+	channelObjectID, err := primitive.ObjectIDFromHex(channelID)
+	if err != nil {
+		return err
+	}
+
+	userObjectID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return err
+	}
+
+	// Mark all messages in this channel as read, except those sent by the user
+	filter := bson.M{
+		"channel_id": channelObjectID,
+		"sender_id":  bson.M{"$ne": userObjectID},
+		"is_read":    false,
+	}
+
+	update := bson.M{
+		"$set": bson.M{
+			"is_read": true,
+		},
+	}
+
+	_, err = m.messageCollection.UpdateMany(ctx, filter, update)
+	return err
 }

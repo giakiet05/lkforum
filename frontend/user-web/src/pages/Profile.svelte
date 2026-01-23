@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import { push } from "svelte-spa-router";
   import Post from "../components/Post.svelte";
+  import CreatePostModal from "../components/CreatePostModal.svelte";
   import type { PostResponse } from "../dtos/post-dto";
   import type { UserResponse } from "../dtos/user-dto";
   import {
@@ -15,9 +16,17 @@
     getSavedPosts,
     getPostsByUserId,
   } from "../services/post-service";
+  import {
+    getChannelBetweenUsers,
+    createChannel,
+  } from "../services/channel-service";
   import { ApiError } from "../errors/api-error";
-  import { setAuth } from "../stores/auth-store";
+  import { setAuth, authStore } from "../stores/auth-store";
   import { toastStore } from "../stores/toast-store";
+  import { setActiveChannel, chatStore } from "../stores/chat-store";
+
+  // Create post modal state
+  let showCreatePostModal = $state(false);
 
   // Route params
   let { params = {} }: { params?: { username?: string } } = $props();
@@ -50,6 +59,7 @@
   let coverFileInput = $state<HTMLInputElement | undefined>();
   let isUploadingAvatar = $state(false);
   let isUploadingCover = $state(false);
+  let isCreatingChannel = $state(false);
 
   onMount(() => {
     loadUserProfile();
@@ -129,13 +139,13 @@
 
     // Validate file type
     if (!file.type.startsWith("image/")) {
-      toastStore.warning("Please select an image file");
+      toastStore.warning("Vui lòng chọn tệp hình ảnh");
       return;
     }
 
     // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      toastStore.warning("Image size must be less than 5MB");
+      toastStore.warning("Kích thước ảnh phải nhỏ hơn 5MB");
       return;
     }
 
@@ -151,7 +161,7 @@
       if (error instanceof ApiError) {
         toastStore.error(error.message);
       } else {
-        toastStore.error("Failed to upload avatar. Please try again.");
+        toastStore.error("Không thể tải ảnh đại diện. Vui lòng thử lại.");
       }
     } finally {
       isUploadingAvatar = false;
@@ -166,13 +176,13 @@
 
     // Validate file type
     if (!file.type.startsWith("image/")) {
-      toastStore.warning("Please select an image file");
+      toastStore.warning("Vui lòng chọn tệp hình ảnh");
       return;
     }
 
     // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      toastStore.warning("Image size must be less than 5MB");
+      toastStore.warning("Kích thước ảnh phải nhỏ hơn 5MB");
       return;
     }
 
@@ -188,7 +198,7 @@
       if (error instanceof ApiError) {
         toastStore.error(error.message);
       } else {
-        toastStore.error("Failed to upload cover. Please try again.");
+        toastStore.error("Không thể tải ảnh bìa. Vui lòng thử lại.");
       }
     } finally {
       isUploadingCover = false;
@@ -197,7 +207,15 @@
   }
 
   function handleCreatePost() {
-    push("/submit");
+    console.log(
+      "Profile: handleCreatePost clicked, showCreatePostModal =",
+      showCreatePostModal,
+    );
+    showCreatePostModal = true;
+    console.log(
+      "Profile: after setting, showCreatePostModal =",
+      showCreatePostModal,
+    );
   }
 
   function handleEditProfile() {
@@ -206,6 +224,52 @@
 
   function handleSettings() {
     push("/settings");
+  }
+
+  // Handle send message to user
+  async function handleSendMessage() {
+    if (!user || isOwnProfile) return;
+
+    const currentUser = $authStore.user;
+    if (!currentUser) {
+      toastStore.warning("Vui lòng đăng nhập để gửi tin nhắn");
+      return;
+    }
+
+    try {
+      isCreatingChannel = true;
+
+      // Check if channel already exists
+      let channel = await getChannelBetweenUsers(currentUser.id, user.id);
+
+      // If not, create new channel
+      if (!channel) {
+        channel = await createChannel(
+          user.id,
+          user.username,
+          user.profile.avatar?.url || "",
+        );
+      }
+
+      // Set active channel and open chat popup
+      setActiveChannel(channel.id);
+
+      // Trigger chat popup to open by dispatching custom event
+      window.dispatchEvent(
+        new CustomEvent("open-chat", { detail: { channelId: channel.id } }),
+      );
+
+      toastStore.success(`Đang mở trò chuyện với ${user.username}`);
+    } catch (error) {
+      console.error("Failed to create/open channel:", error);
+      if (error instanceof ApiError) {
+        toastStore.error(error.message);
+      } else {
+        toastStore.error("Không thể mở trò chuyện. Vui lòng thử lại.");
+      }
+    } finally {
+      isCreatingChannel = false;
+    }
   }
 
   async function loadUserPosts() {
@@ -227,7 +291,7 @@
       if (error instanceof ApiError) {
         postsError = error.message;
       } else {
-        postsError = "Failed to load posts. Please try again.";
+        postsError = "Không thể tải bài viết. Vui lòng thử lại.";
       }
       posts = [];
     } finally {
@@ -248,7 +312,7 @@
       if (error instanceof ApiError) {
         savedError = error.message;
       } else {
-        savedError = "Failed to load saved posts. Please try again.";
+        savedError = "Không thể tải bài viết đã lưu. Vui lòng thử lại.";
       }
       savedPosts = [];
     } finally {
@@ -294,10 +358,16 @@
   }
 </script>
 
+<!-- Create Post Modal -->
+<CreatePostModal
+  show={showCreatePostModal}
+  onClose={() => (showCreatePostModal = false)}
+/>
+
 {#if isLoadingUser}
   <div class="loading-state">
     <div class="spinner"></div>
-    <p>Loading profile...</p>
+    <p>Đang tải hồ sơ...</p>
   </div>
 {:else if isPrivateProfile && privateProfileData}
   <div class="profile-page private-profile">
@@ -319,16 +389,13 @@
       <div class="profile-info-bar">
         <div class="profile-details">
           <div class="avatar-wrapper">
-            {#if privateProfileData.avatar_url}
-              <img
-                src={privateProfileData.avatar_url}
-                alt={privateProfileData.username}
-                class="profile-avatar"
-              />
-            {:else}
-              <div class="avatar-placeholder">
-                {privateProfileData.username[0]?.toUpperCase() || "U"}
-              </div>
+            <img
+              src={privateProfileData.avatar_url || "/user.jpg"}
+              alt={privateProfileData.username}
+              class="profile-avatar"
+            />
+            {#if user && $chatStore.onlineUsers.has(user.id)}
+              <span class="online-indicator"></span>
             {/if}
           </div>
           <div class="profile-text">
@@ -364,7 +431,7 @@
 {:else if errorMessage}
   <div class="error-state">
     <p>{errorMessage}</p>
-    <button class="retry-btn" onclick={loadUserProfile}>Retry</button>
+    <button class="retry-btn" onclick={loadUserProfile}>Thử lại</button>
   </div>
 {:else if user}
   <div class="profile-page">
@@ -410,17 +477,11 @@
       <div class="profile-info-bar">
         <div class="profile-details">
           <div class="avatar-wrapper">
-            {#if user.profile.avatar?.url}
-              <img
-                src={user.profile.avatar.url}
-                alt={user.username}
-                class="profile-avatar"
-              />
-            {:else}
-              <div class="avatar-placeholder">
-                {user.username[0].toUpperCase()}
-              </div>
-            {/if}
+            <img
+              src={user.profile.avatar?.url || "/user.jpg"}
+              alt={user.username}
+              class="profile-avatar"
+            />
             {#if isOwnProfile}
               <button
                 class="change-avatar-btn"
@@ -445,13 +506,42 @@
           <div class="profile-actions">
             <button class="action-btn primary" onclick={handleCreatePost}>
               <i class="fas fa-plus"></i>
-              + Create Post
+              + Tạo bài viết
             </button>
             <button class="action-btn secondary" onclick={handleEditProfile}>
-              Edit Profile
+              Sửa hồ sơ
             </button>
             <button class="action-btn tertiary" onclick={handleSettings}>
               <img src="/dot.png" alt="Settings" class="settings-icon" />
+            </button>
+          </div>
+        {:else}
+          <div class="profile-actions">
+            <button
+              class="action-btn primary"
+              onclick={handleSendMessage}
+              disabled={isCreatingChannel}
+            >
+              {#if isCreatingChannel}
+                <div class="mini-spinner"></div>
+              {:else}
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 20 20"
+                  fill="none"
+                  style="margin-right: 6px;"
+                >
+                  <path
+                    d="M17 9C17 13.4183 13.4183 17 9 17C7.87087 17 6.79301 16.7625 5.81818 16.3362L3 17L3.66379 14.1818C3.23749 13.207 3 12.1291 3 11C3 6.58172 6.58172 3 11 3C15.4183 3 19 6.58172 19 11"
+                    stroke="currentColor"
+                    stroke-width="1.5"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+                Nhắn tin
+              {/if}
             </button>
           </div>
         {/if}
@@ -464,21 +554,21 @@
           <button
             class="tab-btn"
             class:active={activeTab === "posts"}
-            onclick={() => (activeTab = "posts")}>Posts</button
+            onclick={() => (activeTab = "posts")}>Bài viết</button
           >
           {#if isOwnProfile}
             <button
               class="tab-btn"
               class:active={activeTab === "saved"}
-              onclick={() => (activeTab = "saved")}>Saved</button
+              onclick={() => (activeTab = "saved")}>Đã lưu</button
             >
           {/if}
 
           <div class="sort-options">
             <select bind:value={sortBy}>
-              <option value="hot">Hot</option>
-              <option value="newest">Newest</option>
-              <option value="oldest">Oldest</option>
+              <option value="hot">Nổi bật</option>
+              <option value="newest">Mới nhất</option>
+              <option value="oldest">Cũ nhất</option>
             </select>
           </div>
         </div>
@@ -488,16 +578,18 @@
             {#if isLoadingPosts}
               <div class="loading-posts">
                 <div class="spinner"></div>
-                <p>Loading posts...</p>
+                <p>Đang tải bài viết...</p>
               </div>
             {:else if postsError}
               <div class="error-state">
                 <p>{postsError}</p>
-                <button class="retry-btn" onclick={loadUserPosts}>Retry</button>
+                <button class="retry-btn" onclick={loadUserPosts}
+                  >Thử lại</button
+                >
               </div>
             {:else if posts.length === 0}
               <div class="empty-state">
-                <p>No posts yet</p>
+                <p>Chưa có bài viết</p>
               </div>
             {:else}
               <div class="post-list">
@@ -510,7 +602,7 @@
             {#if isLoadingSaved}
               <div class="loading-posts">
                 <div class="spinner"></div>
-                <p>Loading saved posts...</p>
+                <p>Đang tải bài viết đã lưu...</p>
               </div>
             {:else if savedError}
               <div class="error-state">
@@ -518,8 +610,8 @@
               </div>
             {:else if savedPosts.length === 0}
               <div class="empty-state">
-                <p>No saved posts yet</p>
-                <p class="note">Posts you save will appear here</p>
+                <p>Chưa lưu bài viết nào</p>
+                <p class="note">Các bài viết bạn lưu sẽ xuất hiện ở đây</p>
               </div>
             {:else}
               <div class="posts-list">
@@ -534,9 +626,9 @@
       <div class="profile-sidebar">
         <div class="user-card">
           <div class="user-card-body">
-            <h3>About</h3>
+            <h3>Giới thiệu</h3>
             <p class="bio">
-              {user.profile.bio || "No bio yet."}
+              {user.profile.bio || "Chưa có tiểu sử."}
             </p>
 
             <!-- Personal Info -->
@@ -621,7 +713,7 @@
                       </svg>
                       <span class="link-text"
                         >{formatSocialLink(
-                          user.profile.social_links.website
+                          user.profile.social_links.website,
                         )}</span
                       >
                     </a>
@@ -646,7 +738,7 @@
                       </svg>
                       <span class="link-text"
                         >{formatSocialLink(
-                          user.profile.social_links.facebook
+                          user.profile.social_links.facebook,
                         )}</span
                       >
                     </a>
@@ -671,7 +763,7 @@
                       </svg>
                       <span class="link-text"
                         >{formatSocialLink(
-                          user.profile.social_links.youtube
+                          user.profile.social_links.youtube,
                         )}</span
                       >
                     </a>
@@ -696,7 +788,7 @@
                       </svg>
                       <span class="link-text"
                         >{formatSocialLink(
-                          user.profile.social_links.github
+                          user.profile.social_links.github,
                         )}</span
                       >
                     </a>
@@ -821,6 +913,17 @@
     border-radius: 50%;
     border: 4px solid white;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+
+  .online-indicator {
+    position: absolute;
+    bottom: 12px;
+    right: 12px;
+    width: 24px;
+    height: 24px;
+    background: #46d160;
+    border: 4px solid white;
+    border-radius: 50%;
   }
 
   .change-avatar-btn {

@@ -25,6 +25,7 @@ type MembershipService interface {
 	GetAllMemberships(page int, pageSize int) (*dto.PaginatedMembershipsResponse, error)
 	GetMembershipByCommunityID(communityID string, page int, pageSize int) (*dto.PaginatedMembershipsResponse, error)
 	DeleteMembership(req *dto.DeleteMembershipRequest, userID string) error
+	KickMember(communityID string, targetUserID string, modUserID string) error
 
 	GetMembersCount(communityID string) (int64, error)
 	increaseMembersCount(communityID string) error
@@ -37,11 +38,12 @@ type MembershipService interface {
 
 type membershipService struct {
 	membershipRepo repo.MembershipRepo
+	communityRepo  repo.CommunityRepo
 	redisClient    *redis.Client
 }
 
-func NewMembershipService(membershipRepo repo.MembershipRepo, redisClient *redis.Client) MembershipService {
-	svc := &membershipService{membershipRepo: membershipRepo, redisClient: redisClient}
+func NewMembershipService(membershipRepo repo.MembershipRepo, communityRepo repo.CommunityRepo, redisClient *redis.Client) MembershipService {
+	svc := &membershipService{membershipRepo: membershipRepo, communityRepo: communityRepo, redisClient: redisClient}
 	svc.StartRedisToMongoMembershipSync()
 	return svc
 }
@@ -190,6 +192,70 @@ func (m *membershipService) DeleteMembership(req *dto.DeleteMembershipRequest, u
 	}
 
 	return nil
+}
+
+// KickMember allows moderator/creator to remove a member from community
+func (m *membershipService) KickMember(communityID string, targetUserID string, modUserID string) error {
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
+
+	// Check if mod user has permission (is creator or moderator)
+	community, err := m.communityRepo.GetByID(ctx, communityID)
+	if err != nil {
+		return err
+	}
+
+	isCreator := community.CreateByID.Hex() == modUserID
+	isModerator := false
+	for _, mod := range community.Moderators {
+		if mod.UserID.Hex() == modUserID {
+			isModerator = true
+			break
+		}
+	}
+
+	if !isCreator && !isModerator {
+		return apperror.ErrForbidden
+	}
+
+	// Cannot kick creator
+	if community.CreateByID.Hex() == targetUserID {
+		return apperror.NewError(nil, "CANNOT_KICK_CREATOR", "Cannot kick the community creator")
+	}
+
+	// Cannot kick other moderators unless you're creator
+	if !isCreator {
+		for _, mod := range community.Moderators {
+			if mod.UserID.Hex() == targetUserID {
+				return apperror.NewError(nil, "CANNOT_KICK_MODERATOR", "Only creator can kick moderators")
+			}
+		}
+	}
+
+	// Find and delete membership
+	memberships, err := m.membershipRepo.GetByUserID(ctx, targetUserID)
+	if err != nil {
+		return err
+	}
+
+	var membershipID string
+	for _, membership := range memberships {
+		if membership.CommunityID.Hex() == communityID {
+			membershipID = membership.ID.Hex()
+			break
+		}
+	}
+
+	if membershipID == "" {
+		return apperror.NewError(nil, "MEMBERSHIP_NOT_FOUND", "User is not a member of this community")
+	}
+
+	err = m.membershipRepo.Delete(ctx, membershipID)
+	if err != nil {
+		return err
+	}
+
+	return m.decreaseMembersCount(communityID)
 }
 
 func (m *membershipService) increaseMembersCount(communityID string) error {

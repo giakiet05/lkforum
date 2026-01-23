@@ -9,7 +9,7 @@
   let posts = $state<PostResponse[]>([]);
   let loading = $state(false);
   let error = $state<string | null>(null);
-  let sortBy = $state<SortType | "">("");
+  let sortBy = $state<SortType>("best");
 
   async function loadPosts() {
     loading = true;
@@ -28,15 +28,15 @@
     }
   }
 
+  // Reload posts when sortBy changes
   $effect(() => {
-    if (sortBy !== "") {
-      loadPosts();
-    }
-  });
-
-  onMount(() => {
     loadPosts();
   });
+
+  // Export function to allow external reload
+  export function reloadPosts() {
+    loadPosts();
+  }
 </script>
 
 <div class="page-container">
@@ -44,7 +44,6 @@
 
   <div class="sort-options">
     <select bind:value={sortBy}>
-      <option value="" disabled selected hidden>Sắp xếp theo</option>
       <option value="best">Tốt nhất</option>
       <option value="hot">Nổi bật</option>
       <option value="new">Mới nhất</option>
@@ -65,10 +64,13 @@
     </div>
   {:else if posts.length === 0}
     <div class="empty">
-      <p>
-        Trang chủ của bạn đang trống. Tham gia các cộng đồng để xem bài viết!
+      <div class="empty-icon">🏠</div>
+      <h2>Chào mừng đến trang chủ!</h2>
+      <p>Trang chủ hiển thị bài viết từ các cộng đồng bạn đã tham gia.</p>
+      <p class="hint">
+        Hãy tham gia một số cộng đồng và chờ có người đăng bài mới nhé!
       </p>
-      <a href="#/explore" class="explore-link">Khám phá cộng đồng</a>
+      <a href="#/explore" class="explore-link">🔍 Khám phá cộng đồng</a>
     </div>
   {:else}
     <div class="post-list">
@@ -159,12 +161,28 @@
     text-align: center;
   }
 
+  .empty-icon {
+    font-size: 48px;
+    margin-bottom: 8px;
+  }
+
+  .empty h2 {
+    margin: 0 0 12px 0;
+    color: #1c1c1c;
+    font-size: 20px;
+  }
+
+  .empty .hint {
+    color: #878a8c;
+    font-size: 14px;
+  }
+
   .loading p,
   .error p,
   .empty p {
     color: #5a5a5a;
     font-size: 16px;
-    margin: 16px 0;
+    margin: 8px 0;
   }
 
   .spinner {

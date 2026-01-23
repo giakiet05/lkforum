@@ -42,11 +42,12 @@
   let draftCount = $state(0);
   let errorMessage = $state<string | null>(null);
   let allCommunities = $state<CommunityResponse[]>([]);
+  let isLoadingCommunities = $state(false);
 
   // Load communities and draft count from API
   $effect(() => {
     if (show) {
-      if (allCommunities.length === 0) {
+      if (allCommunities.length === 0 && !isLoadingCommunities) {
         loadCommunities();
       }
       loadDraftCount();
@@ -55,17 +56,21 @@
 
   async function loadCommunities() {
     try {
+      isLoadingCommunities = true;
       const response = await getCommunities({ limit: 100 });
-      allCommunities = response.communities;
+      allCommunities = response.communities || [];
     } catch (error) {
       console.error("Failed to load communities:", error);
+      allCommunities = [];
+    } finally {
+      isLoadingCommunities = false;
     }
   }
 
   async function loadDraftCount() {
     try {
       const response = await getDrafts(1, 1); // Just get count, not all drafts
-      draftCount = response.pagination.total;
+      draftCount = response.pagination?.total || 0;
     } catch (error) {
       console.error("Failed to load draft count:", error);
       draftCount = 0;
@@ -215,7 +220,12 @@
       } else if (activeTab === "images") {
         draftData.type = "image";
         draftData.text = bodyText || undefined;
-        // Note: For now, we save without images. Full image upload can be added later
+        // Warning: images are not saved in draft
+        if (mediaFiles.length > 0) {
+          toastStore.warning(
+            "Lưu ý: Hình ảnh/video sẽ không được lưu trong bản nháp",
+          );
+        }
       } else if (activeTab === "link") {
         draftData.type = "text";
         draftData.text = linkUrl
@@ -225,12 +235,12 @@
 
       await createDraft(draftData);
 
-      toastStore.success("Draft saved successfully!");
+      toastStore.success("Đã lưu bản nháp!");
       handleClose();
     } catch (error) {
       console.error("Failed to save draft:", error);
       errorMessage =
-        error instanceof Error ? error.message : "Failed to save draft";
+        error instanceof Error ? error.message : "Không thể lưu bản nháp";
     } finally {
       isSubmitting = false;
     }
@@ -256,30 +266,30 @@
   async function handlePost() {
     // Validation
     if (!title.trim()) {
-      errorMessage = "Title is required!";
+      errorMessage = "Tiêu đề là bắt buộc!";
       return;
     }
 
     if (title.trim().length < 3) {
-      errorMessage = "Title must be at least 3 characters!";
+      errorMessage = "Tiêu đề phải có ít nhất 3 ký tự!";
       return;
     }
 
     const targetCommunity = selectedCommunity || communityName;
     if (!targetCommunity) {
-      errorMessage = "Please select a community!";
+      errorMessage = "Vui lòng chọn cộng đồng!";
       return;
     }
 
     // Poll validation
     if (activeTab === "poll") {
       if (!pollQuestion.trim()) {
-        errorMessage = "Poll question is required!";
+        errorMessage = "Câu hỏi khảo sát là bắt buộc!";
         return;
       }
       const filledOptions = pollOptions.filter((opt) => opt.trim() !== "");
       if (filledOptions.length < 2) {
-        errorMessage = "Poll needs at least 2 options!";
+        errorMessage = "Khảo sát cần ít nhất 2 lựa chọn!";
         return;
       }
     }
@@ -287,7 +297,7 @@
     // Backend doesn't support link posts yet
     if (activeTab === "link") {
       errorMessage =
-        "Link posts are not supported yet. Please use Text or Images tab.";
+        "Bài viết liên kết chưa được hỗ trợ. Vui lòng dùng tab Văn bản hoặc Hình ảnh.";
       return;
     }
 
@@ -373,21 +383,37 @@
     isDragging = false;
   }
 
+  const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
+
   function handleDrop(e: DragEvent) {
     e.preventDefault();
     isDragging = false;
 
     const files = Array.from(e.dataTransfer?.files || []);
-    const imageFiles = files.filter(
-      (f) => f.type.startsWith("image/") || f.type.startsWith("video/"),
-    );
-    mediaFiles = [...mediaFiles, ...imageFiles];
+    const validFiles = files.filter((f) => {
+      if (!f.type.startsWith("image/") && !f.type.startsWith("video/")) {
+        return false;
+      }
+      if (f.size > MAX_FILE_SIZE) {
+        toastStore.warning(`File "${f.name}" vượt quá giới hạn 100MB`);
+        return false;
+      }
+      return true;
+    });
+    mediaFiles = [...mediaFiles, ...validFiles];
   }
 
   function handleFileSelect(e: Event) {
     const input = e.target as HTMLInputElement;
     const files = Array.from(input.files || []);
-    mediaFiles = [...mediaFiles, ...files];
+    const validFiles = files.filter((f) => {
+      if (f.size > MAX_FILE_SIZE) {
+        toastStore.warning(`File "${f.name}" vượt quá giới hạn 100MB`);
+        return false;
+      }
+      return true;
+    });
+    mediaFiles = [...mediaFiles, ...validFiles];
   }
 </script>
 
@@ -396,7 +422,11 @@
     <div class="modal-content" onclick={(e) => e.stopPropagation()}>
       <div class="modal-header">
         <h2>Create post</h2>
-        <span class="drafts-indicator" onclick={handleOpenDrafts}>
+        <span
+          class="drafts-indicator"
+          onclick={handleOpenDrafts}
+          title="Xem các bản nháp đã lưu"
+        >
           Drafts {#if draftCount > 0}<span class="draft-count"
               >{draftCount}</span
             >{/if}
@@ -417,7 +447,7 @@
             <span
               >{selectedCommunity
                 ? `lk/${selectedCommunity}`
-                : "Select a community"}</span
+                : "Chọn cộng đồng"}</span
             >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
               <path
@@ -451,7 +481,7 @@
               id="community-search-input"
               type="text"
               bind:value={communitySearchQuery}
-              placeholder="Select a community"
+              placeholder="Chọn cộng đồng"
               class="community-search-input"
             />
           </div>
@@ -460,7 +490,9 @@
         <!-- Dropdown list of communities -->
         {#if showCommunitySearch}
           <div class="community-dropdown">
-            {#if filteredCommunities.length > 0}
+            {#if isLoadingCommunities}
+              <div class="loading-communities">Đang tải cộng đồng...</div>
+            {:else if filteredCommunities.length > 0}
               {#each filteredCommunities as community}
                 <button
                   class="community-item"
@@ -475,13 +507,13 @@
                   <div class="community-item-info">
                     <div class="community-item-name">lk/{community.name}</div>
                     <div class="community-item-meta">
-                      {community.member_count} members
+                      {community.member_count} thành viên
                     </div>
                   </div>
                 </button>
               {/each}
             {:else}
-              <div class="no-results">No communities found</div>
+              <div class="no-results">Không tìm thấy cộng đồng</div>
             {/if}
           </div>
         {/if}
@@ -494,28 +526,28 @@
           class:active={activeTab === "text"}
           onclick={() => (activeTab = "text")}
         >
-          Text
+          Văn bản
         </button>
         <button
           class="tab-btn"
           class:active={activeTab === "images"}
           onclick={() => (activeTab = "images")}
         >
-          Images & Video
+          Hình ảnh & Video
         </button>
         <button
           class="tab-btn"
           class:active={activeTab === "link"}
           onclick={() => (activeTab = "link")}
         >
-          Link
+          Liên kết
         </button>
         <button
           class="tab-btn"
           class:active={activeTab === "poll"}
           onclick={() => (activeTab = "poll")}
         >
-          Poll
+          Khảo sát
         </button>
       </div>
 
@@ -523,7 +555,7 @@
       <div class="input-group input-with-required">
         <input
           type="text"
-          placeholder="Title"
+          placeholder="Tiêu đề"
           bind:value={title}
           class="title-input"
         />
@@ -535,14 +567,14 @@
       <!-- Add Tags Button -->
       <!-- TODO: Backend doesn't support tags yet -->
       <button class="add-tags-btn" disabled title="Tags not supported yet"
-        >Add tags</button
+        >Thêm thẻ</button
       >
 
       <!-- Content Area based on active tab -->
       {#if activeTab === "text"}
         <div class="body-text-container">
           <textarea
-            placeholder="Body text (optional)"
+            placeholder="Nội dung (tùy chọn)"
             bind:value={bodyText}
             class="body-textarea"
           ></textarea>
@@ -586,7 +618,8 @@
               width="48"
               height="48"
             />
-            <p>Drag or upload media</p>
+            <p>Kéo thả hoặc tải lên</p>
+            <span class="upload-hint">Tối đa 100MB mỗi file</span>
           </label>
           {#if mediaFiles.length > 0}
             <div class="media-previews">
@@ -598,12 +631,13 @@
         </div>
       {:else if activeTab === "link"}
         <div class="warning-message">
-          ⚠️ Link posts are not supported yet. Please use Text or Images tab.
+          ⚠️ Bài viết liên kết chưa được hỗ trợ. Vui lòng sử dụng tab Văn bản
+          hoặc Hình ảnh.
         </div>
         <div class="input-group input-with-required">
           <input
             type="url"
-            placeholder="Link URL"
+            placeholder="URL liên kết"
             bind:value={linkUrl}
             class="link-input"
             disabled
@@ -618,7 +652,7 @@
           <div class="input-group input-with-required">
             <input
               type="text"
-              placeholder="Ask a question..."
+              placeholder="Đặt câu hỏi..."
               bind:value={pollQuestion}
               class="poll-question-input"
             />
@@ -633,7 +667,7 @@
               <div class="poll-option-row">
                 <input
                   type="text"
-                  placeholder={`Option ${index + 1}`}
+                  placeholder={`Lựa chọn ${index + 1}`}
                   value={option}
                   oninput={(e) =>
                     updatePollOption(index, e.currentTarget.value)}
@@ -654,7 +688,7 @@
             <!-- Add Option Button -->
             {#if pollOptions.length < 6}
               <button class="add-option-btn" onclick={addPollOption}>
-                + Add option
+                + Thêm lựa chọn
               </button>
             {/if}
           </div>
@@ -662,16 +696,16 @@
           <!-- Poll Settings -->
           <div class="poll-settings">
             <div class="setting-row">
-              <label for="poll-duration">Poll duration:</label>
+              <label for="poll-duration">Thời gian khảo sát:</label>
               <select
                 id="poll-duration"
                 bind:value={pollDuration}
                 class="duration-select"
               >
-                <option value="1">1 day</option>
-                <option value="3">3 days</option>
-                <option value="7">7 days</option>
-                <option value="14">14 days</option>
+                <option value="1">1 ngày</option>
+                <option value="3">3 ngày</option>
+                <option value="7">7 ngày</option>
+                <option value="14">14 ngày</option>
               </select>
             </div>
 
@@ -682,7 +716,7 @@
                   bind:checked={allowMultiple}
                   class="checkbox"
                 />
-                Allow multiple choices
+                Cho phép chọn nhiều
               </label>
             </div>
           </div>
@@ -703,10 +737,10 @@
           onclick={handleSaveDraft}
           disabled={isSubmitting}
         >
-          Save draft
+          Lưu nháp
         </button>
         <button class="post-btn" onclick={handlePost} disabled={isSubmitting}>
-          {isSubmitting ? "Posting..." : "Post"}
+          {isSubmitting ? "Đang đăng..." : "Đăng"}
         </button>
       </div>
     </div>
@@ -761,6 +795,14 @@
     font-weight: 600;
     color: #1c1c1c;
     cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: background-color 0.2s ease;
+  }
+
+  .drafts-indicator:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+    color: var(--blue--);
   }
 
   .draft-count {
@@ -884,7 +926,8 @@
     color: var(--grayfont);
   }
 
-  .no-results {
+  .no-results,
+  .loading-communities {
     padding: 24px;
     text-align: center;
     color: var(--grayfont);
@@ -1085,6 +1128,11 @@
     margin: 0;
     font-size: 14px;
     color: #7c7c7c;
+  }
+
+  .upload-hint {
+    font-size: 12px;
+    color: #999;
   }
 
   .media-previews {

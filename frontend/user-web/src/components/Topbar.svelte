@@ -9,7 +9,11 @@
   import type { CommunityResponse } from "../dtos/community-dto";
   import { searchUsers } from "../services/user-service";
   import type { UserResponse } from "../dtos/user-dto";
+  import { getPosts } from "../services/post-service";
+  import type { PostResponse } from "../dtos/post-dto";
   import { getNotifications } from "../services/notification-service";
+  import { totalUnreadCount } from "../stores/chat-store";
+  import { generatePostUrl } from "../utils/slug";
 
   type TopbarProps = {
     user?: { name: string; avatar?: string; karma?: number };
@@ -43,6 +47,12 @@
   let showChatPopup = $state(false);
   let dropdownElement = $state<HTMLDivElement | null>(null);
   let unreadNotificationCount = $state(0);
+  let unreadMessageCount = $state(0);
+
+  // Subscribe to total unread count
+  $effect(() => {
+    unreadMessageCount = $totalUnreadCount;
+  });
 
   // Watch forceShowAuthModal prop and open modal when true
   $effect(() => {
@@ -63,12 +73,23 @@
         console.error("Failed to load initial notification count:", err);
       }
     }
+
+    // Listen for open-chat event from Profile page
+    const handleOpenChat = (event: CustomEvent) => {
+      showChatPopup = true;
+    };
+    window.addEventListener("open-chat", handleOpenChat as EventListener);
+
+    return () => {
+      window.removeEventListener("open-chat", handleOpenChat as EventListener);
+    };
   });
 
   // Search dropdown state
   let showSearchDropdown = $state(false);
   let communityResults = $state<CommunityResponse[]>([]);
   let userResults = $state<UserResponse[]>([]);
+  let postResults = $state<PostResponse[]>([]);
   let isSearching = $state(false);
   let searchTimeout: number | null = null;
 
@@ -91,29 +112,48 @@
         return;
       }
 
-      // Search both communities and users in parallel
-      const [communitiesResponse, usersResponse] = await Promise.all([
-        getCommunities({
-          name: cleanQuery,
-          limit: 3,
-        }).catch(() => ({
-          communities: [],
-          pagination: { page: 1, page_size: 0, total_items: 0, total_pages: 0 },
-        })),
-        searchUsers(cleanQuery, 1, 3).catch(() => ({
-          users: [],
-          pagination: { page: 1, page_size: 0, total_items: 0, total_pages: 0 },
-        })),
-      ]);
+      // Search communities, users, and posts in parallel
+      const [communitiesResponse, usersResponse, postsResponse] =
+        await Promise.all([
+          getCommunities({
+            name: cleanQuery,
+            limit: 3,
+          }).catch(() => ({
+            communities: [],
+            pagination: {
+              page: 1,
+              page_size: 0,
+              total_items: 0,
+              total_pages: 0,
+            },
+          })),
+          searchUsers(cleanQuery, 1, 3).catch(() => ({
+            users: [],
+            pagination: {
+              page: 1,
+              page_size: 0,
+              total_items: 0,
+              total_pages: 0,
+            },
+          })),
+          getPosts({
+            search: cleanQuery,
+            limit: 3,
+          }).catch(() => []),
+        ]);
 
       communityResults = communitiesResponse?.communities || [];
       userResults = usersResponse?.users || [];
+      postResults = postsResponse || [];
       showSearchDropdown =
-        communityResults.length > 0 || userResults.length > 0;
+        communityResults.length > 0 ||
+        userResults.length > 0 ||
+        postResults.length > 0;
     } catch (error) {
       console.error("Search failed:", error);
       communityResults = [];
       userResults = [];
+      postResults = [];
       showSearchDropdown = false;
     } finally {
       isSearching = false;
@@ -133,7 +173,8 @@
 
   function handleSearch() {
     if (searchQuery.trim()) {
-      onSearch?.(searchQuery);
+      // Navigate to search page to show full results
+      push(`/search?q=${encodeURIComponent(searchQuery)}`);
       showSearchDropdown = false;
     }
   }
@@ -147,27 +188,55 @@
     }
   }
 
-  function handleCommunityClick(communityName: string) {
-    console.log("🔍 Navigating to community:", communityName);
+  function handleCommunityClick(e: MouseEvent, communityName: string) {
+    e.preventDefault();
+    e.stopPropagation();
     push(`/lk/${communityName}`);
     searchQuery = "";
     communityResults = [];
     userResults = [];
+    postResults = [];
     showSearchDropdown = false;
   }
 
-  function handleUserClick(username: string) {
+  function handleUserClick(e: MouseEvent, username: string) {
+    e.preventDefault();
+    e.stopPropagation();
     push(`/profile/${username}`);
     searchQuery = "";
     communityResults = [];
     userResults = [];
+    postResults = [];
+    showSearchDropdown = false;
+  }
+
+  function handlePostClick(e: MouseEvent, postId: string, postTitle: string) {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log("🔍 Navigating to post:", postId, postTitle);
+
+    if (!postId) {
+      console.error("❌ Post ID is undefined!");
+      return;
+    }
+
+    const url = generatePostUrl(postId, postTitle);
+    console.log("🔗 Pushing URL:", url);
+    push(url);
+
+    searchQuery = "";
+    communityResults = [];
+    userResults = [];
+    postResults = [];
     showSearchDropdown = false;
   }
 
   function handleSearchFocus() {
     if (
       searchQuery.trim() &&
-      (communityResults.length > 0 || userResults.length > 0)
+      (communityResults.length > 0 ||
+        userResults.length > 0 ||
+        postResults.length > 0)
     ) {
       showSearchDropdown = true;
     }
@@ -177,7 +246,7 @@
     // Delay to allow click on dropdown items
     setTimeout(() => {
       showSearchDropdown = false;
-    }, 200);
+    }, 300);
   }
 
   function toggleUserMenu() {
@@ -264,7 +333,13 @@
         </svg>
       </button>
 
-      <div class="brand" role="button" tabindex="0" onclick={() => {}}>
+      <div
+        class="brand"
+        role="button"
+        tabindex="0"
+        onclick={() => (window.location.href = "/")}
+        style="cursor: pointer;"
+      >
         <img src="/LKlogo.svg" alt="LKForum" class="brand-icon" />
         <span class="brand-name">LKForum</span>
       </div>
@@ -329,14 +404,14 @@
             onblur={handleSearchBlur}
           />
 
-          {#if showSearchDropdown && (communityResults.length > 0 || userResults.length > 0)}
+          {#if showSearchDropdown && (communityResults.length > 0 || userResults.length > 0 || postResults.length > 0)}
             <div class="search-dropdown">
               {#if communityResults.length > 0}
                 <div class="search-dropdown-header">Cộng đồng</div>
                 {#each communityResults as community}
                   <button
                     class="search-result-item"
-                    onclick={() => handleCommunityClick(community.name)}
+                    onmousedown={(e) => handleCommunityClick(e, community.name)}
                   >
                     <img
                       src={community.avatar || "/default-community.png"}
@@ -361,7 +436,7 @@
                 {#each userResults as userResult}
                   <button
                     class="search-result-item"
-                    onclick={() => handleUserClick(userResult.username)}
+                    onmousedown={(e) => handleUserClick(e, userResult.username)}
                   >
                     {#if userResult.profile?.avatar?.url}
                       <img
@@ -378,6 +453,29 @@
                       <div class="result-name">u/{userResult.username}</div>
                       <div class="result-meta">
                         {userResult.reputation} karma • {userResult.title}
+                      </div>
+                    </div>
+                  </button>
+                {/each}
+              {/if}
+
+              {#if postResults.length > 0}
+                {#if communityResults.length > 0 || userResults.length > 0}
+                  <div class="search-dropdown-divider"></div>
+                {/if}
+                <div class="search-dropdown-header">Bài viết</div>
+                {#each postResults as post}
+                  <button
+                    class="search-result-item post-result"
+                    onmousedown={(e) =>
+                      handlePostClick(e, post.id, post.title || "post")}
+                  >
+                    <div class="result-info">
+                      <div class="result-name">
+                        {post.title || "Untitled Post"}
+                      </div>
+                      <div class="result-meta">
+                        lk/{post.community.name} • {post.author.username}
                       </div>
                     </div>
                   </button>
@@ -410,6 +508,27 @@
               />
             </svg>
             <span class="button-text">Tạo</span>
+          </button>
+
+          <button
+            type="button"
+            class="icon-button message-btn"
+            onclick={() => (showChatPopup = !showChatPopup)}
+            title="Tin nhắn"
+            aria-label="Tin nhắn"
+          >
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+              <path
+                d="M17 9C17 13.4183 13.4183 17 9 17C7.87087 17 6.79301 16.7625 5.81818 16.3362L3 17L3.66379 14.1818C3.23749 13.207 3 12.1291 3 11C3 6.58172 6.58172 3 11 3C15.4183 3 19 6.58172 19 11"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+            {#if unreadMessageCount > 0}
+              <span class="notification-badge">{unreadMessageCount}</span>
+            {/if}
           </button>
 
           <button
@@ -464,13 +583,11 @@
               aria-expanded={showUserMenu}
             >
               <div class="user-avatar">
-                {#if user.avatar}
-                  <img src={user.avatar} alt={user.name} class="avatar-image" />
-                {:else}
-                  <span class="avatar-fallback"
-                    >{user.name.charAt(0).toUpperCase()}</span
-                  >
-                {/if}
+                <img
+                  src={user.avatar || "/user.jpg"}
+                  alt={user.name}
+                  class="avatar-image"
+                />
               </div>
               <div class="user-info">
                 <span class="user-name">{user.name}</span>
@@ -612,9 +729,9 @@
     --topbar-foreground: #213547;
     --topbar-accent: #ff8a00;
     --topbar-accent-hover: #ff7a00;
-    --topbar-search-background: #ffffff;
-    --topbar-search-border: #e6e9ee;
-    --topbar-search-focus-background: #8fabd4;
+    --topbar-search-background: #ececec;
+    --topbar-search-border: #ececec;
+    --topbar-search-focus-background: #ececec;
     --topbar-search-focus-border: #4a70a9;
     --topbar-search-icon: #000000;
     --topbar-search-text: #000000;
@@ -849,6 +966,20 @@
     overflow: hidden;
     text-overflow: ellipsis;
     line-height: 1.2;
+  }
+
+  .post-result .result-info {
+    gap: 4px;
+  }
+
+  .post-result .result-name {
+    white-space: normal;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    line-height: 1.4;
   }
 
   .search-loading {

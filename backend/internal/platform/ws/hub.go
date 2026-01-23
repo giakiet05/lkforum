@@ -46,17 +46,36 @@ func (h *Hub) RegisterClient(client *Client) {
 	h.register <- client
 }
 
+// GetOnlineUsers returns a list of currently connected user IDs
+func (h *Hub) GetOnlineUsers() []string {
+	userIDs := make([]string, 0, len(h.userClients))
+	for userID := range h.userClients {
+		userIDs = append(userIDs, userID)
+	}
+	return userIDs
+}
+
 func (h *Hub) run(eventChannel bus.EventListener) {
 	for {
 		select {
 		case client := <-h.register:
 			h.userClients[client.UserID] = client
 			log.Printf("WebSocket client registered: %s", client.UserID)
+
+			// Broadcast presence online to all connected users
+			onlineUsers := h.GetOnlineUsers()
+			presencePayload := dto.PresencePayload{UserID: client.UserID}
+			h.broadcastToUsers(onlineUsers, dto.PresenceOnline, presencePayload)
 		case client := <-h.unregister:
 			if _, ok := h.userClients[client.UserID]; ok {
 				delete(h.userClients, client.UserID)
 				close(client.send)
 				log.Printf("WebSocket client unregistered: %s", client.UserID)
+
+				// Broadcast presence offline to remaining connected users
+				onlineUsers := h.GetOnlineUsers()
+				presencePayload := dto.PresencePayload{UserID: client.UserID}
+				h.broadcastToUsers(onlineUsers, dto.PresenceOffline, presencePayload)
 			}
 		case data := <-h.incoming:
 			//Handle message receive from client

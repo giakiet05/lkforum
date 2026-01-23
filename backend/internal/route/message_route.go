@@ -15,5 +15,6 @@ func RegisterMessageRoutes(rg *gin.RouterGroup, c *controller.MessageController)
 		messages.GET(":message_id", c.GetMessageByID)
 		messages.GET("filter", c.GetMessageFilter)
 		messages.DELETE(":message_id", c.DeleteMessageByID)
+		messages.PUT("/channels/:channel_id/read", c.MarkChannelAsRead)
 	}
 }
