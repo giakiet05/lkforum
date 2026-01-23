@@ -256,6 +256,22 @@
     // Load channels
     await loadChannels();
 
+    // Check for channel query param (from notification click)
+    const urlParams = new URLSearchParams(
+      window.location.hash.split("?")[1] || "",
+    );
+    const channelIdFromUrl = urlParams.get("channel");
+    if (channelIdFromUrl) {
+      console.log("📩 Opening channel from notification:", channelIdFromUrl);
+      // Find and select the channel after channels are loaded
+      setTimeout(() => {
+        const targetChannel = channels.find((c) => c.id === channelIdFromUrl);
+        if (targetChannel) {
+          handleSelectChannel(targetChannel);
+        }
+      }, 100);
+    }
+
     // Register message handler (WebSocket already connected in App.svelte)
     if (websocketService.isConnected()) {
       websocketService.onMessage(handleIncomingMessage);

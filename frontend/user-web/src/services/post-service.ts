@@ -10,10 +10,11 @@ import type {
     RemoveImagesRequest,
     PollResponse,
 } from "../dtos/post-dto";
-import { publicFetch, authenticatedFetch, handleApiResponse } from "./api";
+import { publicFetch, authenticatedFetch, handleApiResponse, optionalAuthFetch } from "./api";
 
 /**
  * Get posts with optional filters
+ * Uses optional auth - if logged in, sends token for personalized feed
  */
 export async function getPosts(query?: GetPostsQuery): Promise<PostResponse[]> {
     const params = new URLSearchParams();
@@ -31,7 +32,8 @@ export async function getPosts(query?: GetPostsQuery): Promise<PostResponse[]> {
     const queryString = params.toString();
     const url = queryString ? `/api/posts?${queryString}` : "/api/posts";
 
-    const res = await publicFetch(url, {
+    // Use optionalAuthFetch - sends token if available for personalized home feed
+    const res = await optionalAuthFetch(url, {
         method: "GET",
     });
 

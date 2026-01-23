@@ -2,11 +2,13 @@ import type { Pagination } from './pagination-dto';
 
 // --- Response DTOs ---
 
+// Backend notification types (from model/notification.go)
 export type NotificationType =
     | "comment"
-    | "upvote"
+    | "like"         // Backend uses "like" for upvotes
+    | "follow"
     | "mention"
-    | "message"
+    | "new_message"  // Backend uses "new_message" for messages
     | "system";
 
 export interface NotificationResponse {

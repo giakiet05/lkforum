@@ -61,9 +61,22 @@
   let isUploadingCover = $state(false);
   let isCreatingChannel = $state(false);
 
-  onMount(() => {
-    loadUserProfile();
+  // Watch for params changes to reload profile
+  $effect(() => {
+    // Reset states when params change
+    hasLoadedPosts = false;
+    hasLoadedSaved = false;
+    posts = [];
+    savedPosts = [];
+    postsError = null;
+    savedError = null;
+    activeTab = "posts";
 
+    // Load new profile
+    loadUserProfile();
+  });
+
+  onMount(() => {
     // Listen for auth:unauthorized event to redirect
     const handleUnauthorized = () => {
       push("/");

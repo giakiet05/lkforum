@@ -6,7 +6,7 @@ import type { NotificationResponse, PaginatedNotificationsResponse } from "../dt
  */
 export async function getNotifications(params?: {
     page?: number;
-    limit?: number;
+    pageSize?: number;
 }): Promise<PaginatedNotificationsResponse> {
     const queryParams = new URLSearchParams();
     if (params) {

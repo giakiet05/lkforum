@@ -216,6 +216,10 @@
   async function handleUpvote(e: MouseEvent) {
     e.stopPropagation();
     console.log("⬆️ Upvote clicked for post:", post.id);
+    console.log("⬆️ currentUser:", currentUser);
+    console.log("⬆️ post.author.id:", post.author.id);
+    console.log("⬆️ isOwnPost:", isOwnPost);
+
     if (!currentUser) {
       toastStore.warning("Vui lòng đăng nhập để bỏ phiếu");
       return;
@@ -233,6 +237,7 @@
 
       // Backend tự động toggle: POST cùng giá trị sẽ remove vote
       await voteOnPost(post.id, true);
+      console.log("⬆️ Vote API call successful");
 
       if (previousVote === "up") {
         // Bấm lần 2 - remove upvote

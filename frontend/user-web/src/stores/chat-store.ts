@@ -5,6 +5,9 @@ import type { MessageResponse } from "../dtos/message-dto";
 // --- Chat State ---
 
 interface ChatState {
+    // Current user ID (to filter own messages from unread count)
+    currentUserId: string | null;
+    
     // All channels for current user
     channels: ChannelResponse[];
     
@@ -27,6 +30,7 @@ interface ChatState {
 }
 
 const initialState: ChatState = {
+    currentUserId: null,
     channels: [],
     activeChannelId: null,
     messagesByChannel: new Map(),
@@ -64,15 +68,17 @@ export const activeChannelMessages = derived(
 );
 
 /**
- * Get unread count for each channel
+ * Get unread count for each channel (excluding own messages)
  */
 export const unreadCounts = derived(
     chatStore,
     $chatStore => {
         const counts = new Map<string, number>();
+        const currentUserId = $chatStore.currentUserId;
         
         $chatStore.messagesByChannel.forEach((messages, channelId) => {
-            const unreadCount = messages.filter(m => !m.is_read).length;
+            // Only count unread messages that are NOT from the current user
+            const unreadCount = messages.filter(m => !m.is_read && m.sender_id !== currentUserId).length;
             counts.set(channelId, unreadCount);
         });
         
@@ -81,22 +87,39 @@ export const unreadCounts = derived(
 );
 
 /**
- * Get total unread messages count across all channels
+ * Get total unread messages count across all channels (excluding own messages)
  */
 export const totalUnreadCount = derived(
     chatStore,
     $chatStore => {
         let total = 0;
+        const currentUserId = $chatStore.currentUserId;
+        
         $chatStore.messagesByChannel.forEach((messages, channelId) => {
-            // Get current user from messages to exclude own messages
-            const unreadCount = messages.filter(m => !m.is_read).length;
+            // Only count unread messages that are NOT from the current user
+            const unreadCount = messages.filter(m => {
+                const isUnread = !m.is_read;
+                const isFromOther = m.sender_id !== currentUserId;
+                return isUnread && isFromOther;
+            }).length;
             total += unreadCount;
         });
+        console.log("📊 [chat-store] totalUnreadCount:", total, "currentUserId:", currentUserId);
         return total;
     }
 );
 
 // --- Actions ---
+
+/**
+ * Set current user ID (needed to filter own messages from unread count)
+ */
+export function setCurrentUserId(userId: string | null) {
+    chatStore.update(state => ({
+        ...state,
+        currentUserId: userId
+    }));
+}
 
 /**
  * Set all channels

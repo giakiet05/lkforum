@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { push } from "svelte-spa-router";
   import type { CommentResponse } from "../dtos/comment-dto";
   import CommentComponent from "./Comment.svelte";
   import { deleteComment, createComment } from "../services/comment-service";
@@ -183,9 +184,19 @@
         <img
           src={comment.author.avatar?.url || "/user.jpg"}
           alt={comment.author.username}
-          class="author-avatar"
+          class="author-avatar clickable"
+          onclick={() => push(`/profile/${comment.author.username}`)}
+          role="button"
+          tabindex="0"
         />
-        <span class="author-name">u/{comment.author.username}</span>
+        <span
+          class="author-name clickable"
+          onclick={() => push(`/profile/${comment.author.username}`)}
+          role="button"
+          tabindex="0"
+        >
+          u/{comment.author.username}
+        </span>
         <span class="comment-time">{formatTime(comment.created_at)}</span>
         {#if comment.children && comment.children.length > 0}
           <button class="collapse-btn" onclick={toggleCollapse}>
@@ -428,9 +439,22 @@
     object-fit: cover;
   }
 
+  .author-avatar.clickable {
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+
+  .author-avatar.clickable:hover {
+    opacity: 0.8;
+  }
+
   .author-name {
     font-weight: 700;
     color: #1c1c1c;
+  }
+
+  .author-name.clickable {
+    cursor: pointer;
   }
 
   .author-name:hover {
