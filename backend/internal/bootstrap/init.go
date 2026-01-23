@@ -107,7 +107,7 @@ func initServices(repos *Repos, redisClient *redis.Client, emailSender email.Sen
 	services := &Services{
 		AuthService:         service.NewAuthService(repos.UserRepo, repos.EmailVerificationRepo, repos.PasswordResetRepo, emailSender, redisClient, tokenService),
 		UserService:         service.NewUserService(repos.UserRepo, eventBus, redisClient),
-		MembershipService:   service.NewMembershipService(repos.MembershipRepo, redisClient),
+		MembershipService:   service.NewMembershipService(repos.MembershipRepo, repos.CommunityRepo, redisClient),
 		ReputationService:   service.NewReputationService(repos.UserRepo, eventBus),
 		NotificationService: service.NewNotificationService(repos.NotificationRepo, repos.UserRepo, repos.PostRepo, repos.CommentRepo, repos.CommunityRepo, eventBus, redisClient),
 		ChannelService:      service.NewChannelService(repos.ChannelRepo, eventBus),
@@ -218,7 +218,7 @@ func Init() (*gin.Engine, error) {
 	client := config.NewMongoClient()
 	db := client.Database(config.Cfg.DBName)
 	router := gin.Default()
-	router.MaxMultipartMemory = 10 << 20 // 10 MB
+	router.MaxMultipartMemory = 100 << 20 // 100 MB
 
 	router.Use(func(c *gin.Context) {
 		origin := c.Request.Header.Get("Origin")

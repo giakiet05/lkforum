@@ -82,7 +82,7 @@
       if (error instanceof ApiError) {
         errorMessage = error.message;
       } else {
-        errorMessage = "Failed to load profile.";
+        errorMessage = "Không thể tải hồ sơ.";
       }
     } finally {
       isLoadingUser = false;
@@ -180,19 +180,19 @@
       if (hasLinkChanges) payload.social_links = newLinks;
 
       if (Object.keys(payload).length === 0) {
-        successMessage = "No changes to save";
+        successMessage = "Không có thay đổi để lưu";
         return;
       }
 
       const updatedUser = await updateProfile(payload);
       updateUserState(updatedUser); // Đồng bộ với authStore
-      successMessage = "Profile updated successfully!";
+      successMessage = "Đã cập nhật hồ sơ!";
     } catch (error) {
       console.error("Failed to update profile:", error);
       if (error instanceof ApiError) {
         errorMessage = error.message;
       } else {
-        errorMessage = "Failed to update profile.";
+        errorMessage = "Không thể cập nhật hồ sơ.";
       }
     } finally {
       isSaving = false;
@@ -201,17 +201,17 @@
 
   async function handleChangePassword() {
     if (!oldPassword || !newPassword || !confirmPassword) {
-      errorMessage = "All password fields are required";
+      errorMessage = "Vui lòng điền đầy đủ các trường mật khẩu";
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      errorMessage = "New passwords do not match";
+      errorMessage = "Mật khẩu mới không khớp";
       return;
     }
 
     if (newPassword.length < 6) {
-      errorMessage = "New password must be at least 6 characters";
+      errorMessage = "Mật khẩu mới phải có ít nhất 6 ký tự";
       return;
     }
 
@@ -225,7 +225,7 @@
         new_password: newPassword,
       });
 
-      successMessage = "Password changed successfully!";
+      successMessage = "Đã đổi mật khẩu thành công!";
       showPasswordModal = false;
       oldPassword = "";
       newPassword = "";
@@ -235,7 +235,7 @@
       if (error instanceof ApiError) {
         errorMessage = error.message;
       } else {
-        errorMessage = "Failed to change password.";
+        errorMessage = "Không thể đổi mật khẩu.";
       }
     } finally {
       isSaving = false;
@@ -251,46 +251,44 @@
       editedSettings = JSON.parse(JSON.stringify(settings));
 
       // Show brief success feedback
-      successMessage = "Saved";
+      successMessage = "Đã lưu";
       setTimeout(() => {
-        if (successMessage === "Saved") successMessage = null;
+        if (successMessage === "Đã lưu") successMessage = null;
       }, 2000);
     } catch (error) {
       console.error("Failed to save settings:", error);
       if (error instanceof ApiError) {
         errorMessage = error.message;
       } else {
-        errorMessage = "Failed to save settings.";
+        errorMessage = "Không thể lưu cài đặt.";
       }
     }
   }
 
   function handleDeleteAccount() {
     const confirmed = confirm(
-      "Are you sure you want to delete your account? This action cannot be undone and will permanently delete:\n\n" +
-        "• All your posts and comments\n" +
-        "• Your profile and settings\n" +
-        "• Your saved content\n" +
-        "• All your activity history\n\n" +
-        "Type 'DELETE' to confirm."
+      "Bạn có chắc muốn xóa tài khoản? Hành động này không thể hoàn tác và sẽ xóa vĩnh viễn:\n\n" +
+        "• Tất cả bài viết và bình luận\n" +
+        "• Hồ sơ và cài đặt\n" +
+        "• Nội dung đã lưu\n" +
+        "• Lịch sử hoạt động\n\n" +
+        "Nhập 'DELETE' để xác nhận.",
     );
 
     if (!confirmed) return;
 
     const verification = prompt(
-      "Please type DELETE to confirm account deletion:"
+      "Vui lòng nhập DELETE để xác nhận xóa tài khoản:",
     );
 
     if (verification !== "DELETE") {
-      toastStore.warning(
-        "Account deletion cancelled. Verification text did not match."
-      );
+      toastStore.warning("Hủy xóa tài khoản. Không khớp mã xác nhận.");
       return;
     }
 
     // TODO: Call delete account API when available
     toastStore.info(
-      "Delete account feature is not yet implemented in backend.\n\nRequired API: DELETE /api/users/me"
+      "Tính năng xóa tài khoản chưa được triển khai.\n\nAPI yêu cầu: DELETE /api/users/me",
     );
 
     // Future implementation:
@@ -319,12 +317,12 @@
     if (!file) return;
 
     if (!file.type.startsWith("image/")) {
-      errorMessage = "Please select an image file";
+      errorMessage = "Vui lòng chọn tệp hình ảnh";
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      errorMessage = "Image size must be less than 5MB";
+      errorMessage = "Kích thước ảnh phải nhỏ hơn 5MB";
       return;
     }
 
@@ -333,13 +331,13 @@
       errorMessage = null;
       const updatedUser = await uploadAvatar(file);
       updateUserState(updatedUser); // Đồng bộ với authStore
-      successMessage = "Avatar uploaded!";
+      successMessage = "Đã tải ảnh đại diện lên!";
     } catch (error) {
       console.error("Failed to upload avatar:", error);
       if (error instanceof ApiError) {
         errorMessage = error.message;
       } else {
-        errorMessage = "Failed to upload avatar.";
+        errorMessage = "Không thể tải ảnh đại diện.";
       }
     } finally {
       isUploadingAvatar = false;
@@ -348,20 +346,20 @@
   }
 
   async function handleDeleteAvatar() {
-    if (!confirm("Delete your avatar?")) return;
+    if (!confirm("Xóa ảnh đại diện?")) return;
 
     try {
       isDeletingAvatar = true;
       errorMessage = null;
       const updatedUser = await deleteAvatar();
       updateUserState(updatedUser); // Đồng bộ với authStore
-      successMessage = "Avatar deleted!";
+      successMessage = "Đã xóa ảnh đại diện!";
     } catch (error) {
       console.error("Failed to delete avatar:", error);
       if (error instanceof ApiError) {
         errorMessage = error.message;
       } else {
-        errorMessage = "Failed to delete avatar.";
+        errorMessage = "Không thể xóa ảnh đại diện.";
       }
     } finally {
       isDeletingAvatar = false;
@@ -373,7 +371,7 @@
       editedInterests = editedInterests.filter((i) => i !== interest);
     } else {
       if (editedInterests.length >= 10) {
-        errorMessage = "Max 10 interests";
+        errorMessage = "Tối đa 10 sở thích";
         return;
       }
       editedInterests = [...editedInterests, interest];
@@ -410,9 +408,9 @@
 
   <div class="settings-container">
     <div class="settings-header">
-      <h1>Settings</h1>
+      <h1>Cài đặt</h1>
       <p class="settings-description">
-        Manage your account settings and preferences
+        Quản lý cài đặt tài khoản và tùy chọn của bạn
       </p>
     </div>
 
@@ -455,7 +453,7 @@
               stroke-linejoin="round"
             />
           </svg>
-          Privacy
+          Quyền riêng tư
         </button>
 
         <button
@@ -478,7 +476,7 @@
               stroke-linecap="round"
             />
           </svg>
-          Notifications
+          Thông báo
         </button>
 
         <button
@@ -501,7 +499,7 @@
               stroke-linecap="round"
             />
           </svg>
-          Appearance
+          Giao diện
         </button>
       </div>
 
@@ -509,15 +507,15 @@
         {#if isLoadingUser}
           <div class="loading-state">
             <div class="spinner"></div>
-            <p>Loading...</p>
+            <p>Đang tải...</p>
           </div>
         {:else if activeTab === "account" && user}
           <div class="settings-section">
-            <h2>Account Settings</h2>
-            <p class="section-description">Manage your account information</p>
+            <h2>Cài đặt tài khoản</h2>
+            <p class="section-description">Quản lý thông tin tài khoản</p>
 
             <div class="form-group">
-              <span class="form-label">Profile Picture</span>
+              <span class="form-label">Ảnh đại diện</span>
               <div class="avatar-upload">
                 <div class="avatar-preview">
                   {#if user.profile.avatar?.url}
@@ -534,7 +532,7 @@
                     onclick={() => avatarFileInput.click()}
                     disabled={isUploadingAvatar || isDeletingAvatar}
                   >
-                    {isUploadingAvatar ? "Uploading..." : "Change Avatar"}
+                    {isUploadingAvatar ? "Đang tải..." : "Đổi ảnh đại diện"}
                   </button>
                   {#if user.profile.avatar?.url}
                     <button
@@ -542,7 +540,7 @@
                       onclick={handleDeleteAvatar}
                       disabled={isUploadingAvatar || isDeletingAvatar}
                     >
-                      {isDeletingAvatar ? "Deleting..." : "Remove"}
+                      {isDeletingAvatar ? "Đang xóa..." : "Xóa"}
                     </button>
                   {/if}
                 </div>
@@ -550,7 +548,7 @@
             </div>
 
             <div class="form-group">
-              <label for="username-label">Username</label>
+              <label for="username-label">Tên người dùng</label>
               <div class="input-with-prefix">
                 <span class="input-prefix">u/</span>
                 <input
@@ -560,7 +558,7 @@
                   disabled
                 />
               </div>
-              <p class="input-hint">Your username cannot be changed</p>
+              <p class="input-hint">Tên người dùng không thể thay đổi</p>
             </div>
 
             <div class="form-group">
@@ -571,25 +569,25 @@
                 value={user.email}
                 disabled
               />
-              <p class="input-hint">Your email cannot be changed</p>
+              <p class="input-hint">Email không thể thay đổi</p>
             </div>
 
             <div class="form-group">
-              <label for="bio">Bio</label>
+              <label for="bio">Tiểu sử</label>
               <textarea
                 id="bio"
                 rows="4"
                 bind:value={editedBio}
-                placeholder="Tell us about yourself"
+                placeholder="Kể về bản thân bạn"
                 maxlength="500"
               ></textarea>
-              <p class="input-hint">{editedBio.length}/500 characters</p>
+              <p class="input-hint">{editedBio.length}/500 ký tự</p>
             </div>
 
             <div class="form-group">
-              <label for="gender">Gender</label>
+              <label for="gender">Giới tính</label>
               <select id="gender" bind:value={editedGender}>
-                <option value="">Select gender</option>
+                <option value="">Chọn giới tính</option>
                 {#each genders as gender}
                   <option value={gender}
                     >{gender === "male"
@@ -603,15 +601,15 @@
             </div>
 
             <div class="form-group">
-              <label for="dob">Date of Birth</label>
+              <label for="dob">Ngày sinh</label>
               <input type="date" id="dob" bind:value={editedDateOfBirth} />
-              <p class="input-hint">You must be at least 13 years old</p>
+              <p class="input-hint">Bạn phải ít nhất 13 tuổi</p>
             </div>
 
             <div class="form-group">
-              <label for="location">Location</label>
+              <label for="location">Địa điểm</label>
               <select id="location" bind:value={editedLocation}>
-                <option value="">Select province</option>
+                <option value="">Chọn tỉnh/thành</option>
                 {#each provinces as province}
                   <option value={province}>{province}</option>
                 {/each}
@@ -619,7 +617,7 @@
             </div>
 
             <div class="form-group">
-              <label for="interests-label">Interests (max 10)</label>
+              <label for="interests-label">Sở thích (tối đa 10)</label>
               <div class="interests-grid" id="interests-label">
                 {#each allInterests as interest}
                   <button
@@ -632,16 +630,16 @@
                   </button>
                 {/each}
               </div>
-              <p class="input-hint">{editedInterests.length}/10 selected</p>
+              <p class="input-hint">{editedInterests.length}/10 đã chọn</p>
             </div>
 
             <div class="form-group">
-              <label for="social-website">Social Links</label>
+              <label for="social-website">Liên kết xã hội</label>
               <input
                 type="url"
                 id="social-website"
                 bind:value={editedWebsite}
-                placeholder="Website URL"
+                placeholder="URL Website"
               />
             </div>
             <div class="form-group">
@@ -650,7 +648,7 @@
                 type="text"
                 id="social-facebook"
                 bind:value={editedFacebook}
-                placeholder="Facebook username or URL"
+                placeholder="Tên đăng nhập hoặc URL Facebook"
               />
             </div>
             <div class="form-group">
@@ -659,7 +657,7 @@
                 type="text"
                 id="social-youtube"
                 bind:value={editedYouTube}
-                placeholder="YouTube channel URL"
+                placeholder="URL kênh YouTube"
               />
             </div>
             <div class="form-group">
@@ -668,7 +666,7 @@
                 type="text"
                 id="social-github"
                 bind:value={editedGitHub}
-                placeholder="GitHub username"
+                placeholder="Tên đăng nhập GitHub"
               />
             </div>
 
@@ -678,48 +676,47 @@
                 onclick={handleSaveAccount}
                 disabled={isSaving}
               >
-                {isSaving ? "Saving..." : "Save Changes"}
+                {isSaving ? "Đang lưu..." : "Lưu thay đổi"}
               </button>
             </div>
 
             <div class="password-section">
-              <h3>Password</h3>
+              <h3>Mật khẩu</h3>
               <button
                 class="btn-secondary"
-                onclick={() => (showPasswordModal = true)}
-                >Change Password</button
+                onclick={() => (showPasswordModal = true)}>Đổi mật khẩu</button
               >
             </div>
 
             <!-- Delete Account Section -->
             <div class="danger-zone">
-              <h3>Danger Zone</h3>
+              <h3>Vùng nguy hiểm</h3>
               <div class="danger-content">
                 <div>
-                  <h4>Delete Account</h4>
+                  <h4>Xóa tài khoản</h4>
                   <p>
-                    Permanently delete your account and all of your content.
-                    This action cannot be undone.
+                    Xóa vĩnh viễn tài khoản và tất cả nội dung. Hành động này
+                    không thể hoàn tác.
                   </p>
                 </div>
                 <button
                   class="btn-danger"
                   onclick={() => handleDeleteAccount()}
                 >
-                  Delete Account
+                  Xóa tài khoản
                 </button>
               </div>
             </div>
           </div>
         {:else if activeTab === "privacy" && editedSettings}
           <div class="settings-section">
-            <h2>Privacy Settings</h2>
-            <p class="section-description">Control your privacy preferences</p>
+            <h2>Cài đặt quyền riêng tư</h2>
+            <p class="section-description">Kiểm soát tùy chọn quyền riêng tư</p>
 
             <div class="setting-item">
               <div class="setting-info">
-                <h4>Show Profile</h4>
-                <p>Make your profile visible to others</p>
+                <h4>Hiển thị hồ sơ</h4>
+                <p>Cho phép người khác xem hồ sơ của bạn</p>
               </div>
               <label class="toggle">
                 <input
@@ -733,8 +730,8 @@
 
             <div class="setting-item">
               <div class="setting-info">
-                <h4>Show Email</h4>
-                <p>Display your email on your profile</p>
+                <h4>Hiển thị Email</h4>
+                <p>Hiển thị email trên hồ sơ của bạn</p>
               </div>
               <label class="toggle">
                 <input
@@ -748,8 +745,8 @@
 
             <div class="setting-item">
               <div class="setting-info">
-                <h4>Show Post History</h4>
-                <p>Allow others to see your post history</p>
+                <h4>Hiển thị lịch sử bài viết</h4>
+                <p>Cho phép người khác xem lịch sử bài viết của bạn</p>
               </div>
               <label class="toggle">
                 <input
@@ -763,8 +760,8 @@
 
             <div class="setting-item">
               <div class="setting-info">
-                <h4>Allow Direct Messages</h4>
-                <p>Let others send you direct messages</p>
+                <h4>Cho phép tin nhắn trực tiếp</h4>
+                <p>Cho phép người khác gửi tin nhắn cho bạn</p>
               </div>
               <label class="toggle">
                 <input
@@ -778,8 +775,10 @@
 
             <div class="setting-item">
               <div class="setting-info">
-                <h4>Allow Mentions</h4>
-                <p>Let others mention you in posts and comments</p>
+                <h4>Cho phép nhắc đến</h4>
+                <p>
+                  Cho phép người khác nhắc đến bạn trong bài viết và bình luận
+                </p>
               </div>
               <label class="toggle">
                 <input
@@ -793,15 +792,13 @@
           </div>
         {:else if activeTab === "notifications" && editedSettings}
           <div class="settings-section">
-            <h2>Notification Settings</h2>
-            <p class="section-description">
-              Manage how you receive notifications
-            </p>
+            <h2>Cài đặt thông báo</h2>
+            <p class="section-description">Quản lý cách bạn nhận thông báo</p>
 
             <div class="setting-item">
               <div class="setting-info">
-                <h4>In-App Notifications</h4>
-                <p>Show notifications in the website</p>
+                <h4>Thông báo trong ứng dụng</h4>
+                <p>Hiển thị thông báo trên website</p>
               </div>
               <label class="toggle">
                 <input
@@ -815,8 +812,8 @@
 
             <div class="setting-item">
               <div class="setting-info">
-                <h4>Email Notifications</h4>
-                <p>Send notifications to your email</p>
+                <h4>Thông báo Email</h4>
+                <p>Gửi thông báo đến email của bạn</p>
               </div>
               <label class="toggle">
                 <input
@@ -828,11 +825,11 @@
               </label>
             </div>
 
-            <h3 class="subsection-title">Notify me when:</h3>
+            <h3 class="subsection-title">Thông báo cho tôi khi:</h3>
 
             <div class="setting-item">
               <div class="setting-info">
-                <h4>Someone comments on my post</h4>
+                <h4>Có người bình luận bài viết của tôi</h4>
               </div>
               <label class="toggle">
                 <input
@@ -846,7 +843,7 @@
 
             <div class="setting-item">
               <div class="setting-info">
-                <h4>Someone mentions me</h4>
+                <h4>Có người nhắc đến tôi</h4>
               </div>
               <label class="toggle">
                 <input
@@ -860,7 +857,7 @@
 
             <div class="setting-item">
               <div class="setting-info">
-                <h4>Someone upvotes my post</h4>
+                <h4>Có người upvote bài viết của tôi</h4>
               </div>
               <label class="toggle">
                 <input
@@ -874,7 +871,7 @@
 
             <div class="setting-item">
               <div class="setting-info">
-                <h4>Someone sends me a message</h4>
+                <h4>Có người gửi tin nhắn cho tôi</h4>
               </div>
               <label class="toggle">
                 <input
@@ -888,39 +885,39 @@
           </div>
         {:else if activeTab === "appearance" && editedSettings}
           <div class="settings-section">
-            <h2>Appearance Settings</h2>
-            <p class="section-description">Customize the look and feel</p>
+            <h2>Cài đặt giao diện</h2>
+            <p class="section-description">Tùy chỉnh giao diện</p>
 
             <div class="form-group">
-              <label for="theme">Theme</label>
+              <label for="theme">Giao diện</label>
               <select
                 id="theme"
                 bind:value={editedSettings.appearance.theme}
                 onchange={autoSaveSettings}
               >
-                <option value="light">Light</option>
-                <option value="dark">Dark</option>
-                <option value="auto">Auto</option>
+                <option value="light">Sáng</option>
+                <option value="dark">Tối</option>
+                <option value="auto">Tự động</option>
               </select>
             </div>
 
             <div class="form-group">
-              <label for="fontSize">Font Size</label>
+              <label for="fontSize">Cỡ chữ</label>
               <select
                 id="fontSize"
                 bind:value={editedSettings.appearance.font_size}
                 onchange={autoSaveSettings}
               >
-                <option value="small">Small</option>
-                <option value="medium">Medium</option>
-                <option value="large">Large</option>
+                <option value="small">Nhỏ</option>
+                <option value="medium">Vừa</option>
+                <option value="large">Lớn</option>
               </select>
             </div>
 
             <div class="setting-item">
               <div class="setting-info">
-                <h4>Allow NSFW Content</h4>
-                <p>Show age-restricted content</p>
+                <h4>Cho phép nội dung NSFW</h4>
+                <p>Hiển thị nội dung giới hạn độ tuổi</p>
               </div>
               <label class="toggle">
                 <input
@@ -935,7 +932,7 @@
         {:else if isLoadingSettings}
           <div class="loading-state">
             <div class="spinner"></div>
-            <p>Loading settings...</p>
+            <p>Đang tải cài đặt...</p>
           </div>
         {/if}
       </div>
@@ -951,17 +948,17 @@
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div class="modal-content" onclick={(e) => e.stopPropagation()}>
-      <h2>Change Password</h2>
+      <h2>Đổi mật khẩu</h2>
       <div class="form-group">
-        <label for="oldPassword">Current Password</label>
+        <label for="oldPassword">Mật khẩu hiện tại</label>
         <input type="password" id="oldPassword" bind:value={oldPassword} />
       </div>
       <div class="form-group">
-        <label for="newPassword">New Password</label>
+        <label for="newPassword">Mật khẩu mới</label>
         <input type="password" id="newPassword" bind:value={newPassword} />
       </div>
       <div class="form-group">
-        <label for="confirmPassword">Confirm New Password</label>
+        <label for="confirmPassword">Xác nhận mật khẩu mới</label>
         <input
           type="password"
           id="confirmPassword"
@@ -974,11 +971,11 @@
           onclick={handleChangePassword}
           disabled={isSaving}
         >
-          {isSaving ? "Changing..." : "Change Password"}
+          {isSaving ? "Đang đổi..." : "Đổi mật khẩu"}
         </button>
         <button
           class="btn-secondary"
-          onclick={() => (showPasswordModal = false)}>Cancel</button
+          onclick={() => (showPasswordModal = false)}>Hủy</button
         >
       </div>
     </div>

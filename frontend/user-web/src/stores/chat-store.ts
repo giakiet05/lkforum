@@ -18,6 +18,9 @@ interface ChatState {
     // Typing indicators: Map<channel_id, Set<user_id>>
     typingUsers: Map<string, Set<string>>;
     
+    // Online users: Set<user_id>
+    onlineUsers: Set<string>;
+    
     // Loading states
     isLoadingChannels: boolean;
     isLoadingMessages: boolean;
@@ -28,6 +31,7 @@ const initialState: ChatState = {
     activeChannelId: null,
     messagesByChannel: new Map(),
     typingUsers: new Map(),
+    onlineUsers: new Set(),
     isLoadingChannels: false,
     isLoadingMessages: false
 };
@@ -73,6 +77,22 @@ export const unreadCounts = derived(
         });
         
         return counts;
+    }
+);
+
+/**
+ * Get total unread messages count across all channels
+ */
+export const totalUnreadCount = derived(
+    chatStore,
+    $chatStore => {
+        let total = 0;
+        $chatStore.messagesByChannel.forEach((messages, channelId) => {
+            // Get current user from messages to exclude own messages
+            const unreadCount = messages.filter(m => !m.is_read).length;
+            total += unreadCount;
+        });
+        return total;
     }
 );
 
@@ -296,6 +316,34 @@ export function setLoadingMessages(isLoading: boolean) {
         ...state,
         isLoadingMessages: isLoading
     }));
+}
+
+/**
+ * Add user to online users
+ */
+export function addOnlineUser(userId: string) {
+    chatStore.update(state => {
+        const newOnlineUsers = new Set(state.onlineUsers);
+        newOnlineUsers.add(userId);
+        return {
+            ...state,
+            onlineUsers: newOnlineUsers
+        };
+    });
+}
+
+/**
+ * Remove user from online users
+ */
+export function removeOnlineUser(userId: string) {
+    chatStore.update(state => {
+        const newOnlineUsers = new Set(state.onlineUsers);
+        newOnlineUsers.delete(userId);
+        return {
+            ...state,
+            onlineUsers: newOnlineUsers
+        };
+    });
 }
 
 /**

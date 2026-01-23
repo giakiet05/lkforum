@@ -146,3 +146,28 @@ func (m *MembershipController) DeleteMembership(ctx *gin.Context) {
 
 	dto.SendSuccess(ctx, http.StatusOK, "Membership deleted successfully", gin.H{"community_id": req.CommunityID, "user_id": authUser.(auth.AuthUser).ID})
 }
+
+// KickMember allows moderator/creator to remove a member
+func (m *MembershipController) KickMember(ctx *gin.Context) {
+	communityID := ctx.Param("community_id")
+	userID := ctx.Param("user_id")
+
+	if communityID == "" || userID == "" {
+		dto.SendError(ctx, http.StatusBadRequest, "Community ID and User ID are required", apperror.ErrBadRequest.Code)
+		return
+	}
+
+	authUser, exists := ctx.Get("authUser")
+	if !exists {
+		dto.SendError(ctx, http.StatusForbidden, apperror.ErrForbidden.Message, apperror.ErrForbidden.Code)
+		return
+	}
+
+	err := m.membershipService.KickMember(communityID, userID, authUser.(auth.AuthUser).ID)
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
+		return
+	}
+
+	dto.SendSuccess(ctx, http.StatusOK, "Member kicked successfully", gin.H{"community_id": communityID, "user_id": userID})
+}

@@ -200,7 +200,7 @@ export async function unmuteUser(data: UnbanUserRequest): Promise<void> {
 /**
  * Get banned or muted users in a community (requires authentication)
  */
-export async function getBannedUsers(communityId: string, banType: "ban" | "mute"): Promise<UserResponse[]> {
+export async function getBannedUsers(communityId: string, banType: "banned" | "muted"): Promise<UserResponse[]> {
     const res = await authenticatedFetch(`/api/communities/banned_user?community_id=${communityId}&ban_type=${banType}`, {
         method: "GET",
     });

@@ -20,6 +20,10 @@
     getEditedPosts,
     moderatePost,
   } from "../services/community-service";
+  import {
+    getMembershipsByCommunityId,
+    kickMember,
+  } from "../services/membership-service";
   import { getUserByUsername } from "../services/user-service";
   import { toastStore } from "../stores/toast-store";
   import { authStore } from "../stores/auth-store";
@@ -54,7 +58,12 @@
   let isLoadingRestricted = $state(false);
   let isLoadingModerators = $state(false);
 
-  type SidebarItem = "queue" | "restricted" | "members" | "rules";
+  type SidebarItem =
+    | "queue"
+    | "restricted"
+    | "members"
+    | "all-members"
+    | "rules";
   type QueueTab = "unmoderated" | "edited" | "removed" | "reported";
   type SortOption = "newest" | "oldest" | "most-reported";
   type RestrictedTab = "banned" | "muted";
@@ -63,6 +72,13 @@
   let activeSidebarItem = $state<SidebarItem>("queue");
   let activeQueueTab = $state<QueueTab>("unmoderated");
   let sortBy = $state<SortOption>("newest");
+
+  // All members state
+  let allMembers = $state<any[]>([]);
+  let isLoadingAllMembers = $state(false);
+  let membersPage = $state(1);
+  let membersPageSize = $state(20);
+  let isKickingMember = $state<string | null>(null);
 
   // Queue/Pending Posts state
   let pendingPosts = $state<any[]>([]);
@@ -82,6 +98,17 @@
   let banDuration = $state("");
   let banReason = $state("");
   let banNote = $state("");
+  let showUserSuggestions = $state(false);
+  let selectedSuggestionIndex = $state(-1);
+
+  // Filter members for suggestions based on input
+  const filteredMemberSuggestions = $derived(() => {
+    if (!banUsername.trim() || !allMembers.length) return [];
+    const search = banUsername.toLowerCase().trim();
+    return allMembers
+      .filter((m) => m.user?.username?.toLowerCase().includes(search))
+      .slice(0, 5); // Limit to 5 suggestions
+  });
 
   // Mod & Members state
   let activeMembersTab = $state<MembersTab>("moderators");
@@ -98,7 +125,7 @@
   let ruleDescription = $state("");
 
   const isRuleFormValid = $derived(
-    ruleName.trim().length > 0 && ruleDescription.trim().length > 0
+    ruleName.trim().length > 0 && ruleDescription.trim().length > 0,
   );
 
   // Load community data
@@ -107,6 +134,7 @@
     await loadRestrictedUsers();
     await loadModerators();
     await loadPendingPosts();
+    await loadAllMembers();
   });
 
   // Watch for tab changes and load appropriate posts
@@ -117,6 +145,13 @@
       } else if (activeQueueTab === "edited") {
         loadEditedPosts();
       }
+    }
+  });
+
+  // Watch for sidebar changes and load all members
+  $effect(() => {
+    if (community && activeSidebarItem === "all-members") {
+      loadAllMembers();
     }
   });
 
@@ -172,6 +207,51 @@
     }
   }
 
+  async function loadAllMembers() {
+    if (!community) return;
+
+    try {
+      isLoadingAllMembers = true;
+      const members = await getMembershipsByCommunityId(
+        community.id,
+        membersPage,
+        membersPageSize,
+      );
+      allMembers = members || [];
+    } catch (error) {
+      console.error("Failed to load all members:", error);
+      allMembers = [];
+    } finally {
+      isLoadingAllMembers = false;
+    }
+  }
+
+  async function handleKickMember(userId: string, username: string) {
+    if (!community) return;
+
+    // Prevent kicking creator
+    if (userId === community.create_by_id) {
+      toastStore.error("Không thể xóa người tạo cộng đồng!");
+      return;
+    }
+
+    if (confirm(`Bạn có chắc chắn muốn xóa ${username} khỏi cộng đồng?`)) {
+      try {
+        isKickingMember = userId;
+        await kickMember(community.id, userId);
+        toastStore.success(`Đã xóa ${username} khỏi cộng đồng!`);
+        await loadAllMembers(); // Reload the list
+      } catch (error: any) {
+        console.error("Failed to kick member:", error);
+        toastStore.error(
+          error.message || "Không thể xóa thành viên. Vui lòng thử lại.",
+        );
+      } finally {
+        isKickingMember = null;
+      }
+    }
+  }
+
   async function loadPendingPosts() {
     if (!community) return;
 
@@ -180,7 +260,7 @@
       const response = await getPendingPosts(
         community.id,
         postsPage,
-        postsPageSize
+        postsPageSize,
       );
       pendingPosts = response.posts || [];
       totalPendingPosts = response.pagination?.total_items || 0;
@@ -200,7 +280,7 @@
       const response = await getEditedPosts(
         community.id,
         postsPage,
-        postsPageSize
+        postsPageSize,
       );
       editedPosts = response.posts || [];
       totalEditedPosts = response.pagination?.total_items || 0;
@@ -225,13 +305,13 @@
       posts.sort(
         (a, b) =>
           new Date(b.created_at || b.createdAt).getTime() -
-          new Date(a.created_at || a.createdAt).getTime()
+          new Date(a.created_at || a.createdAt).getTime(),
       );
     } else if (sortBy === "oldest") {
       posts.sort(
         (a, b) =>
           new Date(a.created_at || a.createdAt).getTime() -
-          new Date(b.created_at || b.createdAt).getTime()
+          new Date(b.created_at || b.createdAt).getTime(),
       );
     }
     // most-reported sorting not available yet from backend
@@ -283,7 +363,7 @@
         community.id,
         postId,
         false,
-        removalReason || undefined
+        removalReason || undefined,
       );
       toastStore.success("Post removed successfully!");
       await loadPendingPosts(); // Reload the list
@@ -319,7 +399,7 @@
       .then(() => {
         communityRules = updatedRules;
         toastStore.success(
-          editingRuleIndex !== null ? "Rule updated!" : "Rule created!"
+          editingRuleIndex !== null ? "Rule updated!" : "Rule created!",
         );
         handleBackToRulesList();
       })
@@ -376,7 +456,7 @@
 
   // Restricted Users functions
   const filteredRestrictedUsers = $derived(
-    activeRestrictedTab === "banned" ? bannedUsers : mutedUsers
+    activeRestrictedTab === "banned" ? bannedUsers : mutedUsers,
   );
 
   function handleOpenBanModal() {
@@ -386,6 +466,8 @@
     banDuration = "";
     banReason = "";
     banNote = "";
+    showUserSuggestions = false;
+    selectedSuggestionIndex = -1;
   }
 
   function handleOpenMuteModal() {
@@ -395,14 +477,63 @@
     banDuration = "";
     banReason = "";
     banNote = "";
+    showUserSuggestions = false;
+    selectedSuggestionIndex = -1;
   }
 
   function handleCloseBanModal() {
     showBanModal = false;
+    showUserSuggestions = false;
   }
 
   function handleCloseMuteModal() {
     showMuteModal = false;
+    showUserSuggestions = false;
+  }
+
+  function handleSelectUserSuggestion(username: string) {
+    banUsername = username;
+    showUserSuggestions = false;
+    selectedSuggestionIndex = -1;
+  }
+
+  function handleUserInputKeydown(e: KeyboardEvent) {
+    const suggestions = filteredMemberSuggestions();
+    if (!suggestions.length) return;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      selectedSuggestionIndex = Math.min(
+        selectedSuggestionIndex + 1,
+        suggestions.length - 1,
+      );
+      showUserSuggestions = true;
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      selectedSuggestionIndex = Math.max(selectedSuggestionIndex - 1, 0);
+    } else if (e.key === "Enter" && selectedSuggestionIndex >= 0) {
+      e.preventDefault();
+      const selected = suggestions[selectedSuggestionIndex];
+      if (selected) {
+        handleSelectUserSuggestion(selected.user?.username || "");
+      }
+    } else if (e.key === "Escape") {
+      showUserSuggestions = false;
+      selectedSuggestionIndex = -1;
+    }
+  }
+
+  function handleUserInputFocus() {
+    if (banUsername.trim() && filteredMemberSuggestions().length > 0) {
+      showUserSuggestions = true;
+    }
+  }
+
+  function handleUserInputBlur() {
+    // Delay to allow click on suggestion
+    setTimeout(() => {
+      showUserSuggestions = false;
+    }, 200);
   }
 
   async function handleBanUser() {
@@ -431,7 +562,7 @@
     } catch (error) {
       console.error("Failed to ban user:", error);
       toastStore.error(
-        "Failed to ban user. Please check the username and try again."
+        "Failed to ban user. Please check the username and try again.",
       );
     }
   }
@@ -456,13 +587,13 @@
         length_days: lengthDays,
       });
 
-      toastStore.success("User muted successfully!");
+      toastStore.success("Đã tắt tiếng người dùng thành công!");
       await loadRestrictedUsers(); // Reload the list
       handleCloseMuteModal();
     } catch (error) {
       console.error("Failed to mute user:", error);
       toastStore.error(
-        "Failed to mute user. Please check the username and try again."
+        "Không thể tắt tiếng người dùng. Vui lòng kiểm tra tên người dùng và thử lại.",
       );
     }
   }
@@ -470,18 +601,18 @@
   async function handleUnbanUser(userId: string) {
     if (!community) return;
 
-    if (confirm("Are you sure you want to unban this user?")) {
+    if (confirm("Bạn có chắc chắn muốn bỏ cấm người dùng này?")) {
       try {
         await unbanUser({
           community_id: community.id,
           user_id: userId,
         });
 
-        toastStore.success("User unbanned successfully!");
+        toastStore.success("Đã bỏ cấm người dùng thành công!");
         await loadRestrictedUsers();
       } catch (error) {
         console.error("Failed to unban user:", error);
-        toastStore.error("Failed to unban user. Please try again.");
+        toastStore.error("Không thể bỏ cấm người dùng. Vui lòng thử lại.");
       }
     }
   }
@@ -489,18 +620,20 @@
   async function handleUnmuteUser(userId: string) {
     if (!community) return;
 
-    if (confirm("Are you sure you want to unmute this user?")) {
+    if (confirm("Bạn có chắc chắn muốn bỏ tắt tiếng người dùng này?")) {
       try {
         await unmuteUser({
           community_id: community.id,
           user_id: userId,
         });
 
-        toastStore.success("User unmuted successfully!");
+        toastStore.success("Đã bỏ tắt tiếng người dùng thành công!");
         await loadRestrictedUsers();
       } catch (error) {
         console.error("Failed to unmute user:", error);
-        toastStore.error("Failed to unmute user. Please try again.");
+        toastStore.error(
+          "Không thể bỏ tắt tiếng người dùng. Vui lòng thử lại.",
+        );
       }
     }
   }
@@ -547,13 +680,13 @@
         });
 
         console.log("✅ Moderator added successfully!");
-        toastStore.success(`${inviteUsername} added as moderator!`);
+        toastStore.success(`Đã thêm ${inviteUsername} làm quản trị viên!`);
         await loadCommunity(); // Reload to get updated moderators
         handleCloseInviteModal();
       } catch (error) {
         console.error("❌ Failed to add moderator:", error);
         toastStore.error(
-          "Failed to add moderator. Please check the username and try again."
+          "Không thể thêm quản trị viên. Vui lòng kiểm tra tên người dùng và thử lại.",
         );
       }
     } else {
@@ -565,7 +698,7 @@
 
   function handleEditMember(userId: string, type: "mod" | "approved") {
     console.log("Edit member:", userId, type);
-    toastStore.info("Edit member functionality coming soon!");
+    toastStore.info("Tính năng chỉnh sửa thành viên sẽ có sớm!");
   }
 
   async function handleDeleteMember(userId: string, type: "mod" | "approved") {
@@ -573,7 +706,7 @@
 
     if (
       confirm(
-        `Are you sure you want to remove this ${type === "mod" ? "moderator" : "approved user"}?`
+        `Bạn có chắc chắn muốn xóa ${type === "mod" ? "quản trị viên" : "người dùng được duyệt"} này?`,
       )
     ) {
       if (type === "mod") {
@@ -583,11 +716,11 @@
             removed_moderator: [userId],
           });
 
-          toastStore.success("Moderator removed!");
+          toastStore.success("Đã xóa quản trị viên!");
           await loadCommunity(); // Reload to get updated moderators
         } catch (error) {
           console.error("Failed to remove moderator:", error);
-          toastStore.error("Failed to remove moderator. Please try again.");
+          toastStore.error("Không thể xóa quản trị viên. Vui lòng thử lại.");
         }
       } else {
         // Approved users - not yet implemented
@@ -603,7 +736,7 @@
     <button class="exit-mod-tools" onclick={handleExitModTools}>
       <!-- Use /arrowback_icon.svg (place file into public folder as arrowback_icon.svg) -->
       <img src="/arrowback_icon.svg" alt="" width="20" height="20" />
-      Exit mod tools
+      Thoát quản trị
     </button>
 
     <nav class="mod-nav">
@@ -613,7 +746,7 @@
         onclick={() => handleSidebarClick("queue")}
       >
         <img src="/queue_icon.svg" alt="" width="20" height="20" />
-        <span>Queue</span>
+        <span>Hàng chờ</span>
       </button>
 
       <button
@@ -622,7 +755,7 @@
         onclick={() => handleSidebarClick("restricted")}
       >
         <img src="/restricted_icon.svg" alt="" width="20" height="20" />
-        <span>Restricted Users</span>
+        <span>Người dùng bị giới hạn</span>
       </button>
 
       <button
@@ -631,7 +764,30 @@
         onclick={() => handleSidebarClick("members")}
       >
         <img src="/member_icon.svg" alt="" width="20" height="20" />
-        <span>Mods & Members</span>
+        <span>Quản trị viên</span>
+      </button>
+
+      <button
+        class="nav-item"
+        class:active={activeSidebarItem === "all-members"}
+        onclick={() => handleSidebarClick("all-members")}
+      >
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+          <circle cx="9" cy="7" r="4" />
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+          <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+        </svg>
+        <span>Tất cả thành viên</span>
       </button>
 
       <button
@@ -640,7 +796,7 @@
         onclick={() => handleSidebarClick("rules")}
       >
         <img src="/rule_icon.svg" alt="" width="20" height="20" />
-        <span>Rules</span>
+        <span>Nội quy</span>
       </button>
     </nav>
   </aside>
@@ -650,12 +806,12 @@
     {#if activeSidebarItem === "queue"}
       <div class="queue-section">
         <div class="queue-header">
-          <h1>Queue</h1>
+          <h1>Hàng chờ</h1>
           <div class="sort-options">
             <select bind:value={sortBy}>
-              <option value="newest">Newest</option>
-              <option value="oldest">Oldest</option>
-              <option value="most-reported">Most Reported</option>
+              <option value="newest">Mới nhất</option>
+              <option value="oldest">Cũ nhất</option>
+              <option value="most-reported">Nhiều báo cáo nhất</option>
             </select>
           </div>
         </div>
@@ -667,28 +823,28 @@
             class:active={activeQueueTab === "unmoderated"}
             onclick={() => (activeQueueTab = "unmoderated")}
           >
-            Unmoderated
+            Chưa kiểm duyệt
           </button>
           <button
             class="tab-btn"
             class:active={activeQueueTab === "edited"}
             onclick={() => (activeQueueTab = "edited")}
           >
-            Edited
+            Đã chỉnh sửa
           </button>
           <button
             class="tab-btn"
             class:active={activeQueueTab === "removed"}
             onclick={() => (activeQueueTab = "removed")}
           >
-            Removed
+            Đã xóa
           </button>
           <button
             class="tab-btn"
             class:active={activeQueueTab === "reported"}
             onclick={() => (activeQueueTab = "reported")}
           >
-            Reported
+            Bị báo cáo
           </button>
         </div>
 
@@ -719,7 +875,7 @@
                   </div>
                 </div>
                 {#if post.reportCount}
-                  <span class="report-badge">{post.reportCount} reports</span>
+                  <span class="report-badge">{post.reportCount} báo cáo</span>
                 {/if}
               </div>
 
@@ -728,14 +884,14 @@
 
               {#if post.reportReason}
                 <div class="report-info">
-                  <strong>Report reason:</strong>
+                  <strong>Lý do báo cáo:</strong>
                   {post.reportReason}
                 </div>
               {/if}
 
               {#if post.removedReason}
                 <div class="removed-info">
-                  <strong>Removed by:</strong>
+                  <strong>Xóa bởi:</strong>
                   {post.removedBy} - {post.removedReason}
                 </div>
               {/if}
@@ -745,19 +901,19 @@
                   class="action-btn approve"
                   onclick={() => handleApprove(post.id)}
                 >
-                  Approve
+                  Duyệt
                 </button>
                 <button
                   class="action-btn remove"
                   onclick={() => handleRemove(post.id)}
                 >
-                  Remove
+                  Xóa
                 </button>
               </div>
             </div>
           {:else}
             <div class="empty-state">
-              <p>No posts in this queue</p>
+              <p>Không có bài viết trong hàng chờ này</p>
             </div>
           {/each}
         </div>
@@ -766,14 +922,16 @@
       <!-- Restricted Users Section -->
       <div class="restricted-section">
         <div class="restricted-header">
-          <h1>Restricted Users</h1>
+          <h1>Người dùng bị giới hạn</h1>
           <button
             class="action-btn-primary"
             onclick={activeRestrictedTab === "banned"
               ? handleOpenBanModal
               : handleOpenMuteModal}
           >
-            {activeRestrictedTab === "banned" ? "Ban User" : "Mute User"}
+            {activeRestrictedTab === "banned"
+              ? "Cấm người dùng"
+              : "Tắt tiếng người dùng"}
           </button>
         </div>
 
@@ -784,14 +942,14 @@
             class:active={activeRestrictedTab === "banned"}
             onclick={() => (activeRestrictedTab = "banned")}
           >
-            Banned
+            Bị cấm
           </button>
           <button
             class="tab-btn"
             class:active={activeRestrictedTab === "muted"}
             onclick={() => (activeRestrictedTab = "muted")}
           >
-            Muted
+            Bị tắt tiếng
           </button>
         </div>
 
@@ -799,17 +957,17 @@
         <div class="restricted-table">
           {#if activeRestrictedTab === "banned"}
             <div class="table-header">
-              <div class="col">USERNAME</div>
-              <div class="col">DURATION</div>
-              <div class="col">DATE</div>
-              <div class="col">REASON</div>
-              <div class="col">NOTE</div>
+              <div class="col">TÊN NGƯỜI DÙNG</div>
+              <div class="col">THỜI HẠN</div>
+              <div class="col">NGÀY</div>
+              <div class="col">LÝ DO</div>
+              <div class="col">GHI CHÚ</div>
             </div>
           {:else}
             <div class="table-header muted">
-              <div class="col">USERNAME</div>
-              <div class="col">Duration</div>
-              <div class="col">NOTE</div>
+              <div class="col">TÊN NGƯỜI DÙNG</div>
+              <div class="col">Thời hạn</div>
+              <div class="col">GHI CHÚ</div>
             </div>
           {/if}
 
@@ -818,13 +976,13 @@
               {#if activeRestrictedTab === "banned"}
                 <div class="col user-col">
                   <img
-                    src={user.avatar || "/default-avatar.png"}
+                    src={user.profile?.avatar?.url || "/user.jpg"}
                     alt=""
                     class="user-avatar"
                   />
                   <span>{user.username}</span>
                 </div>
-                <div class="col">Permanent</div>
+                <div class="col">Vĩnh viễn</div>
                 <div class="col">-</div>
                 <div class="col">-</div>
                 <div class="col">
@@ -832,25 +990,25 @@
                     class="unban-btn"
                     onclick={() => handleUnbanUser(user.id)}
                   >
-                    Unban
+                    Bỏ cấm
                   </button>
                 </div>
               {:else}
                 <div class="col user-col">
                   <img
-                    src={user.avatar || "/default-avatar.png"}
+                    src={user.profile?.avatar?.url || "/user.jpg"}
                     alt=""
                     class="user-avatar"
                   />
                   <span>{user.username}</span>
                 </div>
-                <div class="col">Permanent</div>
+                <div class="col">Vĩnh viễn</div>
                 <div class="col">
                   <button
                     class="unban-btn"
                     onclick={() => handleUnmuteUser(user.id)}
                   >
-                    Unmute
+                    Bỏ tắt tiếng
                   </button>
                 </div>
               {/if}
@@ -858,7 +1016,9 @@
           {:else}
             <div class="empty-state">
               <p>
-                No {activeRestrictedTab} users
+                Không có người dùng bị {activeRestrictedTab === "banned"
+                  ? "cấm"
+                  : "tắt tiếng"}
               </p>
             </div>
           {/each}
@@ -868,17 +1028,17 @@
       <!-- Mod & Members Section -->
       <div class="members-section">
         <div class="members-header">
-          <h1>Mod & Members</h1>
+          <h1>Quản trị & Thành viên</h1>
           <button
             class="action-btn-primary"
             onclick={() =>
               handleOpenInviteModal(
-                activeMembersTab === "moderators" ? "mod" : "approved"
+                activeMembersTab === "moderators" ? "mod" : "approved",
               )}
           >
             {activeMembersTab === "moderators"
-              ? "Invite Mod"
-              : "Add Approved User"}
+              ? "Mời quản trị viên"
+              : "Thêm người dùng được duyệt"}
           </button>
         </div>
 
@@ -889,14 +1049,14 @@
             class:active={activeMembersTab === "moderators"}
             onclick={() => (activeMembersTab = "moderators")}
           >
-            Moderators
+            Quản trị viên
           </button>
           <button
             class="tab-btn"
             class:active={activeMembersTab === "approved"}
             onclick={() => (activeMembersTab = "approved")}
           >
-            Approved Users
+            Người dùng được duyệt
           </button>
         </div>
 
@@ -904,10 +1064,10 @@
         <div class="members-table">
           {#if activeMembersTab === "moderators"}
             <div class="table-header moderators">
-              <div class="col">USERNAME</div>
-              <div class="col">PERMISSIONS</div>
-              <div class="col">You can edit</div>
-              <div class="col">JOINED</div>
+              <div class="col">TÊN NGƯỜI DÙNG</div>
+              <div class="col">QUYỀN HẠN</div>
+              <div class="col">Có thể chỉnh sửa</div>
+              <div class="col">THAM GIA</div>
               <div class="col"></div>
             </div>
 
@@ -915,14 +1075,14 @@
               <div class="table-row moderators">
                 <div class="col user-col">
                   <img
-                    src={mod.avatar || "/default-avatar.png"}
+                    src={mod.avatar?.url || "/user.jpg"}
                     alt=""
                     class="user-avatar"
                   />
                   <span>{mod.username}</span>
                 </div>
-                <div class="col">Everything</div>
-                <div class="col">Yes</div>
+                <div class="col">Toàn bộ</div>
+                <div class="col">Có</div>
                 <div class="col joined-col">-</div>
                 <div class="col actions-col">
                   <button
@@ -955,13 +1115,13 @@
               </div>
             {:else}
               <div class="empty-state">
-                <p>No moderators yet</p>
+                <p>Chưa có quản trị viên</p>
               </div>
             {/each}
           {:else}
             <div class="table-header approved">
-              <div class="col">USERNAME</div>
-              <div class="col">Date</div>
+              <div class="col">TÊN NGƯỜI DÙNG</div>
+              <div class="col">Ngày</div>
               <div class="col"></div>
             </div>
 
@@ -1003,7 +1163,98 @@
               </div>
             {:else}
               <div class="empty-state">
-                <p>No approved users yet</p>
+                <p>Chưa có người dùng được duyệt</p>
+              </div>
+            {/each}
+          {/if}
+        </div>
+      </div>
+    {:else if activeSidebarItem === "all-members"}
+      <!-- All Members Section -->
+      <div class="all-members-section">
+        <div class="all-members-header">
+          <h1>Tất cả thành viên ({allMembers.length})</h1>
+          <button
+            class="action-btn refresh"
+            onclick={() => loadAllMembers()}
+            disabled={isLoadingAllMembers}
+          >
+            {isLoadingAllMembers ? "Đang tải..." : "Làm mới"}
+          </button>
+        </div>
+
+        <!-- Members Table -->
+        <div class="all-members-table">
+          <div class="table-header all-members">
+            <div class="col">TÊN NGƯỜI DÙNG</div>
+            <div class="col">VAI TRÒ</div>
+            <div class="col">NGÀY THAM GIA</div>
+            <div class="col"></div>
+          </div>
+
+          {#if isLoadingAllMembers}
+            <div class="loading-state">
+              <p>Đang tải danh sách thành viên...</p>
+            </div>
+          {:else}
+            {#each allMembers as member}
+              {@const isCreatorMember =
+                member.user_id === community?.create_by_id}
+              {@const isMod = moderators.some(
+                (m) => m.user_id === member.user_id,
+              )}
+              <div class="table-row all-members">
+                <div class="col user-col">
+                  <img
+                    src={member.user?.avatar?.url || "/user.jpg"}
+                    alt=""
+                    class="user-avatar"
+                  />
+                  <span>{member.user?.username || "Unknown"}</span>
+                </div>
+                <div class="col role-col">
+                  {#if isCreatorMember}
+                    <span class="role-badge creator">Người tạo</span>
+                  {:else if isMod}
+                    <span class="role-badge mod">Quản trị viên</span>
+                  {:else}
+                    <span class="role-badge member">Thành viên</span>
+                  {/if}
+                </div>
+                <div class="col">
+                  {member.created_at
+                    ? new Date(member.created_at).toLocaleDateString("vi-VN")
+                    : "-"}
+                </div>
+                <div class="col actions-col">
+                  {#if !isCreatorMember && (isCreator() || !isMod)}
+                    <button
+                      class="icon-btn delete kick-btn"
+                      onclick={() =>
+                        handleKickMember(
+                          member.user_id,
+                          member.user?.username || "Unknown",
+                        )}
+                      disabled={isKickingMember === member.user_id}
+                      title="Xóa khỏi cộng đồng"
+                    >
+                      {#if isKickingMember === member.user_id}
+                        <span class="loading-spinner"></span>
+                      {:else}
+                        <img
+                          src="/bin_icon.svg"
+                          alt="Kick"
+                          width="20"
+                          height="20"
+                        />
+                      {/if}
+                    </button>
+                  {/if}
+                </div>
+              </div>
+            {:else}
+              <div class="empty-state">
+                <p>Chưa có thành viên nào</p>
               </div>
             {/each}
           {/if}
@@ -1014,16 +1265,16 @@
         <!-- Rules List View -->
         <div class="rules-list-section">
           <div class="rules-list-header">
-            <h1>Community Rules</h1>
+            <h1>Nội quy cộng đồng</h1>
             <button class="create-rule-btn" onclick={handleCreateRule}>
-              Create Rule
+              Tạo nội quy
             </button>
           </div>
 
           <div class="rules-table">
             <div class="rules-table-header">
-              <div class="col-name">NAME</div>
-              <div class="col-created">CREATED</div>
+              <div class="col-name">TÊN</div>
+              <div class="col-created">TẠO NGÀY</div>
             </div>
 
             {#each communityRules as rule, index}
@@ -1088,7 +1339,7 @@
               </div>
             {:else}
               <div class="empty-rules">
-                <p>No rules yet. Create your first rule!</p>
+                <p>Chưa có nội quy. Tạo nội quy đầu tiên của bạn!</p>
               </div>
             {/each}
           </div>
@@ -1102,10 +1353,10 @@
                 <img src="/arrowback_icon.svg" alt="" width="20" height="20" />
               </button>
               <div>
-                <h2>Name and describe your rule</h2>
+                <h2>Đặt tên và mô tả nội quy của bạn</h2>
                 <p class="sub">
-                  Rules set the expectations for members and redditors visiting
-                  your report
+                  Nội quy đặt ra kỳ vọng cho thành viên và người ghé thăm cộng
+                  đồng
                 </p>
               </div>
             </div>
@@ -1113,11 +1364,11 @@
 
           <form class="rule-form">
             <div class="form-row">
-              <label>Rule name<span class="required">*</span></label>
+              <label>Tên nội quy<span class="required">*</span></label>
               <div class="pill-input">
                 <input
                   type="text"
-                  placeholder="Rule name"
+                  placeholder="Tên nội quy"
                   maxlength="100"
                   bind:value={ruleName}
                 />
@@ -1126,10 +1377,10 @@
             </div>
 
             <div class="form-row">
-              <label>Description<span class="required">*</span></label>
+              <label>Mô tả<span class="required">*</span></label>
               <div class="pill-input textarea">
                 <textarea
-                  placeholder="Description"
+                  placeholder="Mô tả"
                   maxlength="500"
                   bind:value={ruleDescription}
                 ></textarea>
@@ -1145,7 +1396,7 @@
                 onclick={handleSaveRule}
                 type="button"
               >
-                Save
+                Lưu
               </button>
             </div>
           </form>
@@ -1159,25 +1410,60 @@
 {#if showBanModal}
   <div class="modal-overlay" onclick={handleCloseBanModal}>
     <div class="modal-content" onclick={(e) => e.stopPropagation()}>
-      <h2>Ban user</h2>
+      <h2>Cấm người dùng</h2>
 
       <div class="form-group">
-        <div class="search-input-wrapper">
-          <img
-            src="/searchuser_icon.svg"
-            alt="Search"
-            class="search-icon"
-            width="20"
-            height="20"
-          />
-          <input
-            type="text"
-            placeholder="Search for user"
-            bind:value={banUsername}
-            class="search-input"
-          />
+        <div class="search-input-wrapper-with-suggestions">
+          <div class="search-input-wrapper">
+            <img
+              src="/searchuser_icon.svg"
+              alt="Search"
+              class="search-icon"
+              width="20"
+              height="20"
+            />
+            <input
+              type="text"
+              placeholder="Tìm kiếm thành viên..."
+              bind:value={banUsername}
+              class="search-input"
+              oninput={() => {
+                showUserSuggestions = banUsername.trim().length > 0;
+                selectedSuggestionIndex = -1;
+              }}
+              onkeydown={handleUserInputKeydown}
+              onfocus={handleUserInputFocus}
+              onblur={handleUserInputBlur}
+            />
+          </div>
+          {#if showUserSuggestions && filteredMemberSuggestions().length > 0}
+            <div class="user-suggestions">
+              {#each filteredMemberSuggestions() as member, index}
+                <button
+                  type="button"
+                  class="suggestion-item"
+                  class:selected={index === selectedSuggestionIndex}
+                  onclick={() =>
+                    handleSelectUserSuggestion(member.user?.username || "")}
+                >
+                  <img
+                    src={member.user?.avatar?.url || "/user.jpg"}
+                    alt=""
+                    class="suggestion-avatar"
+                  />
+                  <span class="suggestion-username"
+                    >{member.user?.username}</span
+                  >
+                </button>
+              {/each}
+            </div>
+          {:else if showUserSuggestions && banUsername.trim() && filteredMemberSuggestions().length === 0}
+            <div class="user-suggestions">
+              <div class="no-suggestions">Không tìm thấy thành viên</div>
+            </div>
+          {/if}
         </div>
-        <p class="hint">Enter to find user*</p>
+        <p class="hint">Nhập tên để tìm thành viên trong cộng đồng</p>
       </div>
 
       <div class="form-group">
@@ -1191,33 +1477,34 @@
 
       <div class="form-group">
         <select bind:value={banDuration} class="modal-select">
-          <option value="">Duration</option>
-          <option value="1h">1 hour</option>
-          <option value="24h">24 hours</option>
-          <option value="7d">7 days</option>
-          <option value="30d">30 days</option>
-          <option value="permanent">Permanent</option>
+          <option value="">Thời hạn</option>
+          <option value="1h">1 giờ</option>
+          <option value="24h">24 giờ</option>
+          <option value="7d">7 ngày</option>
+          <option value="30d">30 ngày</option>
+          <option value="permanent">Vĩnh viễn</option>
         </select>
       </div>
 
       <div class="form-group">
         <textarea
-          placeholder="Reason"
+          placeholder="Lý do"
           bind:value={banReason}
           class="modal-textarea"
         ></textarea>
       </div>
 
       <div class="form-group">
-        <textarea placeholder="Note" bind:value={banNote} class="modal-textarea"
+        <textarea
+          placeholder="Ghi chú"
+          bind:value={banNote}
+          class="modal-textarea"
         ></textarea>
       </div>
 
       <div class="modal-actions">
-        <button class="btn-cancel" onclick={handleCloseBanModal}>
-          Cancel
-        </button>
-        <button class="btn-danger" onclick={handleBanUser}>Banned</button>
+        <button class="btn-cancel" onclick={handleCloseBanModal}> Hủy </button>
+        <button class="btn-danger" onclick={handleBanUser}>Cấm</button>
       </div>
     </div>
   </div>
@@ -1227,25 +1514,60 @@
 {#if showMuteModal}
   <div class="modal-overlay" onclick={handleCloseMuteModal}>
     <div class="modal-content" onclick={(e) => e.stopPropagation()}>
-      <h2>Mute user</h2>
+      <h2>Tắt tiếng người dùng</h2>
 
       <div class="form-group">
-        <div class="search-input-wrapper">
-          <img
-            src="/searchuser_icon.svg"
-            alt="Search"
-            class="search-icon"
-            width="20"
-            height="20"
-          />
-          <input
-            type="text"
-            placeholder="Search for user"
-            bind:value={banUsername}
-            class="search-input"
-          />
+        <div class="search-input-wrapper-with-suggestions">
+          <div class="search-input-wrapper">
+            <img
+              src="/searchuser_icon.svg"
+              alt="Search"
+              class="search-icon"
+              width="20"
+              height="20"
+            />
+            <input
+              type="text"
+              placeholder="Tìm kiếm thành viên..."
+              bind:value={banUsername}
+              class="search-input"
+              oninput={() => {
+                showUserSuggestions = banUsername.trim().length > 0;
+                selectedSuggestionIndex = -1;
+              }}
+              onkeydown={handleUserInputKeydown}
+              onfocus={handleUserInputFocus}
+              onblur={handleUserInputBlur}
+            />
+          </div>
+          {#if showUserSuggestions && filteredMemberSuggestions().length > 0}
+            <div class="user-suggestions">
+              {#each filteredMemberSuggestions() as member, index}
+                <button
+                  type="button"
+                  class="suggestion-item"
+                  class:selected={index === selectedSuggestionIndex}
+                  onclick={() =>
+                    handleSelectUserSuggestion(member.user?.username || "")}
+                >
+                  <img
+                    src={member.user?.avatar?.url || "/user.jpg"}
+                    alt=""
+                    class="suggestion-avatar"
+                  />
+                  <span class="suggestion-username"
+                    >{member.user?.username}</span
+                  >
+                </button>
+              {/each}
+            </div>
+          {:else if showUserSuggestions && banUsername.trim() && filteredMemberSuggestions().length === 0}
+            <div class="user-suggestions">
+              <div class="no-suggestions">Không tìm thấy thành viên</div>
+            </div>
+          {/if}
         </div>
-        <p class="hint">Enter to find user*</p>
+        <p class="hint">Nhập tên để tìm thành viên trong cộng đồng</p>
       </div>
 
       <div class="form-group">
@@ -1259,33 +1581,34 @@
 
       <div class="form-group">
         <select bind:value={banDuration} class="modal-select">
-          <option value="">Duration</option>
-          <option value="1h">1 hour</option>
-          <option value="24h">24 hours</option>
-          <option value="7d">7 days</option>
-          <option value="30d">30 days</option>
-          <option value="permanent">Permanent</option>
+          <option value="">Thời hạn</option>
+          <option value="1h">1 giờ</option>
+          <option value="24h">24 giờ</option>
+          <option value="7d">7 ngày</option>
+          <option value="30d">30 ngày</option>
+          <option value="permanent">Vĩnh viễn</option>
         </select>
       </div>
 
       <div class="form-group">
         <textarea
-          placeholder="Reason"
+          placeholder="Lý do"
           bind:value={banReason}
           class="modal-textarea"
         ></textarea>
       </div>
 
       <div class="form-group">
-        <textarea placeholder="Note" bind:value={banNote} class="modal-textarea"
+        <textarea
+          placeholder="Ghi chú"
+          bind:value={banNote}
+          class="modal-textarea"
         ></textarea>
       </div>
 
       <div class="modal-actions">
-        <button class="btn-cancel" onclick={handleCloseMuteModal}>
-          Cancel
-        </button>
-        <button class="btn-danger" onclick={handleMuteUser}>Muted</button>
+        <button class="btn-cancel" onclick={handleCloseMuteModal}> Hủy </button>
+        <button class="btn-danger" onclick={handleMuteUser}>Tắt tiếng</button>
       </div>
     </div>
   </div>
@@ -1296,7 +1619,9 @@
   <div class="modal-overlay" onclick={handleCloseInviteModal}>
     <div class="modal-content" onclick={(e) => e.stopPropagation()}>
       <h2>
-        {inviteType === "mod" ? "Invite Moderator" : "Add Approved User"}
+        {inviteType === "mod"
+          ? "Mời quản trị viên"
+          : "Thêm người dùng được duyệt"}
       </h2>
 
       <div class="form-group">
@@ -1310,41 +1635,41 @@
           />
           <input
             type="text"
-            placeholder="Search for user"
+            placeholder="Tìm kiếm người dùng"
             bind:value={inviteUsername}
             class="search-input"
           />
         </div>
-        <p class="hint">Enter username to search</p>
+        <p class="hint">Nhập tên người dùng để tìm</p>
       </div>
 
       {#if inviteType === "mod"}
         <div class="form-group">
-          <label>Permissions</label>
+          <label>Quyền hạn</label>
           <select bind:value={invitePermission} class="permission-select">
-            <option value="Everything">Everything</option>
+            <option value="Everything">Toàn bộ</option>
             <option value="Manage Posts & Comments"
-              >Manage Posts & Comments</option
+              >Quản lý bài viết & bình luận</option
             >
-            <option value="Manage Users">Manage Users</option>
-            <option value="Manage Settings">Manage Settings</option>
+            <option value="Manage Users">Quản lý người dùng</option>
+            <option value="Manage Settings">Quản lý cài đặt</option>
           </select>
         </div>
 
         <div class="form-group">
           <label class="checkbox-label">
             <input type="checkbox" bind:checked={inviteCanEdit} />
-            <span>You can edit this moderator</span>
+            <span>Bạn có thể chỉnh sửa quản trị viên này</span>
           </label>
         </div>
       {/if}
 
       <div class="modal-actions">
         <button class="btn-cancel" onclick={handleCloseInviteModal}>
-          Cancel
+          Hủy
         </button>
         <button class="action-btn-primary" onclick={handleInviteUser}>
-          {inviteType === "mod" ? "Invite" : "Add"}
+          {inviteType === "mod" ? "Mời" : "Thêm"}
         </button>
       </div>
     </div>
@@ -2210,6 +2535,10 @@
     margin-bottom: 16px;
   }
 
+  .search-input-wrapper-with-suggestions {
+    position: relative;
+  }
+
   .search-input-wrapper {
     position: relative;
     display: flex;
@@ -2221,6 +2550,59 @@
     left: 16px;
     pointer-events: none;
     opacity: 0.6;
+  }
+
+  .user-suggestions {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid #edeff1;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    z-index: 100;
+    max-height: 200px;
+    overflow-y: auto;
+    margin-top: 4px;
+  }
+
+  .suggestion-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 10px 16px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.15s;
+  }
+
+  .suggestion-item:hover,
+  .suggestion-item.selected {
+    background: #f6f7f8;
+  }
+
+  .suggestion-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+  }
+
+  .suggestion-username {
+    font-size: 14px;
+    color: #1c1c1c;
+    font-weight: 500;
+  }
+
+  .no-suggestions {
+    padding: 12px 16px;
+    color: #7c7c7c;
+    font-size: 14px;
+    text-align: center;
   }
 
   .search-input,
@@ -2463,5 +2845,128 @@
     display: flex;
     gap: 8px;
     justify-content: flex-end;
+  }
+
+  /* All Members Section */
+  .all-members-section {
+    background: white;
+    border-radius: 8px;
+    padding: 24px 32px;
+  }
+
+  .all-members-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+  }
+
+  .all-members-header h1 {
+    margin: 0;
+    font-size: 24px;
+    font-weight: 700;
+    color: #1c1c1c;
+  }
+
+  .action-btn.refresh {
+    background: #f6f7f8;
+    color: #1c1c1c;
+    border: 1px solid #edeff1;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .action-btn.refresh:hover:not(:disabled) {
+    background: #edeff1;
+  }
+
+  .action-btn.refresh:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .all-members-table {
+    border: 1px solid #edeff1;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .all-members-table .table-header.all-members {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 100px;
+    background: #f6f7f8;
+    padding: 12px 16px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--grayfont);
+    text-transform: uppercase;
+  }
+
+  .all-members-table .table-row.all-members {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 100px;
+    padding: 16px;
+    border-top: 1px solid #edeff1;
+    align-items: center;
+    font-size: 14px;
+    color: #1c1c1c;
+  }
+
+  .role-col {
+    display: flex;
+    align-items: center;
+  }
+
+  .role-badge {
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .role-badge.creator {
+    background: #fff3cd;
+    color: #856404;
+  }
+
+  .role-badge.mod {
+    background: #d4edda;
+    color: #155724;
+  }
+
+  .role-badge.member {
+    background: #e9ecef;
+    color: #495057;
+  }
+
+  .kick-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .loading-spinner {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid #ddd;
+    border-top-color: #666;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  .loading-state {
+    padding: 40px;
+    text-align: center;
+    color: #7c7c7c;
   }
 </style>

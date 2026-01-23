@@ -35,7 +35,7 @@
 
       // Check if user owns the post
       if (post.author.id !== currentUser.id) {
-        toastStore.error("You don't have permission to edit this post");
+        toastStore.error("Bạn không có quyền chỉnh sửa bài viết này");
         push(`/post/${params.slugId}`);
         return;
       }
@@ -53,7 +53,7 @@
 
   async function handleSave() {
     if (!title.trim()) {
-      toastStore.warning("Title is required");
+      toastStore.warning("Tiêu đề là bắt buộc");
       return;
     }
 
@@ -66,18 +66,18 @@
         },
       });
 
-      toastStore.success("Post updated successfully");
+      toastStore.success("Cập nhật bài viết thành công");
       push(`/post/${params.slugId}`);
     } catch (err) {
       console.error("Failed to update post:", err);
-      toastStore.error("Failed to update post. Please try again.");
+      toastStore.error("Không thể cập nhật bài viết. Vui lòng thử lại.");
     } finally {
       isSaving = false;
     }
   }
 
   function handleCancel() {
-    if (confirm("Discard changes?")) {
+    if (confirm("Bỏ thay đổi?")) {
       push(`/post/${params.slugId}`);
     }
   }
@@ -85,27 +85,27 @@
 
 <div class="edit-post-page">
   {#if isLoading}
-    <div class="loading">Loading...</div>
+    <div class="loading">Đang tải...</div>
   {:else if error}
     <div class="error">{error}</div>
   {:else if post}
     <div class="edit-container">
       <div class="header">
-        <h1>Edit Post</h1>
+        <h1>Chỉnh sửa bài viết</h1>
       </div>
 
       <div class="form-content">
         <div class="community-info">
-          <span>Posting to lk/{post.community.name}</span>
+          <span>Đăng tại lk/{post.community.name}</span>
         </div>
 
         <div class="form-group">
-          <label for="title">Title *</label>
+          <label for="title">Tiêu đề *</label>
           <input
             id="title"
             type="text"
             bind:value={title}
-            placeholder="Title"
+            placeholder="Tiêu đề"
             maxlength="300"
             required
           />
@@ -113,11 +113,11 @@
         </div>
 
         <div class="form-group">
-          <label for="content">Content</label>
+          <label for="content">Nội dung</label>
           <textarea
             id="content"
             bind:value={content}
-            placeholder="Text (optional)"
+            placeholder="Nội dung (tuỳ chọn)"
             rows="15"
           ></textarea>
         </div>
@@ -125,36 +125,30 @@
         {#if post.type === "poll"}
           <div class="info-message">
             <p>
-              ⚠️ Poll editing is not yet supported. Only title and text content
-              can be edited.
+              ⚠️ Chưa hỗ trợ chỉnh sửa khảo sát. Chỉ có thể chỉnh sửa tiêu đề và
+              nội dung.
             </p>
           </div>
         {/if}
 
         {#if post.content.images && post.content.images.length > 0}
           <div class="info-message">
-            <p>
-              ⚠️ Image editing is not yet supported. Images will remain
-              unchanged.
-            </p>
+            <p>⚠️ Chưa hỗ trợ chỉnh sửa hình ảnh. Hình ảnh sẽ giữ nguyên.</p>
           </div>
         {/if}
 
         {#if post.content.videos && post.content.videos.length > 0}
           <div class="info-message">
-            <p>
-              ⚠️ Video editing is not yet supported. Videos will remain
-              unchanged.
-            </p>
+            <p>⚠️ Chưa hỗ trợ chỉnh sửa video. Video sẽ giữ nguyên.</p>
           </div>
         {/if}
 
         <div class="footer-actions">
           <button class="btn-cancel" onclick={handleCancel} disabled={isSaving}>
-            Cancel
+            Hủy
           </button>
           <button class="btn-save" onclick={handleSave} disabled={isSaving}>
-            {isSaving ? "Saving..." : "Save"}
+            {isSaving ? "Đang lưu..." : "Lưu"}
           </button>
         </div>
       </div>

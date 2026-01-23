@@ -39,7 +39,7 @@
       const file = input.files[0];
       // Check file size (max 5MB)
       if (file.size > 5 * 1024 * 1024) {
-        error = "Banner image must be less than 5MB";
+        error = "Ảnh banner phải nhỏ hơn 5MB";
         return;
       }
       const reader = new FileReader();
@@ -57,7 +57,7 @@
       const file = input.files[0];
       // Check file size (max 2MB)
       if (file.size > 2 * 1024 * 1024) {
-        error = "Icon image must be less than 2MB";
+        error = "Ảnh icon phải nhỏ hơn 2MB";
         return;
       }
       const reader = new FileReader();
@@ -69,22 +69,29 @@
     }
   }
 
+  function removeBannerImage() {
+    bannerImage = "";
+  }
+
+  function removeIconImage() {
+    iconImage = "";
+  }
+
   function validateStep1() {
     if (!communityName.trim()) {
-      error = "Community name is required";
+      error = "Tên cộng đồng là bắt buộc";
       return false;
     }
     if (communityName.length < 3) {
-      error = "Community name must be at least 3 characters";
+      error = "Tên cộng đồng phải có ít nhất 3 ký tự";
       return false;
     }
     if (communityName.length > 50) {
-      error = "Community name must be less than 50 characters";
+      error = "Tên cộng đồng phải nhỏ hơn 50 ký tự";
       return false;
     }
     if (!/^[a-zA-Z0-9_]+$/.test(communityName)) {
-      error =
-        "Community name can only contain letters, numbers, and underscores";
+      error = "Tên cộng đồng chỉ chứa chữ cái, số và dấu gạch dưới";
       return false;
     }
     if (!description.trim()) {
@@ -166,14 +173,13 @@
 
       // Validate base64 image sizes before sending
       if (iconImage && iconImage.length > 500000) {
-        error =
-          "Icon image is too large. Please use a smaller image (max ~375KB).";
+        error = "Ảnh icon quá lớn. Vui lòng chọn ảnh nhỏ hơn (tối đa ~375KB).";
         currentStep = 1; // Go back to show error
         return;
       }
       if (bannerImage && bannerImage.length > 1000000) {
         error =
-          "Banner image is too large. Please use a smaller image (max ~750KB).";
+          "Ảnh banner quá lớn. Vui lòng chọn ảnh nhỏ hơn (tối đa ~750KB).";
         currentStep = 1; // Go back to show error
         return;
       }
@@ -191,7 +197,7 @@
 
       const result = await createCommunity(requestData);
 
-      toastStore.success(`Community "lk/${result.name}" created successfully!`);
+      toastStore.success(`Đã tạo cộng đồng "lk/${result.name}" thành công!`);
       handleClose();
       push(`/lk/${result.name}`);
     } catch (err: any) {
@@ -200,16 +206,14 @@
         err.message?.includes("already exists") ||
         err.message?.includes("đã tồn tại")
       ) {
-        error =
-          "Community name already exists. Please choose a different name.";
+        error = "Tên cộng đồng đã tồn tại. Vui lòng chọn tên khác.";
       } else if (
         err.message?.includes("server") ||
         err.message?.includes("500")
       ) {
-        error =
-          "Server error occurred. Try reducing image sizes or try again later.";
+        error = "Lỗi server. Thử giảm kích thước ảnh hoặc thử lại sau.";
       } else {
-        error = err.message || "Failed to create community. Please try again.";
+        error = err.message || "Không thể tạo cộng đồng. Vui lòng thử lại.";
       }
 
       // Go back to step 1 to show error
@@ -227,16 +231,16 @@
       <!-- Step 1: Create Community Form -->
       {#if currentStep === 1}
         <div class="modal-header">
-          <h2>Create a community</h2>
+          <h2>Tạo cộng đồng</h2>
           <button class="modal-close-btn" onclick={handleClose}>×</button>
         </div>
 
         <div class="modal-body">
           <!-- Community Name -->
           <div class="form-section">
-            <label for="name" class="label">Name</label>
+            <label for="name" class="label">Tên</label>
             <p class="help-text">
-              Community names including capitalization cannot be changed.
+              Tên cộng đồng (bao gồm cả chữ hoa/thường) không thể thay đổi.
             </p>
             <div class="input-wrapper">
               <span class="prefix">lk/</span>
@@ -253,12 +257,11 @@
 
           <!-- Description -->
           <div class="form-section">
-            <label for="description" class="label">Description (optional)</label
-            >
+            <label for="description" class="label">Mô tả (tùy chọn)</label>
             <textarea
               id="description"
               bind:value={description}
-              placeholder="What is your community about?"
+              placeholder="Cộng đồng của bạn về chủ đề gì?"
               rows="4"
               maxlength="500"
             ></textarea>
@@ -267,7 +270,7 @@
 
           <!-- Community Type -->
           <div class="form-section">
-            <label class="label">Community type</label>
+            <label class="label">Loại cộng đồng</label>
 
             <label class="radio-option">
               <input
@@ -284,10 +287,10 @@
                     width="20"
                     height="20"
                   />
-                  <span class="radio-title">Public</span>
+                  <span class="radio-title">Công khai</span>
                 </div>
                 <p class="radio-description">
-                  Anyone can view, post, and comment to this community
+                  Bất kỳ ai đều có thể xem, đăng bài và bình luận
                 </p>
               </div>
             </label>
@@ -307,11 +310,11 @@
                     width="20"
                     height="20"
                   />
-                  <span class="radio-title">Restricted</span>
+                  <span class="radio-title">Hạn chế</span>
                 </div>
                 <p class="radio-description">
-                  Anyone can view this community, but only approved users can
-                  post
+                  Bất kỳ ai cũng có thể xem, nhưng chỉ người dùng được duyệt mới
+                  có thể đăng bài
                 </p>
               </div>
             </label>
@@ -331,10 +334,10 @@
                     width="20"
                     height="20"
                   />
-                  <span class="radio-title">Private</span>
+                  <span class="radio-title">Riêng tư</span>
                 </div>
                 <p class="radio-description">
-                  Only approved users can view and submit to this community
+                  Chỉ người dùng được duyệt mới có thể xem và đăng bài
                 </p>
               </div>
             </label>
@@ -356,10 +359,10 @@
                     width="20"
                     height="20"
                   />
-                  <span class="checkbox-title">18+ year old community</span>
+                  <span class="checkbox-title">Cộng đồng 18+</span>
                 </div>
                 <p class="checkbox-description">
-                  Must be over 18 to view and contribute
+                  Phải trên 18 tuổi để xem và tham gia
                 </p>
               </div>
             </label>
@@ -377,7 +380,7 @@
 
         <div class="modal-actions">
           <button type="button" class="btn btn-secondary" onclick={handleClose}
-            >Cancel</button
+            >Hủy</button
           >
           <button
             type="button"
@@ -385,7 +388,7 @@
             onclick={handleStep1Next}
             disabled={!communityName.trim()}
           >
-            Next
+            Tiếp theo
           </button>
         </div>
       {/if}
@@ -393,54 +396,96 @@
       <!-- Step 2: Style -->
       {#if currentStep === 2}
         <div class="modal-header">
-          <h2>Style your community</h2>
+          <h2>Thiết kế cộng đồng</h2>
           <button class="modal-close-btn" onclick={handleClose}>×</button>
         </div>
 
         <p class="modal-subtitle">
-          Adding visual flair will catch new members attention and help
-          establish your community's culture! You can update this at any time.
+          Thêm ảnh đại diện sẽ thu hút thành viên mới và giúp xây dựng văn hóa
+          cộng đồng! Bạn có thể cập nhật bất cứ lúc nào.
         </p>
 
         <div class="style-content">
           <!-- Banner Upload -->
           <div class="upload-section">
-            <label class="upload-label">Banner</label>
-            <label class="upload-button">
-              <input
-                type="file"
-                accept="image/*"
-                onchange={handleBannerUpload}
-                style="display: none;"
-              />
-              <img
-                src="/hugeicons_image-upload.svg"
-                alt="Upload"
-                width="20"
-                height="20"
-              />
-              Add
-            </label>
+            <label class="upload-label">Ảnh bìa</label>
+            <div class="upload-actions">
+              <label class="upload-button">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onchange={handleBannerUpload}
+                  style="display: none;"
+                />
+                <img
+                  src="/hugeicons_image-upload.svg"
+                  alt="Upload"
+                  width="20"
+                  height="20"
+                />
+                {bannerImage ? "Đổi" : "Thêm"}
+              </label>
+              {#if bannerImage}
+                <button
+                  type="button"
+                  class="remove-button"
+                  onclick={removeBannerImage}
+                >
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <path d="M18 6L6 18M6 6l12 12" />
+                  </svg>
+                  Xóa
+                </button>
+              {/if}
+            </div>
           </div>
 
           <!-- Icon Upload -->
           <div class="upload-section">
             <label class="upload-label">Icon</label>
-            <label class="upload-button">
-              <input
-                type="file"
-                accept="image/*"
-                onchange={handleIconUpload}
-                style="display: none;"
-              />
-              <img
-                src="/hugeicons_image-upload.svg"
-                alt="Upload"
-                width="20"
-                height="20"
-              />
-              Add
-            </label>
+            <div class="upload-actions">
+              <label class="upload-button">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onchange={handleIconUpload}
+                  style="display: none;"
+                />
+                <img
+                  src="/hugeicons_image-upload.svg"
+                  alt="Upload"
+                  width="20"
+                  height="20"
+                />
+                {iconImage ? "Đổi" : "Thêm"}
+              </label>
+              {#if iconImage}
+                <button
+                  type="button"
+                  class="remove-button"
+                  onclick={removeIconImage}
+                >
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <path d="M18 6L6 18M6 6l12 12" />
+                  </svg>
+                  Xóa
+                </button>
+              {/if}
+            </div>
           </div>
 
           <!-- Preview Card -->
@@ -478,11 +523,11 @@
               </div>
               <div class="preview-info">
                 <h3>lk/{communityName || "community"}</h3>
-                <p>1 member · 1 online</p>
+                <p>1 thành viên · 1 trực tuyến</p>
               </div>
             </div>
             <div class="preview-description">
-              {description || "Community description"}
+              {description || "Mô tả cộng đồng"}
             </div>
           </div>
 
@@ -494,7 +539,7 @@
 
         <div class="modal-actions">
           <button type="button" class="btn btn-secondary" onclick={handleBack}
-            >Back</button
+            >Quay lại</button
           >
           <button
             type="button"
@@ -502,7 +547,7 @@
             onclick={handleSubmit}
             disabled={isLoading}
           >
-            {isLoading ? "Creating..." : "Create Community"}
+            {isLoading ? "Đang tạo..." : "Tạo cộng đồng"}
           </button>
         </div>
       {/if}
@@ -935,6 +980,12 @@
     color: #1c1c1c;
   }
 
+  .upload-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
   .upload-button {
     display: flex;
     align-items: center;
@@ -956,6 +1007,26 @@
 
   .upload-button svg {
     color: #878a8c;
+  }
+
+  .remove-button {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 12px;
+    background: transparent;
+    border: 1px solid #ff4757;
+    border-radius: 4px;
+    color: #ff4757;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .remove-button:hover {
+    background: #ff4757;
+    color: white;
   }
 
   .preview-card {

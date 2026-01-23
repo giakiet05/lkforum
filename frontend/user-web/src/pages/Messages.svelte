@@ -37,6 +37,20 @@
   const isLoadingChannels = $derived($chatStore.isLoadingChannels);
   const isLoadingMessages = $derived($chatStore.isLoadingMessages);
 
+  // Filter channels based on search query
+  const filteredChannels = $derived(() => {
+    if (!searchQuery.trim()) return channels;
+    const query = searchQuery.toLowerCase();
+    return channels.filter((channel) => {
+      const member = channel.members.find((m) => m.user_id !== currentUser?.id);
+      if (!member) return false;
+      return (
+        member.username.toLowerCase().includes(query) ||
+        member.full_name?.toLowerCase().includes(query)
+      );
+    });
+  });
+
   // Get other member info from active channel
   const otherMember = $derived(() => {
     if (!activeChannelData || !currentUser) return null;
@@ -46,8 +60,10 @@
     );
   });
 
-  // Check if other member is online (mock for now - needs backend support)
-  const isOtherMemberOnline = $derived(false);
+  // Check if other member is online
+  const isOtherMemberOnline = $derived(
+    otherMember() ? $chatStore.onlineUsers.has(otherMember().user_id) : false,
+  );
 
   // Get channel settings for current user
   const channelSettings = $derived(() => {
@@ -74,24 +90,24 @@
     const diffMs = now.getTime() - date.getTime();
     const diffMins = Math.floor(diffMs / 60000);
 
-    if (diffMins < 1) return "Just now";
-    if (diffMins < 60) return `${diffMins}m`;
+    if (diffMins < 1) return "Vừa xong";
+    if (diffMins < 60) return `${diffMins} phút`;
 
     const diffHours = Math.floor(diffMins / 60);
-    if (diffHours < 24) return `${diffHours}h`;
+    if (diffHours < 24) return `${diffHours} giờ`;
 
     const diffDays = Math.floor(diffHours / 24);
-    return `${diffDays}d`;
+    return `${diffDays} ngày`;
   }
 
   // Get last message for a channel
   function getLastMessage(channelId: string): string {
     const channelMessages = $chatStore.messagesByChannel.get(channelId) || [];
-    if (channelMessages.length === 0) return "No reports yet";
+    if (channelMessages.length === 0) return "Chưa có tin nhắn nào";
 
     const lastMsg = channelMessages[channelMessages.length - 1];
     const isCurrentUser = lastMsg.sender_id === currentUser?.id;
-    const prefix = isCurrentUser ? "You: " : `${lastMsg.sender_username}: `;
+    const prefix = isCurrentUser ? "Bạn: " : `${lastMsg.sender_username}: `;
 
     return prefix + lastMsg.content;
   }
@@ -109,7 +125,7 @@
   function getUnreadCount(channelId: string): number {
     const channelMessages = $chatStore.messagesByChannel.get(channelId) || [];
     return channelMessages.filter(
-      (m) => !m.is_read && m.sender_id !== currentUser?.id
+      (m) => !m.is_read && m.sender_id !== currentUser?.id,
     ).length;
   }
 
@@ -168,7 +184,7 @@
       websocketService.sendMessage(
         $chatStore.activeChannelId,
         messageInput.trim(),
-        "text"
+        "text",
       );
       messageInput = "";
 
@@ -176,7 +192,7 @@
       setTimeout(scrollToBottom, 100);
     } catch (error) {
       console.error("Failed to send message:", error);
-      toastStore.error("Failed to send message. Please try again.");
+      toastStore.error("Không thể gửi tin nhắn. Vui lòng thử lại.");
     }
   }
 
@@ -240,14 +256,12 @@
     // Load channels
     await loadChannels();
 
-    // Connect WebSocket
-    try {
-      console.log("🔌 Attempting WebSocket connection...");
-      await websocketService.connect();
+    // Register message handler (WebSocket already connected in App.svelte)
+    if (websocketService.isConnected()) {
       websocketService.onMessage(handleIncomingMessage);
-      console.log("✅ WebSocket handlers registered");
-    } catch (error) {
-      console.error("❌ Failed to connect WebSocket:", error);
+      console.log("✅ WebSocket message handler registered");
+    } else {
+      console.warn("⚠️ WebSocket not connected yet");
     }
   });
 
@@ -280,8 +294,12 @@
     <div class="conversations-sidebar">
       <div class="conversations-header">
         <div class="user-info">
-          <img src="/avatar.jpg" alt="User" class="user-avatar" />
-          <h2>Chats</h2>
+          <img
+            src={currentUser?.profile?.avatar?.url || "/user.jpg"}
+            alt="User"
+            class="user-avatar"
+          />
+          <h2>Cuộc trò chuyện</h2>
         </div>
       </div>
 
@@ -295,20 +313,22 @@
         />
         <input
           type="text"
-          placeholder="Search reports..."
+          placeholder="Tìm kiếm tin nhắn..."
           bind:value={searchQuery}
         />
       </div>
 
       <div class="conversations-list">
         {#if isLoadingChannels}
-          <div class="loading-state">Loading channels...</div>
-        {:else if channels.length === 0}
-          <div class="empty-state">No conversations yet</div>
+          <div class="loading-state">Đang tải...</div>
+        {:else if filteredChannels().length === 0}
+          <div class="empty-state">
+            {searchQuery ? "Không tìm thấy kết quả" : "Chưa có cuộc hội thoại"}
+          </div>
         {:else}
-          {#each channels as channel (channel.id)}
+          {#each filteredChannels() as channel (channel.id)}
             {@const member = channel.members.find(
-              (m) => m.user_id !== currentUser?.id
+              (m) => m.user_id !== currentUser?.id,
             )}
             {@const unreadCount = getUnreadCount(channel.id)}
             {#if member}
@@ -320,7 +340,7 @@
               >
                 <div class="conversation-avatar-wrapper">
                   <img
-                    src={member.avatar || "/avatar.jpg"}
+                    src={member.avatar || "/user.jpg"}
                     alt={member.username}
                     class="conversation-avatar"
                   />
@@ -355,17 +375,22 @@
         <!-- Chat Header -->
         <div class="chat-header">
           <div class="chat-user-info">
-            <img
-              src={otherMember()?.avatar || "/avatar.jpg"}
-              alt={otherMember()?.username || "User"}
-              class="chat-avatar"
-            />
-            <div class="chat-user-details">
-              <h3>{otherMember()?.username || "Unknown"}</h3>
+            <div class="avatar-wrapper">
+              <img
+                src={otherMember()?.avatar || "/user.jpg"}
+                alt={otherMember()?.username || "User"}
+                class="chat-avatar"
+              />
               {#if isOtherMemberOnline}
-                <span class="status-online">Active now</span>
+                <span class="online-indicator"></span>
+              {/if}
+            </div>
+            <div class="chat-user-details">
+              <h3>{otherMember()?.username || "Ẩn danh"}</h3>
+              {#if isOtherMemberOnline}
+                <span class="status-online">Đang hoạt động</span>
               {:else}
-                <span class="status-offline">Offline</span>
+                <span class="status-offline">Ngoại tuyến</span>
               {/if}
             </div>
           </div>
@@ -405,8 +430,8 @@
                     />
                     <span
                       >{(channelSettings()?.notification ?? true)
-                        ? "Mute"
-                        : "Unmute"}</span
+                        ? "Tắt thông báo"
+                        : "Bật thông báo"}</span
                     >
                   </button>
                 </div>
@@ -418,7 +443,7 @@
         <!-- Messages Area -->
         <div class="reports-area">
           {#if isLoadingMessages}
-            <div class="loading-reports">Loading reports...</div>
+            <div class="loading-reports">Đang tải tin nhắn...</div>
           {:else}
             <div class="reports-wrapper">
               {#each reports as message (message.id)}
@@ -426,7 +451,7 @@
                 <div class="message-row" class:sent={isSent}>
                   {#if !isSent}
                     <img
-                      src={otherMember()?.avatar || "/avatar.jpg"}
+                      src={otherMember()?.avatar || "/user.jpg"}
                       alt={message.sender_username}
                       class="message-avatar"
                     />

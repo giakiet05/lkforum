@@ -1,7 +1,8 @@
 import type {
     CreateMembershipRequest,
     DeleteMembershipRequest,
-    MembershipResponse
+    MembershipResponse,
+    PaginatedMembershipsResponse
 } from "../dtos/membership-dto";
 import { authenticatedFetch, handleApiResponse } from "./api";
 
@@ -59,7 +60,7 @@ export async function getMembershipsByUserId(
 }
 
 /**
- * Get all memberships for a community
+ * Get all memberships for a community (with user info)
  */
 export async function getMembershipsByCommunityId(
     communityId: string,
@@ -76,7 +77,8 @@ export async function getMembershipsByCommunityId(
         { method: "GET" }
     );
 
-    return await handleApiResponse(res);
+    const data: PaginatedMembershipsResponse = await handleApiResponse(res);
+    return data.memberships || [];
 }
 
 /**
@@ -93,4 +95,18 @@ export async function checkMembership(
         console.error("Failed to check membership:", error);
         return false;
     }
+}
+
+/**
+ * Kick a member from community (moderator/creator only)
+ */
+export async function kickMember(
+    communityId: string,
+    userId: string
+): Promise<void> {
+    const res = await authenticatedFetch(`/api/memberships/kick/${communityId}/${userId}`, {
+        method: "DELETE"
+    });
+
+    await handleApiResponse(res);
 }
