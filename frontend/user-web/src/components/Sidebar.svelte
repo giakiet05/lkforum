@@ -49,7 +49,9 @@
   }
 
   function handleToggleCompact() {
+    console.log("Toggle compact clicked! Current:", compact);
     compact = !compact;
+    console.log("After toggle:", compact);
     onToggleCompact?.();
   }
 

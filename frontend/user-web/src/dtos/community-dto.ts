@@ -10,7 +10,10 @@ export interface CommunitySetting {
 export interface Moderator {
     user_id: string;
     username: string;
-    avatar?: string;
+    avatar?: {
+        url: string;
+        public_id?: string;
+    };
     is_active?: boolean;
 }
 
@@ -77,6 +80,17 @@ export interface UserResponse {
     banner?: string;
     bio?: string;
     created_at?: string;
+    profile?: {
+        avatar?: {
+            url: string;
+            public_id?: string;
+        };
+        cover?: {
+            url: string;
+            public_id?: string;
+        };
+        bio?: string;
+    };
 }
 
 // --- Response DTOs ---

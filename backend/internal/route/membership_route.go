@@ -18,5 +18,6 @@ func RegisterMembershipRoutes(rg *gin.RouterGroup, c *controller.MembershipContr
 		memberships.GET("/community/:community_id", c.GetMembershipByCommunityID)
 		memberships.GET("/:membership_id", c.GetMembershipByID)
 		memberships.DELETE("", c.DeleteMembership)
+		memberships.DELETE("/kick/:community_id/:user_id", c.KickMember) // Moderator/Creator kick member
 	}
 }

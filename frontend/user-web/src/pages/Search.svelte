@@ -1,20 +1,41 @@
 <script lang="ts">
-  import { push } from "svelte-spa-router";
+  import { push, location } from "svelte-spa-router";
   import { getCommunities } from "../services/community-service";
   import { searchUsers } from "../services/user-service";
+  import { getPosts } from "../services/post-service";
+  import { generatePostUrl } from "../utils/slug";
   import type { CommunityResponse } from "../dtos/community-dto";
   import type { UserResponse } from "../dtos/user-dto";
+  import type { PostResponse } from "../dtos/post-dto";
 
   let searchQuery = $state("");
   let communityResults = $state<CommunityResponse[]>([]);
   let userResults = $state<UserResponse[]>([]);
+  let postResults = $state<PostResponse[]>([]);
   let isSearching = $state(false);
   let searchTimeout: number | null = null;
 
+  // Extract query from URL on mount
+  $effect(() => {
+    // Get query from URL hash (e.g., #/search?q=test)
+    const hash = window.location.hash;
+    const queryIndex = hash.indexOf("?");
+    const queryString = queryIndex >= 0 ? hash.substring(queryIndex + 1) : "";
+    const urlParams = new URLSearchParams(queryString);
+    const q = urlParams.get("q");
+    console.log("🔍 Search page mounted with query:", q, "from hash:", hash);
+    if (q) {
+      searchQuery = decodeURIComponent(q);
+      performSearch(searchQuery);
+    }
+  });
+
   async function performSearch(query: string) {
+    console.log("🔎 performSearch called with:", query);
     if (!query.trim()) {
       communityResults = [];
       userResults = [];
+      postResults = [];
       return;
     }
 
@@ -24,18 +45,31 @@
       if (!cleanQuery) {
         communityResults = [];
         userResults = [];
+        postResults = [];
         return;
       }
 
-      const [communities, users] = await Promise.all([
+      console.log("🔎 Searching for:", cleanQuery);
+      const [communities, users, posts] = await Promise.all([
         getCommunities({ search: cleanQuery, limit: 5 }),
         searchUsers(cleanQuery, 5),
+        getPosts({ search: cleanQuery, limit: 5 }),
       ]);
 
-      communityResults = communities.data;
-      userResults = users;
+      console.log("📊 Search results:", {
+        communities: communities,
+        users: users,
+        posts: posts,
+      });
+
+      communityResults = communities.communities || [];
+      userResults = users.users || [];
+      postResults = posts || [];
     } catch (err) {
-      console.error("Search error:", err);
+      console.error("❌ Search error:", err);
+      communityResults = [];
+      userResults = [];
+      postResults = [];
     } finally {
       isSearching = false;
     }
@@ -57,6 +91,10 @@
 
   function handleUserClick(username: string) {
     push(`/profile/${username}`);
+  }
+
+  function handlePostClick(postId: string, title: string) {
+    push(generatePostUrl(postId, title));
   }
 
   function handleBack() {
@@ -114,10 +152,30 @@
   <div class="search-results">
     {#if isSearching}
       <div class="loading">Đang tìm kiếm...</div>
-    {:else if searchQuery.trim() && communityResults.length === 0 && userResults.length === 0}
+    {:else if searchQuery.trim() && communityResults?.length === 0 && userResults?.length === 0 && postResults?.length === 0}
       <div class="no-results">Không tìm thấy kết quả</div>
     {:else}
-      {#if communityResults.length > 0}
+      {#if postResults && postResults.length > 0}
+        <div class="results-section">
+          <h3 class="section-title">Bài viết</h3>
+          {#each postResults as post}
+            <button
+              class="result-item post-item"
+              onclick={() => handlePostClick(post.id, post.title)}
+            >
+              <div class="result-info">
+                <div class="result-name">{post.title}</div>
+                <div class="result-meta">
+                  lk/{post.community.name} • {post.author.username} • {post.upvotes -
+                    post.downvotes} votes
+                </div>
+              </div>
+            </button>
+          {/each}
+        </div>
+      {/if}
+
+      {#if communityResults && communityResults.length > 0}
         <div class="results-section">
           <h3 class="section-title">Cộng đồng</h3>
           {#each communityResults as community}
@@ -141,7 +199,7 @@
         </div>
       {/if}
 
-      {#if userResults.length > 0}
+      {#if userResults && userResults.length > 0}
         <div class="results-section">
           <h3 class="section-title">Người dùng</h3>
           {#each userResults as user}
@@ -280,6 +338,11 @@
 
   .result-item:hover {
     background: var(--hover-background, rgba(0, 0, 0, 0.05));
+  }
+
+  .post-item {
+    flex-direction: column;
+    align-items: flex-start;
   }
 
   .result-avatar {

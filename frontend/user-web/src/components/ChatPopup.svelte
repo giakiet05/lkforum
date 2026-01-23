@@ -14,13 +14,18 @@
     markChannelAsRead,
     setLoadingChannels,
     setLoadingMessages,
+    addOnlineUser,
+    removeOnlineUser,
   } from "../stores/chat-store";
   import {
     getChannelsByUser,
     updateChannel,
     createChannel,
   } from "../services/channel-service";
-  import { getMessages } from "../services/message-service";
+  import {
+    getMessages,
+    markChannelMessagesAsRead,
+  } from "../services/message-service";
   import { websocketService } from "../services/websocket-service";
   import type { ChannelResponse } from "../dtos/channel-dto";
   import type { MessageResponse } from "../dtos/message-dto";
@@ -77,24 +82,24 @@
     const diffMs = now.getTime() - date.getTime();
     const diffMins = Math.floor(diffMs / 60000);
 
-    if (diffMins < 1) return "Just now";
-    if (diffMins < 60) return `${diffMins}m`;
+    if (diffMins < 1) return "Vừa xong";
+    if (diffMins < 60) return `${diffMins} phút`;
 
     const diffHours = Math.floor(diffMins / 60);
-    if (diffHours < 24) return `${diffHours}h`;
+    if (diffHours < 24) return `${diffHours} giờ`;
 
     const diffDays = Math.floor(diffHours / 24);
-    return `${diffDays}d`;
+    return `${diffDays} ngày`;
   }
 
   // Get last message for a channel
   function getLastMessage(channelId: string): string {
     const channelMessages = $chatStore.messagesByChannel.get(channelId) || [];
-    if (channelMessages.length === 0) return "No reports yet";
+    if (channelMessages.length === 0) return "Chưa có tin nhắn nào";
 
     const lastMsg = channelMessages[channelMessages.length - 1];
     const isCurrentUser = lastMsg.sender_id === currentUser?.id;
-    const prefix = isCurrentUser ? "You: " : `${lastMsg.sender_username}: `;
+    const prefix = isCurrentUser ? "Bạn: " : `${lastMsg.sender_username}: `;
 
     return prefix + lastMsg.content;
   }
@@ -112,7 +117,7 @@
   function getUnreadCount(channelId: string): number {
     const channelMessages = $chatStore.messagesByChannel.get(channelId) || [];
     return channelMessages.filter(
-      (m) => !m.is_read && m.sender_id !== currentUser?.id
+      (m) => !m.is_read && m.sender_id !== currentUser?.id,
     ).length;
   }
 
@@ -130,9 +135,23 @@
       console.log("[ChatPopup] Loaded channels:", response);
       setChannels(response.channels);
 
-      // Auto-select first channel
-      if (response.channels.length > 0 && !$chatStore.activeChannelId) {
-        await handleSelectChannel(response.channels[0]);
+      // Auto-select and load messages
+      if (response.channels.length > 0) {
+        // If there's an active channel, load messages for it
+        if ($chatStore.activeChannelId) {
+          const activeChannel = response.channels.find(
+            (c) => c.id === $chatStore.activeChannelId,
+          );
+          if (activeChannel) {
+            await loadMessagesForChannel(activeChannel.id);
+          } else {
+            // Active channel not found, select first
+            await handleSelectChannel(response.channels[0]);
+          }
+        } else {
+          // No active channel, select first
+          await handleSelectChannel(response.channels[0]);
+        }
       }
     } catch (error) {
       console.error("[ChatPopup] Failed to load channels:", error);
@@ -148,18 +167,23 @@
       const channelMessages = await getMessages({ channel_id: channelId });
       setMessages(channelId, channelMessages);
       console.log(
-        `✅ Loaded ${channelMessages.length} messages for channel ${channelId}`
+        `✅ Loaded ${channelMessages.length} messages for channel ${channelId}`,
       );
 
-      // Mark as read
-      markChannelAsRead(channelId);
+      // Mark as read on server and update local state
+      try {
+        await markChannelMessagesAsRead(channelId);
+        markChannelAsRead(channelId);
+      } catch (err) {
+        console.warn("Failed to mark messages as read:", err);
+      }
 
       // Scroll to bottom
       setTimeout(scrollToBottom, 100);
     } catch (error) {
       console.error("Failed to load messages:", error);
       console.log(
-        `⚠️ API error - keeping any existing messages from WebSocket`
+        `⚠️ API error - keeping any existing messages from WebSocket`,
       );
       setLoadingMessages(false);
     }
@@ -179,7 +203,7 @@
       websocketService.sendMessage(
         $chatStore.activeChannelId,
         messageInput.trim(),
-        "text"
+        "text",
       );
       messageInput = "";
 
@@ -231,14 +255,14 @@
   }
 
   function handleExpand() {
-    push("/reports");
+    push("/messages");
     onClose();
   }
 
   // DEBUG: Create test channel with hardcoded user
   async function handleDebugCreateChannel() {
     if (!currentUser) {
-      toastStore.warning("Not logged in!");
+      toastStore.warning("Chưa đăng nhập!");
       return;
     }
 
@@ -256,7 +280,7 @@
 
     // Show selection
     const choice = prompt(
-      `YOUR USER ID: ${currentUser.id}\n\nChoose test user to chat with:\n1. ${testUserIds[0].username} (${testUserIds[0].id})\n2. ${testUserIds[1].username} (${testUserIds[1].id})\n\nOr enter custom User ID:`
+      `YOUR USER ID: ${currentUser.id}\n\nChoose test user to chat with:\n1. ${testUserIds[0].username} (${testUserIds[0].id})\n2. ${testUserIds[1].username} (${testUserIds[1].id})\n\nOr enter custom User ID:`,
     );
 
     if (!choice) return;
@@ -280,7 +304,7 @@
       const newChannel = await createChannel(
         targetUserId,
         targetUsername,
-        "" // Empty avatar for now
+        "", // Empty avatar for now
       );
       console.log("[ChatPopup] Channel created:", newChannel);
 
@@ -296,8 +320,14 @@
   // WebSocket lifecycle
   $effect(() => {
     if (show && currentUser) {
-      // Connect WebSocket and register message handler
-      if (!websocketService.isConnected()) {
+      // Register message handler (WebSocket already connected in App.svelte)
+      if (websocketService.isConnected()) {
+        console.log(
+          "📞 Registering WebSocket message handler (already connected)",
+        );
+        websocketService.onMessage(handleIncomingMessage);
+      } else {
+        // Connect if not already connected (shouldn't normally happen)
         websocketService
           .connect()
           .then(() => {
@@ -307,18 +337,21 @@
           .catch((error) => {
             console.error("Failed to connect WebSocket:", error);
           });
-      } else {
-        console.log(
-          "📞 Registering WebSocket message handler (already connected)"
-        );
-        websocketService.onMessage(handleIncomingMessage);
       }
     }
+
+    // Cleanup on hide
+    return () => {
+      if (show) {
+        websocketService.offMessage(handleIncomingMessage);
+      }
+    };
   });
 
   // Load channels on open
   $effect(() => {
-    if (show && currentUser && channels.length === 0) {
+    if (show && currentUser) {
+      // Always load channels when popup opens to refresh messages
       loadChannels();
     }
   });
@@ -326,6 +359,10 @@
   // Debug: Log channels changes
   $effect(() => {
     console.log("[ChatPopup] Channels changed:", channels.length, channels);
+    console.log(
+      "[ChatPopup] Online users:",
+      Array.from($chatStore.onlineUsers),
+    );
   });
 
   // Cleanup
@@ -376,10 +413,10 @@
       <div class="popup-conversations">
         <div class="popup-conversations-list">
           {#if isLoadingChannels}
-            <div class="popup-loading">Loading...</div>
+            <div class="popup-loading">Đang tải...</div>
           {:else if channels.length === 0}
             <div class="popup-empty">
-              <p>No conversations</p>
+              <p>Chưa có cuộc hội thoại</p>
               <button
                 class="debug-create-channel-btn"
                 onclick={handleDebugCreateChannel}
@@ -390,7 +427,7 @@
           {:else}
             {#each channels as channel (channel.id)}
               {@const member = channel.members.find(
-                (m) => m.user_id !== currentUser?.id
+                (m) => m.user_id !== currentUser?.id,
               )}
               {@const unreadCount = getUnreadCount(channel.id)}
               {#if member}
@@ -402,10 +439,13 @@
                 >
                   <div class="popup-avatar-wrapper">
                     <img
-                      src={member.avatar || "/avatar.jpg"}
+                      src={member.avatar || "/user.jpg"}
                       alt={member.username}
                       class="popup-avatar"
                     />
+                    {#if $chatStore.onlineUsers.has(member.user_id)}
+                      <span class="online-indicator"></span>
+                    {/if}
                   </div>
                   <div class="popup-conversation-info">
                     <div class="popup-conversation-top">
@@ -438,13 +478,23 @@
           <!-- Chat Header -->
           <div class="popup-chat-header">
             <div class="popup-chat-user-info">
-              <img
-                src={otherMember()?.avatar || "/avatar.jpg"}
-                alt={otherMember()?.username || "User"}
-                class="popup-chat-avatar"
-              />
+              <div class="popup-avatar-wrapper">
+                <img
+                  src={otherMember()?.avatar || "/user.jpg"}
+                  alt={otherMember()?.username || "User"}
+                  class="popup-chat-avatar"
+                />
+                {#if otherMember() && $chatStore.onlineUsers.has(otherMember().user_id)}
+                  <span class="online-indicator"></span>
+                {/if}
+              </div>
               <div class="popup-chat-user-details">
-                <h3>{otherMember()?.username || "Unknown"}</h3>
+                <h3>{otherMember()?.username || "Ẩn danh"}</h3>
+                {#if otherMember() && $chatStore.onlineUsers.has(otherMember().user_id)}
+                  <span class="status-text online">Đang hoạt động</span>
+                {:else}
+                  <span class="status-text offline">Ngoại tuyến</span>
+                {/if}
               </div>
             </div>
             <div class="popup-chat-actions">
@@ -483,8 +533,8 @@
                       />
                       <span
                         >{(channelSettings()?.notification ?? true)
-                          ? "Mute"
-                          : "Unmute"}</span
+                          ? "Tắt thông báo"
+                          : "Bật thông báo"}</span
                       >
                     </button>
                   </div>
@@ -496,7 +546,7 @@
           <!-- Messages Area -->
           <div class="popup-reports-area">
             {#if isLoadingMessages}
-              <div class="popup-loading">Loading reports...</div>
+              <div class="popup-loading">Đang tải tin nhắn...</div>
             {:else}
               <div class="popup-reports-wrapper">
                 {#each reports as message (message.id)}
@@ -690,6 +740,17 @@
     object-fit: cover;
   }
 
+  .online-indicator {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 12px;
+    height: 12px;
+    background: #46d160;
+    border: 2px solid white;
+    border-radius: 50%;
+  }
+
   .popup-conversation-info {
     flex: 1;
     min-width: 0;
@@ -787,6 +848,19 @@
     font-size: 14px;
     font-weight: 600;
     color: #1c1c1c;
+  }
+
+  .status-text {
+    font-size: 12px;
+    margin: 0;
+  }
+
+  .status-text.online {
+    color: #46d160;
+  }
+
+  .status-text.offline {
+    color: #7c7c7c;
   }
 
   .popup-chat-actions {

@@ -23,6 +23,7 @@ type MessageService interface {
 	GetMessageByID(channelID string, messageID string, requesterID string) (*model.Message, error)
 	GetMessageFilter(query *dto.GetMessageFilterQuery, requesterID string) (*dto.PaginatedMessagesResponse, error)
 	DeleteMessage(channelID string, messageID string, requesterID string) error
+	MarkChannelAsRead(channelID string, userID string) error
 }
 
 type messageService struct {
@@ -337,4 +338,19 @@ func (m *messageService) DeleteMessage(channelID string, messageID string, reque
 	}
 
 	return m.messageRepository.Delete(ctx, messageID)
+}
+
+func (m *messageService) MarkChannelAsRead(channelID string, userID string) error {
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
+
+	ok, err := m.channelRepository.IsMember(ctx, channelID, userID)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return apperror.ErrForbidden
+	}
+
+	return m.messageRepository.MarkChannelAsRead(ctx, channelID, userID)
 }

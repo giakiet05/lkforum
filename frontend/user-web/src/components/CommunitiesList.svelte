@@ -77,7 +77,7 @@
 <div class="communities-section" class:compact>
   {#if !compact}
     <button class="section-header" onclick={toggleExpand}>
-      <span class="section-title">COMMUNITIES</span>
+      <span class="section-title">CỘNG ĐỒNG</span>
       <span class="expand-icon" class:expanded={isExpanded}>
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
           <path

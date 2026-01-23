@@ -14,6 +14,8 @@ const (
 	TypingIndicator WebSocketMessageType = "typing"
 	InChatIndicator WebSocketMessageType = "in_chat"
 	ErrorMessage    WebSocketMessageType = "error"
+	PresenceOnline  WebSocketMessageType = "presence_online"
+	PresenceOffline WebSocketMessageType = "presence_offline"
 )
 
 type WebSocketMessage struct {
@@ -53,6 +55,10 @@ type ErrorPayload struct {
 	TempMessageID *string `json:"temp_message_id,omitempty"`
 	ErrorCode     *string `json:"error_code,omitempty"`
 	ErrorMsg      string  `json:"error_msg"`
+}
+
+type PresencePayload struct {
+	UserID string `json:"user_id"`
 }
 
 type ChatPresenceKey struct {

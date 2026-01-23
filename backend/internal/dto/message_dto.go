@@ -14,14 +14,14 @@ type CreateMessageRequest struct {
 }
 
 type GetMessageFilterQuery struct {
-	ChannelID     string  `json:"channel_id"`
-	SenderID      *string `json:"sender_id,omitempty"`
-	SearchContent *string `json:"search_content,omitempty"`
-	IsRead        *bool   `json:"is_read,omitempty"`
-	IsSend        *bool   `json:"is_send,omitempty"`
-	IsMedia       *bool   `json:"is_media,omitempty"`
-	Page          int     `json:"page"`
-	PageSize      int     `json:"page_size"`
+	ChannelID     string  `form:"channel_id" binding:"required"`
+	SenderID      *string `form:"sender_id,omitempty"`
+	SearchContent *string `form:"search_content,omitempty"`
+	IsRead        *bool   `form:"is_read,omitempty"`
+	IsSend        *bool   `form:"is_send,omitempty"`
+	IsMedia       *bool   `form:"is_media,omitempty"`
+	Page          int     `form:"page"`
+	PageSize      int     `form:"page_size"`
 }
 
 type MessageResponse struct {

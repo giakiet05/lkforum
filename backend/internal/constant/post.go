@@ -4,7 +4,9 @@ package constant
 type SortType string
 
 const (
-	SortTypeNew SortType = "new"
-	SortTypeTop SortType = "top"
-	SortTypeHot SortType = "hot"
+	SortTypeNew    SortType = "new"
+	SortTypeTop    SortType = "top"
+	SortTypeHot    SortType = "hot"
+	SortTypeBest   SortType = "best"
+	SortTypeRising SortType = "rising"
 )

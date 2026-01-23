@@ -49,7 +49,7 @@
       console.log("📥 loadComments response:", response);
       console.log(
         "📅 First comment created_at:",
-        response.comments?.[0]?.created_at
+        response.comments?.[0]?.created_at,
       );
       // Force reactivity by creating new array reference
       comments = [...(response.comments || [])];
@@ -71,7 +71,7 @@
       const commentsToSort = [...comments];
       console.log(
         "🔄 sortedComments recalculating, comments.length:",
-        comments.length
+        comments.length,
       );
       console.log("🔄 sortedComments array:", commentsToSort);
 
@@ -82,20 +82,20 @@
           return commentsToSort.sort(
             (a, b) =>
               new Date(b.created_at).getTime() -
-              new Date(a.created_at).getTime()
+              new Date(a.created_at).getTime(),
           );
         case "oldest":
           return commentsToSort.sort(
             (a, b) =>
               new Date(a.created_at).getTime() -
-              new Date(b.created_at).getTime()
+              new Date(b.created_at).getTime(),
           );
         case "controversial":
           return commentsToSort;
         default:
           return commentsToSort;
       }
-    })()
+    })(),
   );
 
   const handleSortChange = (sort: SortType) => {
@@ -106,7 +106,7 @@
   const submitComment = async () => {
     if (!newCommentContent.trim()) return;
     if (!currentUser) {
-      errorMessage = "Please login to comment";
+      errorMessage = "Vui lòng đăng nhập để bình luận";
       return;
     }
 
@@ -136,7 +136,7 @@
       console.error("❌ Failed to submit comment:", error);
       // Show specific error message from backend
       errorMessage =
-        error?.message || "Failed to post comment. Please try again.";
+        error?.message || "Không thể đăng bình luận. Vui lòng thử lại.";
     } finally {
       isSubmitting = false;
     }
@@ -180,7 +180,7 @@
   <div class="add-comment">
     <textarea
       bind:value={newCommentContent}
-      placeholder="What are your thoughts?"
+      placeholder="Bạn nghĩ gì?"
       class="comment-textarea"
       rows="4"
       onkeydown={(e) => {
@@ -242,14 +242,14 @@
         onclick={submitComment}
         disabled={isSubmitting}
       >
-        {isSubmitting ? "Posting..." : "Comment"}
+        {isSubmitting ? "Đang gửi..." : "Bình luận"}
       </button>
     </div>
   </div>
 
   <!-- Sort Bar -->
   <div class="sort-bar">
-    <span class="comment-count">{getTotalComments()} Comments</span>
+    <span class="comment-count">{getTotalComments()} Bình luận</span>
     <div class="sort-dropdown">
       <button
         class="sort-btn"
@@ -266,7 +266,13 @@
         </svg>
         Sort by:
         <span class="sort-label"
-          >{sortBy.charAt(0).toUpperCase() + sortBy.slice(1)}</span
+          >{sortBy === "top"
+            ? "Nổi bật"
+            : sortBy === "newest"
+              ? "Mới nhất"
+              : sortBy === "oldest"
+                ? "Cũ nhất"
+                : "Tranh cãi"}</span
         >
         <svg
           width="12"
@@ -285,28 +291,28 @@
             class:active={sortBy === "top"}
             onclick={() => handleSortChange("top")}
           >
-            Top
+            Nổi bật
           </button>
           <button
             class="dropdown-item"
             class:active={sortBy === "newest"}
             onclick={() => handleSortChange("newest")}
           >
-            Newest
+            Mới nhất
           </button>
           <button
             class="dropdown-item"
             class:active={sortBy === "oldest"}
             onclick={() => handleSortChange("oldest")}
           >
-            Oldest
+            Cũ nhất
           </button>
           <button
             class="dropdown-item"
             class:active={sortBy === "controversial"}
             onclick={() => handleSortChange("controversial")}
           >
-            Controversial
+            Tranh cãi
           </button>
         </div>
       {/if}
@@ -316,16 +322,16 @@
   <!-- Comments List -->
   <div class="comments-list">
     {#if isLoading}
-      <div class="loading">Loading comments...</div>
+      <div class="loading">Đang tải bình luận...</div>
     {:else}
       {#each sortedComments as comment (comment.id)}
         <CommentComponent {comment} depth={0} onUpdate={loadComments} />
       {/each}
       {#if sortedComments.length === 0}
         <div class="no-comments">
-          <p>No comments yet</p>
+          <p>Chưa có bình luận</p>
           <p class="no-comments-subtitle">
-            Be the first to share what you think!
+            Hãy là người đầu tiên chia sẻ suy nghĩ!
           </p>
         </div>
       {/if}

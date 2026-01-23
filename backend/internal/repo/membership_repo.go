@@ -125,9 +125,33 @@ func (m *membershipRepo) GetByCommunityIDPaginated(ctx context.Context, communit
 
 	skip := (page - 1) * pageSize
 	filter := bson.M{"community_id": communityObjectID}
-	opts := options.Find().SetSkip(int64(skip)).SetLimit(int64(pageSize))
 
-	cursor, err := m.membershipCollection.Find(ctx, filter, opts)
+	// Count total documents
+	count, err := m.membershipCollection.CountDocuments(ctx, filter)
+	if err != nil {
+		return nil, -1, err
+	}
+
+	// Use aggregation to join with users collection
+	pipeline := mongo.Pipeline{
+		{{Key: "$match", Value: filter}},
+		{{Key: "$skip", Value: int64(skip)}},
+		{{Key: "$limit", Value: int64(pageSize)}},
+		{{Key: "$lookup", Value: bson.M{
+			"from":         config.UserColName,
+			"localField":   "user_id",
+			"foreignField": "_id",
+			"as":           "user_data",
+		}}},
+		{{Key: "$addFields", Value: bson.M{
+			"user": bson.M{"$arrayElemAt": bson.A{"$user_data", 0}},
+		}}},
+		{{Key: "$project", Value: bson.M{
+			"user_data": 0, // Remove the temporary array field
+		}}},
+	}
+
+	cursor, err := m.membershipCollection.Aggregate(ctx, pipeline)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -136,11 +160,6 @@ func (m *membershipRepo) GetByCommunityIDPaginated(ctx context.Context, communit
 	var memberships []*model.Membership
 	if err := cursor.All(ctx, &memberships); err != nil {
 		return nil, 0, err
-	}
-
-	count, err := m.membershipCollection.CountDocuments(ctx, filter)
-	if err != nil {
-		return nil, -1, err
 	}
 
 	return memberships, count, nil

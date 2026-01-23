@@ -97,3 +97,25 @@ func (mc *MessageController) DeleteMessageByID(ctx *gin.Context) {
 
 	dto.SendSuccess(ctx, http.StatusOK, "Message deleted successfully", gin.H{"id": messageID})
 }
+
+func (mc *MessageController) MarkChannelAsRead(ctx *gin.Context) {
+	channelID := ctx.Param("channel_id")
+	if channelID == "" {
+		dto.SendError(ctx, http.StatusBadRequest, "Channel ID is required", apperror.ErrBadRequest.Code)
+		return
+	}
+
+	authUser, exists := ctx.Get("authUser")
+	if !exists {
+		dto.SendError(ctx, http.StatusForbidden, apperror.ErrForbidden.Message, apperror.ErrForbidden.Code)
+		return
+	}
+
+	err := mc.messageService.MarkChannelAsRead(channelID, authUser.(auth.AuthUser).ID)
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
+		return
+	}
+
+	dto.SendSuccess(ctx, http.StatusOK, "Messages marked as read", gin.H{"channel_id": channelID})
+}

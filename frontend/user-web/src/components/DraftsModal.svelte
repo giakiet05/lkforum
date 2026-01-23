@@ -42,7 +42,7 @@
   }
 
   async function handleDelete(draftId: string) {
-    if (!confirm("Are you sure you want to delete this draft?")) {
+    if (!confirm("Bạn có chắc muốn xóa bản nháp này?")) {
       return;
     }
 
@@ -52,7 +52,7 @@
       await loadDrafts();
     } catch (error) {
       console.error("Failed to delete draft:", error);
-      toastStore.error("Failed to delete draft. Please try again.");
+      toastStore.error("Không thể xóa bản nháp. Vui lòng thử lại.");
     }
   }
 
@@ -65,11 +65,11 @@
     const diffDays = Math.floor(diffMs / 86400000);
 
     if (diffMins < 60) {
-      return `${diffMins} minute${diffMins !== 1 ? "s" : ""} ago`;
+      return `${diffMins} phút trước`;
     } else if (diffHours < 24) {
-      return `${diffHours} hour${diffHours !== 1 ? "s" : ""} ago`;
+      return `${diffHours} giờ trước`;
     } else if (diffDays < 7) {
-      return `${diffDays} day${diffDays !== 1 ? "s" : ""} ago`;
+      return `${diffDays} ngày trước`;
     } else {
       return date.toLocaleDateString();
     }
@@ -81,22 +81,25 @@
     <div class="modal-content" onclick={(e) => e.stopPropagation()}>
       <div class="modal-header">
         <h2>
-          Drafts <span class="draft-count">{drafts.length}/{totalDrafts}</span>
+          Bản nháp <span class="draft-count">{drafts.length}/{totalDrafts}</span
+          >
         </h2>
       </div>
 
       {#if isLoading}
-        <div class="loading">Loading drafts...</div>
+        <div class="loading">Đang tải bản nháp...</div>
       {:else if drafts.length === 0}
         <div class="empty-state">
-          <p>No drafts yet</p>
+          <p>Chưa có bản nháp</p>
         </div>
       {:else}
         <div class="drafts-list">
           {#each drafts as draft}
             <div class="draft-item">
               <div class="draft-info">
-                <h3 class="draft-title">{draft.title || "Untitled draft"}</h3>
+                <h3 class="draft-title">
+                  {draft.title || "Bản nháp chưa đặt tên"}
+                </h3>
                 <p class="draft-time">{formatTime(draft.updated_at)}</p>
               </div>
               <div class="draft-actions">

@@ -124,7 +124,7 @@
 
   async function handleSave() {
     if (!currentUser) {
-      toastStore.warning("Please login to save posts");
+      toastStore.warning("Vui lòng đăng nhập để lưu bài viết");
       return;
     }
     if (isSaving || !post) return;
@@ -193,7 +193,7 @@
   async function submitVote() {
     if (!post || selectedOptions.length === 0) return;
     if (!currentUser) {
-      toastStore.warning("Please login to vote on polls");
+      toastStore.warning("Vui lòng đăng nhập để bỏ phiếu khảo sát");
       return;
     }
 
@@ -224,13 +224,13 @@
       selectedOptions = [];
     } catch (error) {
       console.error("Failed to vote on poll:", error);
-      toastStore.error("Failed to submit vote. Please try again.");
+      toastStore.error("Không thể gửi phiếu bầu. Vui lòng thử lại.");
     }
   }
 
   async function handleUnvote() {
     if (!post || !currentUser) {
-      toastStore.warning("Please login to manage votes");
+      toastStore.warning("Vui lòng đăng nhập để quản lý phiếu bầu");
       return;
     }
 
@@ -245,7 +245,7 @@
       }
     } catch (error) {
       console.error("Failed to remove poll vote:", error);
-      toastStore.error("Failed to remove vote. Please try again.");
+      toastStore.error("Không thể xóa phiếu bầu. Vui lòng thử lại.");
     }
   }
 
@@ -276,10 +276,10 @@
     navigator.clipboard
       .writeText(text)
       .then(() => {
-        toastStore.success("Link copied to clipboard!");
+        toastStore.success("Đã sao chép liên kết!");
       })
       .catch(() => {
-        toastStore.error("Failed to copy link");
+        toastStore.error("Không thể sao chép liên kết");
       });
   }
 
@@ -294,14 +294,14 @@
 
   async function handleDelete() {
     showMenu = false;
-    if (!post || !confirm("Are you sure you want to delete this post?")) return;
+    if (!post || !confirm("Bạn có chắc chắn muốn xóa bài viết này?")) return;
 
     try {
       await deletePost(post.id);
       push("/"); // Redirect to home after delete
     } catch (error) {
       console.error("Failed to delete post:", error);
-      toastStore.error("Failed to delete post. Please try again.");
+      toastStore.error("Không thể xóa bài viết. Vui lòng thử lại.");
     }
   }
 
@@ -319,7 +319,7 @@
   async function handleReport(e: Event) {
     e.preventDefault();
     if (!post || !reportReason.trim()) {
-      toastStore.warning("Please select a reason");
+      toastStore.warning("Vui lòng chọn một lý do");
       return;
     }
 
@@ -328,11 +328,11 @@
       await reportPost(post.id, {
         reason: reportReason,
       });
-      toastStore.success("Report submitted successfully");
+      toastStore.success("Đã gửi báo cáo thành công");
       closeReportModal();
     } catch (error) {
       console.error("Failed to report post:", error);
-      toastStore.error("Failed to submit report. Please try again.");
+      toastStore.error("Không thể gửi báo cáo. Vui lòng thử lại.");
     } finally {
       isReporting = false;
     }
@@ -361,7 +361,7 @@
       >
         <path d="M19 12H5M12 19l-7-7 7-7" />
       </svg>
-      Back
+      Quay lại
     </button>
 
     <!-- Post Content -->
@@ -395,7 +395,7 @@
                         width="16"
                         height="16"
                       />
-                      <span>Edit Post</span>
+                      <span>Chỉnh sửa bài viết</span>
                     </button>
                     <button class="menu-item delete" onclick={handleDelete}>
                       <img
@@ -404,11 +404,11 @@
                         width="16"
                         height="16"
                       />
-                      <span>Delete Post</span>
+                      <span>Xóa bài viết</span>
                     </button>
                   {:else}
                     <button class="menu-item" onclick={openReportModal}>
-                      <span>⚠️ Report</span>
+                      <span>⚠️ Báo cáo</span>
                     </button>
                   {/if}
                 </div>
@@ -495,19 +495,19 @@
                     onclick={submitVote}
                     disabled={selectedOptions.length === 0}
                   >
-                    Vote
+                    Bỏ phiếu
                   </button>
                 {:else}
                   <button class="unvote-btn" onclick={handleUnvote}>
-                    Remove Vote
+                    Xóa phiếu bầu
                   </button>
                 {/if}
               </div>
               <p class="poll-footer">
-                {post.content.poll.total_votes} votes • {post.content.poll
+                {post.content.poll.total_votes} phiếu • {post.content.poll
                   .allow_multiple
-                  ? "Multiple choices allowed"
-                  : "Single choice"}
+                  ? "Cho phép nhiều lựa chọn"
+                  : "Chọn một"}
               </p>
             </div>
           {/if}
@@ -537,7 +537,7 @@
           </div>
           <button class="footer-btn">
             <img src="/CommentIcon.svg" alt="Comments" width="20" height="20" />
-            <span>{post.comments_count} Comments</span>
+            <span>{post.comments_count} Bình luận</span>
           </button>
           <button class="footer-btn" onclick={handleShare}>
             <svg
@@ -554,7 +554,7 @@
               <polyline points="16 6 12 2 8 6"></polyline>
               <line x1="12" y1="2" x2="12" y2="15"></line>
             </svg>
-            <span>Share</span>
+            <span>Chia sẻ</span>
           </button>
           <button
             class="footer-btn"
@@ -575,7 +575,7 @@
               <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"
               ></path>
             </svg>
-            <span>{isSaved ? "Saved" : "Save"}</span>
+            <span>{isSaved ? "Đã lưu" : "Lưu"}</span>
           </button>
         </div>
       </div>
@@ -592,7 +592,7 @@
       }}
     />
   {:else}
-    <div class="loading">Loading...</div>
+    <div class="loading">Đang tải...</div>
   {/if}
 </div>
 
@@ -601,39 +601,39 @@
   <div class="modal-overlay" onclick={closeReportModal}>
     <div class="modal-content" onclick={(e) => e.stopPropagation()}>
       <div class="modal-header">
-        <h3>Report Post</h3>
+        <h3>Báo cáo bài viết</h3>
         <button class="close-btn" onclick={closeReportModal}>×</button>
       </div>
       <form onsubmit={handleReport}>
         <div class="form-group">
-          <label for="report-reason">Reason *</label>
+          <label for="report-reason">Lý do *</label>
           <select id="report-reason" bind:value={reportReason} required>
-            <option value="">Select a reason</option>
+            <option value="">Chọn một lý do</option>
             <option value="spam">Spam</option>
-            <option value="harassment">Harassment or Bullying</option>
-            <option value="hate">Hate Speech</option>
-            <option value="violence">Violence or Threat</option>
-            <option value="misinformation">Misinformation</option>
-            <option value="nsfw">NSFW Content</option>
-            <option value="copyright">Copyright Violation</option>
-            <option value="other">Other</option>
+            <option value="harassment">Quấy rối hoặc bắt nạt</option>
+            <option value="hate">Ngôn từ thù hằn</option>
+            <option value="violence">Bạo lực hoặc đe dọa</option>
+            <option value="misinformation">Thông tin sai lệch</option>
+            <option value="nsfw">Nội dung nhạy cảm</option>
+            <option value="copyright">Vi phạm bản quyền</option>
+            <option value="other">Khác</option>
           </select>
         </div>
         <div class="form-group">
-          <label for="report-details">Additional Details (Optional)</label>
+          <label for="report-details">Chi tiết bổ sung (Tuỳ chọn)</label>
           <textarea
             id="report-details"
             bind:value={reportDetails}
-            placeholder="Provide more context about why you're reporting this post..."
+            placeholder="Cung cấp thêm ngữ cảnh về lý do báo cáo bài viết này..."
             rows="4"
           ></textarea>
         </div>
         <div class="modal-actions">
           <button type="button" class="btn-cancel" onclick={closeReportModal}>
-            Cancel
+            Hủy
           </button>
           <button type="submit" class="btn-submit" disabled={isReporting}>
-            {isReporting ? "Submitting..." : "Submit Report"}
+            {isReporting ? "Đang gửi..." : "Gửi báo cáo"}
           </button>
         </div>
       </form>

@@ -1247,11 +1247,20 @@ func (s *postService) buildFindOptions(query *dto.GetPostsQuery) *repo.FindOptio
 
 	switch constant.SortType(query.Sort) {
 	case constant.SortTypeTop:
+		// Top: sort by upvotes count
 		opts.Sort = map[string]int{"votes_count.up": -1}
 	case constant.SortTypeNew:
+		// New: sort by creation time (newest first)
 		opts.Sort = map[string]int{"created_at": -1}
 	case constant.SortTypeHot:
-		opts.Sort = map[string]int{"created_at": -1} // Simplified hot sort
+		// Hot: sort by comment count and recent activity
+		opts.Sort = map[string]int{"comment_count": -1, "created_at": -1}
+	case constant.SortTypeBest:
+		// Best: sort by net score (upvotes - downvotes)
+		opts.Sort = map[string]int{"votes_count.up": -1, "votes_count.down": 1}
+	case constant.SortTypeRising:
+		// Rising: recent posts with high engagement (votes + comments)
+		opts.Sort = map[string]int{"votes_count.up": -1, "comment_count": -1, "created_at": -1}
 	}
 
 	return opts

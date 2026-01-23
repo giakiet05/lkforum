@@ -8,6 +8,8 @@
   import { logout, validateAuth } from "./services/auth-service";
   import { push } from "svelte-spa-router";
   import { onMount } from "svelte";
+  import { websocketService } from "./services/websocket-service";
+  import { addOnlineUser, removeOnlineUser } from "./stores/chat-store";
 
   const sidebarItems = [
     {
@@ -40,7 +42,7 @@
     },
   ];
 
-  let isSidebarCompact = false;
+  let isSidebarCompact = $state(false);
   let isSidebarOpen = $state(false);
   let shouldShowAuthModal = $state(false);
   let isSearchPage = $derived($location === "/search");
@@ -100,8 +102,53 @@
     }
   });
 
+  // Define presence handlers outside so they can be reused
+  const handlePresenceOnline = (payload: { user_id: string }) => {
+    console.log("🟢 User online:", payload.user_id);
+    addOnlineUser(payload.user_id);
+  };
+
+  const handlePresenceOffline = (payload: { user_id: string }) => {
+    console.log("⚫ User offline:", payload.user_id);
+    removeOnlineUser(payload.user_id);
+  };
+
+  // Connect WebSocket when user is authenticated
+  $effect(() => {
+    const user = $authStore.user;
+    if (user && !isAuthChecking) {
+      // Always register presence handlers first
+      websocketService.on("presence_online", handlePresenceOnline);
+      websocketService.on("presence_offline", handlePresenceOffline);
+      console.log("✅ Presence handlers registered");
+
+      // Connect WebSocket if not already connected
+      if (!websocketService.isConnected()) {
+        websocketService
+          .connect()
+          .then(() => {
+            console.log("✅ WebSocket connected for user:", user.username);
+          })
+          .catch((error) => {
+            console.error("❌ Failed to connect WebSocket:", error);
+          });
+      } else {
+        console.log("✅ WebSocket already connected for user:", user.username);
+      }
+    }
+
+    // Cleanup function
+    return () => {
+      websocketService.off("presence_online", handlePresenceOnline);
+      websocketService.off("presence_offline", handlePresenceOffline);
+    };
+  });
+
   function handleLogout() {
     logout();
+    // Redirect to home and refresh the page
+    window.location.href = "/#/";
+    window.location.reload();
   }
 
   function handleNavigate(item: any) {
