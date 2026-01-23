@@ -13,6 +13,7 @@ import (
 
 type VoteService interface {
 	VoteOnTarget(userID, targetID string, targetType model.VoteTargetType, voteValue bool) (*dto.VotesCountResponse, error)
+	VoteOnTargetByAuthor(userID, targetID string, targetType model.VoteTargetType, voteValue bool) (*dto.VotesCountResponse, error)
 	GetUserVote(userID, targetID string, targetType model.VoteTargetType) (*model.Vote, error)
 	FindUserVotes(userID string, targetIDs []string, targetType model.VoteTargetType) (map[string]string, error)
 }
@@ -46,6 +47,35 @@ func (s *voteService) VoteOnTarget(userID, targetID string, targetType model.Vot
 	if err := s.checkModerationStatus(ctx, targetID, targetType); err != nil {
 		return nil, err
 	}
+
+	// Get author ID based on target type
+	authorID, err := s.getAuthorID(ctx, targetID, targetType)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get previous vote to determine events to publish
+	prevVote, _ := s.voteRepo.GetUserVote(ctx, userID, targetID, targetType)
+
+	// Perform vote
+	if err := s.voteRepo.Vote(ctx, userID, targetID, targetType, voteValue); err != nil {
+		return nil, err
+	}
+
+	// Publish events
+	s.publishVoteEvents(authorID, userID, targetID, targetType, prevVote, voteValue)
+
+	// Get updated vote counts
+	return s.getUpdatedVoteCounts(ctx, targetID, targetType)
+}
+
+// VoteOnTargetByAuthor allows the author to vote on their own content without moderation check
+// Used for auto-upvote when creating a post
+func (s *voteService) VoteOnTargetByAuthor(userID, targetID string, targetType model.VoteTargetType, voteValue bool) (*dto.VotesCountResponse, error) {
+	ctx, cancel := util.NewDefaultDBContext()
+	defer cancel()
+
+	// Skip moderation check for author's own vote
 
 	// Get author ID based on target type
 	authorID, err := s.getAuthorID(ctx, targetID, targetType)

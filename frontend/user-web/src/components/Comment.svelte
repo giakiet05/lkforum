@@ -1,9 +1,11 @@
 <script lang="ts">
+  import { push } from "svelte-spa-router";
   import type { CommentResponse } from "../dtos/comment-dto";
   import CommentComponent from "./Comment.svelte";
   import { deleteComment, createComment } from "../services/comment-service";
   import { authStore } from "../stores/auth-store";
   import { toastStore } from "../stores/toast-store";
+  import ConfirmModal from "./ConfirmModal.svelte";
 
   type CommentProps = {
     comment: CommentResponse;
@@ -27,6 +29,7 @@
   let replyImage = $state<File | null>(null);
   let replyImagePreview = $state<string | null>(null);
   let replyErrorMessage = $state<string | null>(null);
+  let showDeleteConfirm = $state(false);
 
   const toggleCollapse = () => {
     isCollapsed = !isCollapsed;
@@ -47,9 +50,12 @@
     editContent = comment.content;
   };
 
-  const handleDelete = async () => {
-    if (!confirm("Bạn có chắc muốn xóa bình luận này?")) return;
+  const handleDelete = () => {
+    showDeleteConfirm = true;
+  };
 
+  const confirmDelete = async () => {
+    showDeleteConfirm = false;
     try {
       await deleteComment(comment.id);
       if (onUpdate) onUpdate();
@@ -183,9 +189,19 @@
         <img
           src={comment.author.avatar?.url || "/user.jpg"}
           alt={comment.author.username}
-          class="author-avatar"
+          class="author-avatar clickable"
+          onclick={() => push(`/profile/${comment.author.username}`)}
+          role="button"
+          tabindex="0"
         />
-        <span class="author-name">u/{comment.author.username}</span>
+        <span
+          class="author-name clickable"
+          onclick={() => push(`/profile/${comment.author.username}`)}
+          role="button"
+          tabindex="0"
+        >
+          u/{comment.author.username}
+        </span>
         <span class="comment-time">{formatTime(comment.created_at)}</span>
         {#if comment.children && comment.children.length > 0}
           <button class="collapse-btn" onclick={toggleCollapse}>
@@ -351,6 +367,17 @@
   </div>
 </div>
 
+<ConfirmModal
+  show={showDeleteConfirm}
+  title="Xác nhận xóa"
+  message="Bạn có chắc muốn xóa bình luận này? Hành động này không thể hoàn tác."
+  confirmText="Xóa"
+  cancelText="Hủy"
+  confirmVariant="danger"
+  onConfirm={confirmDelete}
+  onCancel={() => (showDeleteConfirm = false)}
+/>
+
 <style>
   .comment {
     margin-bottom: 8px;
@@ -428,9 +455,22 @@
     object-fit: cover;
   }
 
+  .author-avatar.clickable {
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+
+  .author-avatar.clickable:hover {
+    opacity: 0.8;
+  }
+
   .author-name {
     font-weight: 700;
     color: #1c1c1c;
+  }
+
+  .author-name.clickable {
+    cursor: pointer;
   }
 
   .author-name:hover {

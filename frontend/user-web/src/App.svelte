@@ -9,7 +9,17 @@
   import { push } from "svelte-spa-router";
   import { onMount } from "svelte";
   import { websocketService } from "./services/websocket-service";
-  import { addOnlineUser, removeOnlineUser } from "./stores/chat-store";
+  import {
+    addOnlineUser,
+    removeOnlineUser,
+    setCurrentUserId,
+    addMessage,
+    setChannels,
+    setMessages,
+  } from "./stores/chat-store";
+  import { getChannelsByUser } from "./services/channel-service";
+  import { getMessages } from "./services/message-service";
+  import type { MessageResponse } from "./dtos/message-dto";
 
   const sidebarItems = [
     {
@@ -113,14 +123,57 @@
     removeOnlineUser(payload.user_id);
   };
 
+  // Global handler for incoming messages (so badge shows even when ChatPopup is closed)
+  const handleGlobalMessage = (payload: any) => {
+    const message: MessageResponse = payload.message || payload;
+    console.log("📨 [App] Global message received:", message);
+    addMessage(message.channel_id, message);
+  };
+
+  // Load channels and messages on login to get unread count
+  async function loadUserChannelsAndMessages(userId: string) {
+    try {
+      console.log("📥 [App] Loading channels for unread count...");
+      const response = await getChannelsByUser(userId);
+      const channels = response.channels || [];
+      setChannels(channels);
+
+      // Load messages for each channel to calculate unread count
+      for (const channel of channels) {
+        try {
+          const messages = await getMessages({ channel_id: channel.id });
+          setMessages(channel.id, messages);
+        } catch (err) {
+          console.error(
+            "Failed to load messages for channel:",
+            channel.id,
+            err,
+          );
+        }
+      }
+      console.log("✅ [App] Channels and messages loaded for unread count");
+    } catch (err) {
+      console.error("❌ [App] Failed to load channels:", err);
+    }
+  }
+
   // Connect WebSocket when user is authenticated
   $effect(() => {
     const user = $authStore.user;
     if (user && !isAuthChecking) {
+      // Set current user ID for chat store (needed to filter own messages from unread count)
+      setCurrentUserId(user.id);
+
+      // Load channels to get initial unread count
+      loadUserChannelsAndMessages(user.id);
+
       // Always register presence handlers first
       websocketService.on("presence_online", handlePresenceOnline);
       websocketService.on("presence_offline", handlePresenceOffline);
-      console.log("✅ Presence handlers registered");
+      // Register global message handler to update badge even when ChatPopup is closed
+      websocketService.on("send_message", handleGlobalMessage);
+      websocketService.on("ack_message", handleGlobalMessage);
+      console.log("✅ Presence and message handlers registered");
 
       // Connect WebSocket if not already connected
       if (!websocketService.isConnected()) {
@@ -135,12 +188,17 @@
       } else {
         console.log("✅ WebSocket already connected for user:", user.username);
       }
+    } else {
+      // Clear current user ID when logged out
+      setCurrentUserId(null);
     }
 
     // Cleanup function
     return () => {
       websocketService.off("presence_online", handlePresenceOnline);
       websocketService.off("presence_offline", handlePresenceOffline);
+      websocketService.off("send_message", handleGlobalMessage);
+      websocketService.off("ack_message", handleGlobalMessage);
     };
   });
 

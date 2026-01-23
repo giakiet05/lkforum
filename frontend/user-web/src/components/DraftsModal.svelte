@@ -2,6 +2,7 @@
   import { getDrafts, deleteDraft } from "../services/draft-service";
   import type { DraftSummaryResponse } from "../dtos/draft-dto";
   import { toastStore } from "../stores/toast-store";
+  import ConfirmModal from "./ConfirmModal.svelte";
 
   interface Props {
     show: boolean;
@@ -14,6 +15,8 @@
   let drafts = $state<DraftSummaryResponse[]>([]);
   let totalDrafts = $state(0);
   let isLoading = $state(false);
+  let showDeleteConfirm = $state(false);
+  let draftToDelete = $state<string | null>(null);
 
   // Load drafts when modal opens
   $effect(() => {
@@ -42,17 +45,23 @@
   }
 
   async function handleDelete(draftId: string) {
-    if (!confirm("Bạn có chắc muốn xóa bản nháp này?")) {
-      return;
-    }
+    draftToDelete = draftId;
+    showDeleteConfirm = true;
+  }
+
+  async function confirmDelete() {
+    if (!draftToDelete) return;
+    showDeleteConfirm = false;
 
     try {
-      await deleteDraft(draftId);
+      await deleteDraft(draftToDelete);
       // Reload drafts after deletion
       await loadDrafts();
     } catch (error) {
       console.error("Failed to delete draft:", error);
       toastStore.error("Không thể xóa bản nháp. Vui lòng thử lại.");
+    } finally {
+      draftToDelete = null;
     }
   }
 
@@ -135,6 +144,20 @@
     </div>
   </div>
 {/if}
+
+<ConfirmModal
+  show={showDeleteConfirm}
+  title="Xác nhận xóa"
+  message="Bạn có chắc muốn xóa bản nháp này?"
+  confirmText="Xóa"
+  cancelText="Hủy"
+  confirmVariant="danger"
+  onConfirm={confirmDelete}
+  onCancel={() => {
+    showDeleteConfirm = false;
+    draftToDelete = null;
+  }}
+/>
 
 <style>
   .modal-overlay {

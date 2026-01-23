@@ -5,8 +5,9 @@
   import type { QueuePost } from "../mocks/mod-queue.mock";
   import { mockRestrictedUsers } from "../mocks/restricted-users.mock";
   import type { RestrictedUser } from "../mocks/restricted-users.mock";
-  import { mockModerators, mockApprovedUsers } from "../mocks/moderators.mock";
-  import type { Moderator, ApprovedUser } from "../mocks/moderators.mock";
+  import { mockModerators } from "../mocks/moderators.mock";
+  import type { Moderator } from "../mocks/moderators.mock";
+  import ConfirmModal from "../components/ConfirmModal.svelte";
   import {
     getCommunities,
     updateCommunity,
@@ -23,6 +24,10 @@
   import {
     getMembershipsByCommunityId,
     kickMember,
+    getPendingMembers,
+    approveMember,
+    rejectMember,
+    getApprovedMembers,
   } from "../services/membership-service";
   import { getUserByUsername } from "../services/user-service";
   import { toastStore } from "../stores/toast-store";
@@ -63,6 +68,7 @@
     | "restricted"
     | "members"
     | "all-members"
+    | "pending-members"
     | "rules";
   type QueueTab = "unmoderated" | "edited" | "removed" | "reported";
   type SortOption = "newest" | "oldest" | "most-reported";
@@ -79,6 +85,21 @@
   let membersPage = $state(1);
   let membersPageSize = $state(20);
   let isKickingMember = $state<string | null>(null);
+
+  // Pending members state (for communities with join_require_approval)
+  let pendingMembers = $state<any[]>([]);
+  let isLoadingPendingMembers = $state(false);
+  let pendingMembersPage = $state(1);
+  let pendingMembersPageSize = $state(20);
+  let pendingMembersCount = $state(0);
+  let isProcessingMember = $state<string | null>(null);
+
+  // Approved members state
+  let approvedMembers = $state<any[]>([]);
+  let isLoadingApprovedMembers = $state(false);
+  let approvedMembersPage = $state(1);
+  let approvedMembersPageSize = $state(20);
+  let approvedMembersCount = $state(0);
 
   // Queue/Pending Posts state
   let pendingPosts = $state<any[]>([]);
@@ -124,6 +145,21 @@
   let ruleName = $state("");
   let ruleDescription = $state("");
 
+  // Confirm modal states
+  let showKickConfirm = $state(false);
+  let showRejectConfirm = $state(false);
+  let showRemoveApprovedConfirm = $state(false);
+  let showDeleteRuleConfirm = $state(false);
+  let showUnbanConfirm = $state(false);
+  let showUnmuteConfirm = $state(false);
+  let showDeleteMemberConfirm = $state(false);
+  let showRemovePostModal = $state(false);
+  let removePostId = $state<string | null>(null);
+  let removePostReason = $state("");
+  let confirmTargetUser = $state<{ id: string; username: string } | null>(null);
+  let confirmTargetIndex = $state<number | null>(null);
+  let confirmMemberType = $state<"mod" | "approved">("mod");
+
   const isRuleFormValid = $derived(
     ruleName.trim().length > 0 && ruleDescription.trim().length > 0,
   );
@@ -135,6 +171,7 @@
     await loadModerators();
     await loadPendingPosts();
     await loadAllMembers();
+    await loadApprovedMembersList();
   });
 
   // Watch for tab changes and load appropriate posts
@@ -152,6 +189,20 @@
   $effect(() => {
     if (community && activeSidebarItem === "all-members") {
       loadAllMembers();
+    }
+  });
+
+  // Watch for sidebar changes and load pending members
+  $effect(() => {
+    if (community && activeSidebarItem === "pending-members") {
+      loadPendingMembersList();
+    }
+  });
+
+  // Load pending members count on community load (for badge)
+  $effect(() => {
+    if (community?.setting?.join_require_approval) {
+      loadPendingMembersList();
     }
   });
 
@@ -235,20 +286,156 @@
       return;
     }
 
-    if (confirm(`Bạn có chắc chắn muốn xóa ${username} khỏi cộng đồng?`)) {
-      try {
-        isKickingMember = userId;
-        await kickMember(community.id, userId);
-        toastStore.success(`Đã xóa ${username} khỏi cộng đồng!`);
-        await loadAllMembers(); // Reload the list
-      } catch (error: any) {
-        console.error("Failed to kick member:", error);
-        toastStore.error(
-          error.message || "Không thể xóa thành viên. Vui lòng thử lại.",
-        );
-      } finally {
-        isKickingMember = null;
-      }
+    confirmTargetUser = { id: userId, username };
+    showKickConfirm = true;
+  }
+
+  async function confirmKickMember() {
+    if (!community || !confirmTargetUser) return;
+    showKickConfirm = false;
+
+    try {
+      isKickingMember = confirmTargetUser.id;
+      await kickMember(community.id, confirmTargetUser.id);
+      toastStore.success(
+        `Đã xóa ${confirmTargetUser.username} khỏi cộng đồng!`,
+      );
+      await loadAllMembers(); // Reload the list
+    } catch (error: any) {
+      console.error("Failed to kick member:", error);
+      toastStore.error(
+        error.message || "Không thể xóa thành viên. Vui lòng thử lại.",
+      );
+    } finally {
+      isKickingMember = null;
+      confirmTargetUser = null;
+    }
+  }
+
+  // Pending members functions
+  async function loadPendingMembersList() {
+    if (!community) return;
+
+    try {
+      isLoadingPendingMembers = true;
+      const response = await getPendingMembers(
+        community.id,
+        pendingMembersPage,
+        pendingMembersPageSize,
+      );
+      console.log("🔍 Pending members response:", response);
+      console.log("🔍 First pending member:", response.memberships?.[0]);
+      pendingMembers = response.memberships || [];
+      pendingMembersCount = response.pagination?.total || 0;
+    } catch (error) {
+      console.error("Failed to load pending members:", error);
+      pendingMembers = [];
+      pendingMembersCount = 0;
+    } finally {
+      isLoadingPendingMembers = false;
+    }
+  }
+
+  // Approved members functions
+  async function loadApprovedMembersList() {
+    if (!community) return;
+
+    try {
+      isLoadingApprovedMembers = true;
+      const response = await getApprovedMembers(
+        community.id,
+        approvedMembersPage,
+        approvedMembersPageSize,
+      );
+      console.log("🔍 Approved members response:", response);
+      console.log("🔍 First member:", response.memberships?.[0]);
+      approvedMembers = response.memberships || [];
+      approvedMembersCount = response.pagination?.total || 0;
+    } catch (error) {
+      console.error("Failed to load approved members:", error);
+      approvedMembers = [];
+      approvedMembersCount = 0;
+    } finally {
+      isLoadingApprovedMembers = false;
+    }
+  }
+
+  async function handleApproveMember(membershipId: string, username: string) {
+    if (!community) return;
+
+    try {
+      isProcessingMember = membershipId;
+      await approveMember(community.id, membershipId);
+      toastStore.success(`Đã duyệt ${username} vào cộng đồng!`);
+      await loadPendingMembersList();
+      await loadApprovedMembersList();
+      await loadAllMembers();
+    } catch (error: any) {
+      console.error("Failed to approve member:", error);
+      toastStore.error(
+        error.message || "Không thể duyệt thành viên. Vui lòng thử lại.",
+      );
+    } finally {
+      isProcessingMember = null;
+    }
+  }
+
+  async function handleRejectMember(membershipId: string, username: string) {
+    if (!community) return;
+
+    confirmTargetUser = { id: membershipId, username };
+    showRejectConfirm = true;
+  }
+
+  async function confirmRejectMember() {
+    if (!community || !confirmTargetUser) return;
+    showRejectConfirm = false;
+
+    try {
+      isProcessingMember = confirmTargetUser.id;
+      await rejectMember(community.id, confirmTargetUser.id);
+      toastStore.success(
+        `Đã từ chối yêu cầu của ${confirmTargetUser.username}!`,
+      );
+      await loadPendingMembersList();
+    } catch (error: any) {
+      console.error("Failed to reject member:", error);
+      toastStore.error(
+        error.message || "Không thể từ chối yêu cầu. Vui lòng thử lại.",
+      );
+    } finally {
+      isProcessingMember = null;
+      confirmTargetUser = null;
+    }
+  }
+
+  async function handleRemoveApprovedUser(userId: string, username: string) {
+    if (!community) return;
+
+    confirmTargetUser = { id: userId, username };
+    showRemoveApprovedConfirm = true;
+  }
+
+  async function confirmRemoveApprovedUser() {
+    if (!community || !confirmTargetUser) return;
+    showRemoveApprovedConfirm = false;
+
+    try {
+      isProcessingMember = confirmTargetUser.id;
+      await kickMember(community.id, confirmTargetUser.id);
+      toastStore.success(
+        `Đã xóa ${confirmTargetUser.username} khỏi danh sách!`,
+      );
+      await loadApprovedMembersList();
+      await loadAllMembers();
+    } catch (error: any) {
+      console.error("Failed to remove approved user:", error);
+      toastStore.error(
+        error.message || "Không thể xóa người dùng. Vui lòng thử lại.",
+      );
+    } finally {
+      isProcessingMember = null;
+      confirmTargetUser = null;
     }
   }
 
@@ -328,16 +515,22 @@
   }
 
   function formatTime(dateString: string): string {
+    if (!dateString) return "Không xác định";
     const date = new Date(dateString);
+    if (isNaN(date.getTime())) return "Không xác định";
+
+    // Check for zero value time (0001-01-01 in Go)
+    if (date.getFullYear() <= 1) return "Không xác định";
+
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
     const diffDays = Math.floor(diffHours / 24);
 
-    if (diffHours < 1) return "just now";
-    if (diffHours < 24) return `${diffHours} hours ago`;
-    if (diffDays < 7) return `${diffDays} days ago`;
-    return date.toLocaleDateString();
+    if (diffHours < 1) return "Vừa xong";
+    if (diffHours < 24) return `${diffHours} giờ trước`;
+    if (diffDays < 7) return `${diffDays} ngày trước`;
+    return date.toLocaleDateString("vi-VN");
   }
 
   async function handleApprove(postId: string) {
@@ -356,20 +549,43 @@
   async function handleRemove(postId: string, reason?: string) {
     if (!community) return;
 
-    const removalReason = reason || prompt("Reason for removal (optional):");
+    if (reason) {
+      // If reason is already provided, proceed directly
+      try {
+        await moderatePost(community.id, postId, false, reason);
+        toastStore.success("Đã xóa bài viết!");
+        await loadPendingPosts();
+      } catch (error) {
+        console.error("Failed to remove post:", error);
+        toastStore.error("Không thể xóa bài viết. Vui lòng thử lại.");
+      }
+    } else {
+      // Show modal to get reason
+      removePostId = postId;
+      removePostReason = "";
+      showRemovePostModal = true;
+    }
+  }
+
+  async function confirmRemovePost() {
+    if (!community || !removePostId) return;
+    showRemovePostModal = false;
 
     try {
       await moderatePost(
         community.id,
-        postId,
+        removePostId,
         false,
-        removalReason || undefined,
+        removePostReason.trim() || undefined,
       );
-      toastStore.success("Post removed successfully!");
-      await loadPendingPosts(); // Reload the list
+      toastStore.success("Đã xóa bài viết!");
+      await loadPendingPosts();
     } catch (error) {
       console.error("Failed to remove post:", error);
-      toastStore.error("Failed to remove post. Please try again.");
+      toastStore.error("Không thể xóa bài viết. Vui lòng thử lại.");
+    } finally {
+      removePostId = null;
+      removePostReason = "";
     }
   }
 
@@ -429,22 +645,33 @@
   function handleDeleteRule(index: number) {
     if (!community) return;
 
-    if (confirm("Are you sure you want to delete this rule?")) {
-      const updatedRules = communityRules.filter((_, i) => i !== index);
+    confirmTargetIndex = index;
+    showDeleteRuleConfirm = true;
+  }
 
-      updateCommunity({
-        id: community.id,
-        rules: updatedRules,
+  async function confirmDeleteRule() {
+    if (!community || confirmTargetIndex === null) return;
+    showDeleteRuleConfirm = false;
+
+    const updatedRules = communityRules.filter(
+      (_, i) => i !== confirmTargetIndex,
+    );
+
+    updateCommunity({
+      id: community.id,
+      rules: updatedRules,
+    })
+      .then(() => {
+        communityRules = updatedRules;
+        toastStore.success("Đã xóa quy tắc!");
       })
-        .then(() => {
-          communityRules = updatedRules;
-          toastStore.success("Rule deleted!");
-        })
-        .catch((error) => {
-          console.error("Failed to delete rule:", error);
-          toastStore.error("Failed to delete rule. Please try again.");
-        });
-    }
+      .catch((error) => {
+        console.error("Failed to delete rule:", error);
+        toastStore.error("Không thể xóa quy tắc. Vui lòng thử lại.");
+      })
+      .finally(() => {
+        confirmTargetIndex = null;
+      });
   }
 
   function handleBackToRulesList() {
@@ -601,40 +828,54 @@
   async function handleUnbanUser(userId: string) {
     if (!community) return;
 
-    if (confirm("Bạn có chắc chắn muốn bỏ cấm người dùng này?")) {
-      try {
-        await unbanUser({
-          community_id: community.id,
-          user_id: userId,
-        });
+    confirmTargetUser = { id: userId, username: "" };
+    showUnbanConfirm = true;
+  }
 
-        toastStore.success("Đã bỏ cấm người dùng thành công!");
-        await loadRestrictedUsers();
-      } catch (error) {
-        console.error("Failed to unban user:", error);
-        toastStore.error("Không thể bỏ cấm người dùng. Vui lòng thử lại.");
-      }
+  async function confirmUnbanUser() {
+    if (!community || !confirmTargetUser) return;
+    showUnbanConfirm = false;
+
+    try {
+      await unbanUser({
+        community_id: community.id,
+        user_id: confirmTargetUser.id,
+      });
+
+      toastStore.success("Đã bỏ cấm người dùng thành công!");
+      await loadRestrictedUsers();
+    } catch (error) {
+      console.error("Failed to unban user:", error);
+      toastStore.error("Không thể bỏ cấm người dùng. Vui lòng thử lại.");
+    } finally {
+      confirmTargetUser = null;
     }
   }
 
   async function handleUnmuteUser(userId: string) {
     if (!community) return;
 
-    if (confirm("Bạn có chắc chắn muốn bỏ tắt tiếng người dùng này?")) {
-      try {
-        await unmuteUser({
-          community_id: community.id,
-          user_id: userId,
-        });
+    confirmTargetUser = { id: userId, username: "" };
+    showUnmuteConfirm = true;
+  }
 
-        toastStore.success("Đã bỏ tắt tiếng người dùng thành công!");
-        await loadRestrictedUsers();
-      } catch (error) {
-        console.error("Failed to unmute user:", error);
-        toastStore.error(
-          "Không thể bỏ tắt tiếng người dùng. Vui lòng thử lại.",
-        );
-      }
+  async function confirmUnmuteUser() {
+    if (!community || !confirmTargetUser) return;
+    showUnmuteConfirm = false;
+
+    try {
+      await unmuteUser({
+        community_id: community.id,
+        user_id: confirmTargetUser.id,
+      });
+
+      toastStore.success("Đã bỏ tắt tiếng người dùng thành công!");
+      await loadRestrictedUsers();
+    } catch (error) {
+      console.error("Failed to unmute user:", error);
+      toastStore.error("Không thể bỏ tắt tiếng người dùng. Vui lòng thử lại.");
+    } finally {
+      confirmTargetUser = null;
     }
   }
 
@@ -704,29 +945,33 @@
   async function handleDeleteMember(userId: string, type: "mod" | "approved") {
     if (!community) return;
 
-    if (
-      confirm(
-        `Bạn có chắc chắn muốn xóa ${type === "mod" ? "quản trị viên" : "người dùng được duyệt"} này?`,
-      )
-    ) {
-      if (type === "mod") {
-        try {
-          await removeModerators({
-            id: community.id,
-            removed_moderator: [userId],
-          });
+    confirmTargetUser = { id: userId, username: "" };
+    confirmMemberType = type;
+    showDeleteMemberConfirm = true;
+  }
 
-          toastStore.success("Đã xóa quản trị viên!");
-          await loadCommunity(); // Reload to get updated moderators
-        } catch (error) {
-          console.error("Failed to remove moderator:", error);
-          toastStore.error("Không thể xóa quản trị viên. Vui lòng thử lại.");
-        }
-      } else {
-        // Approved users - not yet implemented
-        toastStore.info("Approved users feature coming soon!");
+  async function confirmDeleteMember() {
+    if (!community || !confirmTargetUser) return;
+    showDeleteMemberConfirm = false;
+
+    if (confirmMemberType === "mod") {
+      try {
+        await removeModerators({
+          id: community.id,
+          removed_moderator: [confirmTargetUser.id],
+        });
+
+        toastStore.success("Đã xóa quản trị viên!");
+        await loadCommunity(); // Reload to get updated moderators
+      } catch (error) {
+        console.error("Failed to remove moderator:", error);
+        toastStore.error("Không thể xóa quản trị viên. Vui lòng thử lại.");
       }
+    } else {
+      // Approved users - not yet implemented
+      toastStore.info("Approved users feature coming soon!");
     }
+    confirmTargetUser = null;
   }
 </script>
 
@@ -789,6 +1034,34 @@
         </svg>
         <span>Tất cả thành viên</span>
       </button>
+
+      {#if community?.setting?.join_require_approval}
+        <button
+          class="nav-item"
+          class:active={activeSidebarItem === "pending-members"}
+          onclick={() => handleSidebarClick("pending-members")}
+        >
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+            <circle cx="8.5" cy="7" r="4" />
+            <line x1="20" y1="8" x2="20" y2="14" />
+            <line x1="23" y1="11" x2="17" y2="11" />
+          </svg>
+          <span>Yêu cầu tham gia</span>
+          {#if pendingMembersCount > 0}
+            <span class="pending-badge">{pendingMembersCount}</span>
+          {/if}
+        </button>
+      {/if}
 
       <button
         class="nav-item"
@@ -1121,51 +1394,51 @@
           {:else}
             <div class="table-header approved">
               <div class="col">TÊN NGƯỜI DÙNG</div>
-              <div class="col">Ngày</div>
+              <div class="col">Ngày tham gia</div>
               <div class="col"></div>
             </div>
 
-            {#each mockApprovedUsers as user}
-              <div class="table-row approved">
-                <div class="col user-col">
-                  <img src={user.avatar} alt="" class="user-avatar" />
-                  <span>{user.username}</span>
-                </div>
-                <div class="col">{user.joinedDate}</div>
-                <div class="col actions-col">
-                  <button
-                    class="icon-btn edit"
-                    onclick={() =>
-                      handleEditMember(String(user.id), "approved")}
-                    title="Edit user"
-                  >
-                    <img
-                      src="/write_icon.svg"
-                      alt="Edit"
-                      width="20"
-                      height="20"
-                    />
-                  </button>
-                  <button
-                    class="icon-btn delete"
-                    onclick={() =>
-                      handleDeleteMember(String(user.id), "approved")}
-                    title="Remove user"
-                  >
-                    <img
-                      src="/bin_icon.svg"
-                      alt="Delete"
-                      width="20"
-                      height="20"
-                    />
-                  </button>
-                </div>
+            {#if isLoadingApprovedMembers}
+              <div class="loading-state">
+                <p>Đang tải danh sách người dùng được duyệt...</p>
               </div>
             {:else}
-              <div class="empty-state">
-                <p>Chưa có người dùng được duyệt</p>
-              </div>
-            {/each}
+              {#each approvedMembers as member}
+                <div class="table-row approved">
+                  <div class="col user-col">
+                    <img
+                      src={member.user?.avatar?.url || "/user.jpg"}
+                      alt=""
+                      class="user-avatar"
+                    />
+                    <span>{member.user?.username || "Không rõ"}</span>
+                  </div>
+                  <div class="col">{formatTime(member.created_at)}</div>
+                  <div class="col actions-col">
+                    <button
+                      class="icon-btn delete"
+                      onclick={() =>
+                        handleRemoveApprovedUser(
+                          member.user_id,
+                          member.user?.username || "người dùng",
+                        )}
+                      title="Xóa người dùng"
+                    >
+                      <img
+                        src="/bin_icon.svg"
+                        alt="Delete"
+                        width="20"
+                        height="20"
+                      />
+                    </button>
+                  </div>
+                </div>
+              {:else}
+                <div class="empty-state">
+                  <p>Chưa có người dùng được duyệt</p>
+                </div>
+              {/each}
+            {/if}
           {/if}
         </div>
       </div>
@@ -1255,6 +1528,97 @@
             {:else}
               <div class="empty-state">
                 <p>Chưa có thành viên nào</p>
+              </div>
+            {/each}
+          {/if}
+        </div>
+      </div>
+    {:else if activeSidebarItem === "pending-members"}
+      <!-- Pending Members Section -->
+      <div class="pending-members-section">
+        <div class="pending-members-header">
+          <h1>Yêu cầu tham gia ({pendingMembersCount})</h1>
+          <button
+            class="action-btn refresh"
+            onclick={() => loadPendingMembersList()}
+            disabled={isLoadingPendingMembers}
+          >
+            {isLoadingPendingMembers ? "Đang tải..." : "Làm mới"}
+          </button>
+        </div>
+
+        <p class="pending-members-description">
+          Các yêu cầu tham gia cộng đồng đang chờ duyệt. Bạn có thể duyệt hoặc
+          từ chối từng yêu cầu.
+        </p>
+
+        <!-- Pending Members Table -->
+        <div class="pending-members-table">
+          <div class="table-header pending-members">
+            <div class="col">TÊN NGƯỜI DÙNG</div>
+            <div class="col">NGÀY YÊU CẦU</div>
+            <div class="col">HÀNH ĐỘNG</div>
+          </div>
+
+          {#if isLoadingPendingMembers}
+            <div class="loading-state">
+              <p>Đang tải danh sách yêu cầu...</p>
+            </div>
+          {:else}
+            {#each pendingMembers as member}
+              <div class="table-row pending-members">
+                <div class="col user-col">
+                  <button
+                    class="user-link"
+                    onclick={() => push(`/user/${member.user?.username}`)}
+                  >
+                    <img
+                      src={member.user?.avatar?.url || "/user.jpg"}
+                      alt={member.user?.username || "User"}
+                      class="user-avatar"
+                    />
+                    <span class="username"
+                      >u/{member.user?.username || "Unknown"}</span
+                    >
+                  </button>
+                </div>
+                <div class="col">
+                  {formatTime(member.created_at)}
+                </div>
+                <div class="col actions-col">
+                  <button
+                    class="action-btn approve"
+                    onclick={() =>
+                      handleApproveMember(
+                        member.id,
+                        member.user?.username || "Unknown",
+                      )}
+                    disabled={isProcessingMember === member.id}
+                    title="Duyệt thành viên"
+                  >
+                    {#if isProcessingMember === member.id}
+                      Đang xử lý...
+                    {:else}
+                      ✓ Duyệt
+                    {/if}
+                  </button>
+                  <button
+                    class="action-btn reject"
+                    onclick={() =>
+                      handleRejectMember(
+                        member.id,
+                        member.user?.username || "Unknown",
+                      )}
+                    disabled={isProcessingMember === member.id}
+                    title="Từ chối yêu cầu"
+                  >
+                    ✕ Từ chối
+                  </button>
+                </div>
+              </div>
+            {:else}
+              <div class="empty-state">
+                <p>Không có yêu cầu nào đang chờ duyệt</p>
               </div>
             {/each}
           {/if}
@@ -1670,6 +2034,141 @@
         </button>
         <button class="action-btn-primary" onclick={handleInviteUser}>
           {inviteType === "mod" ? "Mời" : "Thêm"}
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- Confirm Modals -->
+<ConfirmModal
+  show={showKickConfirm}
+  title="Xác nhận xóa thành viên"
+  message={`Bạn có chắc chắn muốn xóa ${confirmTargetUser?.username || ""} khỏi cộng đồng?`}
+  confirmText="Xóa"
+  cancelText="Hủy"
+  confirmVariant="danger"
+  onConfirm={confirmKickMember}
+  onCancel={() => {
+    showKickConfirm = false;
+    confirmTargetUser = null;
+  }}
+/>
+
+<ConfirmModal
+  show={showRejectConfirm}
+  title="Xác nhận từ chối"
+  message={`Bạn có chắc chắn muốn từ chối yêu cầu của ${confirmTargetUser?.username || ""}?`}
+  confirmText="Từ chối"
+  cancelText="Hủy"
+  confirmVariant="danger"
+  onConfirm={confirmRejectMember}
+  onCancel={() => {
+    showRejectConfirm = false;
+    confirmTargetUser = null;
+  }}
+/>
+
+<ConfirmModal
+  show={showRemoveApprovedConfirm}
+  title="Xác nhận xóa người dùng"
+  message={`Bạn có chắc chắn muốn xóa ${confirmTargetUser?.username || ""} khỏi danh sách người dùng được duyệt?`}
+  confirmText="Xóa"
+  cancelText="Hủy"
+  confirmVariant="danger"
+  onConfirm={confirmRemoveApprovedUser}
+  onCancel={() => {
+    showRemoveApprovedConfirm = false;
+    confirmTargetUser = null;
+  }}
+/>
+
+<ConfirmModal
+  show={showDeleteRuleConfirm}
+  title="Xác nhận xóa quy tắc"
+  message="Bạn có chắc chắn muốn xóa quy tắc này?"
+  confirmText="Xóa"
+  cancelText="Hủy"
+  confirmVariant="danger"
+  onConfirm={confirmDeleteRule}
+  onCancel={() => {
+    showDeleteRuleConfirm = false;
+    confirmTargetIndex = null;
+  }}
+/>
+
+<ConfirmModal
+  show={showUnbanConfirm}
+  title="Xác nhận bỏ cấm"
+  message="Bạn có chắc chắn muốn bỏ cấm người dùng này?"
+  confirmText="Bỏ cấm"
+  cancelText="Hủy"
+  confirmVariant="primary"
+  onConfirm={confirmUnbanUser}
+  onCancel={() => {
+    showUnbanConfirm = false;
+    confirmTargetUser = null;
+  }}
+/>
+
+<ConfirmModal
+  show={showUnmuteConfirm}
+  title="Xác nhận bỏ tắt tiếng"
+  message="Bạn có chắc chắn muốn bỏ tắt tiếng người dùng này?"
+  confirmText="Bỏ tắt tiếng"
+  cancelText="Hủy"
+  confirmVariant="primary"
+  onConfirm={confirmUnmuteUser}
+  onCancel={() => {
+    showUnmuteConfirm = false;
+    confirmTargetUser = null;
+  }}
+/>
+
+<ConfirmModal
+  show={showDeleteMemberConfirm}
+  title={confirmMemberType === "mod"
+    ? "Xác nhận xóa quản trị viên"
+    : "Xác nhận xóa người dùng"}
+  message={`Bạn có chắc chắn muốn xóa ${confirmMemberType === "mod" ? "quản trị viên" : "người dùng được duyệt"} này?`}
+  confirmText="Xóa"
+  cancelText="Hủy"
+  confirmVariant="danger"
+  onConfirm={confirmDeleteMember}
+  onCancel={() => {
+    showDeleteMemberConfirm = false;
+    confirmTargetUser = null;
+  }}
+/>
+
+<!-- Remove Post Modal -->
+{#if showRemovePostModal}
+  <div class="confirm-overlay" onclick={() => (showRemovePostModal = false)}>
+    <div class="confirm-modal" onclick={(e) => e.stopPropagation()}>
+      <div class="confirm-header">
+        <h3>Xóa bài viết</h3>
+      </div>
+      <div class="confirm-body">
+        <p>Lý do xóa bài viết (tùy chọn):</p>
+        <input
+          type="text"
+          bind:value={removePostReason}
+          placeholder="Nhập lý do..."
+          class="reason-input"
+        />
+      </div>
+      <div class="confirm-actions">
+        <button
+          class="btn-cancel"
+          onclick={() => {
+            showRemovePostModal = false;
+            removePostId = null;
+          }}
+        >
+          Hủy
+        </button>
+        <button class="btn-confirm danger" onclick={confirmRemovePost}>
+          Xóa bài viết
         </button>
       </div>
     </div>
@@ -2968,5 +3467,193 @@
     padding: 40px;
     text-align: center;
     color: #7c7c7c;
+  }
+
+  /* Pending Members Section */
+  .pending-members-section {
+    background: white;
+    border-radius: 8px;
+    padding: 24px 32px;
+  }
+
+  .pending-members-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+
+  .pending-members-header h1 {
+    margin: 0;
+    font-size: 24px;
+    font-weight: 700;
+    color: #1c1c1c;
+  }
+
+  .pending-members-description {
+    color: #7c7c7c;
+    font-size: 14px;
+    margin-bottom: 24px;
+  }
+
+  .pending-members-table {
+    border: 1px solid #edeff1;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .pending-members-table .table-header.pending-members {
+    display: grid;
+    grid-template-columns: 2fr 1fr 200px;
+    background: #f6f7f8;
+    padding: 12px 16px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--grayfont);
+    text-transform: uppercase;
+  }
+
+  .pending-members-table .table-row.pending-members {
+    display: grid;
+    grid-template-columns: 2fr 1fr 200px;
+    padding: 16px;
+    border-top: 1px solid #edeff1;
+    align-items: center;
+    font-size: 14px;
+    color: #1c1c1c;
+  }
+
+  .action-btn.approve {
+    background: var(--blue--);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 16px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .action-btn.approve:hover:not(:disabled) {
+    background: #00008b;
+    filter: brightness(0.85);
+  }
+
+  .action-btn.approve:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .action-btn.reject {
+    background: #f6f7f8;
+    color: #ff4500;
+    border: 1px solid #ff4500;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .action-btn.reject:hover:not(:disabled) {
+    background: #fff5f5;
+  }
+
+  .action-btn.reject:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .pending-badge {
+    background: #ff4500;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 600;
+    margin-left: 8px;
+  }
+
+  /* Confirm Modal Styles */
+  .confirm-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+  }
+
+  .confirm-modal {
+    background: white;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 400px;
+    padding: 24px;
+  }
+
+  .confirm-header h3 {
+    margin: 0 0 16px 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: #1c1c1c;
+  }
+
+  .confirm-body {
+    margin-bottom: 24px;
+  }
+
+  .confirm-body p {
+    margin: 0 0 12px 0;
+    font-size: 14px;
+    color: #576f76;
+  }
+
+  .reason-input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 14px;
+  }
+
+  .confirm-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+  }
+
+  .btn-cancel,
+  .btn-confirm {
+    padding: 10px 20px;
+    border-radius: 9999px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+  }
+
+  .btn-cancel {
+    background: rgba(214, 216, 222, 0.5);
+    color: #1c1c1c;
+  }
+
+  .btn-cancel:hover {
+    background: rgba(214, 216, 222, 0.7);
+  }
+
+  .btn-confirm.danger {
+    background: #ff4500;
+    color: white;
+  }
+
+  .btn-confirm.danger:hover {
+    background: #e03d00;
   }
 </style>

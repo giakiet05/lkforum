@@ -17,6 +17,7 @@
   import { authStore } from "../stores/auth-store";
   import { toastStore } from "../stores/toast-store";
   import type { CommunityResponse } from "../dtos/community-dto";
+  import ConfirmModal from "./ConfirmModal.svelte";
 
   type PostProps = {
     post: PostResponse;
@@ -48,6 +49,7 @@
   // Menu state
   let showMenu = $state(false);
   let showReportModal = $state(false);
+  let showDeleteConfirm = $state(false);
   let reportReason = $state("");
   let reportDetails = $state("");
   let isReporting = $state(false);
@@ -216,6 +218,10 @@
   async function handleUpvote(e: MouseEvent) {
     e.stopPropagation();
     console.log("⬆️ Upvote clicked for post:", post.id);
+    console.log("⬆️ currentUser:", currentUser);
+    console.log("⬆️ post.author.id:", post.author.id);
+    console.log("⬆️ isOwnPost:", isOwnPost);
+
     if (!currentUser) {
       toastStore.warning("Vui lòng đăng nhập để bỏ phiếu");
       return;
@@ -233,6 +239,7 @@
 
       // Backend tự động toggle: POST cùng giá trị sẽ remove vote
       await voteOnPost(post.id, true);
+      console.log("⬆️ Vote API call successful");
 
       if (previousVote === "up") {
         // Bấm lần 2 - remove upvote
@@ -376,9 +383,11 @@
   async function handleDelete(e: MouseEvent) {
     e.stopPropagation();
     showMenu = false;
+    showDeleteConfirm = true;
+  }
 
-    if (!confirm("Bạn có chắc muốn xóa bài viết này?")) return;
-
+  async function confirmDelete() {
+    showDeleteConfirm = false;
     try {
       await deletePost(post.id);
       toastStore.success("Đã xóa bài viết thành công");
@@ -749,6 +758,18 @@
     </div>
   </div>
 {/if}
+
+<!-- Delete Confirmation Modal -->
+<ConfirmModal
+  show={showDeleteConfirm}
+  title="Xác nhận xóa"
+  message="Bạn có chắc chắn muốn xóa bài viết này? Hành động này không thể hoàn tác."
+  confirmText="Xóa"
+  cancelText="Hủy"
+  confirmVariant="danger"
+  onConfirm={confirmDelete}
+  onCancel={() => (showDeleteConfirm = false)}
+/>
 
 <style>
   .post-container {

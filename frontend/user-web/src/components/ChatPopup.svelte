@@ -554,7 +554,7 @@
                   <div class="popup-message-row" class:sent={isSent}>
                     {#if !isSent}
                       <img
-                        src={otherMember()?.avatar || "/avatar.jpg"}
+                        src={otherMember()?.avatar || "/user.jpg"}
                         alt={message.sender_username}
                         class="popup-message-avatar"
                       />

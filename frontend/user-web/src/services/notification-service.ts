@@ -6,7 +6,7 @@ import type { NotificationResponse, PaginatedNotificationsResponse } from "../dt
  */
 export async function getNotifications(params?: {
     page?: number;
-    limit?: number;
+    pageSize?: number;
 }): Promise<PaginatedNotificationsResponse> {
     const queryParams = new URLSearchParams();
     if (params) {
@@ -50,9 +50,12 @@ export async function deleteNotification(notificationId: string): Promise<void> 
  * Mark all notifications as read
  */
 export async function markAllAsRead(): Promise<void> {
+    console.log("🔔 [notification-service] Calling PUT /api/notifications/read-all");
     const res = await authenticatedFetch(`/api/notifications/read-all`, {
         method: "PUT",
     });
-    
-    return await handleApiResponse(res);
+    console.log("🔔 [notification-service] Response status:", res.status);
+    const result = await handleApiResponse(res);
+    console.log("🔔 [notification-service] Response data:", result);
+    return result;
 }

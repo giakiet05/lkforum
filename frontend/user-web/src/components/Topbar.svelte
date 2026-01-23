@@ -61,19 +61,32 @@
     }
   });
 
-  // Load unread notification count on mount
-  onMount(async () => {
+  // Load unread notification count on mount and when user changes
+  async function loadUnreadNotificationCount() {
     if (user) {
       try {
-        const response = await getNotifications({ page: 1, limit: 1 });
+        // Load more notifications to get accurate unread count
+        const response = await getNotifications({ page: 1, pageSize: 100 });
         const unreadCount =
           response.notifications?.filter((n) => !n.is_read).length || 0;
         unreadNotificationCount = unreadCount;
+        console.log(
+          `🔔 [Topbar] Loaded unread notification count: ${unreadCount}`,
+        );
       } catch (err) {
         console.error("Failed to load initial notification count:", err);
       }
+    } else {
+      unreadNotificationCount = 0;
     }
+  }
 
+  // Reload unread count when user changes (login/logout)
+  $effect(() => {
+    loadUnreadNotificationCount();
+  });
+
+  onMount(async () => {
     // Listen for open-chat event from Profile page
     const handleOpenChat = (event: CustomEvent) => {
       showChatPopup = true;
