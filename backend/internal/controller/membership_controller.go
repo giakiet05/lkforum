@@ -171,3 +171,125 @@ func (m *MembershipController) KickMember(ctx *gin.Context) {
 
 	dto.SendSuccess(ctx, http.StatusOK, "Member kicked successfully", gin.H{"community_id": communityID, "user_id": userID})
 }
+
+// GetPendingMembers returns paginated list of pending membership requests for a community
+func (m *MembershipController) GetPendingMembers(ctx *gin.Context) {
+	communityID := ctx.Param("community_id")
+	if communityID == "" {
+		dto.SendError(ctx, http.StatusBadRequest, "Community ID is required", apperror.ErrBadRequest.Code)
+		return
+	}
+
+	authUser, exists := ctx.Get("authUser")
+	if !exists {
+		dto.SendError(ctx, http.StatusForbidden, apperror.ErrForbidden.Message, apperror.ErrForbidden.Code)
+		return
+	}
+
+	pageStr := ctx.DefaultQuery("page", "1")
+	pageSizeStr := ctx.DefaultQuery("page_size", "10")
+
+	page, err := strconv.Atoi(pageStr)
+	if err != nil || page < 1 {
+		page = 1
+	}
+
+	pageSize, err := strconv.Atoi(pageSizeStr)
+	if err != nil || pageSize < 1 {
+		pageSize = 10
+	}
+
+	response, err := m.membershipService.GetPendingMembers(communityID, authUser.(auth.AuthUser).ID, page, pageSize)
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
+		return
+	}
+
+	dto.SendSuccess(ctx, http.StatusOK, "Pending members retrieved successfully", response)
+}
+
+// GetApprovedMembers returns paginated list of approved members for a community
+func (m *MembershipController) GetApprovedMembers(ctx *gin.Context) {
+	communityID := ctx.Param("community_id")
+	if communityID == "" {
+		dto.SendError(ctx, http.StatusBadRequest, "Community ID is required", apperror.ErrBadRequest.Code)
+		return
+	}
+
+	authUser, exists := ctx.Get("authUser")
+	if !exists {
+		dto.SendError(ctx, http.StatusForbidden, apperror.ErrForbidden.Message, apperror.ErrForbidden.Code)
+		return
+	}
+
+	pageStr := ctx.DefaultQuery("page", "1")
+	pageSizeStr := ctx.DefaultQuery("page_size", "10")
+
+	page, err := strconv.Atoi(pageStr)
+	if err != nil || page < 1 {
+		page = 1
+	}
+
+	pageSize, err := strconv.Atoi(pageSizeStr)
+	if err != nil || pageSize < 1 {
+		pageSize = 10
+	}
+
+	response, err := m.membershipService.GetApprovedMembers(communityID, authUser.(auth.AuthUser).ID, page, pageSize)
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
+		return
+	}
+
+	dto.SendSuccess(ctx, http.StatusOK, "Approved members retrieved successfully", response)
+}
+
+// ApproveMember approves a pending membership request
+func (m *MembershipController) ApproveMember(ctx *gin.Context) {
+	communityID := ctx.Param("community_id")
+	membershipID := ctx.Param("membership_id")
+
+	if communityID == "" || membershipID == "" {
+		dto.SendError(ctx, http.StatusBadRequest, "Community ID and Membership ID are required", apperror.ErrBadRequest.Code)
+		return
+	}
+
+	authUser, exists := ctx.Get("authUser")
+	if !exists {
+		dto.SendError(ctx, http.StatusForbidden, apperror.ErrForbidden.Message, apperror.ErrForbidden.Code)
+		return
+	}
+
+	err := m.membershipService.ApproveMember(communityID, membershipID, authUser.(auth.AuthUser).ID)
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
+		return
+	}
+
+	dto.SendSuccess(ctx, http.StatusOK, "Member approved successfully", gin.H{"membership_id": membershipID})
+}
+
+// RejectMember rejects a pending membership request
+func (m *MembershipController) RejectMember(ctx *gin.Context) {
+	communityID := ctx.Param("community_id")
+	membershipID := ctx.Param("membership_id")
+
+	if communityID == "" || membershipID == "" {
+		dto.SendError(ctx, http.StatusBadRequest, "Community ID and Membership ID are required", apperror.ErrBadRequest.Code)
+		return
+	}
+
+	authUser, exists := ctx.Get("authUser")
+	if !exists {
+		dto.SendError(ctx, http.StatusForbidden, apperror.ErrForbidden.Message, apperror.ErrForbidden.Code)
+		return
+	}
+
+	err := m.membershipService.RejectMember(communityID, membershipID, authUser.(auth.AuthUser).ID)
+	if err != nil {
+		dto.SendError(ctx, apperror.StatusFromError(err), apperror.Message(err), apperror.Code(err))
+		return
+	}
+
+	dto.SendSuccess(ctx, http.StatusOK, "Member request rejected successfully", gin.H{"membership_id": membershipID})
+}

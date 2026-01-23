@@ -16,6 +16,7 @@
   import { ApiError } from "../errors/api-error";
   import { setAuth } from "../stores/auth-store";
   import { toastStore } from "../stores/toast-store";
+  import ConfirmModal from "../components/ConfirmModal.svelte";
 
   let activeTab = $state<
     "account" | "privacy" | "notifications" | "appearance"
@@ -56,6 +57,9 @@
   let avatarFileInput: HTMLInputElement;
   let isUploadingAvatar = $state(false);
   let isDeletingAvatar = $state(false);
+  let showDeleteAvatarConfirm = $state(false);
+  let showDeleteAccountModal = $state(false);
+  let deleteAccountVerification = $state("");
 
   onMount(() => {
     loadUserProfile();
@@ -266,25 +270,18 @@
   }
 
   function handleDeleteAccount() {
-    const confirmed = confirm(
-      "Bạn có chắc muốn xóa tài khoản? Hành động này không thể hoàn tác và sẽ xóa vĩnh viễn:\n\n" +
-        "• Tất cả bài viết và bình luận\n" +
-        "• Hồ sơ và cài đặt\n" +
-        "• Nội dung đã lưu\n" +
-        "• Lịch sử hoạt động\n\n" +
-        "Nhập 'DELETE' để xác nhận.",
-    );
+    showDeleteAccountModal = true;
+    deleteAccountVerification = "";
+  }
 
-    if (!confirmed) return;
-
-    const verification = prompt(
-      "Vui lòng nhập DELETE để xác nhận xóa tài khoản:",
-    );
-
-    if (verification !== "DELETE") {
+  function confirmDeleteAccount() {
+    if (deleteAccountVerification !== "DELETE") {
       toastStore.warning("Hủy xóa tài khoản. Không khớp mã xác nhận.");
+      showDeleteAccountModal = false;
       return;
     }
+
+    showDeleteAccountModal = false;
 
     // TODO: Call delete account API when available
     toastStore.info(
@@ -346,7 +343,11 @@
   }
 
   async function handleDeleteAvatar() {
-    if (!confirm("Xóa ảnh đại diện?")) return;
+    showDeleteAvatarConfirm = true;
+  }
+
+  async function confirmDeleteAvatar() {
+    showDeleteAvatarConfirm = false;
 
     try {
       isDeletingAvatar = true;
@@ -977,6 +978,71 @@
           class="btn-secondary"
           onclick={() => (showPasswordModal = false)}>Hủy</button
         >
+      </div>
+    </div>
+  </div>
+{/if}
+
+<ConfirmModal
+  show={showDeleteAvatarConfirm}
+  title="Xác nhận xóa"
+  message="Bạn có chắc muốn xóa ảnh đại diện?"
+  confirmText="Xóa"
+  cancelText="Hủy"
+  confirmVariant="danger"
+  onConfirm={confirmDeleteAvatar}
+  onCancel={() => (showDeleteAvatarConfirm = false)}
+/>
+
+<!-- Delete Account Modal -->
+{#if showDeleteAccountModal}
+  <div class="modal-overlay" onclick={() => (showDeleteAccountModal = false)}>
+    <div
+      class="modal-content delete-account-modal"
+      onclick={(e) => e.stopPropagation()}
+    >
+      <div class="modal-header">
+        <h3>Xóa tài khoản</h3>
+        <button
+          class="close-btn"
+          onclick={() => (showDeleteAccountModal = false)}>×</button
+        >
+      </div>
+      <div class="modal-body">
+        <div class="warning-text">
+          <p><strong>⚠️ Cảnh báo:</strong> Hành động này không thể hoàn tác!</p>
+          <p>Việc xóa tài khoản sẽ xóa vĩnh viễn:</p>
+          <ul>
+            <li>Tất cả bài viết và bình luận</li>
+            <li>Hồ sơ và cài đặt</li>
+            <li>Nội dung đã lưu</li>
+            <li>Lịch sử hoạt động</li>
+          </ul>
+        </div>
+        <div class="verification-input">
+          <label for="delete-verification"
+            >Nhập <strong>DELETE</strong> để xác nhận:</label
+          >
+          <input
+            type="text"
+            id="delete-verification"
+            bind:value={deleteAccountVerification}
+            placeholder="DELETE"
+          />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button
+          class="btn-cancel"
+          onclick={() => (showDeleteAccountModal = false)}>Hủy</button
+        >
+        <button
+          class="btn-danger"
+          onclick={confirmDeleteAccount}
+          disabled={deleteAccountVerification !== "DELETE"}
+        >
+          Xóa tài khoản
+        </button>
       </div>
     </div>
   </div>

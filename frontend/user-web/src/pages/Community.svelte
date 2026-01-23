@@ -313,19 +313,36 @@
         if (community.member_count > 0) {
           community.member_count--;
         }
+        toastStore.success(`Đã rời khỏi cộng đồng ${community.name}!`);
       } else {
         // Join community
-        await createMembership(currentUser.id, community.id);
-        console.log(`✅ Joined community: ${community.name}`);
-        isJoined = true;
-        // Increment member count locally
-        community.member_count++;
+        const membership = await createMembership(currentUser.id, community.id);
+        console.log(`✅ Joined community: ${community.name}`, membership);
+
+        // Check if membership is pending approval
+        if (membership?.status === "pending") {
+          toastStore.success(
+            "Đã gửi yêu cầu tham gia! Vui lòng chờ quản trị viên duyệt.",
+          );
+        } else {
+          isJoined = true;
+          // Increment member count locally
+          community.member_count++;
+          toastStore.success(`Đã tham gia cộng đồng ${community.name}!`);
+        }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("❌ Failed to toggle membership:", error);
-      toastStore.error(
-        error instanceof Error ? error.message : "Failed to update membership",
-      );
+      // Handle specific error cases
+      if (error?.message?.includes("đang chờ duyệt")) {
+        toastStore.warning("Bạn đã gửi yêu cầu tham gia và đang chờ duyệt.");
+      } else {
+        toastStore.error(
+          error instanceof Error
+            ? error.message
+            : "Failed to update membership",
+        );
+      }
     } finally {
       isTogglingMembership = false;
     }

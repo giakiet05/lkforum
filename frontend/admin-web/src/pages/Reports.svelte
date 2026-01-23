@@ -1,12 +1,15 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import ReportTable from "../components/ReportTable.svelte";
+  import ConfirmModal from "../components/ConfirmModal.svelte";
   import { getReports, deleteReport } from "../services/report-service";
   import { toastStore } from "../stores/toast-store";
   import type { Report } from "../dtos/report-dto";
 
   let loading = $state(false);
   let reports = $state<Report[]>([]);
+  let showDeleteConfirm = $state(false);
+  let reportToDelete = $state<string | null>(null);
 
   async function loadReports() {
     loading = true;
@@ -22,14 +25,22 @@
   }
 
   async function handleDeleteReport(reportId: string) {
-    if (!confirm("Bạn có chắc muốn xóa báo cáo này?")) return;
+    reportToDelete = reportId;
+    showDeleteConfirm = true;
+  }
+
+  async function confirmDeleteReport() {
+    if (!reportToDelete) return;
+    showDeleteConfirm = false;
 
     try {
-      await deleteReport(reportId);
+      await deleteReport(reportToDelete);
       await loadReports();
       toastStore.success("Đã xóa báo cáo");
     } catch (error) {
       toastStore.error("Không thể xóa báo cáo");
+    } finally {
+      reportToDelete = null;
     }
   }
 
@@ -51,6 +62,20 @@
     {/if}
   </div>
 </div>
+
+<ConfirmModal
+  show={showDeleteConfirm}
+  title="Xác nhận xóa"
+  message="Bạn có chắc muốn xóa báo cáo này?"
+  confirmText="Xóa"
+  cancelText="Hủy"
+  confirmVariant="danger"
+  onConfirm={confirmDeleteReport}
+  onCancel={() => {
+    showDeleteConfirm = false;
+    reportToDelete = null;
+  }}
+/>
 
 <style>
   .reports-page {

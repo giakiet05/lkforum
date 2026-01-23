@@ -19,5 +19,11 @@ func RegisterMembershipRoutes(rg *gin.RouterGroup, c *controller.MembershipContr
 		memberships.GET("/:membership_id", c.GetMembershipByID)
 		memberships.DELETE("", c.DeleteMembership)
 		memberships.DELETE("/kick/:community_id/:user_id", c.KickMember) // Moderator/Creator kick member
+
+		// Pending members management (for moderators/creators)
+		memberships.GET("/community/:community_id/pending", c.GetPendingMembers)
+		memberships.GET("/community/:community_id/approved", c.GetApprovedMembers)
+		memberships.POST("/community/:community_id/approve/:membership_id", c.ApproveMember)
+		memberships.POST("/community/:community_id/reject/:membership_id", c.RejectMember)
 	}
 }

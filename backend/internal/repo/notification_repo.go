@@ -2,6 +2,7 @@ package repo
 
 import (
 	"context"
+	"log"
 
 	"github.com/giakiet05/lkforum/internal/config"
 	"github.com/giakiet05/lkforum/internal/model"
@@ -66,6 +67,15 @@ func (r *notificationRepo) GetByRecipientID(ctx context.Context, recipientID str
 		return nil, 0, err
 	}
 
+	// Debug log
+	unreadCount := 0
+	for _, n := range notifications {
+		if !n.IsRead {
+			unreadCount++
+		}
+	}
+	log.Printf("📋 [GetByRecipientID] Found %d notifications, %d unread for user %s", len(notifications), unreadCount, recipientID)
+
 	total, err := r.notificationCollection.CountDocuments(ctx, filter)
 	if err != nil {
 		return nil, 0, err
@@ -103,22 +113,32 @@ func (r *notificationRepo) MarkAsRead(ctx context.Context, notificationID primit
 func (r *notificationRepo) MarkAllAsRead(ctx context.Context, recipientID string) (int64, error) {
 	recipientObjID, err := primitive.ObjectIDFromHex(recipientID)
 	if err != nil {
+		log.Printf("❌ [MarkAllAsRead] Invalid recipientID: %s, error: %v", recipientID, err)
 		return 0, err
 	}
 
+	// Match notifications where is_read is false OR is_read doesn't exist (nil)
 	filter := bson.M{
 		"recipient_id": recipientObjID,
-		"is_read":      false,
+		"$or": []bson.M{
+			{"is_read": false},
+			{"is_read": bson.M{"$exists": false}},
+			{"is_read": nil},
+		},
 	}
 	update := bson.M{
 		"$set": bson.M{"is_read": true},
 	}
 
+	log.Printf("🔔 [MarkAllAsRead] Updating notifications for user %s", recipientID)
+
 	result, err := r.notificationCollection.UpdateMany(ctx, filter, update)
 	if err != nil {
+		log.Printf("❌ [MarkAllAsRead] UpdateMany error: %v", err)
 		return 0, err
 	}
 
+	log.Printf("✅ [MarkAllAsRead] MatchedCount: %d, ModifiedCount: %d", result.MatchedCount, result.ModifiedCount)
 	return result.ModifiedCount, nil
 }
 

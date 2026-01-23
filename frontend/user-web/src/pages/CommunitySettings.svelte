@@ -62,14 +62,14 @@
         bannerImage = found.banner || "";
         console.log(
           "🔄 Local state - postRequireApproval:",
-          postRequireApproval
+          postRequireApproval,
         );
       } else {
-        error = "Community not found";
+        error = "Không tìm thấy cộng đồng";
       }
     } catch (err) {
       console.error("Failed to load community:", err);
-      error = "Failed to load community settings";
+      error = "Không thể tải cài đặt cộng đồng";
     } finally {
       isLoading = false;
     }
@@ -96,7 +96,7 @@
     if (input.files && input.files[0]) {
       const file = input.files[0];
       if (file.size > 2 * 1024 * 1024) {
-        error = "Avatar image must be less than 2MB";
+        error = "Ảnh đại diện phải nhỏ hơn 2MB";
         return;
       }
       const reader = new FileReader();
@@ -113,7 +113,7 @@
     if (input.files && input.files[0]) {
       const file = input.files[0];
       if (file.size > 5 * 1024 * 1024) {
-        error = "Banner image must be less than 5MB";
+        error = "Ảnh bìa phải nhỏ hơn 5MB";
         return;
       }
       const reader = new FileReader();
@@ -150,13 +150,13 @@
       const result = await updateCommunity(updateData);
       console.log("✅ Settings saved:", result);
 
-      successMessage = "Settings saved successfully!";
+      successMessage = "Đã lưu cài đặt thành công!";
 
       // Reload community to get fresh data
       await loadCommunity();
     } catch (err: any) {
       console.error("Failed to save settings:", err);
-      error = err.message || "Failed to save settings";
+      error = err.message || "Không thể lưu cài đặt";
     } finally {
       isSaving = false;
     }
@@ -169,17 +169,17 @@
 
 <div class="settings-page">
   {#if isLoading}
-    <div class="loading">Loading settings...</div>
+    <div class="loading">Đang tải cài đặt...</div>
   {:else if error && !community}
     <div class="error-page">
       <p>{error}</p>
-      <button onclick={handleBack}>Back to Community</button>
+      <button onclick={handleBack}>Quay lại cộng đồng</button>
     </div>
   {:else if community}
     {#if !canManageSettings()}
       <div class="error-page">
-        <p>You don't have permission to manage community settings</p>
-        <button onclick={handleBack}>Back to Community</button>
+        <p>Bạn không có quyền quản lý cài đặt cộng đồng</p>
+        <button onclick={handleBack}>Quay lại cộng đồng</button>
       </div>
     {:else}
       <!-- Header -->
@@ -192,9 +192,9 @@
               stroke-width="2"
             />
           </svg>
-          Back
+          Quay lại
         </button>
-        <h1>Community Settings: lk/{community.name}</h1>
+        <h1>Cài đặt cộng đồng: lk/{community.name}</h1>
       </div>
 
       <!-- Settings Form -->
@@ -208,35 +208,35 @@
 
         <!-- Appearance Section -->
         <div class="settings-section">
-          <h2>Appearance</h2>
+          <h2>Giao diện</h2>
 
           <div class="setting-item-column">
             <label>
-              <strong>Description</strong>
+              <strong>Mô tả</strong>
               <textarea
                 bind:value={description}
-                placeholder="Describe your community..."
+                placeholder="Mô tả về cộng đồng của bạn..."
                 maxlength="500"
                 rows="4"
                 class="textarea-input"
               ></textarea>
-              <span class="hint">{description.length}/500 characters</span>
+              <span class="hint">{description.length}/500 ký tự</span>
             </label>
           </div>
 
           <div class="setting-item-column">
             <label>
-              <strong>Community Avatar</strong>
+              <strong>Ảnh đại diện cộng đồng</strong>
               {#if avatarImage}
                 <div class="image-preview">
                   <img
                     src={avatarImage}
-                    alt="Avatar preview"
+                    alt="Xem trước ảnh đại diện"
                     class="avatar-preview"
                   />
                   <span
                     class="remove-image-link"
-                    onclick={() => (avatarImage = "")}>Remove</span
+                    onclick={() => (avatarImage = "")}>Xóa</span
                   >
                 </div>
               {/if}
@@ -246,23 +246,23 @@
                 onchange={handleAvatarUpload}
                 class="file-input"
               />
-              <span class="hint">Max 2MB, square image recommended</span>
+              <span class="hint">Tối đa 2MB, khuyến nghị ảnh vuông</span>
             </label>
           </div>
 
           <div class="setting-item-column">
             <label>
-              <strong>Community Banner</strong>
+              <strong>Ảnh bìa cộng đồng</strong>
               {#if bannerImage}
                 <div class="image-preview">
                   <img
                     src={bannerImage}
-                    alt="Banner preview"
+                    alt="Xem trước ảnh bìa"
                     class="banner-preview"
                   />
                   <span
                     class="remove-image-link"
-                    onclick={() => (bannerImage = "")}>Remove</span
+                    onclick={() => (bannerImage = "")}>Xóa</span
                   >
                 </div>
               {/if}
@@ -273,26 +273,26 @@
                 class="file-input"
               />
               <span class="hint"
-                >Max 5MB, wide image recommended (1600x400)</span
+                >Tối đa 5MB, khuyến nghị ảnh ngang (1600x400)</span
               >
             </label>
           </div>
         </div>
 
         <div class="settings-section">
-          <h2>Moderation Settings</h2>
+          <h2>Cài đặt kiểm duyệt</h2>
 
           <div class="setting-item">
             <div class="setting-info">
-              <h3>Manual Post Approval</h3>
+              <h3>Duyệt bài viết thủ công</h3>
               <p>
                 {#if postRequireApproval}
-                  <strong>Enabled:</strong> All posts must be manually approved by
-                  moderators before appearing in the community.
+                  <strong>Đã bật:</strong> Tất cả bài viết phải được quản trị viên
+                  duyệt trước khi hiển thị trong cộng đồng.
                 {:else}
-                  <strong>Disabled:</strong> Posts are automatically moderated by
-                  AI. Clean posts appear immediately, suspicious posts go to mod
-                  queue.
+                  <strong>Đã tắt:</strong> Bài viết được kiểm duyệt tự động bởi AI.
+                  Bài viết sạch sẽ hiển thị ngay, bài viết nghi vấn sẽ vào hàng chờ
+                  duyệt.
                 {/if}
               </p>
             </div>
@@ -304,12 +304,12 @@
 
           <div class="setting-item">
             <div class="setting-info">
-              <h3>Manual Join Approval</h3>
+              <h3>Duyệt thành viên thủ công</h3>
               <p>
                 {#if joinRequireApproval}
-                  Members must be approved before joining
+                  Thành viên phải được duyệt trước khi tham gia
                 {:else}
-                  Anyone can join without approval
+                  Bất kỳ ai cũng có thể tham gia mà không cần duyệt
                 {/if}
               </p>
             </div>
@@ -321,16 +321,16 @@
         </div>
 
         <div class="settings-section">
-          <h2>Privacy Settings</h2>
+          <h2>Cài đặt quyền riêng tư</h2>
 
           <div class="setting-item">
             <div class="setting-info">
-              <h3>Private Community</h3>
+              <h3>Cộng đồng riêng tư</h3>
               <p>
                 {#if isPrivate}
-                  Only approved members can see posts
+                  Chỉ thành viên được duyệt mới có thể xem bài viết
                 {:else}
-                  Anyone can view posts
+                  Bất kỳ ai cũng có thể xem bài viết
                 {/if}
               </p>
             </div>
@@ -342,12 +342,14 @@
         </div>
 
         <div class="settings-section">
-          <h2>Post Settings</h2>
+          <h2>Cài đặt bài viết</h2>
 
           <div class="setting-item">
             <div class="setting-info">
-              <h3>Max Post Length</h3>
-              <p>Maximum characters allowed in a post (default: 40,000)</p>
+              <h3>Độ dài bài viết tối đa</h3>
+              <p>
+                Số ký tự tối đa cho phép trong một bài viết (mặc định: 40.000)
+              </p>
             </div>
             <input
               type="number"
@@ -366,10 +368,10 @@
             onclick={handleSaveSettings}
             disabled={isSaving}
           >
-            {isSaving ? "Saving..." : "Save Settings"}
+            {isSaving ? "Đang lưu..." : "Lưu cài đặt"}
           </button>
           <button class="cancel-btn" onclick={handleBack} disabled={isSaving}>
-            Cancel
+            Hủy
           </button>
         </div>
       </div>
@@ -655,13 +657,13 @@
   }
 
   .save-btn {
-    background: #0079d3;
-    color: white;
+    background: rgba(214, 216, 222, 0.5);
+    color: #1c1c1c;
     border: none;
   }
 
   .save-btn:hover:not(:disabled) {
-    background: #0060a8;
+    background: rgba(214, 216, 222, 0.7);
   }
 
   .save-btn:disabled {
@@ -670,17 +672,37 @@
   }
 
   .cancel-btn {
-    background: white;
-    color: #0079d3;
-    border: 1px solid #0079d3;
+    background: #0079d3;
+    color: white;
+    border: none;
   }
 
   .cancel-btn:hover:not(:disabled) {
-    background: #f6f7f8;
+    background: #0060a8;
   }
 
   .cancel-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+  }
+
+  .back-btn {
+    background: none;
+    border: none;
+    color: #1c1c1c;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    padding: 8px 12px;
+    margin-bottom: 16px;
+    border-radius: 20px;
+    background: rgba(214, 216, 222, 0.5);
+    transition: background-color 0.2s;
+  }
+
+  .back-btn:hover {
+    background: rgba(214, 216, 222, 0.7);
   }
 </style>

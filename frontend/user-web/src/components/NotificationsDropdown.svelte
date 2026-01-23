@@ -77,13 +77,18 @@
 
   async function handleMarkAllAsRead() {
     try {
+      console.log("🔔 [NotificationsDropdown] Calling markAllAsRead API...");
       await markAllAsRead();
+      console.log("✅ [NotificationsDropdown] markAllAsRead API success");
       // Update all notifications as read
       notifications = notifications.map((n) => ({ ...n, is_read: true }));
       // Update parent unread count to 0
       onUnreadCountChange?.(0);
     } catch (err) {
-      console.error("Failed to mark all as read:", err);
+      console.error(
+        "❌ [NotificationsDropdown] Failed to mark all as read:",
+        err,
+      );
     }
   }
 

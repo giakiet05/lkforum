@@ -4,6 +4,7 @@
   import { getCommunitiesByUserId } from "../services/community-service";
   import { authStore } from "../stores/auth-store";
   import type { CommunityResponse } from "../dtos/community-dto";
+  import ConfirmModal from "../components/ConfirmModal.svelte";
 
   type Community = {
     id: string;
@@ -75,11 +76,25 @@
   let ownedCount = $derived(allCommunities.filter((c) => c.isOwner).length);
   let joinedCount = $derived(allCommunities.filter((c) => !c.isOwner).length);
 
+  let showLeaveConfirm = $state(false);
+  let communityToLeave = $state<Community | null>(null);
+
   function leaveCommunity(communityId: string) {
     const community = allCommunities.find((c) => c.id === communityId);
-    if (community && confirm(`Rời khỏi lk/${community.name}?`)) {
+    if (community) {
+      communityToLeave = community;
+      showLeaveConfirm = true;
+    }
+  }
+
+  function confirmLeaveCommunity() {
+    if (communityToLeave) {
       // TODO: Call API to leave community
-      allCommunities = allCommunities.filter((c) => c.id !== communityId);
+      allCommunities = allCommunities.filter(
+        (c) => c.id !== communityToLeave!.id,
+      );
+      showLeaveConfirm = false;
+      communityToLeave = null;
     }
   }
 
@@ -203,6 +218,20 @@
     {/if}
   </div>
 </div>
+
+<ConfirmModal
+  show={showLeaveConfirm}
+  title="Xác nhận rời cộng đồng"
+  message={`Bạn có chắc chắn muốn rời khỏi lk/${communityToLeave?.name || ""}?`}
+  confirmText="Rời"
+  cancelText="Hủy"
+  confirmVariant="danger"
+  onConfirm={confirmLeaveCommunity}
+  onCancel={() => {
+    showLeaveConfirm = false;
+    communityToLeave = null;
+  }}
+/>
 
 <style>
   .manage-communities-page {

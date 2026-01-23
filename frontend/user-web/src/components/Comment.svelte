@@ -5,6 +5,7 @@
   import { deleteComment, createComment } from "../services/comment-service";
   import { authStore } from "../stores/auth-store";
   import { toastStore } from "../stores/toast-store";
+  import ConfirmModal from "./ConfirmModal.svelte";
 
   type CommentProps = {
     comment: CommentResponse;
@@ -28,6 +29,7 @@
   let replyImage = $state<File | null>(null);
   let replyImagePreview = $state<string | null>(null);
   let replyErrorMessage = $state<string | null>(null);
+  let showDeleteConfirm = $state(false);
 
   const toggleCollapse = () => {
     isCollapsed = !isCollapsed;
@@ -48,9 +50,12 @@
     editContent = comment.content;
   };
 
-  const handleDelete = async () => {
-    if (!confirm("Bạn có chắc muốn xóa bình luận này?")) return;
+  const handleDelete = () => {
+    showDeleteConfirm = true;
+  };
 
+  const confirmDelete = async () => {
+    showDeleteConfirm = false;
     try {
       await deleteComment(comment.id);
       if (onUpdate) onUpdate();
@@ -361,6 +366,17 @@
     </div>
   </div>
 </div>
+
+<ConfirmModal
+  show={showDeleteConfirm}
+  title="Xác nhận xóa"
+  message="Bạn có chắc muốn xóa bình luận này? Hành động này không thể hoàn tác."
+  confirmText="Xóa"
+  cancelText="Hủy"
+  confirmVariant="danger"
+  onConfirm={confirmDelete}
+  onCancel={() => (showDeleteConfirm = false)}
+/>
 
 <style>
   .comment {
