@@ -16,6 +16,7 @@
   let sentinelElement: HTMLDivElement | null = null;
 
   async function loadPosts(reset = true) {
+    console.log(`🔄 [Popular/loadPosts] reset=${reset}, currentPage=${currentPage}`);
     if (reset) {
       loading = true;
       currentPage = 1;
@@ -28,12 +29,15 @@
     error = null;
 
     try {
+      console.log(`📡 [Popular/API Call] page=${currentPage}, limit=20`);
       const newPosts = await getPosts({
         feed_type: "popular",
         sort: sortBy || undefined,
         page: currentPage,
         limit: 20,
       });
+
+      console.log(`✅ [Popular/API Response] received ${newPosts.length} posts`);
 
       if (reset) {
         posts = newPosts;
@@ -42,9 +46,10 @@
       }
 
       hasMore = newPosts.length === 20;
+      console.log(`📊 [Popular/State] Total posts: ${posts.length}, hasMore: ${hasMore}`);
     } catch (err) {
       error = err instanceof Error ? err.message : "Failed to load posts";
-      console.error("Error loading posts:", err);
+      console.error("❌ [Popular/Error] loading posts:", err);
     } finally {
       loading = false;
       loadingMore = false;
@@ -52,8 +57,13 @@
   }
 
   async function loadMorePosts() {
-    if (loadingMore || !hasMore) return;
+    console.log(`🔽 [Popular/loadMorePosts] called - loadingMore=${loadingMore}, hasMore=${hasMore}`);
+    if (loadingMore || !hasMore) {
+      console.log(`⛔ [Popular/loadMorePosts] blocked`);
+      return;
+    }
     currentPage++;
+    console.log(`➕ [Popular/loadMorePosts] incrementing page to ${currentPage}`);
     await loadPosts(false);
   }
 
@@ -68,11 +78,18 @@
 
   // Intersection Observer for infinite scroll
   $effect(() => {
-    if (!sentinelElement || loading) return;
+    if (!sentinelElement || loading) {
+      console.log(`⏸️ [Popular/Observer] not initialized - sentinelElement=${!!sentinelElement}, loading=${loading}`);
+      return;
+    }
+
+    console.log(`👁️ [Popular/Observer] initializing...`);
 
     const observer = new IntersectionObserver(
       (entries) => {
+        console.log(`🎯 [Popular/Observer] callback triggered - isIntersecting=${entries[0].isIntersecting}, hasMore=${hasMore}, loadingMore=${loadingMore}`);
         if (entries[0].isIntersecting && hasMore && !loadingMore) {
+          console.log(`✅ [Popular/Observer] calling loadMorePosts()`);
           loadMorePosts();
         }
       },
@@ -80,8 +97,10 @@
     );
 
     observer.observe(sentinelElement);
+    console.log(`✅ [Popular/Observer] observing sentinel element`);
 
     return () => {
+      console.log(`🛑 [Popular/Observer] disconnecting`);
       observer.disconnect();
     };
   });
