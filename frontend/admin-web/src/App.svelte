@@ -10,9 +10,16 @@
 
   let isSidebarCompact = $state(false);
   let topbarUser = $state<{ name: string; avatar?: string } | undefined>(
-    undefined
+    undefined,
   );
   let showLayout = $derived($isAuthenticated && $location !== "/login");
+
+  // Redirect to login if not authenticated
+  $effect(() => {
+    if (!$isAuthenticated && $location !== "/login") {
+      push("/login");
+    }
+  });
 
   // Load user info
   $effect(() => {

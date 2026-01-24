@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { toastStore } from "../stores/toast-store";
+  import { isAuthenticated } from "../stores/auth-store";
 
   import StatsCard from "../components/StatsCard.svelte";
 
@@ -23,6 +24,17 @@
   let loading = $state(false);
 
   async function loadOverview() {
+    // Only load if authenticated
+    let authenticated = false;
+    const unsubscribe = isAuthenticated.subscribe((val) => {
+      authenticated = val;
+    });
+    unsubscribe();
+
+    if (!authenticated) {
+      return;
+    }
+
     loading = true;
     try {
       overview = await getPlatformOverview();
