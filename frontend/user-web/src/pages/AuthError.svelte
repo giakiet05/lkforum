@@ -2,6 +2,8 @@
   import { onMount } from "svelte";
   import { push } from "svelte-spa-router";
 
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8081";
+
   let errorMessage = $state("");
   let showLoginModal = $state(false);
 
@@ -77,7 +79,7 @@
       <h2>Đăng nhập</h2>
       <p class="modal-subtitle">Chọn phương thức đăng nhập</p>
 
-      <a href="http://localhost:8081/api/auth/google" class="google-btn">
+      <a href="{API_BASE_URL}/api/auth/google" class="google-btn">
         <svg width="20" height="20" viewBox="0 0 24 24">
           <path
             fill="#4285F4"

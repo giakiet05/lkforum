@@ -12,14 +12,10 @@ COPY package.json pnpm-lock.yaml ./
 # Install dependencies
 RUN pnpm install --frozen-lockfile
 
-# Copy source code
+# Copy source code và .env
 COPY . .
 
-# Build arg cho API URL
-ARG VITE_API_BASE_URL=http://localhost:8081
-ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
-
-# Build production
+# Build production (Vite sẽ tự động đọc .env)
 RUN pnpm run build
 
 # Stage 2: Serve với Nginx
