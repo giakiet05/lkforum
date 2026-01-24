@@ -134,6 +134,11 @@ func (s *commentService) CreateComment(request *dto.CreateCommentRequest, userID
 		// TODO: Add proper logging
 	}
 
+	// Increment user's comment count
+	if err := s.userRepo.IncrementCommentCount(ctx, userID, 1); err != nil {
+		log.Printf("⚠️ Failed to increment comment count for user %s: %v", userID, err)
+	}
+
 	// Publish event for moderation
 	s.bus.Publish(&bus.CommentCreatedEvent{
 		CommentID:      createdComment.ID.Hex(),
@@ -266,6 +271,11 @@ func (s *commentService) DeleteCommentByID(commentID string, userID string) erro
 	if err := s.postRepo.Increment(ctx, postID, "comments_count", -1); err != nil {
 		// Log error but don't fail the deletion
 		// TODO: Add proper logging
+	}
+
+	// Decrement user's comment count
+	if err := s.userRepo.IncrementCommentCount(ctx, userID, -1); err != nil {
+		log.Printf("⚠️ Failed to decrement comment count for user %s: %v", userID, err)
 	}
 
 	return nil

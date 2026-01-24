@@ -181,6 +181,7 @@
     disabled={isLoading}
   />
 
+  <!-- Google login tạm ẩn
   <div class="separator">
     <span>HOẶC</span>
   </div>
@@ -190,6 +191,7 @@
     variant="google"
     onclick={handleGoogleLogin}
   />
+  -->
 
   <div class="signup-link">
     {mode === "register" ? "Đã có tài khoản?" : "Chưa có tài khoản?"}

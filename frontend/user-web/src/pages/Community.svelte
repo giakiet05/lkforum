@@ -95,8 +95,8 @@
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      toastStore.warning("Kích thước ảnh phải nhỏ hơn 5MB");
+    if (file.size > 100 * 1024 * 1024) {
+      toastStore.warning("Kích thước ảnh phải nhỏ hơn 100MB");
       return;
     }
 
@@ -295,7 +295,7 @@
           loadMorePosts();
         }
       },
-      { threshold: 0.1 }
+      { threshold: 0.1 },
     );
 
     observer.observe(postsSentinel);

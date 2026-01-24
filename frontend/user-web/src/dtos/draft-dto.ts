@@ -34,9 +34,15 @@ export interface Video {
     duration?: number;
 }
 
+export interface PollOption {
+    id?: string;
+    text: string;
+    votes?: number;
+}
+
 export interface Poll {
     question: string;
-    options: string[];
+    options: PollOption[];
     expires_at?: string;
     allow_multiple?: boolean;
 }

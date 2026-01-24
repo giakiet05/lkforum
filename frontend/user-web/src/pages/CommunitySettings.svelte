@@ -112,8 +112,8 @@
     const input = e.target as HTMLInputElement;
     if (input.files && input.files[0]) {
       const file = input.files[0];
-      if (file.size > 5 * 1024 * 1024) {
-        error = "Ảnh bìa phải nhỏ hơn 5MB";
+      if (file.size > 100 * 1024 * 1024) {
+        error = "Ảnh bìa phải nhỏ hơn 100MB";
         return;
       }
       const reader = new FileReader();
@@ -273,7 +273,7 @@
                 class="file-input"
               />
               <span class="hint"
-                >Tối đa 5MB, khuyến nghị ảnh ngang (1600x400)</span
+                >Tối đa 100MB, khuyến nghị ảnh ngang (1600x400)</span
               >
             </label>
           </div>

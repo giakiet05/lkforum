@@ -1,14 +1,16 @@
 <script lang="ts">
   import DraftsModal from "./DraftsModal.svelte";
   import { createPost, uploadPostImages } from "../services/post-service";
-  import { getCommunities } from "../services/community-service";
+  import { getCommunitiesByUserId } from "../services/community-service";
   import { toastStore } from "../stores/toast-store";
   import {
     createDraft,
     updateDraft,
     getDraftById,
     getDrafts,
+    deleteDraft,
   } from "../services/draft-service";
+  import { authStore } from "../stores/auth-store";
   import type { CommunityResponse } from "../dtos/community-dto";
 
   interface Props {
@@ -44,6 +46,9 @@
   let allCommunities = $state<CommunityResponse[]>([]);
   let isLoadingCommunities = $state(false);
 
+  // Track current draft being edited
+  let currentDraftId = $state<string | null>(null);
+
   // Load communities and draft count from API
   $effect(() => {
     if (show) {
@@ -57,8 +62,13 @@
   async function loadCommunities() {
     try {
       isLoadingCommunities = true;
-      const response = await getCommunities({ limit: 100 });
-      allCommunities = response.communities || [];
+      const currentUser = $authStore.user;
+      if (currentUser) {
+        // Load communities user has joined
+        allCommunities = (await getCommunitiesByUserId(currentUser.id)) || [];
+      } else {
+        allCommunities = [];
+      }
     } catch (error) {
       console.error("Failed to load communities:", error);
       allCommunities = [];
@@ -111,6 +121,7 @@
     communitySearchQuery = "";
     errorMessage = null;
     isSubmitting = false;
+    currentDraftId = null; // Reset draft tracking
     onClose();
   }
 
@@ -145,6 +156,7 @@
       // Load draft data
       title = draft.title || "";
       tags = draft.tags || [];
+      currentDraftId = draftId; // Track current draft
 
       // Set community if available
       if (draft.community_id) {
@@ -165,14 +177,24 @@
           activeTab = "poll";
           bodyText = draft.content?.text || "";
           if (draft.content?.poll) {
-            pollQuestion = draft.content.poll.question;
-            pollOptions = draft.content.poll.options;
+            pollQuestion = draft.content.poll.question || "";
+            // Options từ backend là {id, text, votes}, cần convert sang string array
+            if (Array.isArray(draft.content.poll.options)) {
+              pollOptions = draft.content.poll.options.map((opt: any) =>
+                typeof opt === "string" ? opt : opt.text || "",
+              );
+              // Đảm bảo ít nhất 2 options
+              while (pollOptions.length < 2) {
+                pollOptions.push("");
+              }
+            }
             allowMultiple = draft.content.poll.allow_multiple || false;
           }
         } else if (draft.type === "image") {
           activeTab = "images";
           bodyText = draft.content?.text || "";
-          // TODO: Load images from draft.content.images
+          // Note: Images saved in draft are base64 URLs, but we can't convert them back to File objects
+          // User will need to re-upload images when editing from draft
         }
       }
 
@@ -181,6 +203,16 @@
       console.error("Failed to load draft:", error);
       toastStore.error("Failed to load draft. Please try again.");
     }
+  }
+
+  // Helper to convert File to base64
+  function fileToBase64(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
   }
 
   async function handleSaveDraft() {
@@ -206,9 +238,18 @@
         draftData.type = "poll";
         draftData.text = bodyText || undefined;
         if (pollQuestion) {
+          // Convert options strings to PollOption objects for backend
+          const filteredOptions = pollOptions
+            .filter((opt) => opt.trim() !== "")
+            .map((text, index) => ({
+              id: `option_${index}`,
+              text: text.trim(),
+              votes: 0,
+            }));
+
           draftData.poll = {
             question: pollQuestion,
-            options: pollOptions.filter((opt) => opt.trim() !== ""),
+            options: filteredOptions,
             allow_multiple: allowMultiple,
             expires_at: pollDuration
               ? new Date(
@@ -220,11 +261,29 @@
       } else if (activeTab === "images") {
         draftData.type = "image";
         draftData.text = bodyText || undefined;
-        // Warning: images are not saved in draft
+
+        // Convert images to base64 for draft storage
         if (mediaFiles.length > 0) {
-          toastStore.warning(
-            "Lưu ý: Hình ảnh/video sẽ không được lưu trong bản nháp",
-          );
+          const imagePromises = mediaFiles
+            .filter((f) => f.type.startsWith("image/"))
+            .map(async (file) => {
+              const base64 = await fileToBase64(file);
+              return { url: base64 };
+            });
+          const videoPromises = mediaFiles
+            .filter((f) => f.type.startsWith("video/"))
+            .map(async (file) => {
+              const base64 = await fileToBase64(file);
+              return { url: base64 };
+            });
+
+          const images = await Promise.all(imagePromises);
+          const videos = await Promise.all(videoPromises);
+
+          if (images.length > 0) draftData.images = images;
+          if (videos.length > 0) draftData.videos = videos;
+
+          toastStore.info("Hình ảnh/video đã được lưu vào bản nháp");
         }
       } else if (activeTab === "link") {
         draftData.type = "text";
@@ -233,7 +292,12 @@
           : bodyText || undefined;
       }
 
-      await createDraft(draftData);
+      // Update existing draft or create new one
+      if (currentDraftId) {
+        await updateDraft(currentDraftId, draftData);
+      } else {
+        await createDraft(draftData);
+      }
 
       toastStore.success("Đã lưu bản nháp!");
       handleClose();
@@ -309,8 +373,10 @@
       let community: CommunityResponse | undefined;
 
       if (allCommunities.length === 0) {
-        const response = await getCommunities({ limit: 100 });
-        allCommunities = response.communities;
+        const currentUser = $authStore.user;
+        if (currentUser) {
+          allCommunities = (await getCommunitiesByUserId(currentUser.id)) || [];
+        }
       }
 
       community = allCommunities.find((c) => c.name === targetCommunity);
@@ -354,6 +420,17 @@
       }
 
       console.log("✅ Post created successfully:", post);
+
+      // Delete draft if this was from a draft
+      if (currentDraftId) {
+        try {
+          await deleteDraft(currentDraftId);
+          console.log("🗑️ Draft deleted after successful post");
+        } catch (err) {
+          console.warn("Failed to delete draft:", err);
+          // Don't show error to user - post was successful
+        }
+      }
 
       // Success! Notify parent to reload posts
       if (onPostCreated) {
@@ -414,6 +491,16 @@
       return true;
     });
     mediaFiles = [...mediaFiles, ...validFiles];
+    // Reset input to allow re-selecting same file
+    input.value = "";
+  }
+
+  function removeMediaFile(index: number) {
+    mediaFiles = mediaFiles.filter((_, i) => i !== index);
+  }
+
+  function getMediaPreviewUrl(file: File): string {
+    return URL.createObjectURL(file);
   }
 </script>
 
@@ -492,6 +579,28 @@
           <div class="community-dropdown">
             {#if isLoadingCommunities}
               <div class="loading-communities">Đang tải cộng đồng...</div>
+            {:else if allCommunities.length === 0}
+              <div class="no-communities-joined">
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                  <circle cx="9" cy="7" r="4"></circle>
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                </svg>
+                <span>Hãy tham gia cộng đồng để chia sẻ ý kiến</span>
+                <a
+                  href="/communities"
+                  class="browse-communities-link"
+                  onclick={onClose}>Khám phá cộng đồng</a
+                >
+              </div>
             {:else if filteredCommunities.length > 0}
               {#each filteredCommunities as community}
                 <button
@@ -513,7 +622,7 @@
                 </button>
               {/each}
             {:else}
-              <div class="no-results">Không tìm thấy cộng đồng</div>
+              <div class="no-results">Không tìm thấy cộng đồng phù hợp</div>
             {/if}
           </div>
         {/if}
@@ -564,11 +673,11 @@
         {/if}
       </div>
 
-      <!-- Add Tags Button -->
-      <!-- TODO: Backend doesn't support tags yet -->
+      <!-- Add Tags Button - tạm ẩn vì backend chưa hỗ trợ
       <button class="add-tags-btn" disabled title="Thẻ chưa được hỗ trợ"
         >Thêm thẻ</button
       >
+      -->
 
       <!-- Content Area based on active tab -->
       {#if activeTab === "text"}
@@ -623,8 +732,31 @@
           </label>
           {#if mediaFiles.length > 0}
             <div class="media-previews">
-              {#each mediaFiles as file}
-                <div class="media-preview">{file.name}</div>
+              {#each mediaFiles as file, index}
+                <div class="media-preview-item">
+                  {#if file.type.startsWith("image/")}
+                    <img
+                      src={getMediaPreviewUrl(file)}
+                      alt={file.name}
+                      class="preview-image"
+                    />
+                  {:else if file.type.startsWith("video/")}
+                    <video
+                      src={getMediaPreviewUrl(file)}
+                      class="preview-video"
+                      muted
+                    ></video>
+                    <div class="video-indicator">▶</div>
+                  {/if}
+                  <button
+                    class="remove-media-btn"
+                    onclick={() => removeMediaFile(index)}
+                    title="Xóa file này"
+                  >
+                    ✕
+                  </button>
+                  <span class="file-name">{file.name}</span>
+                </div>
               {/each}
             </div>
           {/if}
@@ -934,6 +1066,39 @@
     font-size: 14px;
   }
 
+  .no-communities-joined {
+    padding: 24px;
+    text-align: center;
+    color: var(--grayfont);
+    font-size: 14px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .no-communities-joined svg {
+    opacity: 0.5;
+  }
+
+  .no-communities-joined span {
+    color: var(--grayfont);
+  }
+
+  .browse-communities-link {
+    color: var(--primary);
+    text-decoration: none;
+    font-weight: 500;
+    padding: 8px 16px;
+    border-radius: 20px;
+    background: var(--primary-light, rgba(0, 122, 255, 0.1));
+    transition: background 0.2s;
+  }
+
+  .browse-communities-link:hover {
+    background: var(--primary-hover, rgba(0, 122, 255, 0.2));
+  }
+
   .community-icon {
     width: 24px;
     height: 24px;
@@ -1139,7 +1304,79 @@
     margin-top: 16px;
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: 12px;
+    justify-content: flex-start;
+  }
+
+  .media-preview-item {
+    position: relative;
+    width: 120px;
+    height: 120px;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #f6f7f8;
+    border: 1px solid #edeff1;
+  }
+
+  .preview-image,
+  .preview-video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .video-indicator {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 36px;
+    height: 36px;
+    background: rgba(0, 0, 0, 0.6);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 14px;
+    pointer-events: none;
+  }
+
+  .remove-media-btn {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 24px;
+    height: 24px;
+    background: rgba(0, 0, 0, 0.7);
+    border: none;
+    border-radius: 50%;
+    color: white;
+    font-size: 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+    z-index: 1;
+  }
+
+  .remove-media-btn:hover {
+    background: #c00;
+  }
+
+  .file-name {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 4px 6px;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    font-size: 10px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .media-preview {

@@ -127,6 +127,47 @@ export async function uploadPostImages(postId: string, images: File[]): Promise<
 }
 
 /**
+ * Remove images from an existing post
+ */
+export async function removePostImages(postId: string, publicIds: string[]): Promise<void> {
+    const res = await authenticatedFetch(`/api/posts/${postId}/images`, {
+        method: "DELETE",
+        body: JSON.stringify({ public_ids: publicIds }),
+    });
+
+    await handleApiResponse(res);
+}
+
+/**
+ * Upload videos to an existing post
+ */
+export async function uploadPostVideos(postId: string, videos: File[]): Promise<PostResponse> {
+    const formData = new FormData();
+    videos.forEach((video) => {
+        formData.append("videos", video);
+    });
+
+    const res = await authenticatedFetch(`/api/posts/${postId}/videos`, {
+        method: "POST",
+        body: formData,
+    });
+
+    return await handleApiResponse(res);
+}
+
+/**
+ * Remove videos from an existing post
+ */
+export async function removePostVideos(postId: string, publicIds: string[]): Promise<void> {
+    const res = await authenticatedFetch(`/api/posts/${postId}/videos`, {
+        method: "DELETE",
+        body: JSON.stringify({ public_ids: publicIds }),
+    });
+
+    await handleApiResponse(res);
+}
+
+/**
  * Get a single post by ID
  */
 export async function getPostById(postId: string): Promise<PostResponse> {
@@ -248,47 +289,6 @@ export async function reportPost(postId: string, data: ReportPostRequest): Promi
     });
 
     await handleApiResponse(res);
-}
-
-/**
- * Remove images from a post
- */
-export async function removeImagesFromPost(postId: string, publicIds: string[]): Promise<PostResponse> {
-    const res = await authenticatedFetch(`/api/posts/${postId}/images`, {
-        method: "DELETE",
-        body: JSON.stringify({ public_ids: publicIds }),
-    });
-
-    return await handleApiResponse(res);
-}
-
-/**
- * Upload videos to a post
- */
-export async function uploadPostVideos(postId: string, videos: File[]): Promise<PostResponse> {
-    const formData = new FormData();
-    videos.forEach((video) => {
-        formData.append("videos", video);
-    });
-
-    const res = await authenticatedFetch(`/api/posts/${postId}/videos`, {
-        method: "POST",
-        body: formData,
-    });
-
-    return await handleApiResponse(res);
-}
-
-/**
- * Remove videos from a post
- */
-export async function removeVideosFromPost(postId: string, publicIds: string[]): Promise<PostResponse> {
-    const res = await authenticatedFetch(`/api/posts/${postId}/videos`, {
-        method: "DELETE",
-        body: JSON.stringify({ public_ids: publicIds }),
-    });
-
-    return await handleApiResponse(res);
 }
 
 /**

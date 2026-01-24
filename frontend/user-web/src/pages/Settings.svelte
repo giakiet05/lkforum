@@ -318,8 +318,8 @@
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      errorMessage = "Kích thước ảnh phải nhỏ hơn 5MB";
+    if (file.size > 100 * 1024 * 1024) {
+      errorMessage = "Kích thước ảnh phải nhỏ hơn 100MB";
       return;
     }
 

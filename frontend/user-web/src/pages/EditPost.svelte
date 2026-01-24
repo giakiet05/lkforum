@@ -2,7 +2,14 @@
   import { onMount } from "svelte";
   import { push } from "svelte-spa-router";
   import type { PostResponse } from "../dtos/post-dto";
-  import { getPostById, updatePost } from "../services/post-service";
+  import {
+    getPostById,
+    updatePost,
+    removePostImages,
+    removePostVideos,
+    uploadPostImages,
+    uploadPostVideos,
+  } from "../services/post-service";
   import { authStore } from "../stores/auth-store";
   import { toastStore } from "../stores/toast-store";
   import { extractPostId } from "../utils/slug";
@@ -21,6 +28,20 @@
   let isSaving = $state(false);
   let error = $state<string | null>(null);
   let showCancelConfirm = $state(false);
+
+  // Media management state
+  let existingImages = $state<Array<{ url: string; public_id: string }>>([]);
+  let existingVideos = $state<Array<{ url: string; public_id: string }>>([]);
+  let imagesToRemove = $state<string[]>([]);
+  let videosToRemove = $state<string[]>([]);
+  let newImageFiles = $state<File[]>([]);
+  let newVideoFiles = $state<File[]>([]);
+  let showRemoveMediaConfirm = $state(false);
+  let mediaToRemove = $state<{
+    type: "image" | "video";
+    publicId: string;
+    url: string;
+  } | null>(null);
 
   const currentUser = $derived($authStore.user);
   const postId = $derived(extractPostId(params.slugId));
@@ -45,6 +66,20 @@
       // Initialize form
       title = post.title;
       content = post.content.text || "";
+
+      // Initialize existing media
+      if (post.content.images) {
+        existingImages = post.content.images.map((img) => ({
+          url: img.url,
+          public_id: img.public_id,
+        }));
+      }
+      if (post.content.videos) {
+        existingVideos = post.content.videos.map((vid) => ({
+          url: vid.url,
+          public_id: vid.public_id,
+        }));
+      }
     } catch (err) {
       console.error("Failed to load post:", err);
       error = "Failed to load post";
@@ -52,6 +87,66 @@
       isLoading = false;
     }
   });
+
+  // Filtered media (excluding ones marked for removal)
+  const displayedImages = $derived(
+    existingImages.filter((img) => !imagesToRemove.includes(img.public_id)),
+  );
+  const displayedVideos = $derived(
+    existingVideos.filter((vid) => !videosToRemove.includes(vid.public_id)),
+  );
+
+  function handleRemoveExistingImage(publicId: string, url: string) {
+    mediaToRemove = { type: "image", publicId, url };
+    showRemoveMediaConfirm = true;
+  }
+
+  function handleRemoveExistingVideo(publicId: string, url: string) {
+    mediaToRemove = { type: "video", publicId, url };
+    showRemoveMediaConfirm = true;
+  }
+
+  function confirmRemoveMedia() {
+    if (mediaToRemove) {
+      if (mediaToRemove.type === "image") {
+        imagesToRemove = [...imagesToRemove, mediaToRemove.publicId];
+      } else {
+        videosToRemove = [...videosToRemove, mediaToRemove.publicId];
+      }
+    }
+    showRemoveMediaConfirm = false;
+    mediaToRemove = null;
+  }
+
+  function handleNewImageSelect(e: Event) {
+    const input = e.target as HTMLInputElement;
+    const files = Array.from(input.files || []).filter((f) =>
+      f.type.startsWith("image/"),
+    );
+    newImageFiles = [...newImageFiles, ...files];
+    input.value = "";
+  }
+
+  function handleNewVideoSelect(e: Event) {
+    const input = e.target as HTMLInputElement;
+    const files = Array.from(input.files || []).filter((f) =>
+      f.type.startsWith("video/"),
+    );
+    newVideoFiles = [...newVideoFiles, ...files];
+    input.value = "";
+  }
+
+  function removeNewImage(index: number) {
+    newImageFiles = newImageFiles.filter((_, i) => i !== index);
+  }
+
+  function removeNewVideo(index: number) {
+    newVideoFiles = newVideoFiles.filter((_, i) => i !== index);
+  }
+
+  function getFilePreviewUrl(file: File): string {
+    return URL.createObjectURL(file);
+  }
 
   async function handleSave() {
     if (!title.trim()) {
@@ -61,12 +156,34 @@
 
     try {
       isSaving = true;
+
+      // 1. Update post text content
       await updatePost(postId, {
         title: title.trim(),
         content: {
           text: content.trim(),
         },
       });
+
+      // 2. Remove images if any marked
+      if (imagesToRemove.length > 0) {
+        await removePostImages(postId, imagesToRemove);
+      }
+
+      // 3. Remove videos if any marked
+      if (videosToRemove.length > 0) {
+        await removePostVideos(postId, videosToRemove);
+      }
+
+      // 4. Upload new images if any
+      if (newImageFiles.length > 0) {
+        await uploadPostImages(postId, newImageFiles);
+      }
+
+      // 5. Upload new videos if any
+      if (newVideoFiles.length > 0) {
+        await uploadPostVideos(postId, newVideoFiles);
+      }
 
       toastStore.success("Cập nhật bài viết thành công");
       push(`/post/${params.slugId}`);
@@ -136,15 +253,167 @@
           </div>
         {/if}
 
-        {#if post.content.images && post.content.images.length > 0}
-          <div class="info-message">
-            <p>⚠️ Chưa hỗ trợ chỉnh sửa hình ảnh. Hình ảnh sẽ giữ nguyên.</p>
+        <!-- Existing Images Section -->
+        {#if displayedImages.length > 0 || newImageFiles.length > 0}
+          <div class="media-section">
+            <label>Hình ảnh</label>
+            <div class="media-grid">
+              {#each displayedImages as img}
+                <div class="media-item">
+                  <img src={img.url} alt="Post image" />
+                  <button
+                    class="remove-btn"
+                    onclick={() =>
+                      handleRemoveExistingImage(img.public_id, img.url)}
+                    title="Xóa ảnh này"
+                  >
+                    ✕
+                  </button>
+                </div>
+              {/each}
+              {#each newImageFiles as file, index}
+                <div class="media-item new">
+                  <img src={getFilePreviewUrl(file)} alt={file.name} />
+                  <button
+                    class="remove-btn"
+                    onclick={() => removeNewImage(index)}
+                    title="Xóa ảnh này"
+                  >
+                    ✕
+                  </button>
+                  <span class="new-badge">Mới</span>
+                </div>
+              {/each}
+            </div>
+            <label class="add-media-btn">
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                onchange={handleNewImageSelect}
+                hidden
+              />
+              + Thêm ảnh
+            </label>
+          </div>
+        {:else if post.type !== "poll"}
+          <div class="media-section">
+            <label>Hình ảnh</label>
+            <label class="add-media-btn">
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                onchange={handleNewImageSelect}
+                hidden
+              />
+              + Thêm ảnh
+            </label>
+            {#if newImageFiles.length > 0}
+              <div class="media-grid">
+                {#each newImageFiles as file, index}
+                  <div class="media-item new">
+                    <img src={getFilePreviewUrl(file)} alt={file.name} />
+                    <button
+                      class="remove-btn"
+                      onclick={() => removeNewImage(index)}
+                      title="Xóa ảnh này"
+                    >
+                      ✕
+                    </button>
+                    <span class="new-badge">Mới</span>
+                  </div>
+                {/each}
+              </div>
+            {/if}
           </div>
         {/if}
 
-        {#if post.content.videos && post.content.videos.length > 0}
-          <div class="info-message">
-            <p>⚠️ Chưa hỗ trợ chỉnh sửa video. Video sẽ giữ nguyên.</p>
+        <!-- Existing Videos Section -->
+        {#if displayedVideos.length > 0 || newVideoFiles.length > 0}
+          <div class="media-section">
+            <label>Video</label>
+            <div class="media-grid">
+              {#each displayedVideos as vid}
+                <div class="media-item video">
+                  <video src={vid.url} muted></video>
+                  <div class="video-overlay">▶</div>
+                  <button
+                    class="remove-btn"
+                    onclick={() =>
+                      handleRemoveExistingVideo(vid.public_id, vid.url)}
+                    title="Xóa video này"
+                  >
+                    ✕
+                  </button>
+                </div>
+              {/each}
+              {#each newVideoFiles as file, index}
+                <div class="media-item video new">
+                  <video src={getFilePreviewUrl(file)} muted></video>
+                  <div class="video-overlay">▶</div>
+                  <button
+                    class="remove-btn"
+                    onclick={() => removeNewVideo(index)}
+                    title="Xóa video này"
+                  >
+                    ✕
+                  </button>
+                  <span class="new-badge">Mới</span>
+                </div>
+              {/each}
+            </div>
+            <label class="add-media-btn">
+              <input
+                type="file"
+                accept="video/*"
+                multiple
+                onchange={handleNewVideoSelect}
+                hidden
+              />
+              + Thêm video
+            </label>
+          </div>
+        {:else if post.type !== "poll"}
+          <div class="media-section">
+            <label>Video</label>
+            <label class="add-media-btn">
+              <input
+                type="file"
+                accept="video/*"
+                multiple
+                onchange={handleNewVideoSelect}
+                hidden
+              />
+              + Thêm video
+            </label>
+            {#if newVideoFiles.length > 0}
+              <div class="media-grid">
+                {#each newVideoFiles as file, index}
+                  <div class="media-item video new">
+                    <video src={getFilePreviewUrl(file)} muted></video>
+                    <div class="video-overlay">▶</div>
+                    <button
+                      class="remove-btn"
+                      onclick={() => removeNewVideo(index)}
+                      title="Xóa video này"
+                    >
+                      ✕
+                    </button>
+                    <span class="new-badge">Mới</span>
+                  </div>
+                {/each}
+              </div>
+            {/if}
+          </div>
+        {/if}
+
+        {#if imagesToRemove.length > 0 || videosToRemove.length > 0}
+          <div class="warning-message">
+            <p>
+              ⚠️ {imagesToRemove.length + videosToRemove.length} media sẽ bị xóa
+              khi lưu bài viết.
+            </p>
           </div>
         {/if}
 
@@ -170,6 +439,22 @@
   confirmVariant="danger"
   onConfirm={confirmCancel}
   onCancel={() => (showCancelConfirm = false)}
+/>
+
+<ConfirmModal
+  show={showRemoveMediaConfirm}
+  title="Xác nhận xóa"
+  message="Bạn có chắc muốn xóa {mediaToRemove?.type === 'image'
+    ? 'ảnh'
+    : 'video'} này? Hành động này không thể hoàn tác sau khi lưu."
+  confirmText="Xóa"
+  cancelText="Hủy"
+  confirmVariant="danger"
+  onConfirm={confirmRemoveMedia}
+  onCancel={() => {
+    showRemoveMediaConfirm = false;
+    mediaToRemove = null;
+  }}
 />
 
 <style>
@@ -326,5 +611,130 @@
   .info-message p {
     margin: 0;
     font-size: 14px;
+  }
+
+  .warning-message {
+    padding: 12px;
+    background: #f8d7da;
+    border: 1px solid #f5c6cb;
+    border-radius: 4px;
+    color: #721c24;
+  }
+
+  .warning-message p {
+    margin: 0;
+    font-size: 14px;
+  }
+
+  /* Media Section Styles */
+  .media-section {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .media-section > label:first-child {
+    font-weight: 600;
+    font-size: 14px;
+    color: #1c1c1c;
+  }
+
+  .media-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .media-item {
+    position: relative;
+    width: 120px;
+    height: 120px;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #f6f7f8;
+    border: 1px solid #edeff1;
+  }
+
+  .media-item.new {
+    border: 2px solid var(--blue--);
+  }
+
+  .media-item img,
+  .media-item video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .media-item .remove-btn {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 24px;
+    height: 24px;
+    background: rgba(0, 0, 0, 0.7);
+    border: none;
+    border-radius: 50%;
+    color: white;
+    font-size: 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+    z-index: 1;
+  }
+
+  .media-item .remove-btn:hover {
+    background: #c00;
+  }
+
+  .media-item .video-overlay {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 36px;
+    height: 36px;
+    background: rgba(0, 0, 0, 0.6);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 14px;
+    pointer-events: none;
+  }
+
+  .media-item .new-badge {
+    position: absolute;
+    bottom: 4px;
+    left: 4px;
+    padding: 2px 6px;
+    background: var(--blue--);
+    color: white;
+    font-size: 10px;
+    font-weight: 600;
+    border-radius: 4px;
+  }
+
+  .add-media-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 16px;
+    background: transparent;
+    border: 1px dashed var(--blue--);
+    border-radius: 8px;
+    color: var(--blue--);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    width: fit-content;
+  }
+
+  .add-media-btn:hover {
+    background: rgba(21, 48, 96, 0.05);
   }
 </style>
