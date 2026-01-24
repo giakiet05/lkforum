@@ -1,5 +1,6 @@
 <script lang="ts">
   import { push } from "svelte-spa-router";
+  import { toastStore } from "../stores/toast-store";
 
   type Topic = {
     id: string;
@@ -180,24 +181,24 @@
 
     // Validation
     if (!communityName.trim()) {
-      error = "Community name is required";
+      error = "Tên cộng đồng là bắt buộc";
       return;
     }
 
     if (communityName.length < 3) {
-      error = "Community name must be at least 3 characters";
+      error = "Tên cộng đồng phải có ít nhất 3 ký tự";
       return;
     }
 
     if (communityName.length > 21) {
-      error = "Community name must be less than 21 characters";
+      error = "Tên cộng đồng phải dưới 21 ký tự";
       return;
     }
 
     // Check for valid characters (letters, numbers, underscores)
     if (!/^[a-zA-Z0-9_]+$/.test(communityName)) {
       error =
-        "Community name can only contain letters, numbers, and underscores";
+        "Tên cộng đồng chỉ được chứa chữ cái, số và dấu gạch dưới";
       return;
     }
 
@@ -208,7 +209,7 @@
     setTimeout(() => {
       isLoading = false;
       toastStore.success(
-        `Community "lk/${communityName}" created successfully!`
+        `Cộng đồng "lk/${communityName}" đã được tạo thành công!`
       );
       // Navigate to the new report page
       push(`/lk/${communityName}`);
@@ -223,16 +224,16 @@
 <div class="create-report-page">
   <div class="container">
     <div class="header">
-      <h1>Create a report</h1>
+      <h1>Tạo cộng đồng</h1>
       <button class="close-btn" onclick={handleCancel}>×</button>
     </div>
 
     <form onsubmit={handleSubmit}>
       <!-- Community Name -->
       <div class="form-section">
-        <label for="name" class="label">Name</label>
+        <label for="name" class="label">Tên</label>
         <p class="help-text">
-          Community names including capitalization cannot be changed.
+          Tên cộng đồng bao gồm chữ hoa không thể thay đổi.
         </p>
         <div class="input-wrapper">
           <span class="prefix">lk/</span>
@@ -240,7 +241,7 @@
             type="text"
             id="name"
             bind:value={communityName}
-            placeholder="community_name"
+            placeholder="ten_cong_dong"
             maxlength="21"
             disabled={isLoading}
           />
@@ -252,11 +253,11 @@
 
       <!-- Description -->
       <div class="form-section">
-        <label for="description" class="label">Description (optional)</label>
+        <label for="description" class="label">Mô tả (tùy chọn)</label>
         <textarea
           id="description"
           bind:value={description}
-          placeholder="What is your report about?"
+          placeholder="Cộng đồng của bạn về điều gì?"
           rows="4"
           maxlength="500"
           disabled={isLoading}
@@ -268,7 +269,7 @@
 
       <!-- Community Type -->
       <div class="form-section">
-        <label class="label">Community type</label>
+        <label class="label">Loại cộng đồng</label>
 
         <label class="radio-option">
           <input
@@ -290,10 +291,10 @@
                   d="M10 2a8 8 0 100 16 8 8 0 000-16zM9 13V9h2v4H9zm0-6V5h2v2H9z"
                 />
               </svg>
-              <span class="radio-title">Public</span>
+              <span class="radio-title">Công khai</span>
             </div>
             <p class="radio-description">
-              Anyone can view, post, and comment to this report
+              Bất kỳ ai cũng có thể xem, đăng và bình luận
             </p>
           </div>
         </label>
@@ -318,10 +319,10 @@
                   d="M10 2a8 8 0 00-8 8v5a3 3 0 003 3h10a3 3 0 003-3v-5a8 8 0 00-8-8zm0 2a6 6 0 016 6v5a1 1 0 01-1 1H5a1 1 0 01-1-1v-5a6 6 0 016-6z"
                 />
               </svg>
-              <span class="radio-title">Restricted</span>
+              <span class="radio-title">Hạn chế</span>
             </div>
             <p class="radio-description">
-              Anyone can view this report, but only approved users can post
+              Bất kỳ ai cũng có thể xem, nhưng chỉ người được duyệt mới đăng được
             </p>
           </div>
         </label>
@@ -346,10 +347,10 @@
                   d="M10 2a4 4 0 00-4 4v2H5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-1V6a4 4 0 00-4-4zm2 6V6a2 2 0 10-4 0v2h4z"
                 />
               </svg>
-              <span class="radio-title">Private</span>
+              <span class="radio-title">Riêng tư</span>
             </div>
             <p class="radio-description">
-              Only approved users can view and submit to this report
+              Chỉ người được duyệt mới có thể xem và gửi
             </p>
           </div>
         </label>
@@ -364,9 +365,9 @@
             disabled={isLoading}
           />
           <div class="checkbox-content">
-            <span class="checkbox-title">18+ year old report</span>
+            <span class="checkbox-title">Cộng đồng 18+</span>
             <p class="checkbox-description">
-              Must be over 18 to view and contribute
+              Phải trên 18 tuổi để xem và đóng góp
             </p>
           </div>
         </label>
@@ -374,9 +375,9 @@
 
       <!-- Topics Section -->
       <div class="form-section">
-        <label class="label">Topics (Optional)</label>
+        <label class="label">Chủ đề (Tùy chọn)</label>
         <p class="help-text">
-          Add up to 3 topics to help interested redditors find your report.
+          Thêm tối đa 3 chủ đề để giúp mọi người tìm thấy cộng đồng của bạn.
         </p>
         <button
           type="button"
@@ -392,7 +393,7 @@
               stroke-linecap="round"
             />
           </svg>
-          Add Topics
+          Thêm chủ đề
         </button>
         {#if selectedTopics.length > 0}
           <div class="selected-topics">
@@ -425,14 +426,14 @@
           onclick={handleCancel}
           disabled={isLoading}
         >
-          Cancel
+          Hủy
         </button>
         <button
           type="submit"
           class="btn btn-primary"
           disabled={isLoading || !communityName.trim()}
         >
-          {isLoading ? "Creating..." : "Create Community"}
+          {isLoading ? "Đang tạo..." : "Tạo cộng đồng"}
         </button>
       </div>
     </form>
@@ -444,12 +445,12 @@
   <div class="modal-overlay" onclick={closeTopicsModal}>
     <div class="modal-content" onclick={(e) => e.stopPropagation()}>
       <div class="modal-header">
-        <h2>Add topics</h2>
+        <h2>Thêm chủ đề</h2>
         <button class="modal-close-btn" onclick={closeTopicsModal}>×</button>
       </div>
 
       <p class="modal-subtitle">
-        Add up to 3 topics to help interested redditors find your report.
+        Thêm tối đa 3 chủ đề để giúp mọi người tìm thấy cộng đồng của bạn.
       </p>
 
       <!-- Search Input -->
@@ -470,12 +471,12 @@
         </svg>
         <input
           type="text"
-          placeholder="Filter topics"
+          placeholder="Lọc chủ đề"
           bind:value={topicSearchQuery}
         />
       </div>
 
-      <div class="topics-counter">Topics {selectedTopics.length}/3</div>
+      <div class="topics-counter">Chủ đề {selectedTopics.length}/3</div>
 
       <!-- Topics List -->
       <div class="topics-list">
@@ -523,7 +524,7 @@
           class="btn btn-secondary"
           onclick={closeTopicsModal}
         >
-          Back
+          Quay lại
         </button>
         <button
           type="button"
@@ -531,7 +532,7 @@
           onclick={handleTopicsNext}
           disabled={selectedTopics.length === 0}
         >
-          Next
+          Tiếp theo
         </button>
       </div>
     </div>
@@ -543,19 +544,18 @@
   <div class="modal-overlay" onclick={closeStyleModal}>
     <div class="modal-content" onclick={(e) => e.stopPropagation()}>
       <div class="modal-header">
-        <h2>Style your report</h2>
+        <h2>Trang trí cộng đồng</h2>
         <button class="modal-close-btn" onclick={closeStyleModal}>×</button>
       </div>
 
       <p class="modal-subtitle">
-        Adding visual flair will catch new members attention and help establish
-        your report's culture! You can update this at any time.
+        Thêm hình ảnh sẽ thu hút sự chú ý của thành viên mới và giúp thiết lập văn hóa cộng đồng của bạn! Bạn có thể cập nhật bất cứ lúc nào.
       </p>
 
       <div class="style-content">
         <!-- Banner Upload -->
         <div class="upload-section">
-          <label class="upload-label">Banner</label>
+          <label class="upload-label">Ảnh bìa</label>
           <label class="upload-button">
             <input
               type="file"
@@ -572,13 +572,13 @@
                 stroke-linejoin="round"
               />
             </svg>
-            Add
+            Thêm
           </label>
         </div>
 
         <!-- Icon Upload -->
         <div class="upload-section">
-          <label class="upload-label">Icon</label>
+          <label class="upload-label">Biểu tượng</label>
           <label class="upload-button">
             <input
               type="file"
@@ -595,7 +595,7 @@
                 stroke-linejoin="round"
               />
             </svg>
-            Add
+            Thêm
           </label>
         </div>
 
@@ -634,11 +634,11 @@
             </div>
             <div class="preview-info">
               <h3>lk/{communityName || "report"}</h3>
-              <p>1 member · 1 online</p>
+              <p>1 thành viên · 1 trực tuyến</p>
             </div>
           </div>
           <div class="preview-description">
-            {description || "Community description"}
+            {description || "Mô tả cộng đồng"}
           </div>
         </div>
 
@@ -657,10 +657,10 @@
           class="btn btn-secondary"
           onclick={handleStyleBack}
         >
-          Back
+          Quay lại
         </button>
         <button type="button" class="btn btn-primary" onclick={handleSubmit}>
-          {isLoading ? "Creating..." : "Next"}
+          {isLoading ? "Đang tạo..." : "Tiếp theo"}
         </button>
       </div>
     </div>

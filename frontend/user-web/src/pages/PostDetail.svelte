@@ -389,7 +389,7 @@
               <button
                 class="more-btn"
                 onclick={toggleMenu}
-                title="More options"
+                title="Thêm tùy chọn"
               >
                 •••
               </button>
@@ -526,7 +526,7 @@
             <button
               class="footer-btn vote-btn"
               class:voted={userVote === "up"}
-              aria-label="Upvote"
+              aria-label="Bình chọn tăng"
               disabled={isVoting || isOwnPost}
               onclick={handleUpvote}
             >
@@ -536,7 +536,7 @@
             <button
               class="footer-btn vote-btn"
               class:voted={userVote === "down"}
-              aria-label="Downvote"
+              aria-label="Bình chọn giảm"
               disabled={isVoting || isOwnPost}
               onclick={handleDownvote}
             >

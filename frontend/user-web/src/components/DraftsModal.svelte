@@ -115,7 +115,7 @@
                 <button
                   class="draft-action-btn edit-btn"
                   onclick={() => handleEdit(draft.id)}
-                  title="Edit draft"
+                  title="Sửa bản nháp"
                 >
                   <img
                     src="/write_icon.svg"
@@ -127,7 +127,7 @@
                 <button
                   class="draft-action-btn delete-btn"
                   onclick={() => handleDelete(draft.id)}
-                  title="Delete draft"
+                  title="Xóa bản nháp"
                 >
                   <img
                     src="/bin_icon.svg"

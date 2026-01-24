@@ -291,7 +291,7 @@
 <div class="reports-page">
   <!-- Header -->
   <div class="reports-header">
-    <button class="back-btn" onclick={handleBack} title="Back to home">
+    <button class="back-btn" onclick={handleBack} title="Về trang chủ">
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
         <path
           d="M15 18L9 12L15 6"
@@ -415,7 +415,7 @@
               <button
                 class="action-icon-btn"
                 onclick={toggleChatMenu}
-                title="More options"
+                title="Thêm tùy chọn"
               >
                 <svg
                   width="20"
@@ -487,7 +487,7 @@
 
         <!-- Message Input -->
         <div class="message-input-container">
-          <button class="emoji-btn" title="Emoji">
+          <button class="emoji-btn" title="Biểu tượng cảm xúc">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
               <circle
                 cx="12"
@@ -522,9 +522,9 @@
             class="send-btn"
             onclick={handleSendMessage}
             disabled={!messageInput.trim() || !websocketService.isConnected()}
-            title="Send"
+            title="Gửi"
           >
-            <img src="/send_icon.svg" alt="Send" width="24" height="24" />
+            <img src="/send_icon.svg" alt="Gửi" width="24" height="24" />
           </button>
         </div>
       {:else}

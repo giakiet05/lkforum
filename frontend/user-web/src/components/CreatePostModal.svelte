@@ -421,13 +421,13 @@
   <div class="modal-overlay" onclick={handleClose}>
     <div class="modal-content" onclick={(e) => e.stopPropagation()}>
       <div class="modal-header">
-        <h2>Create post</h2>
+        <h2>Tạo bài viết</h2>
         <span
           class="drafts-indicator"
           onclick={handleOpenDrafts}
           title="Xem các bản nháp đã lưu"
         >
-          Drafts {#if draftCount > 0}<span class="draft-count"
+          Bản nháp {#if draftCount > 0}<span class="draft-count"
               >{draftCount}</span
             >{/if}
         </span>
@@ -566,7 +566,7 @@
 
       <!-- Add Tags Button -->
       <!-- TODO: Backend doesn't support tags yet -->
-      <button class="add-tags-btn" disabled title="Tags not supported yet"
+      <button class="add-tags-btn" disabled title="Thẻ chưa được hỗ trợ"
         >Thêm thẻ</button
       >
 
@@ -579,7 +579,7 @@
             class="body-textarea"
           ></textarea>
           <div class="editor-tools">
-            <button class="tool-btn" title="Add picture">
+            <button class="tool-btn" title="Thêm ảnh">
               <img
                 src="/picture_icon.svg"
                 alt="Picture"
@@ -587,10 +587,10 @@
                 height="20"
               />
             </button>
-            <button class="tool-btn" title="Add link">
+            <button class="tool-btn" title="Thêm liên kết">
               <img src="/link_icon.svg" alt="Link" width="20" height="20" />
             </button>
-            <button class="tool-btn" title="Add video">
+            <button class="tool-btn" title="Thêm video">
               <img src="/video_icon.svg" alt="Video" width="20" height="20" />
             </button>
           </div>
@@ -677,7 +677,7 @@
                   <button
                     class="remove-option-btn"
                     onclick={() => removePollOption(index)}
-                    title="Remove option"
+                    title="Xóa lựa chọn"
                   >
                     ✕
                   </button>

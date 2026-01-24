@@ -335,9 +335,9 @@
   }
 
   function formatDate(dateString?: string): string {
-    if (!dateString) return "Unknown";
+    if (!dateString) return "Không xác định";
     const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
+    return date.toLocaleDateString("vi-VN", {
       month: "long",
       day: "numeric",
       year: "numeric",
@@ -476,12 +476,12 @@
               class="change-cover-btn"
               onclick={() => coverFileInput?.click()}
               disabled={isUploadingCover}
-              title="Change cover"
+              title="Đổi ảnh bìa"
             >
               {#if isUploadingCover}
                 <div class="mini-spinner"></div>
               {:else}
-                <img src="/change_profile_image.png" alt="Change cover" />
+                <img src="/change_profile_image.png" alt="Đổi ảnh bìa" />
               {/if}
             </button>
           </div>
@@ -500,12 +500,12 @@
                 class="change-avatar-btn"
                 onclick={() => avatarFileInput?.click()}
                 disabled={isUploadingAvatar}
-                title="Change avatar"
+                title="Đổi ảnh đại diện"
               >
                 {#if isUploadingAvatar}
                   <div class="mini-spinner"></div>
                 {:else}
-                  <img src="/change_profile_image.png" alt="Change avatar" />
+                  <img src="/change_profile_image.png" alt="Đổi ảnh đại diện" />
                 {/if}
               </button>
             {/if}
@@ -815,22 +815,22 @@
                 <span class="stat-value"
                   >{user.profile.stats?.post_count ?? 0}</span
                 >
-                <span class="stat-label">Posts</span>
+                <span class="stat-label">Bài viết</span>
               </div>
               <div class="stat">
                 <span class="stat-value"
                   >{user.profile.stats?.comment_count ?? 0}</span
                 >
-                <span class="stat-label">Comments</span>
+                <span class="stat-label">Bình luận</span>
               </div>
               <div class="stat">
                 <span class="stat-value">{user.reputation ?? 0}</span>
-                <span class="stat-label">Reputation</span>
+                <span class="stat-label">Danh tiếng</span>
               </div>
             </div>
             <div class="cake-day">
               <i class="fas fa-birthday-cake"></i>
-              {user.profile.stats?.member_since || "Member"}
+              {user.profile.stats?.member_since || "Thành viên"}
             </div>
           </div>
         </div>

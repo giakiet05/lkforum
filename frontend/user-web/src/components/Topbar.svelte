@@ -485,7 +485,7 @@
                   >
                     <div class="result-info">
                       <div class="result-name">
-                        {post.title || "Untitled Post"}
+                        {post.title || "Bài viết không tiêu đề"}
                       </div>
                       <div class="result-meta">
                         lk/{post.community.name} • {post.author.username}

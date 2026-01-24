@@ -3,6 +3,7 @@
   import CreateCommunityModal from "./CreateCommunityModal.svelte";
   import { getCommunitiesByUserId } from "../services/community-service";
   import { authStore } from "../stores/auth-store";
+  import { toastStore } from "../stores/toast-store";
   import type { CommunityResponse } from "../dtos/community-dto";
   import type { UserResponse } from "../dtos/user-dto";
   import { onMount } from "svelte";
@@ -58,6 +59,10 @@
   }
 
   function handleCreateCommunity() {
+    if (!user) {
+      toastStore.warning("Vui lòng đăng nhập để tạo cộng đồng");
+      return;
+    }
     showCreateModal = true;
   }
 

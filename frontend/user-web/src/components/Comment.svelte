@@ -157,7 +157,7 @@
         class="vote-btn"
         class:voted={userVote === "up"}
         onclick={() => handleVote("up")}
-        aria-label="Upvote"
+        aria-label="Bình chọn tăng"
       >
         <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
           <path d="M8 3l5 7H3l5-7z" />
@@ -174,7 +174,7 @@
         class="vote-btn"
         class:voted={userVote === "down"}
         onclick={() => handleVote("down")}
-        aria-label="Downvote"
+        aria-label="Bình chọn giảm"
       >
         <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
           <path d="M8 13L3 6h10l-5 7z" />
@@ -309,7 +309,7 @@
                     document
                       .getElementById(`reply-image-upload-{comment.id}`)
                       ?.click()}
-                  title="Add image"
+                  title="Thêm ảnh"
                 >
                   <img
                     src="/icon_comment.png"
@@ -324,11 +324,11 @@
                     document
                       .getElementById(`reply-image-upload-{comment.id}`)
                       ?.click()}
-                  title="Add picture"
+                  title="Thêm ảnh"
                 >
                   <img
                     src="/comment_picture.png"
-                    alt="Add picture"
+                    alt="Thêm ảnh"
                     width="20"
                     height="20"
                   />
