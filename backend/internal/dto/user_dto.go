@@ -136,6 +136,15 @@ func FromUser(u *model.User) *UserResponse {
 				MemberSince:  formatMemberSince(u.RoleContent.AsUser.Stats.JoinedAt),
 				LastActive:   formatLastActive(u.RoleContent.AsUser.Stats.LastActiveAt),
 			}
+		} else {
+			// Provide default stats if not set (for backward compatibility with old users)
+			profile.Stats = &ActivityStatsResponse{
+				PostCount:    0,
+				CommentCount: 0,
+				TotalUpvotes: 0,
+				MemberSince:  formatMemberSince(u.CreatedAt),
+				LastActive:   formatLastActive(u.CreatedAt),
+			}
 		}
 
 		resp.Profile = profile

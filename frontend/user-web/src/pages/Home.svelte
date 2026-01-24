@@ -58,9 +58,18 @@
     await loadPosts(false);
   }
 
-  // Reload posts when sortBy changes
-  $effect(() => {
+  // Load posts on mount
+  onMount(() => {
     loadPosts(true);
+  });
+
+  // Reload posts when sortBy changes
+  let previousSortBy = sortBy;
+  $effect(() => {
+    if (sortBy !== previousSortBy) {
+      previousSortBy = sortBy;
+      loadPosts(true);
+    }
   });
 
   // Intersection Observer for infinite scroll
@@ -73,7 +82,7 @@
           loadMorePosts();
         }
       },
-      { threshold: 0.1 }
+      { threshold: 0.1 },
     );
 
     observer.observe(sentinelElement);

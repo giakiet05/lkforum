@@ -1,6 +1,7 @@
 package model
 
 import (
+	"math"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -16,6 +17,7 @@ type Post struct {
 	Content       *PostContent       `bson:"content,omitempty" json:"content,omitempty"`
 	VotesCount    *VotesCount        `bson:"votes_count,omitempty" json:"votes_count"`
 	CommentsCount int                `bson:"comments_count" json:"comments_count"`
+	HotScore      float64            `bson:"hot_score" json:"hot_score"` // Score for "best" sorting (votes + time decay)
 	CreatedAt     time.Time          `bson:"created_at,omitempty" json:"created_at,omitempty"`
 	UpdatedAt     *time.Time         `bson:"updated_at,omitempty" json:"updated_at,omitempty"`
 	IsDeleted     bool               `bson:"is_deleted,omitempty" json:"is_deleted"`
@@ -90,4 +92,38 @@ type ModerationResult struct {
 	Reason       string   `bson:"reason" json:"reason"`               // Explanation in Vietnamese
 	CheckedText  bool     `bson:"checked_text" json:"checked_text"`   // Was text content checked
 	CheckedMedia bool     `bson:"checked_media" json:"checked_media"` // Were images/videos checked
+}
+
+// CalculateHotScore calculates the hot score for a post based on Reddit's algorithm
+// Score = log10(max(|score|, 1)) + sign(score) * (created_at - epoch) / 45000
+// This gives newer posts a chance to compete with older popular posts
+func CalculateHotScore(upvotes, downvotes int, createdAt time.Time) float64 {
+	score := upvotes - downvotes
+
+	// Use absolute score, minimum 1 to avoid log(0)
+	absScore := score
+	if absScore < 0 {
+		absScore = -absScore
+	}
+	if absScore < 1 {
+		absScore = 1
+	}
+
+	// Sign of score: 1 for positive, -1 for negative, 0 for zero
+	sign := 0.0
+	if score > 0 {
+		sign = 1.0
+	} else if score < 0 {
+		sign = -1.0
+	}
+
+	// Seconds since epoch (Reddit uses Dec 8, 2005, we use a more recent date)
+	epoch := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+	seconds := createdAt.Sub(epoch).Seconds()
+
+	// Hot score formula
+	// The 45000 divisor means a post needs ~12.5 hours to drop one "point" in ranking
+	hotScore := math.Log10(float64(absScore)) + sign*seconds/45000.0
+
+	return hotScore
 }

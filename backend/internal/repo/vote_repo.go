@@ -244,18 +244,45 @@ func (r *voteRepo) removeVoteInTransaction(sessCtx mongo.SessionContext, vote *m
 // updateTargetVoteCount updates the vote count for either post or comment
 func (r *voteRepo) updateTargetVoteCount(ctx context.Context, targetID primitive.ObjectID, targetType model.VoteTargetType, upInc, downInc int) error {
 	filter := bson.M{"_id": targetID}
-	update := bson.M{"$inc": bson.M{"votes_count.up": upInc, "votes_count.down": downInc}}
 
 	var collection *mongo.Collection
 	switch targetType {
 	case model.VoteTargetPost:
 		collection = r.postCollection
+
+		// For posts, also update hot_score
+		// First get the current post to calculate new hot_score
+		var post model.Post
+		if err := collection.FindOne(ctx, filter).Decode(&post); err != nil {
+			return err
+		}
+
+		newUpvotes := 0
+		newDownvotes := 0
+		if post.VotesCount != nil {
+			newUpvotes = post.VotesCount.Up + upInc
+			newDownvotes = post.VotesCount.Down + downInc
+		} else {
+			newUpvotes = upInc
+			newDownvotes = downInc
+		}
+
+		hotScore := model.CalculateHotScore(newUpvotes, newDownvotes, post.CreatedAt)
+
+		update := bson.M{
+			"$inc": bson.M{"votes_count.up": upInc, "votes_count.down": downInc},
+			"$set": bson.M{"hot_score": hotScore},
+		}
+		_, err := collection.UpdateOne(ctx, filter, update)
+		return err
+
 	case model.VoteTargetComment:
 		collection = r.commentCollection
+		update := bson.M{"$inc": bson.M{"votes_count.up": upInc, "votes_count.down": downInc}}
+		_, err := collection.UpdateOne(ctx, filter, update)
+		return err
+
 	default:
 		return apperror.ErrInvalidID
 	}
-
-	_, err := collection.UpdateOne(ctx, filter, update)
-	return err
 }

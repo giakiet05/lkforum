@@ -237,6 +237,13 @@ func (s *authService) CompleteRegistration(verificationToken, username, password
 		RoleContent: model.RoleContent{
 			AsUser: &model.UserRoleContent{
 				Avatar: &model.Image{}, // Initialize with an empty Image struct
+				Stats: &model.ActivityStats{
+					PostCount:    0,
+					CommentCount: 0,
+					TotalUpvotes: 0,
+					JoinedAt:     time.Now(),
+					LastActiveAt: time.Now(),
+				},
 			},
 		},
 	}
@@ -683,6 +690,13 @@ func (s *authService) CompleteGoogleSetup(setupToken, username string) (*model.U
 		RoleContent: model.RoleContent{
 			AsUser: &model.UserRoleContent{
 				Avatar: &model.Image{URL: claims.Picture},
+				Stats: &model.ActivityStats{
+					PostCount:    0,
+					CommentCount: 0,
+					TotalUpvotes: 0,
+					JoinedAt:     time.Now(),
+					LastActiveAt: time.Now(),
+				},
 			},
 		},
 	}

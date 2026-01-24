@@ -156,9 +156,9 @@
       return;
     }
 
-    // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      toastStore.warning("Kích thước ảnh phải nhỏ hơn 5MB");
+    // Validate file size (max 100MB)
+    if (file.size > 100 * 1024 * 1024) {
+      toastStore.warning("Kích thước ảnh phải nhỏ hơn 100MB");
       return;
     }
 
@@ -193,9 +193,9 @@
       return;
     }
 
-    // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      toastStore.warning("Kích thước ảnh phải nhỏ hơn 5MB");
+    // Validate file size (max 100MB)
+    if (file.size > 100 * 1024 * 1024) {
+      toastStore.warning("Kích thước ảnh phải nhỏ hơn 100MB");
       return;
     }
 

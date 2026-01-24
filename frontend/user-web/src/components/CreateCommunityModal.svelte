@@ -37,9 +37,9 @@
     const input = e.target as HTMLInputElement;
     if (input.files && input.files[0]) {
       const file = input.files[0];
-      // Check file size (max 5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        error = "Ảnh banner phải nhỏ hơn 5MB";
+      // Check file size (max 100MB)
+      if (file.size > 100 * 1024 * 1024) {
+        error = "Ảnh banner phải nhỏ hơn 100MB";
         return;
       }
       const reader = new FileReader();

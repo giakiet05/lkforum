@@ -26,6 +26,11 @@ type UserRepo interface {
 	GetByEmail(ctx context.Context, email string) (*model.User, error)
 	Find(ctx context.Context, filter Filter, opts *FindOptions) ([]*model.User, int64, error)
 
+	// User activity stats methods
+	IncrementPostCount(ctx context.Context, userID string, delta int) error
+	IncrementCommentCount(ctx context.Context, userID string, delta int) error
+	IncrementTotalUpvotes(ctx context.Context, userID string, delta int) error
+
 	// Stats methods
 	CountTotal(ctx context.Context) (int64, error)
 	CountActiveAfter(ctx context.Context, since time.Time) (int64, error)
@@ -261,4 +266,52 @@ func (r *userRepo) CountVerified(ctx context.Context) (int64, error) {
 		"is_verified": true,
 	}
 	return r.userCollection.CountDocuments(ctx, filter)
+}
+
+// IncrementPostCount increments or decrements user's post count
+func (r *userRepo) IncrementPostCount(ctx context.Context, userID string, delta int) error {
+	objectID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return apperror.ErrInvalidID
+	}
+
+	filter := bson.M{"_id": objectID}
+	update := bson.M{
+		"$inc": bson.M{"role_content.as_user.stats.post_count": delta},
+	}
+
+	_, err = r.userCollection.UpdateOne(ctx, filter, update)
+	return err
+}
+
+// IncrementCommentCount increments or decrements user's comment count
+func (r *userRepo) IncrementCommentCount(ctx context.Context, userID string, delta int) error {
+	objectID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return apperror.ErrInvalidID
+	}
+
+	filter := bson.M{"_id": objectID}
+	update := bson.M{
+		"$inc": bson.M{"role_content.as_user.stats.comment_count": delta},
+	}
+
+	_, err = r.userCollection.UpdateOne(ctx, filter, update)
+	return err
+}
+
+// IncrementTotalUpvotes increments or decrements user's total upvotes
+func (r *userRepo) IncrementTotalUpvotes(ctx context.Context, userID string, delta int) error {
+	objectID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return apperror.ErrInvalidID
+	}
+
+	filter := bson.M{"_id": objectID}
+	update := bson.M{
+		"$inc": bson.M{"role_content.as_user.stats.total_upvotes": delta},
+	}
+
+	_, err = r.userCollection.UpdateOne(ctx, filter, update)
+	return err
 }

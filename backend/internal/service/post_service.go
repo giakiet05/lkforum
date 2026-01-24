@@ -172,6 +172,8 @@ func (s *postService) CreatePost(userID string, req *dto.CreatePostRequest) (*dt
 		log.Printf("🤖 Post will be PENDING (AI check)")
 	}
 
+	createdAt := time.Now()
+
 	post := &model.Post{
 		AuthorID:         authorID,
 		CommunityID:      communityID,
@@ -180,11 +182,12 @@ func (s *postService) CreatePost(userID string, req *dto.CreatePostRequest) (*dt
 		Content:          &model.PostContent{Text: req.Text},
 		VotesCount:       &model.VotesCount{Up: 0, Down: 0},
 		CommentsCount:    0,
+		HotScore:         model.CalculateHotScore(0, 0, createdAt), // Initial hot score based on creation time
 		IsDeleted:        false,
 		IsHidden:         false,
 		IsDraft:          false,
 		IsBan:            false,
-		CreatedAt:        time.Now(),
+		CreatedAt:        createdAt,
 		Tags:             req.Tags,
 		ModerationStatus: initialStatus,
 	}
@@ -220,6 +223,11 @@ func (s *postService) CreatePost(userID string, req *dto.CreatePostRequest) (*dt
 	createdPost, err := s.postRepo.Create(ctx, post)
 	if err != nil {
 		return nil, err
+	}
+
+	// Increment user's post count
+	if err := s.userRepo.IncrementPostCount(ctx, userID, 1); err != nil {
+		log.Printf("⚠️ Failed to increment post count for user %s: %v", userID, err)
 	}
 
 	log.Printf("✅ Post created in DB - ID: %s, Status: %s, IsDeleted: %v", createdPost.ID.Hex(), createdPost.ModerationStatus, createdPost.IsDeleted)
@@ -602,6 +610,13 @@ func (s *postService) DeletePost(postID string, userID string) error {
 			if !isCreator && !isModerator {
 				return apperror.ErrForbidden
 			}
+		}
+	}
+
+	// Decrement user's post count (only for the author)
+	if isAuthor {
+		if err := s.userRepo.IncrementPostCount(ctx, userID, -1); err != nil {
+			log.Printf("⚠️ Failed to decrement post count for user %s: %v", userID, err)
 		}
 	}
 
@@ -1259,8 +1274,9 @@ func (s *postService) buildFindOptions(query *dto.GetPostsQuery) *repo.FindOptio
 		// Hot: sort by comment count and recent activity
 		opts.Sort = map[string]int{"comment_count": -1, "created_at": -1}
 	case constant.SortTypeBest:
-		// Best: sort by net score (upvotes - downvotes)
-		opts.Sort = map[string]int{"votes_count.up": -1, "votes_count.down": 1}
+		// Best: Use hot_score for ranking (calculated field that combines votes + time decay)
+		// This provides variety as newer posts with decent engagement can compete with older popular posts
+		opts.Sort = map[string]int{"hot_score": -1, "created_at": -1}
 	case constant.SortTypeRising:
 		// Rising: recent posts with high engagement (votes + comments)
 		opts.Sort = map[string]int{"votes_count.up": -1, "comment_count": -1, "created_at": -1}

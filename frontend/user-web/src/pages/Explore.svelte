@@ -10,7 +10,7 @@
   let loading = $state(false);
   let loadingMore = $state(false);
   let error = $state<string | null>(null);
-  let sortBy = $state<SortType | "">("");
+  let sortBy = $state<SortType>("best");
   let currentPage = $state(1);
   let hasMore = $state(true);
   let sentinelElement: HTMLDivElement | null = null;
@@ -57,10 +57,13 @@
     await loadPosts(false);
   }
 
+  // Reload posts when sortBy changes (not on initial)
+  let previousSortBy: string | null = null;
   $effect(() => {
-    if (sortBy !== "") {
+    if (previousSortBy !== null && sortBy !== previousSortBy) {
       loadPosts(true);
     }
+    previousSortBy = sortBy;
   });
 
   // Intersection Observer for infinite scroll
@@ -73,7 +76,7 @@
           loadMorePosts();
         }
       },
-      { threshold: 0.1 }
+      { threshold: 0.1 },
     );
 
     observer.observe(sentinelElement);
