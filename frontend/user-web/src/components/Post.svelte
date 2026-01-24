@@ -79,16 +79,6 @@
   async function loadCommunityData() {
     try {
       communityData = await getCommunityById(post.community.id);
-      console.log("🔍 Post moderation check:", {
-        postId: post.id,
-        currentUserId: currentUser?.id,
-        communityCreatorId: communityData.create_by_id,
-        isAdmin,
-        isCreator,
-        moderators: communityData.moderators,
-        isModerator,
-        canDelete,
-      });
     } catch (error) {
       console.error("Failed to load community data:", error);
     }
