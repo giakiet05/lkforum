@@ -14,6 +14,7 @@
     reportPost,
   } from "../services/post-service";
   import { getCommunityById } from "../services/community-service";
+  import { checkMembership } from "../services/membership-service";
   import { authStore } from "../stores/auth-store";
   import { toastStore } from "../stores/toast-store";
   import type { CommunityResponse } from "../dtos/community-dto";
@@ -54,6 +55,8 @@
   let reportDetails = $state("");
   let isReporting = $state(false);
   let communityData = $state<CommunityResponse | null>(null);
+  let isMember = $state(false);
+  let isCheckingMembership = $state(false);
 
   const currentUser = $derived($authStore.user);
   const isOwnPost = $derived(currentUser && post.author.id === currentUser.id);
@@ -65,10 +68,11 @@
   );
   const canDelete = $derived(isOwnPost || isAdmin || isCreator || isModerator);
 
-  // Load community data to check moderator status
+  // Load community data to check moderator status and membership
   $effect(() => {
     if (currentUser && post.community.id) {
       loadCommunityData();
+      checkUserMembership();
     }
   });
 
@@ -87,6 +91,23 @@
       });
     } catch (error) {
       console.error("Failed to load community data:", error);
+    }
+  }
+
+  async function checkUserMembership() {
+    if (!currentUser?.id || !post.community.id) {
+      isMember = false;
+      return;
+    }
+
+    try {
+      isCheckingMembership = true;
+      isMember = await checkMembership(currentUser.id, post.community.id);
+    } catch (error) {
+      console.error("Failed to check membership:", error);
+      isMember = false;
+    } finally {
+      isCheckingMembership = false;
     }
   }
 
@@ -463,9 +484,16 @@
         >
       </div>
       <div class="post-header-right">
-        <button class="join-btn" onclick={handleButtonClick}>Tham gia</button>
+        <button
+          class="join-btn"
+          class:joined={isMember}
+          onclick={handleButtonClick}
+          disabled={isMember || isCheckingMembership}
+        >
+          {isMember ? "Đã tham gia" : "Tham gia"}
+        </button>
         <div class="menu-container">
-          <button class="more-btn" onclick={toggleMenu} title="More options">
+          <button class="more-btn" onclick={toggleMenu} title="Thêm tùy chọn">
             <img src="/dot.png" alt="" width="20" height="20" />
           </button>
           {#if showMenu}
@@ -547,7 +575,7 @@
               class="carousel-btn prev-btn"
               onclick={prevImage}
               disabled={currentImageIndex === 0}
-              aria-label="Previous image"
+              aria-label="Ảnh trước"
             >
               ‹
             </button>
@@ -555,7 +583,7 @@
               class="carousel-btn next-btn"
               onclick={nextImage}
               disabled={currentImageIndex === post.content.images.length - 1}
-              aria-label="Next image"
+              aria-label="Ảnh sau"
             >
               ›
             </button>
@@ -649,7 +677,7 @@
         <button
           class="footer-btn vote-btn"
           class:voted={userVote === "up"}
-          aria-label="Upvote"
+          aria-label="Bình chọn tăng"
           disabled={isVoting || isOwnPost}
           onclick={handleUpvote}
         >
@@ -659,7 +687,7 @@
         <button
           class="footer-btn vote-btn"
           class:voted={userVote === "down"}
-          aria-label="Downvote"
+          aria-label="Bình chọn giảm"
           disabled={isVoting || isOwnPost}
           onclick={handleDownvote}
         >
@@ -873,6 +901,18 @@
 
   .join-btn:hover {
     background: var(--darkblue--);
+  }
+
+  .join-btn.joined,
+  .join-btn:disabled {
+    background: #e0e0e0;
+    color: #666;
+    cursor: not-allowed;
+  }
+
+  .join-btn.joined:hover,
+  .join-btn:disabled:hover {
+    background: #e0e0e0;
   }
 
   .more-btn {

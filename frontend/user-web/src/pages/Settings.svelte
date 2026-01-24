@@ -437,7 +437,7 @@
               stroke-linecap="round"
             />
           </svg>
-          Account
+          Tài khoản
         </button>
 
         <button

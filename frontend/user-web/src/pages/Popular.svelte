@@ -8,34 +8,83 @@
 
   let posts = $state<PostResponse[]>([]);
   let loading = $state(false);
+  let loadingMore = $state(false);
   let error = $state<string | null>(null);
   let sortBy = $state<SortType | "">("");
+  let currentPage = $state(1);
+  let hasMore = $state(true);
+  let sentinelElement: HTMLDivElement | null = null;
 
-  async function loadPosts() {
-    loading = true;
+  async function loadPosts(reset = true) {
+    if (reset) {
+      loading = true;
+      currentPage = 1;
+      posts = [];
+      hasMore = true;
+    } else {
+      loadingMore = true;
+    }
+
     error = null;
+
     try {
-      posts = await getPosts({
+      const newPosts = await getPosts({
         feed_type: "popular",
         sort: sortBy || undefined,
+        page: currentPage,
         limit: 20,
       });
+
+      if (reset) {
+        posts = newPosts;
+      } else {
+        posts = [...posts, ...newPosts];
+      }
+
+      hasMore = newPosts.length === 20;
     } catch (err) {
       error = err instanceof Error ? err.message : "Failed to load posts";
       console.error("Error loading posts:", err);
     } finally {
       loading = false;
+      loadingMore = false;
     }
+  }
+
+  async function loadMorePosts() {
+    if (loadingMore || !hasMore) return;
+    currentPage++;
+    await loadPosts(false);
   }
 
   $effect(() => {
     if (sortBy !== "") {
-      loadPosts();
+      loadPosts(true);
     }
   });
 
+  // Intersection Observer for infinite scroll
+  $effect(() => {
+    if (!sentinelElement || loading) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loadingMore) {
+          loadMorePosts();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    observer.observe(sentinelElement);
+
+    return () => {
+      observer.disconnect();
+    };
+  });
+
   onMount(() => {
-    loadPosts();
+    loadPosts(true);
   });
 </script>
 
@@ -73,6 +122,22 @@
         <Post {post} />
       {/each}
     </div>
+
+    <!-- Sentinel for infinite scroll -->
+    {#if hasMore}
+      <div class="sentinel" bind:this={sentinelElement}>
+        {#if loadingMore}
+          <div class="loading-more">
+            <div class="spinner"></div>
+            <p>Đang tải thêm...</p>
+          </div>
+        {/if}
+      </div>
+    {:else if posts.length > 0}
+      <div class="end-message">
+        <p>Bạn đã xem hết bài viết</p>
+      </div>
+    {/if}
   {/if}
 </div>
 
@@ -194,5 +259,41 @@
     display: flex;
     flex-direction: column;
     gap: 16px;
+  }
+
+  .sentinel {
+    min-height: 100px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .loading-more {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    text-align: center;
+  }
+
+  .loading-more p {
+    color: #5a5a5a;
+    font-size: 14px;
+    margin: 12px 0 0 0;
+  }
+
+  .end-message {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 32px 24px;
+    text-align: center;
+  }
+
+  .end-message p {
+    color: #878a8c;
+    font-size: 14px;
+    font-weight: 500;
   }
 </style>

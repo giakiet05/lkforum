@@ -194,7 +194,7 @@
     {#if imagePreview}
       <div class="image-preview">
         <img src={imagePreview} alt="Preview" />
-        <button class="remove-image" onclick={removeImage} title="Remove image">
+        <button class="remove-image" onclick={removeImage} title="Xóa ảnh">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
             <path
               d="M4 4l8 8M12 4l-8 8"
@@ -219,7 +219,7 @@
           class="attachment-btn"
           onclick={() =>
             document.getElementById("comment-image-upload")?.click()}
-          title="Add image"
+          title="Thêm ảnh"
         >
           <img
             src="/icon_comment.png"
@@ -232,7 +232,7 @@
           class="attachment-btn"
           onclick={() =>
             document.getElementById("comment-image-upload")?.click()}
-          title="Add picture"
+          title="Thêm ảnh"
         >
           <img src="/comment_picture.png" alt="" width="20" height="20" />
         </button>

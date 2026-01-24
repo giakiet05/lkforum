@@ -76,16 +76,14 @@
   class="login-form"
 >
   <div class="input-group">
-    <label for="identifier"
-      >{mode === "register" ? "Username" : "Tên đăng nhập"}</label
-    >
+    <label for="identifier">Tên đăng nhập</label>
     <input
       id="identifier"
       type="text"
       bind:value={identifier}
       placeholder={mode === "register"
-        ? "Choose a username"
-        : "Enter your username"}
+        ? "Chọn tên đăng nhập"
+        : "Nhập tên đăng nhập"}
     />
   </div>
 
@@ -96,7 +94,7 @@
         id="email"
         type="email"
         bind:value={email}
-        placeholder="Enter your email"
+        placeholder="Nhập email của bạn"
       />
     </div>
   {/if}

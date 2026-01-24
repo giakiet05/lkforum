@@ -29,7 +29,7 @@
       <button
         class="toast-close"
         onclick={() => toastStore.remove(toast.id)}
-        aria-label="Close"
+        aria-label="Đóng"
       >
         ✕
       </button>

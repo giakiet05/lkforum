@@ -380,11 +380,11 @@
         <button
           class="header-icon-btn debug-btn"
           onclick={handleDebugCreateChannel}
-          title="Create Test Channel"
+          title="Tạo kênh thử nghiệm"
         >
           🔧
         </button>
-        <button class="header-icon-btn" onclick={handleExpand} title="Expand">
+        <button class="header-icon-btn" onclick={handleExpand} title="Mở rộng">
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
             <path
               d="M13 3h4v4M7 17H3v-4M17 3l-7 7M3 17l7-7"
@@ -395,7 +395,7 @@
             />
           </svg>
         </button>
-        <button class="header-icon-btn" onclick={onClose} title="Close">
+        <button class="header-icon-btn" onclick={onClose} title="Đóng">
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
             <path
               d="M15 5L5 15M5 5l10 10"
@@ -502,7 +502,7 @@
                 <button
                   class="popup-action-icon-btn"
                   onclick={toggleChatMenu}
-                  title="More options"
+                  title="Thêm tùy chọn"
                 >
                   <svg
                     width="18"
@@ -573,7 +573,7 @@
 
           <!-- Message Input -->
           <div class="popup-message-input">
-            <button class="popup-emoji-btn" title="Emoji">
+            <button class="popup-emoji-btn" title="Biểu tượng cảm xúc">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                 <circle
                   cx="12"
@@ -608,9 +608,9 @@
               class="popup-send-btn"
               onclick={handleSendMessage}
               disabled={!messageInput.trim() || !websocketService.isConnected()}
-              title="Send"
+              title="Gửi"
             >
-              <img src="/send_icon.svg" alt="Send" width="20" height="20" />
+              <img src="/send_icon.svg" alt="Gửi" width="20" height="20" />
             </button>
           </div>
         {/if}

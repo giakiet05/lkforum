@@ -43,7 +43,7 @@
   // Callback when new post is created
   function handlePostCreated() {
     console.log("📨 handlePostCreated called - reloading posts...");
-    loadPosts(); // Reload posts to show new post
+    loadPosts(true); // Reload posts to show new post
   }
 
   // API data
@@ -51,10 +51,13 @@
   let posts = $state<PostResponse[]>([]);
   let isLoadingCommunity = $state(true);
   let isLoadingPosts = $state(true);
+  let loadingMorePosts = $state(false);
   let communityError = $state<string | null>(null);
   let postsError = $state<string | null>(null);
   let currentPage = $state(1);
-  const postsPerPage = 10;
+  const postsPerPage = 20;
+  let hasMorePosts = $state(true);
+  let postsSentinel: HTMLDivElement | null = null;
 
   // Check if current user is the creator of this community
   const isCreator = $derived(() => {
@@ -174,17 +177,25 @@
   }
 
   // Load posts for this community
-  async function loadPosts() {
+  async function loadPosts(reset = true) {
     if (!community) {
       console.warn("⚠️ loadPosts called but community is null");
       return;
     }
 
+    if (reset) {
+      isLoadingPosts = true;
+      currentPage = 1;
+      posts = [];
+      hasMorePosts = true;
+    } else {
+      loadingMorePosts = true;
+    }
+
     try {
       console.log(
-        `🔍 Loading posts for community: ${community.name} (${community.id})`,
+        `🔍 Loading posts for community: ${community.name} (${community.id}), page: ${currentPage}`,
       );
-      isLoadingPosts = true;
       postsError = null;
 
       const fetchedPosts = await getPosts({
@@ -197,15 +208,31 @@
 
       console.log("📦 Fetched posts response:", fetchedPosts);
       console.log(`✅ Loaded ${fetchedPosts.length} posts`);
-      posts = fetchedPosts;
+
+      if (reset) {
+        posts = fetchedPosts;
+      } else {
+        posts = [...posts, ...fetchedPosts];
+      }
+
+      hasMorePosts = fetchedPosts.length === postsPerPage;
     } catch (error) {
       console.error("❌ Failed to load posts:", error);
       postsError =
         error instanceof Error ? error.message : "Failed to load posts";
-      posts = [];
+      if (reset) {
+        posts = [];
+      }
     } finally {
       isLoadingPosts = false;
+      loadingMorePosts = false;
     }
+  }
+
+  async function loadMorePosts() {
+    if (loadingMorePosts || !hasMorePosts) return;
+    currentPage++;
+    await loadPosts(false);
   }
 
   // Check if user is member of this community
@@ -240,7 +267,7 @@
   // Reload posts when sort or time frame changes
   $effect(() => {
     if (community && !isLoadingCommunity) {
-      loadPosts();
+      loadPosts(true);
     }
   });
 
@@ -256,6 +283,26 @@
     if (community && !isLoadingCommunity) {
       checkMembership();
     }
+  });
+
+  // Intersection Observer for infinite scroll
+  $effect(() => {
+    if (!postsSentinel || isLoadingPosts) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMorePosts && !loadingMorePosts) {
+          loadMorePosts();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    observer.observe(postsSentinel);
+
+    return () => {
+      observer.disconnect();
+    };
   });
 
   /* Old mock data
@@ -529,7 +576,7 @@
           {#if isJoined}
             <button
               class="create-post-action-btn"
-              title="Create post"
+              title="Tạo bài viết"
               onclick={() => {
                 if (!$authStore.user) {
                   toastStore.error("Vui lòng đăng nhập để tạo bài viết");
@@ -548,7 +595,7 @@
           {/if}
 
           <!-- Notification Bell Button -->
-          <button class="action-btn" title="Notifications">
+          <button class="action-btn" title="Thông báo">
             <svg viewBox="0 0 20 20" fill="currentColor">
               <path
                 d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"
@@ -560,7 +607,7 @@
           {#if canUseModeTools()}
             <button
               class="mod-tools-btn"
-              title="Moderator tools"
+              title="Công cụ quản trị"
               onclick={handleModTools}
             >
               <svg viewBox="0 0 20 20" fill="currentColor">
@@ -576,7 +623,7 @@
             <!-- More Options Button -->
             <button
               class="action-btn"
-              title="More options"
+              title="Thêm tùy chọn"
               onclick={handleSettings}
             >
               <svg viewBox="0 0 20 20" fill="currentColor">
@@ -636,6 +683,22 @@
             {#each posts as post}
               <Post {post} />
             {/each}
+
+            <!-- Sentinel for infinite scroll -->
+            {#if hasMorePosts}
+              <div class="posts-sentinel" bind:this={postsSentinel}>
+                {#if loadingMorePosts}
+                  <div class="loading-more">
+                    <div class="spinner"></div>
+                    <p>Đang tải thêm...</p>
+                  </div>
+                {/if}
+              </div>
+            {:else if posts.length > 0}
+              <div class="end-message">
+                <p>Bạn đã xem hết bài viết</p>
+              </div>
+            {/if}
           {/if}
         </div>
       </div>
@@ -719,7 +782,7 @@
             {#if isCreator()}
               <button
                 class="invite-mod-btn"
-                title="Invite moderator"
+                title="Mời quản trị viên"
                 onclick={handleOpenInviteModModal}
               >
                 <svg
@@ -1241,6 +1304,60 @@
   .post-list {
     display: flex;
     flex-direction: column;
+  }
+
+  .posts-sentinel {
+    min-height: 100px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .loading-more {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    text-align: center;
+  }
+
+  .loading-more p {
+    color: #5a5a5a;
+    font-size: 14px;
+    margin: 12px 0 0 0;
+  }
+
+  .loading-more .spinner {
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid var(--blue--);
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    0% {
+      transform: rotate(0deg);
+    }
+    100% {
+      transform: rotate(360deg);
+    }
+  }
+
+  .end-message {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 32px 24px;
+    text-align: center;
+  }
+
+  .end-message p {
+    color: #878a8c;
+    font-size: 14px;
+    font-weight: 500;
   }
 
   /* Sidebar */

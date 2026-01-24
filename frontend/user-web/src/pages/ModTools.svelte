@@ -1361,7 +1361,7 @@
                   <button
                     class="icon-btn edit"
                     onclick={() => handleEditMember(mod.user_id, "mod")}
-                    title="Edit moderator"
+                    title="Sửa quản trị viên"
                   >
                     <img
                       src="/write_icon.svg"
@@ -1374,7 +1374,7 @@
                     <button
                       class="icon-btn delete"
                       onclick={() => handleDeleteMember(mod.user_id, "mod")}
-                      title="Remove moderator"
+                      title="Xóa quản trị viên"
                     >
                       <img
                         src="/bin_icon.svg"
@@ -1659,7 +1659,7 @@
                       e.stopPropagation();
                       handleEditRule(index);
                     }}
-                    title="Edit rule"
+                    title="Sửa quy tắc"
                   >
                     <img
                       src="/write_icon.svg"
@@ -1674,7 +1674,7 @@
                       e.stopPropagation();
                       handleDeleteRule(index);
                     }}
-                    title="Delete rule"
+                    title="Xóa quy tắc"
                   >
                     <img
                       src="/bin_icon.svg"
@@ -1686,7 +1686,7 @@
                   <button
                     class="icon-btn more"
                     onclick={(e) => e.stopPropagation()}
-                    title="More options"
+                    title="Thêm tùy chọn"
                   >
                     <svg
                       width="20"
