@@ -1,0 +1,79 @@
+@startuml LKForum_Component_Backend
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+LAYOUT_LEFT_RIGHT()
+
+title Component Diagram - Backend API
+
+System_Boundary(lkforum, "LKForum System") {
+    Container(user_web, "User Web App", "Svelte 5", "User-facing forum application")
+    Container(admin_web, "Admin Web App", "Svelte 5", "Administration application")
+    ContainerDb(database, "Database", "MongoDB", "Stores users, posts, comments, communities, messages, votes, and notifications")
+    ContainerDb(cache, "Cache Store", "Redis", "Cache and session store")
+
+    Container_Boundary(api, "Backend API (Go + Gin)") {
+        Component(api_interface, "API Interface", "Gin controllers + routes", "Exposes HTTP endpoints for auth, users, communities, posts, comments, reports, notifications, drafts, and admin APIs")
+        Component(websocket_gateway, "WebSocket Gateway", "websocket controller", "Accepts and manages real-time WebSocket connections")
+        Component(access_control, "Access Control", "Auth + rate-limit middleware", "Validates JWT tokens, applies authorization context, and enforces request limits")
+
+        Component(auth_service, "Auth & Identity Service", "service layer", "Registration, login, OTP verification, token lifecycle, and OAuth login")
+        Component(user_service, "User Service", "service layer", "User profiles, account settings, and user state management")
+        Component(community_service, "Community Service", "service layer", "Community lifecycle, memberships, and moderation settings")
+        Component(content_service, "Content Service", "service layer", "Posts, comments, drafts, voting, and post history")
+        Component(messaging_service, "Messaging Service", "service layer", "Channels, direct messages, and delivery orchestration")
+        Component(notification_service, "Notification Service", "service layer", "Notification creation, retrieval, and read state")
+        Component(admin_service, "Admin & Moderation Service", "service layer", "Reports, platform moderation actions, and admin statistics")
+
+        Component(repository_layer, "Repository Layer", "repo package", "Data access abstraction for Database collections")
+        Component(cache_layer, "Cache & Session Adapter", "Redis adapter", "OTP storage, refresh sessions, and rate-limit counters")
+        Component(oauth_adapter, "OAuth Adapter", "Google integration", "Verifies Google identity and exchanges profile data")
+        Component(email_adapter, "Email Adapter", "Email service integration", "Sends OTP and transactional emails")
+        Component(realtime_hub, "Realtime Hub", "websocket hub", "Broadcasts events and messages to connected clients")
+    }
+}
+
+System_Ext(google, "Google OAuth 2.0", "Identity provider")
+System_Ext(email_service, "Email Service", "Email delivery provider")
+
+Rel(user_web, api_interface, "Calls APIs", "HTTPS/JSON")
+Rel(admin_web, api_interface, "Calls admin APIs", "HTTPS/JSON")
+Rel(user_web, websocket_gateway, "Opens realtime connection", "WebSocket")
+
+Rel(api_interface, access_control, "Applies")
+Rel(api_interface, auth_service, "Invokes")
+Rel(api_interface, user_service, "Invokes")
+Rel(api_interface, community_service, "Invokes")
+Rel(api_interface, content_service, "Invokes")
+Rel(api_interface, messaging_service, "Invokes")
+Rel(api_interface, notification_service, "Invokes")
+Rel(api_interface, admin_service, "Invokes")
+
+Rel(websocket_gateway, access_control, "Validates identity with")
+Rel(websocket_gateway, messaging_service, "Delegates message operations to")
+Rel(websocket_gateway, realtime_hub, "Registers and routes events via")
+
+Rel(auth_service, repository_layer, "Reads/writes identities")
+Rel(auth_service, cache_layer, "Stores OTP and token session data")
+Rel(auth_service, oauth_adapter, "Performs OAuth login through")
+Rel(auth_service, email_adapter, "Sends OTP through")
+
+Rel(user_service, repository_layer, "Reads/writes user data")
+Rel(community_service, repository_layer, "Reads/writes communities and memberships")
+Rel(content_service, repository_layer, "Reads/writes posts, comments, votes, drafts, history")
+Rel(messaging_service, repository_layer, "Reads/writes channels and messages")
+Rel(messaging_service, realtime_hub, "Publishes realtime message events")
+Rel(notification_service, repository_layer, "Reads/writes notifications")
+Rel(notification_service, realtime_hub, "Publishes notification events")
+Rel(admin_service, repository_layer, "Reads/writes reports and moderation data")
+
+Rel(repository_layer, database, "Persists domain data in")
+Rel(cache_layer, cache, "Stores cache/session/TTL state in")
+Rel(access_control, cache_layer, "Uses rate-limit counters from")
+Rel(oauth_adapter, google, "Calls")
+Rel(email_adapter, email_service, "Sends mail via")
+Rel(realtime_hub, user_web, "Pushes realtime events to", "WebSocket")
+Rel(realtime_hub, admin_web, "Pushes realtime events to", "WebSocket")
+
+SHOW_LEGEND()
+
+@enduml

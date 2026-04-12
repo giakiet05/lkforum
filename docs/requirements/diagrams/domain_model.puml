@@ -1,0 +1,43 @@
+@startuml
+skinparam rectangle {
+    BackgroundColor White
+    BorderColor Black
+    Shadowing false
+}
+
+' Top Level Management (External to the data flow but manages it)
+rectangle "Admin" as Admin
+
+' THE CORE SYSTEM (Everything inside this box is the platform's domain)
+rectangle "LKForum Core System" as Core {
+    rectangle "User" as User
+    rectangle "Community" as Community
+    rectangle "Post" as Post
+    rectangle "Comment" as Comment
+    rectangle "Vote" as Vote
+    rectangle "Message" as Message
+    rectangle "Notification" as Notification
+    rectangle "Report" as Report
+}
+
+' Admin Actions (Management Flow)
+Admin -down-> User : manage accounts
+Admin -down-> Community : manage global settings
+Admin -down-> Report : review global violations
+
+' User Interactions (Data Provision Flow - The "Provide Data" part from template)
+User -down-> Community : create / join / participate
+User -down-> Post : provide content data
+User -down-> Comment : provide interaction data
+User -down-> Vote : provide feedback data
+User -down-> Message : send / receive
+User -down-> Report : provide violation data
+
+' Internal System Flows
+Post -right-> Notification : trigger alerts
+Comment -right-> Notification : trigger alerts
+Community "1" *-down- "0..*" Post : contains
+Post "1" *-down- "0..*" Comment : contains
+Report -up-> Admin : escalated for review
+
+@enduml

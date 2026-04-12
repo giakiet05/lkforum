@@ -1,0 +1,100 @@
+@startuml
+left to right direction
+skinparam packageStyle rectangle
+
+actor "Guest User" as Guest
+actor "Member" as Member
+actor "Community Moderator" as Mod
+actor "Community Owner" as Owner
+actor "System Admin" as Admin
+
+' Inheritance: Higher roles can do everything lower roles do
+Guest <|-- Member
+Member <|-- Mod
+Mod <|-- Owner
+
+rectangle "LKForum System" {
+    
+    package "Identity & Profile" {
+        usecase "Sign Up" as UC_SignUp
+        usecase "Sign In" as UC_SignIn
+        usecase "Forgot Password" as UC_Forgot
+        usecase "Manage Profile" as UC_Profile
+        usecase "Change Settings" as UC_Settings
+        usecase "View Activity History" as UC_Activity
+        usecase "Follow/Unfollow User" as UC_Follow
+    }
+
+    package "Content Interaction" {
+        usecase "Browse Content" as UC_Browse
+        usecase "Search Content" as UC_Search
+        usecase "Create Post" as UC_CreatePost
+        usecase "Edit Post" as UC_EditPost
+        usecase "Delete Post" as UC_DelPost
+        usecase "Post Comment" as UC_Comment
+        usecase "Reply to Comment" as UC_Reply
+        usecase "Vote (Upvote/Downvote)" as UC_Vote
+        usecase "Participate in Polls" as UC_Poll
+        usecase "Save Post" as UC_Save
+        usecase "Hide Post" as UC_Hide
+        usecase "Manage Drafts" as UC_Draft
+    }
+
+    package "Social & Engagement" {
+        usecase "Private Messaging (1-1)" as UC_Chat
+        usecase "Manage Notifications" as UC_Notify
+        usecase "Report Violation" as UC_Report
+    }
+
+    package "Community Management" {
+        usecase "Create Community" as UC_Create_Comm
+        usecase "Approve/Reject Posts" as UC_Mod_Approve
+        usecase "Ban/Mute User (Community)" as UC_Mod_Ban
+        usecase "Configure Community" as UC_Owner_Config
+        usecase "Assign Roles (Mod/Contributor)" as UC_Owner_Assign
+    }
+
+    package "Platform Administration" {
+        usecase "Handle Global Reports" as UC_Admin_Report
+        usecase "Manage Platform (Global)" as UC_Admin_Manage
+        usecase "View Analytics" as UC_Admin_Stats
+    }
+}
+
+Guest --> UC_Browse
+Guest --> UC_Search
+Guest --> UC_SignUp
+Guest --> UC_SignIn
+Guest --> UC_Forgot
+
+Member --> UC_Profile
+Member --> UC_Settings
+Member --> UC_Activity
+Member --> UC_Follow
+Member --> UC_CreatePost
+Member --> UC_EditPost
+Member --> UC_DelPost
+Member --> UC_Comment
+Member --> UC_Reply
+Member --> UC_Vote
+Member --> UC_Poll
+Member --> UC_Save
+Member --> UC_Hide
+Member --> UC_Draft
+Member --> UC_Chat
+Member --> UC_Notify
+Member --> UC_Report
+Member --> UC_Create_Comm
+
+Mod --> UC_Mod_Approve
+Mod --> UC_Mod_Ban
+Mod --> UC_DelPost
+
+Owner --> UC_Owner_Config
+Owner --> UC_Owner_Assign
+
+Admin --> UC_Admin_Report
+Admin --> UC_Admin_Manage
+Admin --> UC_Admin_Stats
+
+@enduml
