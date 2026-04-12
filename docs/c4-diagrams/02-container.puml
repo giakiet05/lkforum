@@ -1,0 +1,35 @@
+@startuml LKForum_Container
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+LAYOUT_TOP_DOWN()
+
+title Container Diagram - LKForum
+
+Person(user, "User", "Forum user, including moderator and community owner roles")
+Person(admin, "Admin", "System administrator")
+
+System_Boundary(lkforum, "LKForum System") {
+    Container(user_web, "User Web App", "Svelte 5, TypeScript", "User-facing UI for posting, commenting, messaging, and community interactions. Port: 5173")
+    Container(admin_web, "Admin Web App", "Svelte 5, TypeScript", "Administration UI for statistics, users, communities, and reports. Port: 5174")
+    Container(api, "Backend API", "Go, Gin Framework", "REST API and WebSocket server for authentication and business logic. Port: 8080")
+    ContainerDb(mongodb, "Database", "MongoDB", "Stores users, posts, comments, communities, messages, votes, and notifications")
+    ContainerDb(redis, "Cache Store", "Redis", "Stores sessions (refresh tokens), cached data, rate-limit counters, and OTP codes")
+}
+
+System_Ext(google, "Google OAuth 2.0", "Authentication provider")
+System_Ext(email, "Email Service", "SMTP")
+
+Rel(user, user_web, "Uses", "HTTPS")
+Rel(admin, admin_web, "Administers", "HTTPS")
+
+Rel(user_web, api, "Calls API", "HTTPS/JSON, WebSocket")
+Rel(admin_web, api, "Calls API", "HTTPS/JSON")
+
+Rel(api, mongodb, "Reads/Writes", "MongoDB Wire Protocol")
+Rel(api, redis, "Cache, sessions", "RESP")
+Rel(api, google, "OAuth login", "HTTPS/OAuth 2.0")
+Rel(api, email, "Sends OTP", "SMTP")
+
+SHOW_LEGEND()
+
+@enduml

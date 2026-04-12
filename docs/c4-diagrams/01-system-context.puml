@@ -1,0 +1,24 @@
+@startuml LKForum_System_Context
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+
+LAYOUT_WITH_LEGEND()
+
+title System Context Diagram - LKForum
+
+Person(user, "User", "Forum user, including moderator and community owner roles")
+Person(admin, "Admin", "System administrator")
+
+System(lkforum, "LKForum System", "Community forum platform for creating communities, publishing posts, commenting, and real-time messaging")
+
+System_Ext(google, "Google OAuth 2.0", "User authentication via Google accounts")
+System_Ext(email, "Email Service", "Sends OTP and notification emails (SMTP)")
+
+Rel(user, lkforum, "Uses forum features", "HTTPS, WebSocket")
+Rel(admin, lkforum, "Performs system administration", "HTTPS")
+
+Rel(lkforum, google, "Authenticates users", "OAuth 2.0")
+Rel(lkforum, email, "Sends OTP and notifications", "SMTP")
+
+SHOW_LEGEND()
+
+@enduml
