@@ -1,0 +1,18 @@
+@startuml US11_Upload_Avatar
+title US-11: Upload Avatar (Member)
+
+|Member|
+start
+:(1) Open profile avatar settings;
+:(2) Choose image file;
+:(3) Confirm upload;
+
+|System|
+:(4) Validate file type/size;
+:(5) Store avatar and update profile;
+
+|Member|
+:(6) See new avatar applied;
+
+stop
+@enduml

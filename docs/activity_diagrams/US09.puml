@@ -1,0 +1,22 @@
+@startuml US09_Email_Password_SignIn
+title US-09: Sign in with Email and Password (Member)
+
+|Member|
+start
+:(1) Open login form;
+:(2) Enter email and password;
+:(3) Submit credentials;
+
+|System|
+:(4) Validate credentials;
+if (Credentials valid?) then (Yes)
+  :(5) Create/refresh session;
+  |Member|
+  :(6) Enter app as signed-in user;
+else (No)
+  |Member|
+  :(5) See error message and stay on login;
+endif
+
+stop
+@enduml

@@ -1,0 +1,18 @@
+@startuml US10_Customize_Profile_Bio
+title US-10: Customize Profile Bio (Member)
+
+|Member|
+start
+:(1) Open profile settings;
+:(2) Edit bio text;
+:(3) Submit changes;
+
+|System|
+:(4) Validate content length/format;
+:(5) Save updated bio;
+
+|Member|
+:(6) See updated bio on profile;
+
+stop
+@enduml

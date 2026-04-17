@@ -1,0 +1,33 @@
+@startuml US01_Browse_Posts_Guest
+title US-01: Browse Posts (Guest User)
+
+|Guest User|
+start
+:(1) Open forum website;
+
+|System|
+:(2) Load landing page UI;
+:(3) Request public posts;
+
+:(4) Fetch posts from database;
+if (Posts available?) then (Yes)
+  :(5) Return post list;
+else (No)
+  :(5) Return empty result;
+endif
+
+|Guest User|
+:(6) View post list / empty state;
+
+if (Select a post?) then (Yes)
+  |System|
+  :(7) Fetch post details;
+  :(8) Fetch comments;
+
+  |Guest User|
+  :(9) View post content and comments;
+else (No)
+endif
+
+stop
+@enduml

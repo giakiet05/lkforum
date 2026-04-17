@@ -1,0 +1,18 @@
+@startuml US12_Upload_Profile_Banner
+title US-12: Upload Profile Banner (Member)
+
+|Member|
+start
+:(1) Open profile banner settings;
+:(2) Choose banner image;
+:(3) Confirm upload;
+
+|System|
+:(4) Validate banner type/size;
+:(5) Store banner and update profile;
+
+|Member|
+:(6) View updated banner on profile;
+
+stop
+@enduml

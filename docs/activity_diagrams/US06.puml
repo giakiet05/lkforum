@@ -1,0 +1,25 @@
+@startuml US06_Prompt_Signup_On_Restricted_Action
+title US-06: Prompt Signup on Restricted Action (Guest User)
+
+|Guest User|
+start
+:(1) Attempt a restricted action (e.g., vote/comment);
+
+|System|
+:(2) Detect guest status;
+:(3) Block action and show signup/login prompt;
+
+|Guest User|
+:(4) See prompt and choose next step;
+if (Proceed to signup?) then (Yes)
+  |System|
+  :(5) Redirect to signup flow;
+  |Guest User|
+  :(6) Continue with signup;
+else (No)
+  |Guest User|
+  :(5) Return to browsing;
+endif
+
+stop
+@enduml

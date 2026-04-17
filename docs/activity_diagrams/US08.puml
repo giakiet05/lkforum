@@ -1,0 +1,24 @@
+@startuml US08_Google_SignIn
+title US-08: Sign in with Google (Member)
+
+|Member|
+start
+:(1) Open sign-in page;
+:(2) Choose Google sign-in;
+
+|System|
+:(3) Redirect to Google consent;
+
+|Member|
+:(4) Grant permission with Google account;
+
+|System|
+:(5) Receive authorization response;
+:(6) Verify token and user identity;
+:(7) Create/refresh session;
+
+|Member|
+:(8) Access account as signed-in user;
+
+stop
+@enduml

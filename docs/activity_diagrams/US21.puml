@@ -1,0 +1,70 @@
+@startuml US21_Manage_Comment_On_Post
+title US-21: Manage Comment on Post
+
+|Member|
+start
+:Open post;
+
+:Select comment action;
+
+if (Action?) then (Create)
+  :Enter comment content;
+
+  |System|
+  :Validate content;
+  if (Valid?) then (Yes)
+    :Save comment;
+    :Update comment list;
+  else (No)
+    :Return error message;
+  endif
+
+  |Member|
+  :View new comment / error;
+
+elseif (Edit)
+  :Select own comment;
+  :Modify content;
+
+  |System|
+  :Validate updated content;
+  if (Valid?) then (Yes)
+    :Update comment;
+  else (No)
+    :Return error message;
+  endif
+
+  |Member|
+  :View updated comment / error;
+
+elseif (Delete)
+  :Select own comment;
+  :Confirm deletion;
+
+  |System|
+  :Delete comment;
+  :Update comment list;
+
+  |Member|
+  :View updated list;
+
+elseif (Reply)
+  :Select comment to reply;
+  :Enter reply content;
+
+  |System|
+  :Validate content;
+  if (Valid?) then (Yes)
+    :Save reply;
+    :Link reply to parent comment;
+  else (No)
+    :Return error message;
+  endif
+
+  |Member|
+  :View reply / error;
+
+endif
+
+stop
+@enduml

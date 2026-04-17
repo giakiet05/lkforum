@@ -1,0 +1,21 @@
+@startuml US05_View_User_Profile
+title US-05: View User Profile (Guest User)
+
+|Guest User|
+start
+:(1) Choose a user profile to view;
+
+|System|
+:(2) Load public profile data;
+
+|Guest User|
+:(3) View profile info and activity;
+if (Navigate to related content?) then (Yes)
+  |System|
+  :(4) Load selected content (posts/comments);
+  |Guest User|
+  :(5) Read selected content;
+endif
+
+stop
+@enduml

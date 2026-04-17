@@ -1,0 +1,22 @@
+@startuml US02_View_Post_And_Comments
+title US-02: View Post and Comments (Guest User)
+
+|Guest User|
+start
+:(1) Select a post to read;
+
+|System|
+:(2) Load post content;
+:(3) Load comments thread;
+
+|Guest User|
+:(4) Read post and comments;
+if (Need more comments?) then (Yes)
+  |System|
+  :(5) Fetch additional comments batch;
+  |Guest User|
+  :(6) Continue reading;
+endif
+
+stop
+@enduml

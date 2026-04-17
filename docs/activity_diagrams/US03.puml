@@ -1,0 +1,23 @@
+@startuml US03_Search_By_Keyword
+title US-03: Search by Keyword (Guest User)
+
+|Guest User|
+start
+:(1) Open search interface;
+:(2) Enter keywords and submit;
+
+|System|
+:(3) Run search against public content;
+:(4) Return matched results list;
+
+|Guest User|
+:(5) Review search results;
+if (Open a result?) then (Yes)
+  |System|
+  :(6) Load selected content view;
+  |Guest User|
+  :(7) Read selected content;
+endif
+
+stop
+@enduml

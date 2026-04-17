@@ -1,0 +1,30 @@
+@startuml US07_Signup_With_Email_OTP
+title US-07: Email Signup with OTP Verification (Guest User)
+
+|Guest User|
+start
+:(1) Open signup form;
+:(2) Enter email and submit;
+
+|System|
+:(3) Send OTP to provided email;
+
+|Guest User|
+:(4) Enter OTP code;
+
+|System|
+:(5) Validate OTP;
+if (OTP valid?) then (Yes)
+  |Guest User|
+  :(6) Set username and password;
+  |System|
+  :(7) Create account and start session;
+  |Guest User|
+  :(8) See signup success and continue;
+else (No)
+  |Guest User|
+  :(6) Re-enter OTP or request new code;
+endif
+
+stop
+@enduml

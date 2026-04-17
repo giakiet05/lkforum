@@ -1,0 +1,23 @@
+@startuml US04_Search_Communities
+title US-04: Search Communities (Guest User)
+
+|Guest User|
+start
+:(1) Open communities search;
+:(2) Enter community name/keywords and submit;
+
+|System|
+:(3) Run search over public communities;
+:(4) Return community results;
+
+|Guest User|
+:(5) Review community list;
+if (Open a community?) then (Yes)
+  |System|
+  :(6) Load community overview;
+  |Guest User|
+  :(7) View community details;
+endif
+
+stop
+@enduml
