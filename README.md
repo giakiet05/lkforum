@@ -1,6 +1,6 @@
 # LKForum
 
-LKForum is a community forum platform with two web clients (user + admin), a Go backend API, MongoDB for persistent data, Redis for cache/session/rate-limit state, and WebSocket for real-time messaging/notifications.
+Community Social Network LKForum is a website that provides a comprehensive, modern solution for building and managing online communities.
 
 ## C4 Architecture
 
