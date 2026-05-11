@@ -1,0 +1,71 @@
+\begin{longtblr}[
+    caption = {Business Rules for UC-26 - Configure Community},
+    label = {tab:uc26_business_rules}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rowhead = 1,
+    rows = {valign=m, cmd=\nopagebreak},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[c,1.8cm] Q[c,1.5cm] Q[c,3.0cm] Q[l,7.5cm]}
+}
+\textbf{ID} & \textbf{Activity} & \textbf{Rule Type} & \textbf{Description} \\
+
+BR-UC26-01 & (1--3, 4) & Authorization Rules &
+\textbf{Open Community Settings and Validate Access:}
+\begin{itemize}
+    \item The community settings page requires a logged-in user.
+    \item The service allows the update only when the requester is the community creator or an active moderator.
+    \item if \textbf{authUser == null} or the requester lacks moderator access, then the system returns a forbidden response.
+\end{itemize} \\
+
+BR-UC26-02 & (2--3, 4) & Validation Rules &
+\textbf{Validate the Settings Request:}
+\begin{itemize}
+    \item The controller binds the request to \texttt{UpdateCommunityRequest}.
+    \item The request must include the community ID.
+    \item The request may include description, avatar, banner, moderation settings, and rules.
+    \item if the payload cannot be bound, then the controller returns a bad request response.
+\end{itemize} \\
+
+BR-UC26-03 & (5) & Workflow Rules &
+\textbf{Load the Community Record:}
+\begin{itemize}
+    \item The service loads the target community before applying changes.
+    \item if the community does not exist, then the operation stops with the corresponding error.
+\end{itemize} \\
+
+BR-UC26-04 & (5) & Workflow Rules &
+\textbf{Apply Community Field Updates:}
+\begin{itemize}
+    \item The service updates only the non-nil fields from the request.
+    \item The configurable fields are description, avatar, banner, settings, and rules.
+    \item The service rejects save attempts that do not change any field.
+\end{itemize} \\
+
+BR-UC26-05 & (5) & Constraint Rules &
+\textbf{Require at Least One Change:}
+\begin{itemize}
+    \item if no update fields are provided, then the service returns \texttt{ErrNoFieldsToUpdate}.
+\end{itemize} \\
+
+BR-UC26-06 & (5) & Workflow Rules &
+\textbf{Persist the Community Settings:}
+\begin{itemize}
+    \item The service saves the updated community through \textbf{\textit{UpdateCommunity()}}.
+    \item The repository replaces the full community record after the in-memory updates are applied.
+\end{itemize} \\
+
+BR-UC26-07 & (6) & Message Rules &
+\textbf{Return the Saved Community Settings:}
+\begin{itemize}
+    \item The controller returns the updated community after persistence succeeds.
+\end{itemize} \\
+
+BR-UC26-08 & (6) & Message Rules &
+\textbf{Return Community Update Error:}
+\begin{itemize}
+    \item if authentication, permission, validation, lookup, or persistence checks fail, then the controller returns the corresponding error response.
+\end{itemize} \\
+\end{longtblr}

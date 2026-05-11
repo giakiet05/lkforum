@@ -1,0 +1,52 @@
+\begin{longtblr}[
+    caption = {Business Rules for UC-09 - Search Content},
+    label = {tab:uc09_business_rules}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rowhead = 1,
+    rows = {valign=m, cmd=\nopagebreak},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[c,1.8cm] Q[c,1.5cm] Q[c,3.0cm] Q[l,7.5cm]}
+}
+\textbf{ID} & \textbf{Activity} & \textbf{Rule Type} & \textbf{Description} \\
+
+BR-UC09-01 & (1--3) & Workflow Rules &
+\textbf{Open Search Page and Collect Query:}
+\begin{itemize}
+    \item The system opens the search page when the user navigates to \texttt{/search}.
+    \item if the query comes from the URL or the input field, then the system loads it into the page state before searching.
+    \item if the query is empty after trimming, then the system clears all result lists and stops searching.
+\end{itemize} \\
+
+BR-UC09-02 & (4) & Validation Rules &
+\textbf{Normalize the Query:}
+\begin{itemize}
+    \item The system decodes the query and removes optional prefixes such as \texttt{c/}, \texttt{lk/}, and \texttt{u/}.
+    \item if \textbf{cleanQuery == null} or \textbf{cleanQuery.trim() == ""}, then the system keeps the result sets empty.
+\end{itemize} \\
+
+BR-UC09-03 & (5) & Workflow Rules &
+\textbf{Search Communities, Users, and Posts in Parallel:}
+\begin{itemize}
+    \item The system calls \textbf{\textit{GetCommunitiesFilter()}}, \textbf{\textit{GetUsers()}}, and \textbf{\textit{GetPosts()}} through the frontend service layer.
+    \item The three requests run in parallel with the same cleaned query.
+    \item if any request fails, then the search page clears the result lists and leaves the page in the empty-state path.
+\end{itemize} \\
+
+BR-UC09-04 & (6--7) & Message Rules &
+\textbf{Return Matched Results or Empty State:}
+\begin{itemize}
+    \item if any result list contains items, then the system renders the matching posts, communities, and users.
+    \item if all result lists are empty, then the system shows the empty-state message instead of an error.
+\end{itemize} \\
+
+BR-UC09-05 & (8--9) & Redirect Rules &
+\textbf{Open Selected Result:}
+\begin{itemize}
+    \item if the user selects a post, then the system opens the generated post URL.
+    \item if the user selects a community, then the system navigates to the community page using \texttt{/lk/\{communityName\}}.
+    \item if the user selects a user, then the system navigates to the profile page using \texttt{/profile/\{username\}}.
+\end{itemize} \\
+\end{longtblr}

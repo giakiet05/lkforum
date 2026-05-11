@@ -1,0 +1,47 @@
+\begin{longtblr}[
+    caption = {Business Rules for UC-12 - Soft Delete Post},
+    label = {tab:uc12_business_rules}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rowhead = 1,
+    rows = {valign=m, cmd=\nopagebreak},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[c,1.8cm] Q[c,1.5cm] Q[c,3.0cm] Q[l,7.5cm]}
+}
+\textbf{ID} & \textbf{Activity} & \textbf{Rule Type} & \textbf{Description} \\
+
+BR-UC12-01 & (1--3) & Workflow Rules &
+\textbf{Open Post Menu, Choose Delete, and Confirm:}
+\begin{itemize}
+    \item The user opens the post menu, selects delete, and confirms the deletion action.
+    \item The system does not delete the post until the user confirmation step is complete.
+\end{itemize} \\
+
+BR-UC12-02 & (4--5) & Authorization Rules &
+\textbf{Load Post and Verify Delete Permission:}
+\begin{itemize}
+    \item The controller requires an authenticated user for the delete request.
+    \item if \textbf{authUser == null}, then the controller returns an unauthorized response.
+    \item The service loads the post by ID and if the post no longer exists, then it returns a post-not-found error.
+    \item if \textbf{post.AuthorID == userID}, then the requester may delete their own post.
+    \item if \textbf{post.AuthorID != userID}, then the service checks whether the user is an admin, the community creator, or a community moderator.
+    \item if none of those permissions exist, then the service returns a forbidden error.
+\end{itemize} \\
+
+BR-UC12-03 & (6--7) & Workflow Rules &
+\textbf{Soft Delete the Post Record and Adjust Counters:}
+\begin{itemize}
+    \item The system marks the post as deleted in storage through \textbf{\textit{SoftDelete()}}.
+    \item if the author deletes their own post, then the system decreases the author's post count by one.
+    \item if the requester is not the author, then the system does not change the author's post count.
+\end{itemize} \\
+
+BR-UC12-04 & (8--9) & Message Rules &
+\textbf{Return Success or Error Response:}
+\begin{itemize}
+    \item The system returns a success response with the deleted post ID after the record is marked deleted.
+    \item if any authorization or persistence step fails, then the controller returns the corresponding error message.
+\end{itemize} \\
+\end{longtblr}

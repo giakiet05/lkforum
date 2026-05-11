@@ -1,0 +1,22 @@
+@startuml UC_21_Manage_Notifications
+title UC-21: Manage Notifications
+
+|User|
+start
+:(1) Open Notifications;
+
+|System|
+:(2) Load the user's notifications;
+:(3) Return the notification list;
+
+|User|
+:(4) Mark one notification or all notifications as read;
+:(5) Delete a notification if needed;
+
+|System|
+:(6) Validate notification ownership;
+:(7) Update read or deleted status;
+:(8) Return the refreshed list;
+
+stop
+@enduml

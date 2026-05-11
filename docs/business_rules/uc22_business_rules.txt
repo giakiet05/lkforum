@@ -1,0 +1,66 @@
+\begin{longtblr}[
+    caption = {Business Rules for UC-22 - Report Violation},
+    label = {tab:uc22_business_rules}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rowhead = 1,
+    rows = {valign=m, cmd=\nopagebreak},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[c,1.8cm] Q[c,1.5cm] Q[c,3.0cm] Q[l,7.5cm]}
+}
+\textbf{ID} & \textbf{Activity} & \textbf{Rule Type} & \textbf{Description} \\
+
+BR-UC22-01 & (1--3) & Authorization Rules &
+\textbf{Open and Submit the Report Form:}
+\begin{itemize}
+    \item The report action requires an authenticated user.
+    \item The report form is opened from a post detail or post card action in the current implementation.
+    \item if \textbf{authUser == null}, then the controller returns a forbidden response.
+\end{itemize} \\
+
+BR-UC22-02 & (2--4) & Validation Rules &
+\textbf{Validate the Report Payload:}
+\begin{itemize}
+    \item The controller binds the JSON body to \texttt{ReportPostRequest}.
+    \item The submitted \textbf{reason} is required.
+    \item The submitted \textbf{description} is optional.
+    \item if the payload is invalid, then the controller returns a bad request response.
+\end{itemize} \\
+
+BR-UC22-03 & (4) & Validation Rules &
+\textbf{Validate the Target Post:}
+\begin{itemize}
+    \item The service parses \textbf{reporterID} and \textbf{postID} to object IDs.
+    \item The service loads the target post before creating a report.
+    \item if the post does not exist or the IDs are invalid, then the operation stops with the corresponding error.
+\end{itemize} \\
+
+BR-UC22-04 & (4) & Constraint Rules &
+\textbf{Prevent Self-Reporting and Duplicate Reports:}
+\begin{itemize}
+    \item The system rejects a report when the reporter is the author of the target post.
+    \item The system rejects a report when the same user has already reported the same post.
+\end{itemize} \\
+
+BR-UC22-05 & (5--6) & Workflow Rules &
+\textbf{Create and Store the Report:}
+\begin{itemize}
+    \item The service creates a \texttt{Report} with \textbf{TargetType = post}.
+    \item The repository stores the report record with \textbf{IsDeleted = false}.
+    \item The report is stored for pending review after successful creation.
+\end{itemize} \\
+
+BR-UC22-06 & (7) & Message Rules &
+\textbf{Return Report Confirmation:}
+\begin{itemize}
+    \item The controller returns a success response after the report is saved.
+\end{itemize} \\
+
+BR-UC22-07 & (7) & Message Rules &
+\textbf{Return Report Error Message:}
+\begin{itemize}
+    \item if authentication, validation, ownership, duplicate-report, or persistence checks fail, then the controller returns the corresponding error response.
+\end{itemize} \\
+\end{longtblr}

@@ -1,0 +1,22 @@
+\begin{longtblr}[
+    caption = {Business Rules for UC-07 - Follow / Unfollow User},
+    label = {tab:uc07_business_rules}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rowhead = 1,
+    rows = {valign=m, cmd=\nopagebreak},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[c,1.5cm] Q[c,3.0cm] Q[l,9.0cm]}
+}
+\textbf{Activity} & \textbf{Rule Type} & \textbf{Description} \\
+
+(3--6) & Constraint Rules &
+\textbf{Backend Rule Status:}
+\begin{itemize}
+    \item No follow or unfollow route, controller, or service is present in the backend code.
+    \item The repository currently has no server-side business rules to define for this use case.
+    \item This use case remains documented-only until a backend implementation is added.
+\end{itemize} \\
+\end{longtblr}

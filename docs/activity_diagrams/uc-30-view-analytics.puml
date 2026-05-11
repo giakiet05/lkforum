@@ -1,0 +1,15 @@
+@startuml UC_30_View_Analytics
+title UC-30: View Analytics
+
+|Admin|
+start
+:(1) Open the analytics dashboard;
+
+|System|
+:(2) Load platform overview statistics;
+:(3) Load user growth statistics;
+:(4) Load content growth statistics;
+:(5) Return the analytics data;
+
+stop
+@enduml

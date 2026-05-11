@@ -1,0 +1,24 @@
+@startuml UC_20_Private_Messaging
+title UC-20: Private Messaging
+
+|User|
+start
+:(1) Open Messages;
+
+|System|
+:(2) Load the user's channels and recent messages;
+:(3) Return the conversation list;
+
+|User|
+:(4) Select a conversation;
+:(5) Type a message and send it;
+
+|System|
+:(6) Validate channel membership and recipient settings;
+:(7) Persist the message;
+:(8) Broadcast the message to the conversation members;
+:(9) Mark the channel as read for the current user;
+:(10) Return delivery status;
+
+stop
+@enduml

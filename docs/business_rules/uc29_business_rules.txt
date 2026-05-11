@@ -1,0 +1,58 @@
+\begin{longtblr}[
+    caption = {Business Rules for UC-29 - Manage Platform},
+    label = {tab:uc29_business_rules}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rowhead = 1,
+    rows = {valign=m, cmd=\nopagebreak},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[c,1.8cm] Q[c,1.5cm] Q[c,3.0cm] Q[l,7.5cm]}
+}
+\textbf{ID} & \textbf{Activity} & \textbf{Rule Type} & \textbf{Description} \\
+
+BR-UC29-01 & (1--5) & Authorization Rules &
+\textbf{Validate Admin Login and Access Rights:}
+\begin{itemize}
+    \item The login endpoint accepts an identifier and password.
+    \item The service loads the account by email or username and requires the \texttt{admin} role.
+    \item The service rejects banned, deleted, or non-admin accounts before issuing tokens.
+    \item The service verifies the password for local accounts in \textbf{\textit{AdminLogin()}}.
+\end{itemize} \\
+
+BR-UC29-02 & (2--4) & Validation Rules &
+\textbf{Validate the Admin Login Request:}
+\begin{itemize}
+    \item The controller binds the login payload to \texttt{UserLoginRequest}.
+    \item The request must include both identifier and password fields.
+    \item if the payload cannot be bound, then the controller returns a bad request response.
+    \item if the credentials are invalid, then the service returns an invalid credentials response.
+\end{itemize} \\
+
+BR-UC29-03 & (3--5) & Workflow Rules &
+\textbf{Issue Admin Tokens and Allow Protected Access:}
+\begin{itemize}
+    \item The service generates access and refresh tokens with \textbf{\textit{AdminLogin()}} after successful authentication.
+    \item The login controller returns the authenticated user together with both tokens.
+    \item Admin dashboard and tool routes require \texttt{RequireAuth()} and \texttt{RequireAdmin()} before they can be reached.
+    \item The protected admin stats routes expose the dashboard overview and related admin tools only after the token is accepted.
+\end{itemize} \\
+
+BR-UC29-04 & (6--8) & Workflow Rules &
+\textbf{Revoke the Active Admin Session:}
+\begin{itemize}
+    \item The logout endpoint reads the bearer access token and optional refresh token from the request.
+    \item The service extracts the token JTIs and invalidates them when token revocation is available in \textbf{\textit{AdminLogout()}}.
+    \item The logout call completes even when token invalidation is unavailable, so the admin session ends cleanly.
+\end{itemize} \\
+
+BR-UC29-05 & (5, 8) & Message Rules &
+\textbf{Return the Admin Auth Result:}
+\begin{itemize}
+    \item The login response returns the user profile, access token, and refresh token.
+    \item The logout response confirms that the admin session has ended.
+    \item if authentication, validation, lookup, role, status, or token cleanup checks fail, then the controller returns the corresponding error response.
+\end{itemize} \\
+\end{longtblr}
+

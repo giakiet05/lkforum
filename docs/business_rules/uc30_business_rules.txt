@@ -1,0 +1,55 @@
+\begin{longtblr}[
+    caption = {Business Rules for UC-30 - View Analytics},
+    label = {tab:uc30_business_rules}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rowhead = 1,
+    rows = {valign=m, cmd=\nopagebreak},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[c,1.8cm] Q[c,1.5cm] Q[c,3.0cm] Q[l,7.5cm]}
+}
+\textbf{ID} & \textbf{Activity} & \textbf{Rule Type} & \textbf{Description} \\
+
+BR-UC30-01 & (1--5) & Authorization Rules &
+\textbf{Open the Analytics Dashboard with Admin Access:}
+\begin{itemize}
+    \item The analytics routes require authentication and the \texttt{admin} role.
+    \item The protected admin stats routes are guarded by \texttt{RequireAuth()} and \texttt{RequireAdmin()}.
+    \item if the requester is not an admin, then the system returns a forbidden response.
+\end{itemize} \\
+
+BR-UC30-02 & (2--4) & Validation Rules &
+\textbf{Validate the Analytics Query Parameters:}
+\begin{itemize}
+    \item The controller binds the user statistics query to \texttt{GetUserStatsQuery}.
+    \item The controller binds the content statistics query to \texttt{GetContentStatsQuery}.
+    \item The \texttt{period} field is optional and defaults to \texttt{week} when omitted.
+    \item if the query cannot be bound, then the controller returns a bad request response.
+\end{itemize} \\
+
+BR-UC30-03 & (2) & Workflow Rules &
+\textbf{Load the Platform Overview Snapshot:}
+\begin{itemize}
+    \item The service loads the platform overview using \textbf{\textit{GetPlatformOverview()}}.
+    \item The overview aggregates user, community, content, and moderation statistics from the repositories.
+    \item The overview response includes the current snapshot timestamp in \texttt{UpdatedAt}.
+\end{itemize} \\
+
+BR-UC30-04 & (3--5) & Workflow Rules &
+\textbf{Load User and Content Growth Statistics:}
+\begin{itemize}
+    \item The service loads user statistics using \textbf{\textit{GetUserStats()}} and content statistics using \textbf{\textit{GetContentStats()}}.
+    \item The service selects the growth window from the requested period and falls back to \texttt{week} when needed.
+    \item The response includes the overview and the corresponding growth series for the requested analytics view.
+\end{itemize} \\
+
+BR-UC30-05 & (5) & Message Rules &
+\textbf{Return the Analytics Result or Error:}
+\begin{itemize}
+    \item The controller returns the analytics payload after the overview or growth data is loaded successfully.
+    \item if authentication, authorization, validation, lookup, or persistence checks fail, then the controller returns the corresponding error response.
+\end{itemize} \\
+\end{longtblr}
+

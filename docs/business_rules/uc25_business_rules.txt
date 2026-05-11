@@ -1,0 +1,67 @@
+\begin{longtblr}[
+    caption = {Business Rules for UC-25 - Ban / Mute User},
+    label = {tab:uc25_business_rules}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rowhead = 1,
+    rows = {valign=m, cmd=\nopagebreak},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[c,1.8cm] Q[c,1.5cm] Q[c,3.0cm] Q[l,7.5cm]}
+}
+\textbf{ID} & \textbf{Activity} & \textbf{Rule Type} & \textbf{Description} \\
+
+BR-UC25-01 & (1--4, 5) & Authorization Rules &
+\textbf{Open the Restricted Users Panel and Validate Moderator Access:}
+\begin{itemize}
+    \item The ban and mute actions require authentication.
+    \item The service checks that the requester is a moderator of the target community.
+    \item if \textbf{authUser == null} or the requester is not a moderator, then the system returns a forbidden response.
+\end{itemize} \\
+
+BR-UC25-02 & (2--4, 5) & Validation Rules &
+\textbf{Validate the Restriction Request:}
+\begin{itemize}
+    \item The controller binds the request to \texttt{CommunityBanUserRequest}.
+    \item The request must include \textbf{communityID}, \textbf{userID}, \textbf{type}, and \textbf{lengthDays}.
+    \item The restriction type must be either \textbf{banned} or \textbf{muted}.
+    \item The reason field is accepted by the API and is stored with the restriction record.
+\end{itemize} \\
+
+BR-UC25-03 & (5) & Validation Rules &
+\textbf{Validate the Target User and Community:}
+\begin{itemize}
+    \item The service converts the community ID, user ID, and requester ID to object IDs.
+    \item if any ID is invalid, then the operation stops with the corresponding error.
+\end{itemize} \\
+
+BR-UC25-04 & (6) & Workflow Rules &
+\textbf{Store the Ban Record:}
+\begin{itemize}
+    \item if \textbf{type = banned}, then the service creates a \texttt{CommunityBan} record with \textbf{Type = banned}.
+    \item The service calculates \textbf{ExpiresAt} from \textbf{lengthDays}.
+    \item The repository clears any existing active restriction for the same user and community before inserting the new ban.
+    \item The ban record stores the target user, community, reason, requester, banned time, expiration time, and soft-delete flags.
+\end{itemize} \\
+
+BR-UC25-05 & (7) & Workflow Rules &
+\textbf{Store the Mute Record:}
+\begin{itemize}
+    \item if \textbf{type = muted}, then the service creates a \texttt{CommunityBan} record with \textbf{Type = muted}.
+    \item The same expiration and audit fields are stored for mute actions.
+    \item The repository clears any existing active restriction for the same user and community before inserting the new mute.
+\end{itemize} \\
+
+BR-UC25-06 & (8) & Message Rules &
+\textbf{Return the Updated Restriction State:}
+\begin{itemize}
+    \item The controller returns a success response after the restriction is saved.
+\end{itemize} \\
+
+BR-UC25-07 & (8) & Message Rules &
+\textbf{Return Restriction Error Message:}
+\begin{itemize}
+    \item if authentication, permission, validation, ID conversion, or persistence checks fail, then the controller returns the corresponding error response.
+\end{itemize} \\
+\end{longtblr}

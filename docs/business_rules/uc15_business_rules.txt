@@ -1,0 +1,61 @@
+\begin{longtblr}[
+    caption = {Business Rules for UC-15 - Vote on Content},
+    label = {tab:uc15_business_rules}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rowhead = 1,
+    rows = {valign=m, cmd=\nopagebreak},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[c,1.8cm] Q[c,1.5cm] Q[c,3.0cm] Q[l,7.5cm]}
+}
+\textbf{ID} & \textbf{Activity} & \textbf{Rule Type} & \textbf{Description} \\
+
+BR-UC15-01 & (4) & Validation Rules &
+\textbf{Validate Authentication, Target Type, and Vote Payload:}
+\begin{itemize}
+    \item The controller requires an authenticated user before casting or removing a vote.
+    \item if \textbf{authUser == null}, then the controller returns an unauthorized response.
+    \item The controller accepts only \textbf{post} or \textbf{comment} as \textbf{target\_type}.
+    \item if the target type is invalid, then the controller returns a bad-request response.
+    \item The controller binds the request body to \texttt{PostVoteRequest}.
+    \item if JSON binding fails or \textbf{value == null}, then the controller returns a bad-request response.
+\end{itemize} \\
+
+BR-UC15-02 & (4) & Message Rules &
+\textbf{Return Bad-Request Message:}
+\begin{itemize}
+    \item if the target type is invalid or the vote payload is malformed, then the system returns the bad-request message.
+\end{itemize} \\
+
+BR-UC15-03 & (4) & Workflow Rules &
+\textbf{Check Target Visibility and Load Existing Vote:}
+\begin{itemize}
+    \item For post voting, the system loads the post and allows voting only when the moderation status is \textbf{approved} or \textbf{skipped}.
+    \item For comment voting, the system loads the comment and does not apply a moderation gate.
+    \item The system loads the existing vote, if any, before applying the new vote action.
+\end{itemize} \\
+
+BR-UC15-04 & (5--7) & Workflow Rules &
+\textbf{Create, Change, or Remove the Vote:}
+\begin{itemize}
+    \item if no previous vote exists, then the system creates a new vote record.
+    \item if the new value matches the previous value, then the system removes the vote.
+    \item if the new value differs from the previous value, then the system updates the existing vote value.
+    \item The vote repository updates the target's vote counters inside a transaction.
+    \item For post votes, the repository also recalculates \textbf{hot\_score} from the new totals.
+\end{itemize} \\
+
+BR-UC15-05 & (8) & Message Rules &
+\textbf{Return Updated Vote Totals:}
+\begin{itemize}
+    \item The system returns the updated upvote, downvote, and score totals after the transaction completes.
+\end{itemize} \\
+
+BR-UC15-06 & (9) & Message Rules &
+\textbf{Return Vote Error Message:}
+\begin{itemize}
+    \item if authentication, moderation, or persistence fails, then the controller returns the corresponding error message.
+\end{itemize} \\
+\end{longtblr}

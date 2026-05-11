@@ -1,0 +1,76 @@
+\begin{longtblr}[
+    caption = {Business Rules for UC-24 - Approve / Reject Post},
+    label = {tab:uc24_business_rules}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rowhead = 1,
+    rows = {valign=m, cmd=\nopagebreak},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[c,1.8cm] Q[c,1.5cm] Q[c,3.0cm] Q[l,7.5cm]}
+}
+\textbf{ID} & \textbf{Activity} & \textbf{Rule Type} & \textbf{Description} \\
+
+BR-UC24-01 & (1--2, 5) & Authorization Rules &
+\textbf{Open the Moderation Queue and Validate Moderator Permissions:}
+\begin{itemize}
+    \item The moderation queue endpoints require authentication.
+    \item The service checks that the requester is a moderator of the target community before loading or moderating posts.
+    \item if \textbf{authUser == null} or the user is not a moderator, then the system returns a forbidden response.
+\end{itemize} \\
+
+BR-UC24-02 & (2) & Workflow Rules &
+\textbf{Load Pending or Edited Posts:}
+\begin{itemize}
+    \item The system loads pending posts with \textbf{\textit{GetPendingPosts()}}.
+    \item The system loads edited posts with \textbf{\textit{GetEditedPosts()}}.
+    \item The queued posts are filtered by community ID and moderation status before being returned.
+\end{itemize} \\
+
+BR-UC24-03 & (3--4, 5) & Validation Rules &
+\textbf{Validate the Moderation Decision:}
+\begin{itemize}
+    \item The controller binds the request to \texttt{ModeratePostRequest}.
+    \item The request must include the community ID, post ID, and approve flag.
+    \item if the moderation route parameters are missing or the request body is invalid, then the controller returns a bad request response.
+\end{itemize} \\
+
+BR-UC24-04 & (5) & Validation Rules &
+\textbf{Validate the Target Post:}
+\begin{itemize}
+    \item The service loads the target post before applying the decision.
+    \item The post must belong to the same community as the moderation request.
+    \item The post must still be in \textbf{moderation\_status = pending}.
+    \item if the post is missing, in another community, or not pending, then the operation stops with the corresponding error.
+\end{itemize} \\
+
+BR-UC24-05 & (6--7) & Workflow Rules &
+\textbf{Approve the Post:}
+\begin{itemize}
+    \item if \textbf{approve = true}, then the service sets \textbf{moderation\_status = approved}.
+    \item The service updates \textbf{moderated\_at} for the post.
+    \item The service publishes a \texttt{PostApprovedEvent} so the post becomes visible to the community flow.
+\end{itemize} \\
+
+BR-UC24-06 & (6--8) & Workflow Rules &
+\textbf{Reject the Post:}
+\begin{itemize}
+    \item if \textbf{approve = false}, then the service sets \textbf{moderation\_status = rejected}.
+    \item The service stores a \texttt{ModerationResult} with \textbf{IsViolation = true} and the rejection reason.
+    \item if no rejection reason is supplied, then the service uses the default moderator rejection reason.
+    \item The service publishes a \texttt{PostRejectedEvent} for downstream notifications.
+\end{itemize} \\
+
+BR-UC24-07 & (9) & Message Rules &
+\textbf{Return the Moderation Result:}
+\begin{itemize}
+    \item The controller returns a success response with the post ID and final status after the update succeeds.
+\end{itemize} \\
+
+BR-UC24-08 & (9) & Message Rules &
+\textbf{Return Moderation Error Message:}
+\begin{itemize}
+    \item if authentication, permission, validation, lookup, or persistence checks fail, then the controller returns the corresponding error response.
+\end{itemize} \\
+\end{longtblr}

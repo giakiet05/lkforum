@@ -1,0 +1,100 @@
+\begin{longtblr}[
+    caption = {Business Rules for UC-03 - Forgot Password},
+    label = {tab:uc03_business_rules}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rowhead = 1,
+    rows = {valign=m, cmd=\nopagebreak},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[c,1.8cm] Q[c,1.5cm] Q[c,3.0cm] Q[l,7.5cm]}
+}
+\textbf{ID} & \textbf{Activity} & \textbf{Rule Type} & \textbf{Description} \\
+
+BR-UC03-1 & (4) & Validation Rules &
+\textbf{Validate Reset Request:}
+\begin{itemize}
+    \item The controller checks \textbf{email} in \texttt{ForgotPasswordRequest}.
+    \item If binding fails or \textbf{email} is missing or invalid, the controller returns a bad request response.
+\end{itemize} \\
+
+BR-UC03-2 & (5) & Authorization Rules &
+\textbf{Validate Account Ownership:}
+\begin{itemize}
+    \item The service looks up the account by \textbf{email} using the user repository.
+    \item If the account does not exist, the service returns an email-not-registered error.
+    \item If the account exists but the \textbf{provider} is not local, the service returns a login-method-mismatch error.
+\end{itemize} \\
+
+BR-UC03-3 & (6) & Workflow Rules &
+\textbf{Create Password Reset Request:}
+\begin{itemize}
+    \item The system deletes any existing reset record for the same \textbf{email}.
+    \item The system generates a 6-digit \textbf{OTP}, a \textbf{nonce}, and an expiry timestamp using \textbf{\textit{generateOTP()}} and \textbf{\textit{generateNonce()}}.
+    \item The system stores a new password-reset record with \textbf{IsVerified = false}.
+\end{itemize} \\
+
+BR-UC03-4 & (7--9) & Message Rules &
+\textbf{Return Reset Request Result:}
+\begin{itemize}
+    \item If the account is not local, the service returns a login-method-mismatch error.
+    \item If the reset record is created successfully, the system sends the reset OTP asynchronously by email.
+    \item The system returns a success message telling the user to check the inbox.
+\end{itemize} \\
+
+BR-UC03-5 & (10--11) & Validation Rules &
+\textbf{Validate Reset OTP:}
+\begin{itemize}
+    \item The controller checks \textbf{email} and \textbf{otp} in \texttt{VerifyResetPasswordOTPRequest}.
+    \item If binding fails, the controller returns a bad request response.
+    \item If no reset record exists for the \textbf{email}, the service returns an invalid \textbf{OTP} error.
+    \item If the reset record is already verified, the service returns an email-already-verified error.
+    \item If the \textbf{OTP} does not match or has expired, the service returns an invalid or expired \textbf{OTP} error.
+\end{itemize} \\
+
+BR-UC03-6 & (12--13) & Workflow Rules &
+\textbf{Verify OTP and Generate Reset Token:}
+\begin{itemize}
+    \item The service marks the reset record as verified.
+    \item The service generates a reset token from the verified \textbf{email} and \textbf{nonce} using \textbf{\textit{CreateVerificationToken()}}.
+\end{itemize} \\
+
+BR-UC03-7 & (14) & Message Rules &
+\textbf{Return OTP Error:}
+\begin{itemize}
+    \item If the OTP is invalid or expired, the controller returns the corresponding error message.
+\end{itemize} \\
+
+BR-UC03-8 & (17) & Validation Rules &
+\textbf{Validate New Password:}
+\begin{itemize}
+    \item The controller checks \textbf{reset\_token} and \textbf{new\_password} in \texttt{ResetPasswordRequest}.
+    \item If binding fails or \textbf{reset\_token} is missing, the controller returns a bad request response.
+    \item The DTO binding requires \textbf{new\_password} to be present and at least 6 characters long.
+    \item The service requires \textbf{new\_password} to be at least 8 characters long.
+    \item The service requires \textbf{new\_password} to contain uppercase, lowercase, numeric, and special characters.
+\end{itemize} \\
+
+BR-UC03-9 & (18) & Workflow Rules &
+\textbf{Hash and Update Password:}
+\begin{itemize}
+    \item The service parses the reset token and verifies the stored \textbf{nonce}.
+    \item The service looks up the user by \textbf{email}.
+    \item The service hashes \textbf{new\_password} with \textbf{\textit{GenerateFromPassword()}}.
+    \item The service updates the user password in the repository.
+\end{itemize} \\
+
+BR-UC03-10 & (19) & Workflow Rules &
+\textbf{Clean Up Reset Record:}
+\begin{itemize}
+    \item The service deletes the reset record after a successful password change.
+    \item The controller returns a success response telling the user they can log in with the new password.
+\end{itemize} \\
+
+BR-UC03-11 & (20) & Message Rules &
+\textbf{Return Password Error:}
+\begin{itemize}
+    \item If the new password is invalid, the controller returns the corresponding error message.
+\end{itemize} \\
+\end{longtblr}

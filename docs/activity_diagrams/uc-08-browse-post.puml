@@ -1,0 +1,24 @@
+@startuml UC_08_Browse_Post
+title UC-08: Browse Post
+
+|User|
+start
+:(1) Open the forum homepage;
+
+|System|
+:(2) Load and fetch public posts;
+if (Results available?) then (Yes)
+  :(3) Display post list;
+else (No)
+  :(4) Display empty state;
+endif
+
+|User|
+:(5) Select a post;
+
+|System|
+:(6) Fetch selected post details;
+:(7) Return post details;
+
+stop
+@enduml

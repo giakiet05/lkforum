@@ -620,7 +620,7 @@ func (s *postService) DeletePost(postID string, userID string) error {
 		}
 	}
 
-	return s.postRepo.Delete(ctx, postID)
+	return s.postRepo.SoftDelete(ctx, postID)
 }
 
 func (s *postService) AddImagesToPost(userID, postID string, form *multipart.Form) ([]*model.Image, error) {

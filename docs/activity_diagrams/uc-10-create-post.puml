@@ -1,0 +1,33 @@
+@startuml UC_10_Create_Post
+title UC-10: Create Post
+
+|User|
+start
+:(1) Open the Create Post modal;
+:(2) Select a community;
+:(3) Choose a post type and enter title/content;
+
+if (Add media or poll?) then (Yes)
+  :(4) Attach images or videos / configure poll options;
+endif
+
+:(5) Submit the post;
+
+|System|
+:(6) Validate the author and community membership;
+if (Post data valid?) then (Yes)
+  :(7) Create the post record;
+  if (Media attached?) then (Yes)
+    |Third-party Cloudinary|
+    :(8) Upload images or videos;
+
+    |System|
+    :(9) Attach uploaded media to the post;
+  endif
+  :(10) Trigger moderation workflow and return the created post;
+else (No)
+  :(11) Return error message;
+endif
+
+stop
+@enduml

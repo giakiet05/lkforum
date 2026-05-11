@@ -1,0 +1,70 @@
+\begin{longtblr}[
+    caption = {Business Rules for UC-20 - Private Messaging},
+    label = {tab:uc20_business_rules}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rowhead = 1,
+    rows = {valign=m, cmd=\nopagebreak},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[c,1.8cm] Q[c,1.5cm] Q[c,3.0cm] Q[l,7.5cm]}
+}
+\textbf{ID} & \textbf{Activity} & \textbf{Rule Type} & \textbf{Description} \\
+
+BR-UC20-01 & (2--3) & Authorization Rules &
+\textbf{Load the User's Conversations:}
+\begin{itemize}
+    \item The controller requires an authenticated user before loading conversation data.
+    \item if \textbf{authUser == null}, then the controller returns a forbidden response.
+    \item The channel service only returns channels when the requester matches the target user ID.
+    \item if the requester is not the same as the target user, then the service returns a forbidden error.
+\end{itemize} \\
+
+BR-UC20-02 & (2--3) & Workflow Rules &
+\textbf{Return Conversation List and Recent Message State:}
+\begin{itemize}
+    \item The service loads the user's channels using \textbf{\textit{GetChannelsByUserID()}}.
+    \item The service returns the conversation list together with pagination data.
+    \item The message filter endpoint returns the user's messages only when the requester is a member of the channel.
+\end{itemize} \\
+
+BR-UC20-03 & (6) & Validation Rules &
+\textbf{Validate New Message Payload and Channel Access:}
+\begin{itemize}
+    \item The websocket hub decodes the \texttt{new_message} payload before publishing the event.
+    \item if the payload is malformed or required fields are missing, then the hub sends an error message back to the sender.
+    \item The message service validates that \textbf{temp\_message\_id}, \textbf{channel\_id}, \textbf{sender\_id}, \textbf{sender\_username}, and \textbf{content} are present.
+    \item The service loads the target channel and verifies that the sender is a member of that channel.
+    \item The service checks each recipient's direct-message setting before continuing.
+\end{itemize} \\
+
+BR-UC20-04 & (7--8) & Workflow Rules &
+\textbf{Persist and Broadcast the Message:}
+\begin{itemize}
+    \item The service creates a \texttt{Message} with \textbf{IsSend = false}, \textbf{IsRead = false}, and \textbf{IsDeleted = false}.
+    \item The repository stores the message and returns the created record.
+    \item The message service publishes a broadcast event so the websocket hub can send an ACK to the sender and a delivery event to the recipients.
+    \item if persistence fails, then the service publishes a message error event instead of broadcasting success.
+\end{itemize} \\
+
+BR-UC20-05 & (9) & Workflow Rules &
+\textbf{Mark the Channel as Read:}
+\begin{itemize}
+    \item The message service marks the channel as read only for channel members.
+    \item The repository updates unread messages to \textbf{is\_read = true} for messages not sent by the current user.
+\end{itemize} \\
+
+BR-UC20-06 & (10) & Message Rules &
+\textbf{Return Delivery Status:}
+\begin{itemize}
+    \item The websocket hub sends an ACK back to the sender with the stored message payload.
+    \item The websocket hub broadcasts the created message to the other channel members.
+\end{itemize} \\
+
+BR-UC20-07 & (10) & Message Rules &
+\textbf{Return Messaging Error:}
+\begin{itemize}
+    \item if authentication, membership, recipient privacy, or persistence fails, then the system returns the corresponding error message to the sender.
+\end{itemize} \\
+\end{longtblr}

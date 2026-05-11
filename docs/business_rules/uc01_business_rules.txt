@@ -1,0 +1,77 @@
+\begin{longtblr}[
+    caption = {Business Rules for UC-01 - Sign Up},
+    label = {tab:uc01_business_rules}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rowhead = 1,
+    rows = {valign=m, cmd=\nopagebreak},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[c,1.8cm] Q[c,1.5cm] Q[c,3.0cm] Q[l,7.5cm]}
+}
+\textbf{ID} & \textbf{Activity} & \textbf{Rule Type} & \textbf{Description} \\
+
+BR-01 & (4) & Validation Rules &
+\textbf{Validate Email Format:}
+\begin{itemize}
+    \item The system checks \textbf{email} in \texttt{SendEmailVerificationRequest}.
+    \item If \textbf{email} is missing or does not match the email binding rule, the controller returns a bad request response.
+\end{itemize} \\
+
+BR-02 & (5) & Constraint Rules &
+\textbf{Check Email Availability and Prepare Verification Record:}
+\begin{itemize}
+    \item The system checks whether the \textbf{email} already exists in the user repository.
+    \item If the \textbf{email} already exists, the system returns an email-exists error.
+    \item If an old verification record exists for the same \textbf{email}, the system deletes it before creating a new one.
+\end{itemize} \\
+
+BR-03 & (6) & Workflow Rules &
+\textbf{Create OTP Verification Record:}
+\begin{itemize}
+    \item The system generates \textbf{OTP} and \textbf{nonce} values.
+    \item The system stores a new email verification record with \textbf{email}, \textbf{OTP}, \textbf{OTPExpiresAt}, \textbf{Nonce}, and \textbf{IsVerified = false}.
+\end{itemize} \\
+
+BR-04 & (7) & Message Rules &
+\textbf{Send Verification Email:}
+\begin{itemize}
+    \item If an email sender is configured, the system sends the \textbf{OTP} by email asynchronously.
+\end{itemize} \\
+
+BR-05 & (12) & Validation Rules &
+\textbf{Verify OTP and Issue Token:}
+\begin{itemize}
+    \item The system checks that \textbf{email} and \textbf{otp} are present.
+    \item If no verification record exists for the \textbf{email}, the service returns an invalid \textbf{OTP} error.
+    \item If the verification record is already marked verified, the service returns an email-already-verified error.
+    \item If the \textbf{OTP} does not match, the service returns an invalid \textbf{OTP} error.
+    \item If the \textbf{OTP} has expired, the service returns an expired \textbf{OTP} error.
+\end{itemize} \\
+
+BR-06 & (13) & Workflow Rules &
+\textbf{Verify OTP and Mark Email as Verified:}
+\begin{itemize}
+    \item The service marks the verification record as verified before generating the verification token.
+    \item The verification token is created from the verified \textbf{email} and \textbf{nonce}.
+\end{itemize} \\
+
+BR-07 & (17) & Validation Rules &
+\textbf{Validate Registration Fields:}
+\begin{itemize}
+    \item The system checks that \textbf{username} is between 3 and 20 characters.
+    \item The system checks that \textbf{password} is at least 8 characters long.
+    \item The system checks that \textbf{password} contains uppercase, lowercase, numeric, and special characters.
+    \item The system parses the \textbf{verification\_token} and verifies the stored \textbf{nonce} before registration continues.
+    \item The system checks that the \textbf{username} is still available and that the \textbf{email} is still not registered.
+\end{itemize} \\
+
+BR-08 & (18--21) & Workflow Rules &
+\textbf{Create Account and Complete Login:}
+\begin{itemize}
+    \item The system hashes the \textbf{password} with \textbf{\textit{bcrypt.GenerateFromPassword()}} before storing it.
+    \item The system creates the new local user with default settings and \textbf{IsVerified = true}.
+    \item The system deletes the verification record, invalidates the \textbf{username} cache, generates access and refresh tokens using \textbf{\textit{GenerateToken()}}, stores the auth state, and redirects to the home page.
+\end{itemize} \\
+\end{longtblr}

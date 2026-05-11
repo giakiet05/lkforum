@@ -1,0 +1,26 @@
+@startuml UC_02_Local_Sign_In
+title UC-02.1: Sign In (Local)
+
+|User|
+start
+:(1) Open the Login page;
+:(2) Enter username/email and password;
+:(3) Submit credentials;
+
+|System|
+:(4) Validate login input;
+:(5) Look up the account by email or username;
+if (Account found?) then (Yes)
+  :(6) Verify password and account status;
+  if (Credentials valid?) then (Yes)
+    :(7) Generate access and refresh tokens;
+    :(8) Return login success response;
+  else (No)
+    :(9) Return error message;
+  endif
+else (No)
+  :(10) Return error message;
+endif
+
+stop
+@enduml

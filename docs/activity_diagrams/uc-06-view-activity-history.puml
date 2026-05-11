@@ -1,0 +1,25 @@
+@startuml UC_06_View_Activity_History
+title UC-06: View Activity History
+
+|User|
+start
+:(1) Open the Activity History page;
+:(2) Choose a page of history records;
+
+|System|
+:(3) Validate authenticated user;
+:(4) Fetch paginated post history for the user;
+if (Records found?) then (Yes)
+  :(5) Return the history list and pagination data;
+else (No)
+  :(6) Return an empty result;
+endif
+
+|User|
+:(7) View past posts and interactions;
+
+|System|
+:(8) Return the selected history record when requested;
+
+stop
+@enduml

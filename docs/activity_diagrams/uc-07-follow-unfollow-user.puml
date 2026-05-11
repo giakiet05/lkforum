@@ -1,0 +1,21 @@
+@startuml UC_07_Follow_Unfollow_User
+title UC-07: Follow / Unfollow User
+
+|User|
+start
+:(1) Open another user's profile;
+:(2) Click Follow or Unfollow;
+
+|System|
+:(3) Validate authenticated user and target user;
+if (Action is Follow?) then (Yes)
+  :(4) Create follow relationship;
+  :(5) Increase follower/feed visibility state;
+else (No)
+  :(6) Remove follow relationship;
+  :(7) Reduce follower/feed visibility state;
+endif
+:(8) Return updated follow status;
+
+stop
+@enduml

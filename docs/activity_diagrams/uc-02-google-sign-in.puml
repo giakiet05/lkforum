@@ -1,0 +1,45 @@
+@startuml UC_02_Google_Sign_In
+title UC-02.2: Sign In (Google OAuth)
+
+|User|
+start
+:(1) Open Login page;
+:(2) Click "Login with Google";
+
+|System|
+:(3) Redirect user to Google OAuth page;
+
+|User|
+if (Cancel sign-in?) then (Yes)
+    :(4) Cancel authentication process;
+    stop
+else (No)
+endif
+
+|Third-party Google|
+:(5) Authenticate user and request consent;
+:(6) Return authorization code;
+
+|System|
+:(7) Receive OAuth callback;
+:(8) Validate callback and retrieve Google profile data;
+
+if (Google account already registered?) then (Yes)
+
+    if (Account active?) then (Yes)
+        :(9) Generate access and refresh tokens;
+        :(10) Return login success response;
+    else (No)
+        :(11) Return banned/inactive account error;
+    endif
+
+else (No)
+
+    :(12) Create new user account from Google profile;
+    :(13) Generate access and refresh tokens;
+    :(14) Return registration and login success response;
+
+endif
+
+stop
+@enduml

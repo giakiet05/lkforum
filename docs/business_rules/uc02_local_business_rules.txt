@@ -1,0 +1,47 @@
+\begin{longtblr}[
+    caption = {Business Rules for UC-02.1 - Sign In (Local)},
+    label = {tab:uc02_local_business_rules}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rowhead = 1,
+    rows = {valign=m, cmd=\nopagebreak},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[c,1.8cm] Q[c,1.5cm] Q[c,3.0cm] Q[l,7.5cm]}
+}
+\textbf{ID} & \textbf{Activity} & \textbf{Rule Type} & \textbf{Description} \\
+
+BR-01 & (4) & Validation Rules &
+\textbf{Validate Login Input:}
+\begin{itemize}
+    \item The controller checks the JSON body for \textbf{identifier} and \textbf{password} in \texttt{UserLoginRequest}.
+    \item If binding fails or either field is missing, the controller returns a bad request response.
+    \item The controller does not validate the \textbf{identifier} format here; the service decides whether to search by email or username.
+\end{itemize} \\
+
+BR-02 & (5) & Workflow Rules &
+\textbf{Look Up Account:}
+\begin{itemize}
+    \item The service checks whether \textbf{identifier} is an email using \textbf{\textit{isEmail()}}.
+    \item The service looks up the account by email or username using the user repository.
+    \item If no account exists, the service returns an invalid credentials error.
+\end{itemize} \\
+
+BR-03 & (6) & Authorization Rules &
+\textbf{Verify Password and Account Status:}
+\begin{itemize}
+    \item The system checks that the account uses the local provider.
+    \item The service compares the stored password with \textbf{password} using \textbf{\textit{bcrypt.CompareHashAndPassword()}}.
+    \item If the password hash is empty or the comparison fails, the service returns an invalid credentials error.
+    \item If \textbf{IsVerified} is false, the service returns an email-not-verified error.
+    \item If the user is banned and the ban has not expired, the service returns a user-inactive error.
+\end{itemize} \\
+
+BR-04 & (7--10) & Message Rules &
+\textbf{Return Authentication Response:}
+\begin{itemize}
+    \item The system returns an error message for invalid credentials.
+    \item The system returns the authenticated user data together with the access and refresh tokens on success.
+\end{itemize} \\
+\end{longtblr}

@@ -1,0 +1,17 @@
+@startuml UC_22_Report_Violation
+title UC-22: Report Violation
+
+|User|
+start
+:(1) Open the report form from a post, comment, or community;
+:(2) Enter the reason and details;
+:(3) Submit the report;
+
+|System|
+:(4) Validate authentication and report data;
+:(5) Create the report record;
+:(6) Store it as pending review;
+:(7) Return confirmation;
+
+stop
+@enduml

@@ -1,0 +1,65 @@
+\begin{longtblr}[
+    caption = {Business Rules for UC-23 - Create Community},
+    label = {tab:uc23_business_rules}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rowhead = 1,
+    rows = {valign=m, cmd=\nopagebreak},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[c,1.8cm] Q[c,1.5cm] Q[c,3.0cm] Q[l,7.5cm]}
+}
+\textbf{ID} & \textbf{Activity} & \textbf{Rule Type} & \textbf{Description} \\
+
+BR-UC23-01 & (1--4) & Authorization Rules &
+\textbf{Open and Submit the Create Community Form:}
+\begin{itemize}
+    \item The create-community action requires an authenticated user.
+    \item if \textbf{authUser == null}, then the controller returns a forbidden response.
+    \item The controller passes the authenticated user's ID to the service when creating the community.
+\end{itemize} \\
+
+BR-UC23-02 & (2--4) & Validation Rules &
+\textbf{Validate Community Input:}
+\begin{itemize}
+    \item The controller binds the request to \texttt{CreateCommunityRequest}.
+    \item The community name is required and must satisfy the configured length rule.
+    \item The community description, when provided, must respect its length limit.
+    \item The request may include optional avatar, banner, setting, rules, moderators, creator metadata, and adult-content flag.
+\end{itemize} \\
+
+BR-UC23-03 & (5) & Constraint Rules &
+\textbf{Prevent Duplicate Community Names:}
+\begin{itemize}
+    \item The repository enforces a unique index on community name.
+    \item if the same community name already exists, then the service returns a community-name-exists error.
+\end{itemize} \\
+
+BR-UC23-04 & (6) & Workflow Rules &
+\textbf{Create the Community Record:}
+\begin{itemize}
+    \item The service creates a community with the submitted fields and the creator ID.
+    \item The new community is stored with \textbf{IsDeleted = false} and \textbf{IsBanned = false}.
+    \item The service persists the community through \textbf{\textit{CreateCommunity()}}.
+\end{itemize} \\
+
+BR-UC23-05 & (7) & Workflow Rules &
+\textbf{Create the Initial Membership:}
+\begin{itemize}
+    \item After the community is created, the service creates a membership record for the creator.
+    \item The creator becomes the first member of the new community.
+\end{itemize} \\
+
+BR-UC23-06 & (8) & Message Rules &
+\textbf{Return the New Community:}
+\begin{itemize}
+    \item The controller returns the created community with a success response after persistence succeeds.
+\end{itemize} \\
+
+BR-UC23-07 & (8) & Message Rules &
+\textbf{Return Community Creation Error:}
+\begin{itemize}
+    \item if authentication, validation, duplicate-name, or persistence checks fail, then the controller returns the corresponding error response.
+\end{itemize} \\
+\end{longtblr}

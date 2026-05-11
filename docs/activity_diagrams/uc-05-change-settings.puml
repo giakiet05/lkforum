@@ -1,0 +1,26 @@
+@startuml UC_05_Change_Settings
+title UC-05: Change Settings
+
+|User|
+start
+:(1) Open the Settings page;
+
+|System|
+:(2) Load current account settings;
+:(3) Return privacy, notification, appearance, and content settings;
+
+|User|
+:(4) Modify settings values;
+:(5) Save changes;
+
+|System|
+:(6) Validate settings values;
+if (Settings valid?) then (Yes)
+  :(7) Update settings in the database;
+  :(8) Return updated settings;
+else (No)
+  :(9) Return error message;
+endif
+
+stop
+@enduml

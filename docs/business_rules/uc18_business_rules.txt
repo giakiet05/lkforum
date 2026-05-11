@@ -1,0 +1,43 @@
+\begin{longtblr}[
+    caption = {Business Rules for UC-18 - Hide Post},
+    label = {tab:uc18_business_rules}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rowhead = 1,
+    rows = {valign=m, cmd=\nopagebreak},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[c,1.8cm] Q[c,1.5cm] Q[c,3.0cm] Q[l,7.5cm]}
+}
+\textbf{ID} & \textbf{Activity} & \textbf{Rule Type} & \textbf{Description} \\
+
+BR-UC18-01 & (3) & Validation Rules &
+\textbf{Validate Authentication and Post Ownership:}
+\begin{itemize}
+    \item The controller requires an authenticated user before hiding a post.
+    \item if \textbf{authUser == null}, then the controller returns a forbidden response.
+    \item The service loads the post by ID before hiding it.
+    \item if the post cannot be found, then the service returns the post lookup error.
+    \item if the authenticated user is not the post author, then the service returns a forbidden error.
+\end{itemize} \\
+
+BR-UC18-02 & (4--5) & Workflow Rules &
+\textbf{Mark the Post Hidden and Remove It From Visible Feeds:}
+\begin{itemize}
+    \item The service updates the post record by setting \textbf{is\_hidden = true}.
+    \item The hidden marker keeps the post out of normal feed queries because feed filters exclude hidden posts.
+\end{itemize} \\
+
+BR-UC18-03 & (6) & Message Rules &
+\textbf{Return Hide Success Message:}
+\begin{itemize}
+    \item The system returns \texttt{Post hidden successfully} after the hidden state is stored.
+\end{itemize} \\
+
+BR-UC18-04 & (6) & Message Rules &
+\textbf{Return Hide Error Message:}
+\begin{itemize}
+    \item if authentication, ownership, or persistence fails, then the controller returns the corresponding error message.
+\end{itemize} \\
+\end{longtblr}

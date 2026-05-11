@@ -1,0 +1,50 @@
+\begin{longtblr}[
+    caption = {Business Rules for UC-06 - View Activity History},
+    label = {tab:uc06_business_rules}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rowhead = 1,
+    rows = {valign=m, cmd=\nopagebreak},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[c,1.8cm] Q[c,1.5cm] Q[c,3.0cm] Q[l,7.5cm]}
+}
+\textbf{ID} & \textbf{Activity} & \textbf{Rule Type} & \textbf{Description} \\
+
+BR-UC06-01 & (3) & Authorization Rules &
+\textbf{Validate Authenticated User:}
+\begin{itemize}
+    \item if \textbf{authUser} is missing, then the controller returns a forbidden response.
+    \item if \textbf{authUser} exists, then the system continues to fetch the activity history for that user.
+\end{itemize} \\
+
+BR-UC06-02 & (4) & Workflow Rules &
+\textbf{Fetch Paginated History:}
+\begin{itemize}
+    \item if \textbf{user\_id} does not match the authenticated user, then the service returns a forbidden error.
+    \item if the request is valid, then the service calls \textbf{\textit{GetPostHistoryByUserID()}} to fetch the user's post history.
+    \item if \textbf{page} or \textbf{page\_size} is invalid, then the controller uses defaults of 1 and 10.
+\end{itemize} \\
+
+BR-UC06-03 & (5--6) & Message Rules &
+\textbf{Return History List or Empty Result:}
+\begin{itemize}
+    \item if records are found, then the controller returns the history list together with pagination data.
+    \item if no records are found, then the service returns an empty result with pagination data.
+\end{itemize} \\
+
+BR-UC06-04 & (7) & Authorization Rules &
+\textbf{Check Record Ownership:}
+\begin{itemize}
+    \item if the requester opens a selected history record, then the service checks that \textbf{requesterID} matches the stored \textbf{UserID}.
+    \item if the requester does not own the record, then the service returns a forbidden error.
+\end{itemize} \\
+
+BR-UC06-05 & (8) & Message Rules &
+\textbf{Return Selected History Record:}
+\begin{itemize}
+    \item if the requester owns the record, then the system returns the selected history item.
+    \item the returned item is converted with \textbf{\textit{FromPostHistory()}} before being sent to the client.
+\end{itemize} \\
+\end{longtblr}

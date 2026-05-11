@@ -1,0 +1,19 @@
+@startuml UC_17_Save_Post
+title UC-17: Save Post
+
+|User|
+start
+:(1) Open a post;
+:(2) Click "Save";
+
+|System|
+:(3) Validate authentication and post state;
+if (Post already saved?) then (Yes)
+  :(4) Keep the saved marker;
+else (No)
+  :(5) Create the saved-post record;
+endif
+:(6) Return the updated saved state;
+
+stop
+@enduml

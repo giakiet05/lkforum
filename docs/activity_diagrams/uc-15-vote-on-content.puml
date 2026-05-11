@@ -1,0 +1,22 @@
+@startuml UC_15_Vote_On_Content
+title UC-15: Vote on Content
+
+|User|
+start
+:(1) Open a post or comment;
+:(2) Choose Upvote or Downvote;
+:(3) Submit the vote;
+
+|System|
+:(4) Validate authentication and target type;
+if (Target is approved and visible?) then (Yes)
+  :(5) Load the existing vote, if any;
+  :(6) Create, change, or remove the vote;
+  :(7) Recalculate vote counts;
+  :(8) Return updated vote totals;
+else (No)
+  :(9) Return error message;
+endif
+
+stop
+@enduml

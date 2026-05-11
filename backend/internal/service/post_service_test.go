@@ -866,7 +866,7 @@ func TestDeletePost(t *testing.T) {
 					Return(existingPost, nil)
 
 				mockPostRepo.EXPECT().
-					Delete(gomock.Any(), postID).
+					SoftDelete(gomock.Any(), postID).
 					Return(errors.New("database connection error"))
 			},
 			wantErr: errors.New("database connection error"),

@@ -1,0 +1,59 @@
+\begin{longtblr}[
+    caption = {Business Rules for UC-16 - Participate in Poll},
+    label = {tab:uc16_business_rules}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rowhead = 1,
+    rows = {valign=m, cmd=\nopagebreak},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[c,1.8cm] Q[c,1.5cm] Q[c,3.0cm] Q[l,7.5cm]}
+}
+\textbf{ID} & \textbf{Activity} & \textbf{Rule Type} & \textbf{Description} \\
+
+BR-UC16-01 & (4) & Validation Rules &
+\textbf{Validate Authentication, Poll State, and Vote Payload:}
+\begin{itemize}
+    \item The controller requires an authenticated user before recording a poll vote.
+    \item if \textbf{authUser == null}, then the controller returns an unauthorized response.
+    \item The controller binds the request body to \texttt{PollVoteRequest}.
+    \item if JSON binding fails or \textbf{option\_id} is missing, then the controller returns a bad-request response.
+    \item The service loads the target post and requires it to contain poll content.
+    \item if the post cannot be found, is not a poll, or does not contain poll data, then the service returns an error.
+\end{itemize} \\
+
+BR-UC16-02 & (4) & Message Rules &
+\textbf{Return Bad-Request Message:}
+\begin{itemize}
+    \item if the request payload is invalid, then the system returns the bad-request message.
+\end{itemize} \\
+
+BR-UC16-03 & (5--6) & Workflow Rules &
+\textbf{Record the Poll Vote:}
+\begin{itemize}
+    \item The repository loads the user's existing poll votes for the post.
+    \item if the poll is single-choice and the user already voted another option, then the repository removes the previous vote before adding the new one.
+    \item if the selected option was already voted by the user, then the repository removes that specific vote instead of adding a duplicate.
+    \item The repository stores the new poll vote and increments the selected option vote count plus the poll total votes.
+\end{itemize} \\
+
+BR-UC16-04 & (7) & Workflow Rules &
+\textbf{Return Updated Poll Results:}
+\begin{itemize}
+    \item The service reloads the poll and user vote IDs after the transaction completes.
+    \item The system returns the refreshed poll response with updated totals and user vote IDs.
+\end{itemize} \\
+
+BR-UC16-05 & (7) & Message Rules &
+\textbf{Return Created Poll Vote Message:}
+\begin{itemize}
+    \item The system returns \texttt{Poll vote cast successfully} with the updated poll payload.
+\end{itemize} \\
+
+BR-UC16-06 & (8) & Message Rules &
+\textbf{Return Poll Vote Error Message:}
+\begin{itemize}
+    \item if authentication, poll validation, or persistence fails, then the controller returns the corresponding error message.
+\end{itemize} \\
+\end{longtblr}

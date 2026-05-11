@@ -1,0 +1,64 @@
+\begin{longtblr}[
+    caption = {Business Rules for UC-02.2 - Sign In (Google OAuth)},
+    label = {tab:uc02_google_business_rules}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rowhead = 1,
+    rows = {valign=m, cmd=\nopagebreak},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[c,1.8cm] Q[c,1.5cm] Q[c,3.0cm] Q[l,7.5cm]}
+}
+\textbf{ID} & \textbf{Activity} & \textbf{Rule Type} & \textbf{Description} \\
+
+BR-01 & (3--6) & Redirect Rules &
+\textbf{Start Google OAuth Flow:}
+\begin{itemize}
+    \item The system redirects the user to Google OAuth using a generated state value.
+    \item Google authenticates the user and returns an authorization code.
+\end{itemize} \\
+
+BR-02 & (7--8) & Validation Rules &
+\textbf{Process Google Callback:}
+\begin{itemize}
+    \item The controller checks that the callback contains \textbf{code}.
+    \item If \textbf{code} is missing, the controller redirects to the frontend error page with a missing-auth-code message.
+    \item The service exchanges \textbf{code} for Google profile data using \textbf{\textit{GetGoogleUserInfo()}}.
+    \item If Google rejects the authorization code or profile lookup fails, the controller redirects to the frontend error page with the returned error message.
+\end{itemize} \\
+
+BR-03 & (9--11) & Authorization Rules &
+\textbf{Login or Setup Decision:}
+\begin{itemize}
+    \item If an account exists and \textbf{provider} is Google, the service generates access and refresh tokens using \textbf{\textit{GenerateToken()}}.
+    \item If the account belongs to a different login method, the service returns a login-method-mismatch error.
+    \item If the account is banned and the ban has not expired, the service returns a user-inactive error.
+    \item If no Google account exists, the service creates a setup token using \textbf{\textit{CreateSetupToken()}} and returns the setup-required result.
+\end{itemize} \\
+
+BR-04 & (12) & Validation Rules &
+\textbf{Validate Google Setup Input:}
+\begin{itemize}
+    \item The controller checks the JSON body for \textbf{setup\_token} and \textbf{username} in \texttt{CompleteGoogleSetupRequest}.
+    \item If binding fails or \textbf{setup\_token} is missing, the controller returns a bad request response.
+    \item The service validates that \textbf{username} is at least 3 characters and no more than 20 characters.
+    \item If \textbf{username} already exists, the service returns a username-exists error.
+    \item If the Google email is already taken, the service returns an email-exists error.
+\end{itemize} \\
+
+BR-05 & (13) & Workflow Rules &
+\textbf{Create Google Account:}
+\begin{itemize}
+    \item The system parses \textbf{setup\_token} to recover the Google claims.
+    \item The system creates the user with \textbf{provider} set to Google, stores \textbf{provider\_id}, applies default settings, and copies the Google avatar URL when available.
+    \item The system generates access and refresh tokens after the user is created.
+\end{itemize} \\
+
+BR-06 & (14) & Message Rules &
+\textbf{Return Setup Success:}
+\begin{itemize}
+    \item The system returns the created user together with the access and refresh tokens.
+    \item The system shows the setup-complete success response.
+\end{itemize} \\
+\end{longtblr}

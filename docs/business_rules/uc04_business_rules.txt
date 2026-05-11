@@ -1,0 +1,64 @@
+\begin{longtblr}[
+    caption = {Business Rules for UC-04 - Manage Profile},
+    label = {tab:uc04_business_rules}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rowhead = 1,
+    rows = {valign=m, cmd=\nopagebreak},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[c,1.8cm] Q[c,1.5cm] Q[c,3.0cm] Q[l,7.5cm]}
+}
+\textbf{ID} & \textbf{Activity} & \textbf{Rule Type} & \textbf{Description} \\
+
+BR-UC04-1 & (5) & Validation Rules &
+\textbf{Validate Profile Fields:}
+\begin{itemize}
+    \item The controller checks the JSON body for \texttt{UserProfileUpdateRequest}.
+    \item If binding fails, the controller returns a bad request response.
+    \item \textbf{bio} is limited by DTO validation to 500 characters.
+    \item \textbf{social\_links.website} must be a valid URL when provided.
+\end{itemize} \\
+
+BR-UC04-2 & (6) & Workflow Rules &
+\textbf{Update Profile Data:}
+\begin{itemize}
+    \item The service loads the current user and updates \textbf{RoleContent.AsUser}.
+    \item Empty string values clear the corresponding profile field.
+    \item The service accepts updates for \textbf{gender}, \textbf{date\_of\_birth}, \textbf{location}, \textbf{interests}, and \textbf{social\_links}.
+\end{itemize} \\
+
+BR-UC04-3 & (7) & Validation Rules &
+\textbf{Reject Invalid Profile Values:}
+\begin{itemize}
+    \item If \textbf{gender} is not valid, the service returns an invalid gender error.
+    \item If \textbf{date\_of\_birth} cannot be parsed as \texttt{2006-01-02}, the service returns an invalid date format error.
+    \item If the calculated age is below 13, the service returns an age-too-young error.
+    \item If the calculated age is above 150, the service returns an invalid birth date error.
+    \item If \textbf{location} is not a valid province, the service returns an invalid province error.
+    \item If more than 10 interests are submitted or any interest is invalid, the service returns an error.
+\end{itemize} \\
+
+BR-UC04-4 & (8) & Workflow Rules &
+\textbf{Upload Profile Image:}
+\begin{itemize}
+    \item When the user uploads an avatar or cover image, the controller sends the file to \textbf{\textit{cloudinary.UploadImages()}}.
+    \item The service stores the returned image \textbf{URL} and \textbf{PublicID} in the user profile.
+    \item If an older image exists, the service deletes the old asset asynchronously using \textbf{\textit{cloudinary.Delete()}}.
+\end{itemize} \\
+
+BR-UC04-5 & (9) & Workflow Rules &
+\textbf{Save Image Metadata:}
+\begin{itemize}
+    \item The service updates \textbf{Avatar} or \textbf{Cover} with the new image metadata.
+    \item The service persists the updated user profile in the repository.
+\end{itemize} \\
+
+BR-UC04-6 & (10) & Message Rules &
+\textbf{Return Updated Profile:}
+\begin{itemize}
+    \item The system returns the refreshed user profile after saving changes.
+    \item If validation fails, the controller returns the corresponding error message.
+\end{itemize} \\
+\end{longtblr}

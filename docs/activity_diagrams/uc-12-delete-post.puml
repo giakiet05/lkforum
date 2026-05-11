@@ -1,0 +1,22 @@
+@startuml UC_12_Delete_Post
+title UC-12: Delete Post
+
+|User|
+start
+:(1) Open the post menu;
+:(2) Choose Delete post;
+:(3) Confirm deletion;
+
+|System|
+:(4) Load the post record;
+:(5) Verify delete permission;
+if (Allowed to delete?) then (Yes)
+  :(6) Soft delete the post;
+  :(7) Decrease post count when the author deletes their own post;
+  :(8) Return delete success response;
+else (No)
+  :(9) Return error message;
+endif
+
+stop
+@enduml

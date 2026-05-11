@@ -1,0 +1,52 @@
+\begin{longtblr}[
+    caption = {Business Rules for UC-05 - Change Settings},
+    label = {tab:uc05_business_rules}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rowhead = 1,
+    rows = {valign=m, cmd=\nopagebreak},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[c,1.8cm] Q[c,1.5cm] Q[c,3.0cm] Q[l,7.5cm]}
+}
+\textbf{ID} & \textbf{Activity} & \textbf{Rule Type} & \textbf{Description} \\
+
+BR-UC05-01 & (2--3) & Workflow Rules &
+\textbf{Load Current Settings:}
+\begin{itemize}
+    \item The system loads the current user's settings from the database using \textbf{\textit{GetSettings()}}.
+    \item If the user has no settings record, the service returns default settings through \textbf{\textit{FromSettings()}}.
+    \item The returned settings include \textbf{privacy}, \textbf{notification}, \textbf{appearance}, and \textbf{content} groups.
+\end{itemize} \\
+
+BR-UC05-02 & (6) & Validation Rules &
+\textbf{Validate Settings Values:}
+\begin{itemize}
+    \item The controller checks the JSON body for \texttt{UpdateSettingsRequest}.
+    \item If binding fails, the controller returns a bad request response.
+    \item \textbf{theme} must be one of \texttt{light}, \texttt{dark}, or \texttt{auto}.
+    \item \textbf{font\_size} must be one of \texttt{small}, \texttt{medium}, or \texttt{large}.
+\end{itemize} \\
+
+BR-UC05-03 & (7) & Workflow Rules &
+\textbf{Update Settings in Database:}
+\begin{itemize}
+    \item The service loads the current user and initializes \textbf{Settings} when it is nil.
+    \item The service updates only the settings fields provided in the request.
+    \item The service persists the updated user record using the user repository.
+\end{itemize} \\
+
+BR-UC05-04 & (8) & Message Rules &
+\textbf{Return Updated Settings:}
+\begin{itemize}
+    \item The controller returns the refreshed settings after the database update succeeds.
+    \item The response includes the updated \textbf{appearance}, \textbf{notifications}, \textbf{privacy}, and \textbf{content} values.
+\end{itemize} \\
+
+BR-UC05-05 & (9) & Message Rules &
+\textbf{Return Error Message:}
+\begin{itemize}
+    \item If validation fails or the service returns an error, the controller returns the corresponding error message.
+\end{itemize} \\
+\end{longtblr}

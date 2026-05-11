@@ -1,0 +1,16 @@
+@startuml UC_26_Configure_Community
+title UC-26: Configure Community
+
+|User|
+start
+:(1) Open Community Settings;
+:(2) Update description, avatar, banner, and moderation settings;
+:(3) Save the changes;
+
+|System|
+:(4) Validate ownership or moderator access;
+:(5) Update the community record;
+:(6) Return the saved settings;
+
+stop
+@enduml

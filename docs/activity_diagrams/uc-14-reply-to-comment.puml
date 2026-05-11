@@ -1,0 +1,21 @@
+@startuml UC_14_Reply_To_Comment
+title UC-14: Reply to Comment
+
+|User|
+start
+:(1) Open a comment thread;
+:(2) Write a reply;
+:(3) Submit the reply;
+
+|System|
+:(4) Validate authentication and parent comment;
+if (User signed in?) then (Yes)
+  :(5) Create the reply with parent_id;
+  :(6) Increment the post comment count;
+  :(7) Return the created reply;
+else (No)
+  :(8) Return error message;
+endif
+
+stop
+@enduml

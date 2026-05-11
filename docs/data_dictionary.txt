@@ -1,0 +1,911 @@
+\subsection{Authentication and User Profile Models}
+
+\begin{longtblr}[
+    caption = {User},
+    label = {tab:data_dictionary_user}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[l,2.8cm] Q[l,4.5cm] Q[c,2.5cm] Q[c,1.5cm] Q[l,4.2cm]}
+}
+\textbf{Data Element} & \textbf{Description} & \textbf{Composition / Data Type} & \textbf{Length} & \textbf{Values} \\
+
+ID & Unique identifier of a user. & objectId & 24 & System-generated, unique. \\
+Username & Display name used to identify a user account. & string & -- & Must be unique within the platform. \\
+Email & Email address used for authentication and contact. & string & -- & Must be unique and valid. \\
+Reputation & User reputation score. & integer & -- & System-maintained counter. \\
+Password & Hashed password for a local account. & string & -- & Stored only for local providers. \\
+Provider & Authentication source for a user account. & enum & -- & local, google \\
+ProviderID & External account identifier returned by the provider. & string & -- & Used for third-party login linkage. \\
+Role & Platform-wide role of the user. & enum & -- & user, admin \\
+RoleContent & Role-specific data attached to the user account. & object & -- & Contains user or admin sub-document data. \\
+Settings & User preference configuration. & object & -- & Contains appearance, notification, privacy, and content settings. \\
+IsVerified & Indicates whether the account has been verified. & boolean & -- & true, false \\
+IsBanned & Indicates whether the account is currently banned. & boolean & -- & true, false \\
+BanUntil & Timestamp when a ban expires, if any. & timestamp & -- & Null means permanent ban. \\
+BanReason & Reason recorded for a ban action. & string & -- & Optional free text. \\
+CreatedAt & Timestamp when the record was created. & timestamp & -- & System-generated. \\
+DeletedAt & Timestamp for soft-deleted records. & timestamp & -- & Null when not deleted. \\
+\end{longtblr}
+
+\begin{longtblr}[
+    caption = {RoleContent},
+    label = {tab:data_dictionary_role_content}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[l,2.8cm] Q[l,4.5cm] Q[c,2.5cm] Q[c,1.5cm] Q[l,4.2cm]}
+}
+\textbf{Data Element} & \textbf{Description} & \textbf{Composition / Data Type} & \textbf{Length} & \textbf{Values} \\
+
+AsUser & User-specific profile data. & object & -- & See UserRoleContent table. \\
+AsAdmin & Admin-specific profile data. & object & -- & See AdminRoleContent table. \\
+\end{longtblr}
+
+\begin{longtblr}[
+    caption = {UserRoleContent},
+    label = {tab:data_dictionary_user_role_content}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[l,2.8cm] Q[l,4.5cm] Q[c,2.5cm] Q[c,1.5cm] Q[l,4.2cm]}
+}
+\textbf{Data Element} & \textbf{Description} & \textbf{Composition / Data Type} & \textbf{Length} & \textbf{Values} \\
+
+Avatar & Profile image. & object & -- & See Image table. \\
+Cover & Cover image. & object & -- & See Image table. \\
+Bio & Short biography. & string & -- & User-generated text. \\
+Gender & Declared gender. & enum & -- & male, female, prefer_not_to_say \\
+DateOfBirth & User date of birth. & timestamp & -- & Optional date value. \\
+Location & Province or city. & enum & -- & One of the provinces defined in model/location.go. \\
+Interests & List of user interests. & array[string] & -- & Values defined in model/interest.go. \\
+SocialLinks & Collection of public social profiles. & object & -- & Website, Facebook, YouTube, GitHub links. \\
+Stats & User activity statistics. & object & -- & Post, comment, and vote counters plus timestamps. \\
+\end{longtblr}
+
+\begin{longtblr}[
+    caption = {SocialLinks},
+    label = {tab:data_dictionary_social_links}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[l,2.8cm] Q[l,4.5cm] Q[c,2.5cm] Q[c,1.5cm] Q[l,4.2cm]}
+}
+\textbf{Data Element} & \textbf{Description} & \textbf{Composition / Data Type} & \textbf{Length} & \textbf{Values} \\
+
+Website & Personal website URL. & string & -- & Optional URL. \\
+Facebook & Facebook profile URL. & string & -- & Optional URL. \\
+YouTube & YouTube channel URL. & string & -- & Optional URL. \\
+GitHub & GitHub profile URL. & string & -- & Optional URL. \\
+\end{longtblr}
+
+\begin{longtblr}[
+    caption = {ActivityStats},
+    label = {tab:data_dictionary_activity_stats}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[l,2.8cm] Q[l,4.5cm] Q[c,2.5cm] Q[c,1.5cm] Q[l,4.2cm]}
+}
+\textbf{Data Element} & \textbf{Description} & \textbf{Composition / Data Type} & \textbf{Length} & \textbf{Values} \\
+
+PostCount & Number of posts created. & integer & -- & System-maintained counter. \\
+CommentCount & Number of comments created. & integer & -- & System-maintained counter. \\
+TotalUpvotes & Total upvotes received. & integer & -- & System-maintained counter. \\
+JoinedAt & Timestamp when the user joined. & timestamp & -- & System-generated. \\
+LastActiveAt & Timestamp of the last activity. & timestamp & -- & System-generated. \\
+\end{longtblr}
+
+\begin{longtblr}[
+    caption = {AdminRoleContent},
+    label = {tab:data_dictionary_admin_role_content}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[l,2.8cm] Q[l,4.5cm] Q[c,2.5cm] Q[c,1.5cm] Q[l,4.2cm]}
+}
+\textbf{Data Element} & \textbf{Description} & \textbf{Composition / Data Type} & \textbf{Length} & \textbf{Values} \\
+
+Permissions & Admin capability list. & array[string] & -- & Permission names granted to the admin. \\
+\end{longtblr}
+
+\begin{longtblr}[
+    caption = {UserSettings},
+    label = {tab:data_dictionary_user_settings}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[l,2.8cm] Q[l,4.5cm] Q[c,2.5cm] Q[c,1.5cm] Q[l,4.2cm]}
+}
+\textbf{Data Element} & \textbf{Description} & \textbf{Composition / Data Type} & \textbf{Length} & \textbf{Values} \\
+
+Appearance & Visual preferences. & object & -- & See AppearanceSettings table. \\
+Notifications & Notification preferences. & object & -- & See NotificationSettings table. \\
+Privacy & Privacy preferences. & object & -- & See PrivacySettings table. \\
+Content & Content filtering preferences. & object & -- & See ContentSettings table. \\
+\end{longtblr}
+
+\begin{longtblr}[
+    caption = {AppearanceSettings},
+    label = {tab:data_dictionary_appearance_settings}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[l,2.8cm] Q[l,4.5cm] Q[c,2.5cm] Q[c,1.5cm] Q[l,4.2cm]}
+}
+\textbf{Data Element} & \textbf{Description} & \textbf{Composition / Data Type} & \textbf{Length} & \textbf{Values} \\
+
+Theme & UI theme preference. & enum & -- & light, dark, auto \\
+FontSize & UI font size preference. & enum & -- & small, medium, large \\
+\end{longtblr}
+
+\begin{longtblr}[
+    caption = {NotificationSettings},
+    label = {tab:data_dictionary_notification_settings}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[l,2.8cm] Q[l,4.5cm] Q[c,2.5cm] Q[c,1.5cm] Q[l,4.2cm]}
+}
+\textbf{Data Element} & \textbf{Description} & \textbf{Composition / Data Type} & \textbf{Length} & \textbf{Values} \\
+
+InAppEnabled & In-app notification toggle. & boolean & -- & true, false \\
+EmailEnabled & Email notification toggle. & boolean & -- & true, false \\
+NotifyOnComment & Notify on comments. & boolean & -- & true, false \\
+NotifyOnMention & Notify on mentions. & boolean & -- & true, false \\
+NotifyOnUpvote & Notify on upvotes. & boolean & -- & true, false \\
+NotifyOnMessage & Notify on private messages. & boolean & -- & true, false \\
+\end{longtblr}
+
+\begin{longtblr}[
+    caption = {PrivacySettings},
+    label = {tab:data_dictionary_privacy_settings}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[l,2.8cm] Q[l,4.5cm] Q[c,2.5cm] Q[c,1.5cm] Q[l,4.2cm]}
+}
+\textbf{Data Element} & \textbf{Description} & \textbf{Composition / Data Type} & \textbf{Length} & \textbf{Values} \\
+
+ShowProfile & Controls whether a profile is public. & boolean & -- & true, false \\
+ShowEmail & Controls whether email is visible on the profile. & boolean & -- & true, false \\
+ShowPostHistory & Controls whether post history is visible. & boolean & -- & true, false \\
+AllowDirectMessages & Controls whether direct messages are allowed. & boolean & -- & true, false \\
+AllowMentions & Controls whether mentions are allowed. & boolean & -- & true, false \\
+\end{longtblr}
+
+\begin{longtblr}[
+    caption = {ContentSettings},
+    label = {tab:data_dictionary_content_settings}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[l,2.8cm] Q[l,4.5cm] Q[c,2.5cm] Q[c,1.5cm] Q[l,4.2cm]}
+}
+\textbf{Data Element} & \textbf{Description} & \textbf{Composition / Data Type} & \textbf{Length} & \textbf{Values} \\
+
+AllowNSFW & Controls whether NSFW content is allowed. & boolean & -- & true, false \\
+\end{longtblr}
+
+\begin{longtblr}[
+    caption = {Verification Records},
+    label = {tab:data_dictionary_verification}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[l,2.8cm] Q[l,4.5cm] Q[c,2.5cm] Q[c,1.5cm] Q[l,4.2cm]}
+}
+\textbf{Data Element} & \textbf{Description} & \textbf{Composition / Data Type} & \textbf{Length} & \textbf{Values} \\
+
+EmailVerification.ID & Unique identifier of an email verification record. & objectId & 24 & System-generated, unique. \\
+EmailVerification.Email & Email being verified. & string & -- & Must be unique and valid. \\
+EmailVerification.OTP & One-time password used for verification. & string & 6 & Six-digit numeric code. \\
+EmailVerification.OTPExpiresAt & Expiration timestamp for the OTP. & timestamp & -- & System-generated. \\
+EmailVerification.IsVerified & Indicates whether the OTP has already been verified. & boolean & -- & true, false \\
+EmailVerification.Nonce & Anti-replay token. & string & -- & System-generated random value. \\
+EmailVerification.CreatedAt & Timestamp when the record was created. & timestamp & -- & System-generated. \\
+\end{longtblr}
+
+\begin{longtblr}[
+    caption = {PasswordReset},
+    label = {tab:data_dictionary_password_reset}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[l,2.8cm] Q[l,4.5cm] Q[c,2.5cm] Q[c,1.5cm] Q[l,4.2cm]}
+}
+\textbf{Data Element} & \textbf{Description} & \textbf{Composition / Data Type} & \textbf{Length} & \textbf{Values} \\
+
+PasswordReset.ID & Unique identifier of a password reset record. & objectId & 24 & System-generated, unique. \\
+PasswordReset.Email & Email being reset. & string & -- & Must be unique and valid. \\
+PasswordReset.OTP & One-time password used for reset. & string & 6 & Six-digit numeric code. \\
+PasswordReset.OTPExpiresAt & Expiration timestamp for the OTP. & timestamp & -- & System-generated. \\
+PasswordReset.IsVerified & Indicates whether the OTP has already been verified. & boolean & -- & true, false \\
+PasswordReset.Nonce & Anti-replay token. & string & -- & System-generated random value. \\
+PasswordReset.CreatedAt & Timestamp when the record was created. & timestamp & -- & System-generated. \\
+\end{longtblr}
+
+\begin{longtblr}[
+    caption = {Image},
+    label = {tab:data_dictionary_image}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[l,2.8cm] Q[l,4.5cm] Q[c,2.5cm] Q[c,1.5cm] Q[l,4.2cm]}
+}
+\textbf{Data Element} & \textbf{Description} & \textbf{Composition / Data Type} & \textbf{Length} & \textbf{Values} \\
+
+URL & Public URL of a stored image. & string & -- & Cloudinary or equivalent media URL. \\
+PublicID & Provider-specific image identifier. & string & -- & Used for delete/update operations. \\
+UploadedAt & Timestamp when the image was uploaded. & timestamp & -- & System-generated. \\
+\end{longtblr}
+
+\begin{longtblr}[
+    caption = {Video},
+    label = {tab:data_dictionary_video}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[l,2.8cm] Q[l,4.5cm] Q[c,2.5cm] Q[c,1.5cm] Q[l,4.2cm]}
+}
+\textbf{Data Element} & \textbf{Description} & \textbf{Composition / Data Type} & \textbf{Length} & \textbf{Values} \\
+
+URL & Public URL of a stored video. & string & -- & Cloudinary or equivalent media URL. \\
+PublicID & Provider-specific video identifier. & string & -- & Used for delete/update operations. \\
+UploadedAt & Timestamp when the video was uploaded. & timestamp & -- & System-generated. \\
+\end{longtblr}
+
+\subsection{Community and Membership Models}
+
+\begin{longtblr}[
+    caption = {Community},
+    label = {tab:data_dictionary_community}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[l,2.8cm] Q[l,4.5cm] Q[c,2.5cm] Q[c,1.5cm] Q[l,4.2cm]}
+}
+\textbf{Data Element} & \textbf{Description} & \textbf{Composition / Data Type} & \textbf{Length} & \textbf{Values} \\
+
+ID & Unique identifier of a community. & objectId & 24 & System-generated, unique. \\
+Name & Public name of a community. & string & -- & Must be unique. \\
+Description & Text describing a community. & string / text & -- & Optional free text. \\
+Avatar & Community avatar image URL. & string & -- & Optional media URL. \\
+Banner & Banner image for a community. & string & -- & Optional media URL. \\
+Setting & Community configuration settings. & object & -- & Contains privacy and moderation flags. \\
+Rules & Published rules of a community. & array[object] & -- & Title and description entries. \\
+Moderators & List of assigned community moderators. & array[object] & -- & Moderator sub-documents. \\
+MemberCount & Current number of community members. & integer & -- & System-maintained counter. \\
+PostCount & Current number of community posts. & integer & -- & System-maintained counter. \\
+CreateAt & Timestamp when the community was created. & timestamp & -- & System-generated. \\
+CreateByID & Identifier of the creator. & objectId & 24 & Must correspond to an existing user id. \\
+CreateByName & Username of the creator. & string & -- & Copied from the creator account. \\
+CreateByAvatar & Avatar URL of the creator. & string & -- & Copied from the creator profile. \\
+Is18Plus & Marks the community as adult content. & boolean & -- & true, false \\
+IsDeleted & Indicates whether the community is soft deleted. & boolean & -- & true, false \\
+IsBanned & Indicates whether the community is banned. & boolean & -- & true, false \\
+BanReason & Reason recorded for a community ban. & string & -- & Optional free text. \\
+\end{longtblr}
+
+\begin{longtblr}[
+    caption = {CommunitySetting},
+    label = {tab:data_dictionary_community_setting}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[l,2.8cm] Q[l,4.5cm] Q[c,2.5cm] Q[c,1.5cm] Q[l,4.2cm]}
+}
+\textbf{Data Element} & \textbf{Description} & \textbf{Composition / Data Type} & \textbf{Length} & \textbf{Values} \\
+
+IsPrivate & Controls whether the community is visible only to members. & boolean & -- & true, false \\
+PostRequireApproval & Controls whether new posts require moderator approval. & boolean & -- & true, false \\
+JoinRequireApproval & Controls whether join requests require approval. & boolean & -- & true, false \\
+MaxPostLength & Maximum allowed post length in characters. & integer & -- & Positive integer. \\
+\end{longtblr}
+
+\begin{longtblr}[
+    caption = {CommunityRule},
+    label = {tab:data_dictionary_community_rule}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[l,2.8cm] Q[l,4.5cm] Q[c,2.5cm] Q[c,1.5cm] Q[l,4.2cm]}
+}
+\textbf{Data Element} & \textbf{Description} & \textbf{Composition / Data Type} & \textbf{Length} & \textbf{Values} \\
+
+Title & Short title for a community rule. & string & -- & User-defined label. \\
+Description & Detailed explanation of a community rule. & string & -- & User-defined text. \\
+\end{longtblr}
+
+\begin{longtblr}[
+    caption = {Moderator},
+    label = {tab:data_dictionary_moderator}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[l,2.8cm] Q[l,4.5cm] Q[c,2.5cm] Q[c,1.5cm] Q[l,4.2cm]}
+}
+\textbf{Data Element} & \textbf{Description} & \textbf{Composition / Data Type} & \textbf{Length} & \textbf{Values} \\
+
+UserID & Identifier of the moderator account. & objectId & 24 & Must correspond to an existing user id. \\
+Username & Moderator username. & string & -- & Copied from the user account. \\
+Avatar & Moderator avatar. & object & -- & See Image table. \\
+IsActive & Indicates whether the moderator role is active. & boolean & -- & true, false \\
+AssignedAt & Timestamp when the moderator role was assigned. & timestamp & -- & System-generated. \\
+\end{longtblr}
+
+\begin{longtblr}[
+    caption = {Membership},
+    label = {tab:data_dictionary_membership}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[l,2.8cm] Q[l,4.5cm] Q[c,2.5cm] Q[c,1.5cm] Q[l,4.2cm]}
+}
+\textbf{Data Element} & \textbf{Description} & \textbf{Composition / Data Type} & \textbf{Length} & \textbf{Values} \\
+
+ID & Unique identifier of a membership record. & objectId & 24 & System-generated, unique. \\
+UserID & Identifier of the member user. & objectId & 24 & Must correspond to an existing user id. \\
+CommunityID & Identifier of the target community. & objectId & 24 & Must correspond to an existing community id. \\
+Status & Membership review status. & enum & -- & pending, approved, rejected \\
+CreatedAt & Timestamp when the membership was created. & timestamp & -- & System-generated. \\
+User & Cached user summary for a membership entry. & object & -- & Contains id, username, and avatar. \\
+\end{longtblr}
+
+\begin{longtblr}[
+    caption = {UserInfo},
+    label = {tab:data_dictionary_user_info}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[l,2.8cm] Q[l,4.5cm] Q[c,2.5cm] Q[c,1.5cm] Q[l,4.2cm]}
+}
+\textbf{Data Element} & \textbf{Description} & \textbf{Composition / Data Type} & \textbf{Length} & \textbf{Values} \\
+
+ID & Identifier of the membership user summary. & objectId & 24 & Must correspond to an existing user id. \\
+Username & Username of the membership user summary. & string & -- & Copied from the user account. \\
+Avatar & Avatar of the membership user summary. & object & -- & See Image table. \\
+\end{longtblr}
+
+\begin{longtblr}[
+    caption = {CommunityBan},
+    label = {tab:data_dictionary_community_ban}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[l,2.8cm] Q[l,4.5cm] Q[c,2.5cm] Q[c,1.5cm] Q[l,4.2cm]}
+}
+\textbf{Data Element} & \textbf{Description} & \textbf{Composition / Data Type} & \textbf{Length} & \textbf{Values} \\
+
+CommunityID & Identifier of the banned community. & objectId & 24 & Must correspond to an existing community id. \\
+UserID & Identifier of the banned user. & objectId & 24 & Must correspond to an existing user id. \\
+Type & Ban category applied by the community. & enum & -- & banned, muted \\
+Reason & Reason recorded for the ban or mute. & string & -- & Optional free text. \\
+BannedAt & Timestamp when the restriction was applied. & timestamp & -- & System-generated. \\
+BannedBy & Identifier of the moderator who applied the restriction. & objectId & 24 & Must correspond to an existing user id. \\
+ExpiresAt & Timestamp when the restriction expires. & timestamp & -- & Null for permanent restrictions. \\
+\end{longtblr}
+
+\subsection{Content and Moderation Models}
+
+\begin{longtblr}[
+    caption = {Post},
+    label = {tab:data_dictionary_post}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[l,2.8cm] Q[l,4.5cm] Q[c,2.5cm] Q[c,1.5cm] Q[l,4.2cm]}
+}
+\textbf{Data Element} & \textbf{Description} & \textbf{Composition / Data Type} & \textbf{Length} & \textbf{Values} \\
+
+ID & Unique identifier of a post. & objectId & 24 & System-generated, unique. \\
+AuthorID & Identifier of the post author. & objectId & 24 & Must correspond to an existing user id. \\
+CommunityID & Identifier of the community that owns the post. & objectId & 24 & Must correspond to an existing community id. \\
+Type & Type of post content. & enum & -- & text, poll, video, image \\
+Title & Title of a post. & string & -- & Text entered by the author. \\
+Content & Main post payload. & object & -- & Contains text, images, videos, or poll data. \\
+VotesCount & Vote summary for a post or comment. & object & -- & Up and down counts. \\
+CommentsCount & Number of comments on a post. & integer & -- & System-maintained counter. \\
+HotScore & Ranking score used for best sorting. & float & -- & Calculated from votes and time decay. \\
+CreatedAt & Timestamp when the post was created. & timestamp & -- & System-generated. \\
+UpdatedAt & Timestamp of the last content update. & timestamp & -- & Null until updated. \\
+IsDeleted & Indicates whether the record is soft deleted. & boolean & -- & true, false \\
+IsHidden & Indicates whether the post is hidden by its author. & boolean & -- & true, false \\
+IsEdited & Indicates whether the post has been edited. & boolean & -- & true, false \\
+Tags & Tags attached to a post. & array[string] & -- & Free-form keywords. \\
+IsDraft & Indicates whether the post is saved as a draft. & boolean & -- & true, false \\
+IsBan & Indicates whether a post is banned. & boolean & -- & true, false \\
+BanReason & Reason recorded for a post ban. & string & -- & Optional free text. \\
+ModerationStatus & Current AI or moderator moderation state. & enum & -- & pending, approved, rejected, skipped \\
+ModerationResult & Moderation analysis details. & object & -- & Contains violation flag, confidence, categories, and reason. \\
+ModeratedAt & Timestamp when moderation happened. & timestamp & -- & Null until moderated. \\
+\end{longtblr}
+
+\begin{longtblr}[
+    caption = {PostContent},
+    label = {tab:data_dictionary_post_content}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[l,2.8cm] Q[l,4.5cm] Q[c,2.5cm] Q[c,1.5cm] Q[l,4.2cm]}
+}
+\textbf{Data Element} & \textbf{Description} & \textbf{Composition / Data Type} & \textbf{Length} & \textbf{Values} \\
+
+Text & Text body of a post. & string & -- & Optional for non-text posts. \\
+Images & Attached images in a post. & array[object] & -- & Array of image metadata. \\
+Videos & Attached videos in a post. & array[object] & -- & Array of video metadata. \\
+Poll & Poll payload attached to a post. & object & -- & Question, options, votes, expiry, and multi-select flag. \\
+\end{longtblr}
+
+\begin{longtblr}[
+    caption = {Poll},
+    label = {tab:data_dictionary_poll_struct}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[l,2.8cm] Q[l,4.5cm] Q[c,2.5cm] Q[c,1.5cm] Q[l,4.2cm]}
+}
+\textbf{Data Element} & \textbf{Description} & \textbf{Composition / Data Type} & \textbf{Length} & \textbf{Values} \\
+
+Question & Question presented to poll voters. & string & -- & Poll text. \\
+Options & Available poll options. & array[object] & -- & Each option has id, text, and votes. \\
+TotalVotes & Total number of poll votes. & integer & -- & System-maintained counter. \\
+ExpiresAt & Poll expiry timestamp. & timestamp & -- & Null when the poll never expires. \\
+AllowMultiple & Controls whether voters may choose more than one option. & boolean & -- & true, false \\
+\end{longtblr}
+
+\begin{longtblr}[
+    caption = {PollOption},
+    label = {tab:data_dictionary_poll_option}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[l,2.8cm] Q[l,4.5cm] Q[c,2.5cm] Q[c,1.5cm] Q[l,4.2cm]}
+}
+\textbf{Data Element} & \textbf{Description} & \textbf{Composition / Data Type} & \textbf{Length} & \textbf{Values} \\
+
+ID & Identifier of a poll option. & string & -- & Unique within the poll. \\
+Text & Display text of a poll option. & string & -- & Option label. \\
+Votes & Vote count for a poll option. & integer & -- & System-maintained counter. \\
+\end{longtblr}
+
+\begin{longtblr}[
+    caption = {VotesCount},
+    label = {tab:data_dictionary_votes_count}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[l,2.8cm] Q[l,4.5cm] Q[c,2.5cm] Q[c,1.5cm] Q[l,4.2cm]}
+}
+\textbf{Data Element} & \textbf{Description} & \textbf{Composition / Data Type} & \textbf{Length} & \textbf{Values} \\
+
+Up & Number of upvotes. & integer & -- & System-maintained counter. \\
+Down & Number of downvotes. & integer & -- & System-maintained counter. \\
+\end{longtblr}
+
+\begin{longtblr}[
+    caption = {ModerationResult},
+    label = {tab:data_dictionary_moderation_result}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[l,2.8cm] Q[l,4.5cm] Q[c,2.5cm] Q[c,1.5cm] Q[l,4.2cm]}
+}
+\textbf{Data Element} & \textbf{Description} & \textbf{Composition / Data Type} & \textbf{Length} & \textbf{Values} \\
+
+IsViolation & Indicates whether the content violates policy. & boolean & -- & true, false \\
+Confidence & Confidence score returned by moderation. & float & -- & 0.0 to 1.0 \\
+Categories & Categories detected by moderation. & array[string] & -- & Issue labels such as hate speech or violence. \\
+Reason & Human-readable moderation explanation. & string & -- & Localized explanation text. \\
+CheckedText & Indicates whether text was analyzed. & boolean & -- & true, false \\
+CheckedMedia & Indicates whether media was analyzed. & boolean & -- & true, false \\
+\end{longtblr}
+
+\begin{longtblr}[
+    caption = {Comment},
+    label = {tab:data_dictionary_comment}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[l,2.8cm] Q[l,4.5cm] Q[c,2.5cm] Q[c,1.5cm] Q[l,4.2cm]}
+}
+\textbf{Data Element} & \textbf{Description} & \textbf{Composition / Data Type} & \textbf{Length} & \textbf{Values} \\
+
+ID & Unique identifier of a comment. & objectId & 24 & System-generated, unique. \\
+Author & Author details attached to a comment. & object & -- & Contains id, username, and avatar. \\
+PostID & Identifier of the parent post. & objectId & 24 & Must correspond to an existing post id. \\
+ParentID & Identifier of the parent comment, if any. & objectId & 24 & Null for top-level comments. \\
+Content & Comment body text. & string & -- & User-generated text. \\
+VotesCount & Vote summary for a comment. & object & -- & Up and down counts. \\
+CreatedAt & Timestamp when the comment was created. & timestamp & -- & System-generated. \\
+DeletedAt & Timestamp for soft-deleted comments. & timestamp & -- & Null when not deleted. \\
+IsDeleted & Indicates whether a comment is soft deleted. & boolean & -- & true, false \\
+\end{longtblr}
+
+\begin{longtblr}[
+    caption = {CommentAuthor},
+    label = {tab:data_dictionary_comment_author}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[l,2.8cm] Q[l,4.5cm] Q[c,2.5cm] Q[c,1.5cm] Q[l,4.2cm]}
+}
+\textbf{Data Element} & \textbf{Description} & \textbf{Composition / Data Type} & \textbf{Length} & \textbf{Values} \\
+
+ID & Identifier of the comment author. & objectId & 24 & Must correspond to an existing user id. \\
+Username & Username of the comment author. & string & -- & Copied from the user account. \\
+Avatar & Avatar for the comment author. & object & -- & Image metadata. \\
+\end{longtblr}
+
+\begin{longtblr}[
+    caption = {Draft},
+    label = {tab:data_dictionary_draft}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[l,2.8cm] Q[l,4.5cm] Q[c,2.5cm] Q[c,1.5cm] Q[l,4.2cm]}
+}
+\textbf{Data Element} & \textbf{Description} & \textbf{Composition / Data Type} & \textbf{Length} & \textbf{Values} \\
+
+ID & Unique identifier of a draft. & objectId & 24 & System-generated, unique. \\
+AuthorID & Identifier of the draft author. & objectId & 24 & Must correspond to an existing user id. \\
+CommunityID & Identifier of the draft community, if any. & string & -- & Optional community id string. \\
+Type & Post type stored in a draft. & enum & -- & text, poll, video, image \\
+Title & Draft title. & string & -- & Optional until publish time. \\
+Content & Draft content payload. & object & -- & Same shape as post content. \\
+Tags & Tags saved with the draft. & array[string] & -- & Optional free-form keywords. \\
+CreatedAt & Timestamp when the draft was created. & timestamp & -- & System-generated. \\
+UpdatedAt & Timestamp when the draft was last updated. & timestamp & -- & System-generated. \\
+\end{longtblr}
+
+\begin{longtblr}[
+    caption = {Image},
+    label = {tab:data_dictionary_image}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[l,2.8cm] Q[l,4.5cm] Q[c,2.5cm] Q[c,1.5cm] Q[l,4.2cm]}
+}
+\textbf{Data Element} & \textbf{Description} & \textbf{Composition / Data Type} & \textbf{Length} & \textbf{Values} \\
+
+URL & Public URL of a stored image. & string & -- & Cloudinary or equivalent media URL. \\
+PublicID & Provider-specific image identifier. & string & -- & Used for delete/update operations. \\
+UploadedAt & Timestamp when the image was uploaded. & timestamp & -- & System-generated. \\
+\end{longtblr}
+
+\begin{longtblr}[
+    caption = {Video},
+    label = {tab:data_dictionary_video}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[l,2.8cm] Q[l,4.5cm] Q[c,2.5cm] Q[c,1.5cm] Q[l,4.2cm]}
+}
+\textbf{Data Element} & \textbf{Description} & \textbf{Composition / Data Type} & \textbf{Length} & \textbf{Values} \\
+
+URL & Public URL of a stored video. & string & -- & Cloudinary or equivalent media URL. \\
+PublicID & Provider-specific video identifier. & string & -- & Used for delete/update operations. \\
+UploadedAt & Timestamp when the video was uploaded. & timestamp & -- & System-generated. \\
+\end{longtblr}
+
+\subsection{Engagement and Activity Models}
+
+\begin{longtblr}[
+    caption = {SavedPost},
+    label = {tab:data_dictionary_saved_post}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[l,2.8cm] Q[l,4.5cm] Q[c,2.5cm] Q[c,1.5cm] Q[l,4.2cm]}
+}
+\textbf{Data Element} & \textbf{Description} & \textbf{Composition / Data Type} & \textbf{Length} & \textbf{Values} \\
+
+ID & Unique identifier of a saved-post record. & objectId & 24 & System-generated, unique. \\
+UserID & Identifier of the user who saved the post. & objectId & 24 & Must correspond to an existing user id. \\
+PostID & Identifier of the saved post. & objectId & 24 & Must correspond to an existing post id. \\
+SavedAt & Timestamp when a post was saved. & timestamp & -- & System-generated. \\
+\end{longtblr}
+
+\begin{longtblr}[
+    caption = {LikedPost},
+    label = {tab:data_dictionary_liked_post}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[l,2.8cm] Q[l,4.5cm] Q[c,2.5cm] Q[c,1.5cm] Q[l,4.2cm]}
+}
+\textbf{Data Element} & \textbf{Description} & \textbf{Composition / Data Type} & \textbf{Length} & \textbf{Values} \\
+
+ID & Unique identifier of a liked-post record. & objectId & 24 & System-generated, unique. \\
+UserID & Identifier of the user who liked the post. & objectId & 24 & Must correspond to an existing user id. \\
+PostID & Identifier of the liked post. & objectId & 24 & Must correspond to an existing post id. \\
+LikedAt & Timestamp when a post was liked. & timestamp & -- & System-generated. \\
+\end{longtblr}
+
+\begin{longtblr}[
+    caption = {PostHistory},
+    label = {tab:data_dictionary_post_history}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[l,2.8cm] Q[l,4.5cm] Q[c,2.5cm] Q[c,1.5cm] Q[l,4.2cm]}
+}
+\textbf{Data Element} & \textbf{Description} & \textbf{Composition / Data Type} & \textbf{Length} & \textbf{Values} \\
+
+ID & Unique identifier of a post history record. & objectId & 24 & System-generated, unique. \\
+UserID & Identifier of the user who viewed the post. & objectId & 24 & Must correspond to an existing user id. \\
+PostID & Identifier of the viewed post. & objectId & 24 & Must correspond to an existing post id. \\
+ViewedAt & Timestamp when a post was viewed. & timestamp & -- & System-generated. \\
+\end{longtblr}
+
+\subsection{Communication Models}
+
+\begin{longtblr}[
+    caption = {Notification},
+    label = {tab:data_dictionary_notification}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[l,2.8cm] Q[l,4.5cm] Q[c,2.5cm] Q[c,1.5cm] Q[l,4.2cm]}
+}
+\textbf{Data Element} & \textbf{Description} & \textbf{Composition / Data Type} & \textbf{Length} & \textbf{Values} \\
+
+ID & Unique identifier of a notification. & objectId & 24 & System-generated, unique. \\
+RecipientID & Identifier of the notification recipient. & objectId & 24 & Must correspond to an existing user id. \\
+ActorID & Identifier of the user who triggered the notification. & objectId & 24 & Optional when the system is the actor. \\
+Type & Type of notification. & enum & -- & comment, like, follow, mention, new_message, system \\
+Message & Notification text shown to the recipient. & string & -- & System-generated or templated text. \\
+Link & URL or route associated with the notification. & string & -- & Navigation target. \\
+IsRead & Indicates whether a notification has been read. & boolean & -- & true, false \\
+Metadata & Additional notification payload. & map[string]interface{} & -- & Arbitrary key-value data. \\
+CreatedAt & Timestamp when the notification was created. & timestamp & -- & System-generated. \\
+\end{longtblr}
+
+\begin{longtblr}[
+    caption = {Channel},
+    label = {tab:data_dictionary_channel}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[l,2.8cm] Q[l,4.5cm] Q[c,2.5cm] Q[c,1.5cm] Q[l,4.2cm]}
+}
+\textbf{Data Element} & \textbf{Description} & \textbf{Composition / Data Type} & \textbf{Length} & \textbf{Values} \\
+
+ID & Unique identifier of a private message channel. & objectId & 24 & System-generated, unique. \\
+Members & Channel participants. & array[object] & -- & Member summaries. \\
+Settings & Per-user channel settings. & array[object] & -- & Nickname and notification preferences. \\
+Status & Channel lifecycle status. & enum & -- & active, block \\
+CreatedAt & Timestamp when the channel was created. & timestamp & -- & System-generated. \\
+UpdatedAt & Timestamp when the channel was last updated. & timestamp & -- & System-generated. \\
+\end{longtblr}
+
+\begin{longtblr}[
+    caption = {ChannelSetting},
+    label = {tab:data_dictionary_channel_setting}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[l,2.8cm] Q[l,4.5cm] Q[c,2.5cm] Q[c,1.5cm] Q[l,4.2cm]}
+}
+\textbf{Data Element} & \textbf{Description} & \textbf{Composition / Data Type} & \textbf{Length} & \textbf{Values} \\
+
+UserID & Identifier of the user owning the channel settings. & objectId & 24 & Must correspond to a channel member. \\
+Nickname & Custom nickname for the other user in the channel. & string & -- & Optional display label. \\
+Notification & Controls notification delivery for the channel. & boolean & -- & true, false \\
+TypingIndicator & Controls typing indicator visibility. & boolean & -- & true, false \\
+IsDeleted & Indicates whether the channel setting is hidden. & boolean & -- & true, false \\
+\end{longtblr}
+
+\begin{longtblr}[
+    caption = {ChannelMember},
+    label = {tab:data_dictionary_channel_member}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[l,2.8cm] Q[l,4.5cm] Q[c,2.5cm] Q[c,1.5cm] Q[l,4.2cm]}
+}
+\textbf{Data Element} & \textbf{Description} & \textbf{Composition / Data Type} & \textbf{Length} & \textbf{Values} \\
+
+UserID & Identifier of the channel member. & objectId & 24 & Must correspond to an existing user id. \\
+Username & Username of the channel member. & string & -- & Copied from the user account. \\
+Avatar & Avatar URL of the channel member. & string & -- & Optional media URL. \\
+\end{longtblr}
+
+\begin{longtblr}[
+    caption = {Message},
+    label = {tab:data_dictionary_message}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[l,2.8cm] Q[l,4.5cm] Q[c,2.5cm] Q[c,1.5cm] Q[l,4.2cm]}
+}
+\textbf{Data Element} & \textbf{Description} & \textbf{Composition / Data Type} & \textbf{Length} & \textbf{Values} \\
+
+ID & Unique identifier of a private message. & objectId & 24 & System-generated, unique. \\
+ChannelID & Identifier of the private message channel. & objectId & 24 & Must correspond to an existing channel id. \\
+SenderID & Identifier of the message sender. & objectId & 24 & Null for system messages. \\
+SenderUsername & Cached sender username. & string & -- & Copied from the sender account. \\
+Type & Message category. & enum & -- & user, system \\
+Content & Message body text. & string & -- & User-generated or system-generated text. \\
+IsSend & Indicates whether the message was delivered successfully. & boolean & -- & true, false \\
+IsDeleted & Indicates whether the message is soft deleted. & boolean & -- & true, false \\
+DeletedAt & Timestamp when the message was deleted. & timestamp & -- & Null when not deleted. \\
+\end{longtblr}
+
+\subsection{Reporting and Administration Models}
+
+\begin{longtblr}[
+    caption = {Report},
+    label = {tab:data_dictionary_report}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[l,2.8cm] Q[l,4.5cm] Q[c,2.5cm] Q[c,1.5cm] Q[l,4.2cm]}
+}
+\textbf{Data Element} & \textbf{Description} & \textbf{Composition / Data Type} & \textbf{Length} & \textbf{Values} \\
+
+ID & Unique identifier of a report. & objectId & 24 & System-generated, unique. \\
+ReporterID & Identifier of the user who submitted the report. & objectId & 24 & Must correspond to an existing user id. \\
+TargetID & Identifier of the reported user, post, or comment. & objectId & 24 & Must correspond to an existing target id. \\
+TargetType & Type of reported target. & enum & -- & user, post, comment \\
+Reason & Short reason for a report or moderation action. & string & -- & Free text provided by the user or moderator. \\
+Description & Longer report details or explanation. & string & -- & Optional free text. \\
+IsDeleted & Indicates whether the report is soft deleted. & boolean & -- & true, false \\
+DeletedAt & Timestamp for deleted reports. & timestamp & -- & Null when not deleted. \\
+CreatedAt & Timestamp when the report was created. & timestamp & -- & System-generated. \\
+\end{longtblr}
+
+\begin{longtblr}[
+    caption = {Enum and Value Classes},
+    label = {tab:data_dictionary_enums}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[l,2.8cm] Q[l,4.5cm] Q[c,2.5cm] Q[c,1.5cm] Q[l,4.2cm]}
+}
+\textbf{Data Element} & \textbf{Description} & \textbf{Composition / Data Type} & \textbf{Length} & \textbf{Values} \\
+
+AuthProvider & User authentication source. & enum & -- & local, google \\
+Role & Platform-wide user role. & enum & -- & user, admin \\
+Gender & Declared gender. & enum & -- & male, female, prefer_not_to_say \\
+VNProvince & User location value. & enum & -- & One of the provinces defined in model/location.go. \\
+Interest & User interest label. & enum & -- & Values defined in model/interest.go. \\
+PostType & Post content type. & enum & -- & text, poll, video, image \\
+ModerationStatus & Moderation state. & enum & -- & pending, approved, rejected, skipped \\
+MembershipStatus & Membership review state. & enum & -- & pending, approved, rejected \\
+NotificationType & Notification type. & enum & -- & comment, like, follow, mention, new_message, system \\
+ChannelStatus & Channel lifecycle status. & enum & -- & active, block \\
+MessageType & Message category. & enum & -- & user, system \\
+ReportTargetType & Reported target type. & enum & -- & user, post, comment \\
+VoteType & Vote direction type. & enum & -- & up, down \\
+VoteTargetType & Vote target type. & enum & -- & post, comment \\
+\end{longtblr}

@@ -1,0 +1,44 @@
+@startuml UC_11_Edit_Post
+title UC-11: Edit Post
+
+|User|
+start
+:(1) Open an existing post for editing;
+
+|System|
+:(2) Load the post data;
+:(3) Verify ownership;
+if (User is the author?) then (Yes)
+  :(4) Return editable post content;
+else (No)
+  :(5) Return error message;
+  stop
+endif
+
+|User|
+:(6) Update title and content;
+if (Change media?) then (Yes)
+  :(7) Mark images or videos to remove and attach new files;
+endif
+:(8) Save changes;
+
+|System|
+:(9) Update the post record;
+if (Remove media?) then (Yes)
+  |Third-party Cloudinary|
+  :(10) Delete removed images or videos;
+
+  |System|
+  :(11) Persist the media removal result;
+endif
+if (Upload new media?) then (Yes)
+  |Third-party Cloudinary|
+  :(12) Upload new images or videos;
+
+  |System|
+  :(13) Attach new media to the post;
+endif
+:(14) Return the updated post;
+
+stop
+@enduml

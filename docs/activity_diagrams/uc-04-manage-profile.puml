@@ -1,0 +1,32 @@
+@startuml UC_04_Manage_Profile
+title UC-04: Manage Profile
+
+|User|
+start
+:(1) Open the Profile / Settings page;
+:(2) Edit bio, gender, date of birth, location, interests, or social links;
+:(3) Choose to update avatar or cover image if needed;
+:(4) Submit profile changes;
+
+|System|
+:(5) Validate profile fields;
+if (Profile data valid?) then (Yes)
+  :(6) Update profile information in the database;
+else (No)
+  :(7) Return error message;
+  stop
+endif
+
+if (Upload avatar or cover?) then (Yes)
+  |Third-party Cloudinary|
+  :(8) Upload image file;
+
+  |System|
+  :(9) Save image URL and public ID to the user profile;
+endif
+
+|System|
+:(10) Return updated profile data;
+
+stop
+@enduml

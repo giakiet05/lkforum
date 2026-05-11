@@ -1,0 +1,58 @@
+\begin{longtblr}[
+    caption = {Business Rules for UC-21 - Manage Notifications},
+    label = {tab:uc21_business_rules}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rowhead = 1,
+    rows = {valign=m, cmd=\nopagebreak},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[c,1.8cm] Q[c,1.5cm] Q[c,3.0cm] Q[l,7.5cm]}
+}
+\textbf{ID} & \textbf{Activity} & \textbf{Rule Type} & \textbf{Description} \\
+
+\textbf{BR-UC21-01} & (2--3) & Workflow Rules &
+\textbf{Load Notifications:}
+\begin{itemize}
+    \item The system loads notifications for \textbf{recipientID} using \textbf{\textit{GetNotifications()}}.
+    \item The system returns the notification list with pagination data.
+\end{itemize} \\
+
+\textbf{BR-UC21-02} & (4--8) & Authorization Rules &
+\textbf{Validate Notification Ownership:}
+\begin{itemize}
+    \item The notification routes require authentication before any operation is processed.
+    \item The system only updates or deletes notifications that belong to the authenticated user.
+    \item If the notification ID is missing or the current user does not own the record, the operation is rejected.
+\end{itemize} \\
+
+\textbf{BR-UC21-03} & (4) & Validation Rules &
+\textbf{Validate Notification ID for Single-Item Actions:}
+\begin{itemize}
+    \item If the user marks one notification as read or deletes one notification, the system validates \textbf{notificationID}.
+    \item The service converts \textbf{notificationID} to an object ID before calling the repository.
+\end{itemize} \\
+
+\textbf{BR-UC21-04} & (4--7) & Workflow Rules &
+\textbf{Update Notification State:}
+\begin{itemize}
+    \item If the user marks all notifications as read, the system updates them using \textbf{\textit{MarkAllAsRead()}}.
+    \item If the user marks a single notification as read, the system updates it using \textbf{\textit{MarkAsRead()}}.
+    \item If the user deletes a notification, the system removes it using \textbf{\textit{DeleteNotification()}}.
+    \item The repository filters updates by both notification ID and recipient ID.
+\end{itemize} \\
+
+\textbf{BR-UC21-05} & (8) & Message Rules &
+\textbf{Return the Refreshed Notification List:}
+\begin{itemize}
+    \item The controller returns the updated list or success response after the operation completes.
+\end{itemize} \\
+
+\textbf{BR-UC21-06} & (8) & Message Rules &
+\textbf{Return Notification Error Message:}
+\begin{itemize}
+    \item If authentication, ownership, validation, or persistence fails, the controller returns the corresponding error response.
+\end{itemize} \\
+\end{longtblr}
+

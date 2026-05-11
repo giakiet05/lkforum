@@ -1,0 +1,21 @@
+@startuml UC_16_Participate_In_Poll
+title UC-16: Participate in Poll
+
+|User|
+start
+:(1) Open a poll post;
+:(2) Select one or more poll options;
+:(3) Submit the vote;
+
+|System|
+:(4) Validate authentication and poll state;
+if (Poll is open?) then (Yes)
+  :(5) Remove prior vote for single-choice polls if needed;
+  :(6) Record the selected poll option(s);
+  :(7) Return updated poll results;
+else (No)
+  :(8) Return error message;
+endif
+
+stop
+@enduml

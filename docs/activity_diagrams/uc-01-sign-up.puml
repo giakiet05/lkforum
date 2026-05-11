@@ -1,0 +1,55 @@
+@startuml UC_01_Sign_Up
+title UC-01: Sign Up
+
+|User|
+start
+:(1) Open the Register page;
+:(2) Enter email;
+:(3) Submit email;
+
+|System|
+:(4) Validate email format;
+if (Email valid?) then (Yes)
+  :(5) Check whether email is already registered;
+  if (Email available?) then (Yes)
+    :(6) Create OTP and verification record;
+    :(7) Send verification email;
+  else (No)
+    :(8) Return error message;
+    stop
+  endif
+else (No)
+  :(9) Return error message;
+  stop
+endif
+
+|User|
+:(10) Enter received OTP;
+:(11) Submit OTP;
+
+|System|
+:(12) Verify OTP and mark email as verified;
+if (OTP valid?) then (Yes)
+  :(13) Generate verification token;
+else (No)
+  :(14) Return error message;
+  stop
+endif
+
+|User|
+:(15) Enter username and password;
+:(16) Confirm registration;
+
+|System|
+:(17) Validate username and password;
+if (Inputs valid?) then (Yes)
+  :(18) Create user account;
+  :(19) Generate access and refresh tokens;
+  :(20) Store auth state and clear verification token;
+  :(21) Log user in and redirect to home page;
+else (No)
+  :(22) Return error message;
+endif
+
+stop
+@enduml

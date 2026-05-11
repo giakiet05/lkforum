@@ -1,0 +1,60 @@
+\begin{longtblr}[
+    caption = {Business Rules for UC-19 - Manage Drafts},
+    label = {tab:uc19_business_rules}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rowhead = 1,
+    rows = {valign=m, cmd=\nopagebreak},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[c,1.8cm] Q[c,1.5cm] Q[c,3.0cm] Q[l,7.5cm]}
+}
+\textbf{ID} & \textbf{Activity} & \textbf{Rule Type} & \textbf{Description} \\
+
+BR-UC19-01 & (2--3) & Workflow Rules &
+\textbf{Load the User's Draft List:}
+\begin{itemize}
+    \item The service loads drafts by author using \textbf{\textit{GetDraftsByAuthor()}}.
+    \item The service returns the draft summaries with pagination metadata.
+\end{itemize} \\
+
+BR-UC19-02 & (6--7) & Authorization Rules &
+\textbf{Validate Draft Ownership and Payload:}
+\begin{itemize}
+    \item The controller requires an authenticated user before draft operations.
+    \item if \textbf{authUser == null}, then the controller returns a forbidden response.
+    \item The service parses the author ID and draft ID to ObjectIDs.
+    \item if either ID cannot be parsed, then the service returns an invalid-ID error.
+    \item The service loads the draft and if the draft author does not match the requester, then the service returns a forbidden error.
+\end{itemize} \\
+
+BR-UC19-03 & (6--7) & Workflow Rules &
+\textbf{Store Draft Changes:}
+\begin{itemize}
+    \item The service creates or updates the draft record with community, type, title, text, tags, images, videos, and poll data.
+    \item The draft record updates \textbf{UpdatedAt} whenever changes are saved.
+    \item if the draft does not exist or the author is invalid, then the operation stops before saving.
+\end{itemize} \\
+
+BR-UC19-04 & (8--10) & Workflow Rules &
+\textbf{Publish or Keep the Draft:}
+\begin{itemize}
+    \item if publish is requested, then the service validates that title, community, and type are present.
+    \item The service creates a post from the draft using \textbf{\textit{CreatePost()}}.
+    \item After a successful publish, the service deletes the draft record.
+    \item if publish is not requested, then the service keeps the draft for later editing.
+\end{itemize} \\
+
+BR-UC19-05 & (11) & Message Rules &
+\textbf{Return Updated Draft State:}
+\begin{itemize}
+    \item The system returns the updated draft or published post response after the operation completes.
+\end{itemize} \\
+
+BR-UC19-06 & (11) & Message Rules &
+\textbf{Return Draft Error Message:}
+\begin{itemize}
+    \item if authentication, ownership, validation, or persistence fails, then the controller returns the corresponding error message.
+\end{itemize} \\
+\end{longtblr}

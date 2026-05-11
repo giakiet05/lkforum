@@ -1,0 +1,17 @@
+@startuml UC_27_Assign_Roles
+title UC-27: Assign Roles
+
+|User|
+start
+:(1) Open the role management panel;
+:(2) Invite a member as moderator;
+:(3) Submit the role assignment;
+
+|System|
+:(4) Validate creator permissions;
+:(5) Add the moderator invitation record;
+:(6) Notify or activate the role for the target user;
+:(7) Return the updated role list;
+
+stop
+@enduml

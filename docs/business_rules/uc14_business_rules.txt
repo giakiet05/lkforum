@@ -1,0 +1,49 @@
+\begin{longtblr}[
+    caption = {Business Rules for UC-14 - Reply to Comment},
+    label = {tab:uc14_business_rules}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rowhead = 1,
+    rows = {valign=m, cmd=\nopagebreak},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[c,1.8cm] Q[c,1.5cm] Q[c,3.0cm] Q[l,7.5cm]}
+}
+\textbf{ID} & \textbf{Activity} & \textbf{Rule Type} & \textbf{Description} \\
+
+BR-UC14-01 & (4) & Validation Rules &
+\textbf{Validate Parent Reply Request and Access:}
+\begin{itemize}
+    \item The controller binds the request to \texttt{CreateCommentRequest}.
+    \item if JSON binding fails, then the controller returns a bad-request response.
+    \item \textbf{post\_id} and \textbf{content} are required by the request DTO.
+    \item The controller requires an authenticated user before creating the reply.
+    \item if \textbf{authUser == null}, then the controller returns a forbidden response.
+    \item The service loads the target post by \textbf{post\_id}; if the post cannot be found, then the reply flow stops.
+    \item if \textbf{parent\_id} is provided, then the service parses it and uses it as the reply parent when valid.
+    \item The system checks whether the user is muted or banned in the post's community.
+    \item if the user is muted or banned, then the service returns the corresponding access error.
+\end{itemize} \\
+
+BR-UC14-02 & (4) & Message Rules &
+\textbf{Return Bad-Request Message:}
+\begin{itemize}
+    \item if request binding fails, then the system returns the bad-request message for the reply form.
+\end{itemize} \\
+
+BR-UC14-03 & (5--7) & Workflow Rules &
+\textbf{Create Reply and Update Counters:}
+\begin{itemize}
+    \item The system creates the reply with the current user as author, the selected post as target, and the optional parent comment.
+    \item The system stores the new reply with \textbf{IsDeleted = false}.
+    \item The system increments the post comment count and the user's comment count.
+    \item The system publishes the comment-created event for downstream processing.
+\end{itemize} \\
+
+BR-UC14-04 & (7) & Message Rules &
+\textbf{Return Created Reply Message:}
+\begin{itemize}
+    \item The system returns \texttt{Comment created successfully} with the created reply payload.
+\end{itemize} \\
+\end{longtblr}

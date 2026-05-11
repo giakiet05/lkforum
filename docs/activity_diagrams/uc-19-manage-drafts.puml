@@ -1,0 +1,28 @@
+@startuml UC_19_Manage_Drafts
+title UC-19: Manage Drafts
+
+|User|
+start
+:(1) Open Drafts;
+
+|System|
+:(2) Load the user's draft list;
+:(3) Return drafts to the UI;
+
+|User|
+:(4) Create or edit a draft;
+:(5) Save the draft;
+
+|System|
+:(6) Validate ownership and draft content;
+:(7) Store the draft changes;
+if (Publish draft?) then (Yes)
+  :(8) Create the post from the draft;
+  :(9) Delete the draft after publishing;
+else (No)
+  :(10) Keep the draft for later editing;
+endif
+:(11) Return the updated draft state;
+
+stop
+@enduml

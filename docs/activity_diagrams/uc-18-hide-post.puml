@@ -1,0 +1,16 @@
+@startuml UC_18_Hide_Post
+title UC-18: Hide Post
+
+|User|
+start
+:(1) Open a post;
+:(2) Click "Hide";
+
+|System|
+:(3) Validate authentication and post visibility;
+:(4) Store the hidden-post record;
+:(5) Remove the post from the user's feed views;
+:(6) Return success;
+
+stop
+@enduml

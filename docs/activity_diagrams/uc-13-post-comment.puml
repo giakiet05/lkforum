@@ -1,0 +1,21 @@
+@startuml UC_13_Post_Comment
+title UC-13: Post Comment
+
+|User|
+start
+:(1) Open a post;
+:(2) Write a comment;
+:(3) Submit the comment;
+
+|System|
+:(4) Validate authentication and post state;
+if (User signed in?) then (Yes)
+  :(5) Create the comment record;
+  :(6) Increment the post comment count;
+  :(7) Return the created comment;
+else (No)
+  :(8) Return error message;
+endif
+
+stop
+@enduml

@@ -1,0 +1,50 @@
+\begin{longtblr}[
+    caption = {Business Rules for UC-17 - Save Post},
+    label = {tab:uc17_business_rules}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rowhead = 1,
+    rows = {valign=m, cmd=\nopagebreak},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[c,1.8cm] Q[c,1.5cm] Q[c,3.0cm] Q[l,7.5cm]}
+}
+\textbf{ID} & \textbf{Activity} & \textbf{Rule Type} & \textbf{Description} \\
+
+BR-UC17-01 & (3) & Validation Rules &
+\textbf{Validate Authentication and Post ID:}
+\begin{itemize}
+    \item The controller requires an authenticated user before saving a post.
+    \item if \textbf{authUser == null}, then the controller returns a forbidden response.
+    \item The service parses the user ID and post ID to ObjectIDs.
+    \item if either ID cannot be parsed, then the service returns an invalid-ID error.
+\end{itemize} \\
+
+BR-UC17-02 & (3) & Workflow Rules &
+\textbf{Check Post State and Save Relation:}
+\begin{itemize}
+    \item The service loads the post before saving it.
+    \item if the post cannot be found, then the service returns the post lookup error.
+    \item The saved-post repository stores the relation with upsert semantics so an existing saved marker is kept instead of duplicated.
+\end{itemize} \\
+
+BR-UC17-03 & (4--5) & Workflow Rules &
+\textbf{Create or Keep the Saved Marker:}
+\begin{itemize}
+    \item if the post is already saved by the user, then the system keeps the saved marker unchanged.
+    \item if the post is not yet saved, then the system creates the saved-post record.
+\end{itemize} \\
+
+BR-UC17-04 & (6) & Message Rules &
+\textbf{Return Updated Saved State:}
+\begin{itemize}
+    \item The system returns \texttt{Post saved successfully} after the save relation is stored.
+\end{itemize} \\
+
+BR-UC17-05 & (6) & Message Rules &
+\textbf{Return Save Error Message:}
+\begin{itemize}
+    \item if authentication, ID parsing, or post lookup fails, then the controller returns the corresponding error message.
+\end{itemize} \\
+\end{longtblr}

@@ -1,0 +1,22 @@
+@startuml UC_24_Approve_Reject_Post
+title UC-24: Approve / Reject Post
+
+|User|
+start
+:(1) Open the moderation queue;
+:(2) Review a pending or edited post;
+:(3) Choose approve or reject;
+:(4) Add a rejection reason if needed;
+
+|System|
+:(5) Validate moderator permissions;
+:(6) Update the post moderation status;
+if (Approved?) then (Yes)
+  :(7) Publish the post to the community;
+else (No)
+  :(8) Mark the post as rejected and store the reason;
+endif
+:(9) Return the moderation result;
+
+stop
+@enduml

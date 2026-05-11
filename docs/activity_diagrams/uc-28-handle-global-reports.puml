@@ -1,0 +1,19 @@
+@startuml UC_28_Handle_Global_Reports
+title UC-28: Handle Global Reports
+
+|User|
+start
+:(1) Open the global reports dashboard;
+:(2) Filter or select a report;
+:(3) Review the report details;
+:(4) Delete one or more reports after handling;
+
+|System|
+:(5) Validate admin access;
+:(6) Load reports using the selected filters;
+:(7) Return the report details;
+:(8) Delete the selected report records;
+:(9) Return the updated report list;
+
+stop
+@enduml

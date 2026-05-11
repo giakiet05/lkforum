@@ -1,0 +1,787 @@
+\section{Use Case Description}
+
+\subsection{UC-01 - Sign Up}
+\begin{table}[H]
+\centering
+\begin{tblr}{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    colspec = {Q[l,3cm] Q[l,11cm]}
+}
+\textbf{Name} & Sign Up \\
+\textbf{Description} & This use case describes how a new user creates an account and verifies the email address using OTP. \\
+\textbf{Actor} & User \\
+\textbf{Trigger} & When the user clicks the ``Sign Up'' button. \\
+\textbf{Pre-condition} & The user is not logged in to the system. \newline The user is on the sign up page. \\
+\textbf{Post-condition} & The user account is created and verified. \newline The user is authenticated and can access the system. \\
+\end{tblr}
+\caption{Use Case Specification - Sign Up}
+\end{table}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{SRS/diagrams/activity_diagrams/UC_01_Sign_Up.png}
+    \caption{Activity Diagram for UC-01}
+    \label{fig:ad_uc01}
+\end{figure}
+
+\subsection{UC-02 - Sign In}
+\begin{table}[H]
+\centering
+\begin{tblr}{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    colspec = {Q[l,3cm] Q[l,11cm]}
+}
+\textbf{Name} & Sign In \\
+\textbf{Description} & This use case describes how a registered user logs into the system using local credentials or Google OAuth. \\
+\textbf{Actor} & User \\
+\textbf{Trigger} & When the user clicks the ``Sign In'' button. \\
+\textbf{Pre-condition} & The user is not logged in to the system. \newline The user is on the sign in page. \\
+\textbf{Post-condition} & The user is authenticated. \newline The user is redirected to the appropriate page. \\
+\end{tblr}
+\caption{Use Case Specification - Sign In}
+\end{table}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{SRS/diagrams/activity_diagrams/UC_02_Local_Sign_In.png}
+    \caption{Activity Diagram for UC-02 Local Sign In}
+    \label{fig:ad_uc02_local}
+\end{figure}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{SRS/diagrams/activity_diagrams/UC_02_Google_Sign_In.png}
+    \caption{Activity Diagram for UC-02 Google Sign In}
+    \label{fig:ad_uc02_google}
+\end{figure}
+
+\subsection{UC-03 - Forgot Password}
+\begin{table}[H]
+\centering
+\begin{tblr}{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    colspec = {Q[l,3cm] Q[l,11cm]}
+}
+\textbf{Name} & Forgot Password \\
+\textbf{Description} & This use case describes how a user resets a forgotten password through email verification and OTP. \\
+\textbf{Actor} & User \\
+\textbf{Trigger} & When the user clicks the ``Forgot Password'' link. \\
+\textbf{Pre-condition} & The user has an existing account and can access the registered email address. \newline The user is not logged in to the system. \\
+\textbf{Post-condition} & The user password is reset successfully. \newline The user can sign in again with the new password. \\
+\end{tblr}
+\caption{Use Case Specification - Forgot Password}
+\end{table}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{SRS/diagrams/activity_diagrams/UC_03_Forgot_Password.png}
+    \caption{Activity Diagram for UC-03}
+    \label{fig:ad_uc03}
+\end{figure}
+
+\subsection{UC-04 - Manage Profile}
+\begin{table}[H]
+\centering
+\begin{tblr}{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    colspec = {Q[l,3cm] Q[l,11cm]}
+}
+\textbf{Name} & Manage Profile \\
+\textbf{Description} & This use case describes how a user updates profile information such as bio, avatar, and cover image. \\
+\textbf{Actor} & User \\
+\textbf{Trigger} & When the user opens the profile edit page. \\
+\textbf{Pre-condition} & The user is logged in to the system. \newline The user has permission to edit the profile. \\
+\textbf{Post-condition} & The profile information is updated and stored. \newline The new profile data is visible across the system. \\
+\end{tblr}
+\caption{Use Case Specification - Manage Profile}
+\end{table}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{SRS/diagrams/activity_diagrams/UC_04_Manage_Profile.png}
+    \caption{Activity Diagram for UC-04}
+    \label{fig:ad_uc04}
+\end{figure}
+
+\subsection{UC-05 - Change Settings}
+\begin{table}[H]
+\centering
+\begin{tblr}{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    colspec = {Q[l,3cm] Q[l,11cm]}
+}
+\textbf{Name} & Change Settings \\
+\textbf{Description} & This use case describes how a user changes account preferences such as privacy, notifications, and theme. \\
+\textbf{Actor} & User \\
+\textbf{Trigger} & When the user opens the settings page. \\
+\textbf{Pre-condition} & The user is logged in to the system. \newline The settings page is available to the user. \\
+\textbf{Post-condition} & The selected preferences are saved. \newline The account settings are updated for future sessions. \\
+\end{tblr}
+\caption{Use Case Specification - Change Settings}
+\end{table}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{SRS/diagrams/activity_diagrams/UC_05_Change_Settings.png}
+    \caption{Activity Diagram for UC-05}
+    \label{fig:ad_uc05}
+\end{figure}
+
+\subsection{UC-06 - View Activity History}
+\begin{table}[H]
+\centering
+\begin{tblr}{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    colspec = {Q[l,3cm] Q[l,11cm]}
+}
+\textbf{Name} & View Activity History \\
+\textbf{Description} & This use case describes how a user reviews past posts, comments, and interactions. \\
+\textbf{Actor} & User \\
+\textbf{Trigger} & When the user opens the activity history page. \\
+\textbf{Pre-condition} & The user is logged in to the system. \newline The user has activity records in the system. \\
+\textbf{Post-condition} & The activity history is displayed to the user. \newline The user can review prior activity. \\
+\end{tblr}
+\caption{Use Case Specification - View Activity History}
+\end{table}
+\begin{figure}[H]
+    \centering
+\includegraphics[width=0.8\textwidth]{SRS/diagrams/activity_diagrams/UC_06_View_Activity_History.png}
+    \caption{Activity Diagram for UC-06}
+    \label{fig:ad_uc06}
+\end{figure}
+
+\subsection{UC-07 - Follow / Unfollow User}
+\begin{table}[H]
+\centering
+\begin{tblr}{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    colspec = {Q[l,3cm] Q[l,11cm]}
+}
+\textbf{Name} & Follow / Unfollow User \\
+\textbf{Description} & This use case describes how a user subscribes to or unsubscribes from another user's activity feed. \\
+\textbf{Actor} & User \\
+\textbf{Trigger} & When the user clicks the follow or unfollow action on another profile. \\
+\textbf{Pre-condition} & The user is logged in to the system. \newline The target profile is available for follow actions. \\
+\textbf{Post-condition} & The follow relationship is created or removed. \newline The user's feed and follower lists are updated. \\
+\end{tblr}
+\caption{Use Case Specification - Follow / Unfollow User}
+\end{table}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{SRS/diagrams/activity_diagrams/UC_07_Follow_Unfollow_User.png}
+    \caption{Activity Diagram for UC-07}
+    \label{fig:ad_uc07}
+\end{figure}
+
+\subsection{UC-08 - Browse Content}
+\begin{table}[H]
+\centering
+\begin{tblr}{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    colspec = {Q[l,3cm] Q[l,11cm]}
+}
+\textbf{Name} & Browse Content \\
+\textbf{Description} & This use case describes how a visitor or user explores communities and public posts. \\
+\textbf{Actor} & Guest User / User \\
+\textbf{Trigger} & When the user opens the forum homepage or a community page. \\
+\textbf{Pre-condition} & The browsing page is accessible. \newline The user may be logged in or not logged in. \\
+\textbf{Post-condition} & Public posts and community content are shown. \newline The user can continue browsing or open a post. \\
+\end{tblr}
+\caption{Use Case Specification - Browse Content}
+\end{table}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{SRS/diagrams/activity_diagrams/UC_08_Browse_Content.png}
+    \caption{Activity Diagram for UC-08}
+    \label{fig:ad_uc08}
+\end{figure}
+
+\subsection{UC-09 - Search Content}
+\begin{table}[H]
+\centering
+\begin{tblr}{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    colspec = {Q[l,3cm] Q[l,11cm]}
+}
+\textbf{Name} & Search Content \\
+\textbf{Description} & This use case describes how a user searches for posts, users, or communities by keyword. \\
+\textbf{Actor} & User \\
+\textbf{Trigger} & When the user enters a search term and submits the search. \\
+\textbf{Pre-condition} & The search page is available. \newline The system has searchable content. \\
+\textbf{Post-condition} & Matching results are returned to the user. \newline The user can open a result or refine the search. \\
+\end{tblr}
+\caption{Use Case Specification - Search Content}
+\end{table}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{SRS/diagrams/activity_diagrams/UC_09_Search_Content.png}
+    \caption{Activity Diagram for UC-09}
+    \label{fig:ad_uc09}
+\end{figure}
+
+\subsection{UC-10 - Create Post}
+\begin{table}[H]
+\centering
+\begin{tblr}{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    colspec = {Q[l,3cm] Q[l,11cm]}
+}
+\textbf{Name} & Create Post \\
+\textbf{Description} & This use case describes how a member creates and submits a new post in a community. \\
+\textbf{Actor} & User \\
+\textbf{Trigger} & When the user clicks the ``Create Post'' action. \\
+\textbf{Pre-condition} & The user is logged in to the system. \newline The user is a member of the selected community. \\
+\textbf{Post-condition} & The post is stored successfully. \newline The post appears in the community or enters moderation if required. \\
+\end{tblr}
+\caption{Use Case Specification - Create Post}
+\end{table}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{SRS/diagrams/activity_diagrams/UC_10_Create_Post.png}
+    \caption{Activity Diagram for UC-10}
+    \label{fig:ad_uc10}
+\end{figure}
+
+\subsection{UC-11 - Edit Post}
+\begin{table}[H]
+\centering
+\begin{tblr}{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    colspec = {Q[l,3cm] Q[l,11cm]}
+}
+\textbf{Name} & Edit Post \\
+\textbf{Description} & This use case describes how a member modifies an existing post and preserves edit history. \\
+\textbf{Actor} & User \\
+\textbf{Trigger} & When the user opens an existing post and chooses ``Edit''. \\
+\textbf{Pre-condition} & The user is logged in to the system. \newline The user owns the post or has edit permission. \\
+\textbf{Post-condition} & The edited post is saved successfully. \newline The edit history is retained. \\
+\end{tblr}
+\caption{Use Case Specification - Edit Post}
+\end{table}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{SRS/diagrams/activity_diagrams/UC_11_Edit_Post.png}
+    \caption{Activity Diagram for UC-11}
+    \label{fig:ad_uc11}
+\end{figure}
+
+\subsection{UC-12 - Delete Post}
+\begin{table}[H]
+\centering
+\begin{tblr}{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    colspec = {Q[l,3cm] Q[l,11cm]}
+}
+\textbf{Name} & Delete Post \\
+\textbf{Description} & This use case describes how a member or moderator removes a post from public view using soft delete. \\
+\textbf{Actor} & User / Moderator \\
+\textbf{Trigger} & When the user clicks the ``Delete'' action on a post. \\
+\textbf{Pre-condition} & The user is logged in to the system. \newline The user has permission to delete the post. \\
+\textbf{Post-condition} & The post is marked as deleted. \newline The post is hidden from public view. \\
+\end{tblr}
+\caption{Use Case Specification - Delete Post}
+\end{table}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{SRS/diagrams/activity_diagrams/UC_12_Delete_Post.png}
+    \caption{Activity Diagram for UC-12}
+    \label{fig:ad_uc12}
+\end{figure}
+
+\subsection{UC-13 - Post Comment}
+\begin{table}[H]
+\centering
+\begin{tblr}{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    colspec = {Q[l,3cm] Q[l,11cm]}
+}
+\textbf{Name} & Post Comment \\
+\textbf{Description} & This use case describes how a user adds a direct comment to a post. \\
+\textbf{Actor} & User \\
+\textbf{Trigger} & When the user submits a comment on a post. \\
+\textbf{Pre-condition} & The user is logged in to the system. \newline The target post is visible and commentable. \\
+\textbf{Post-condition} & The comment is created and attached to the post. \newline The comment count is updated. \\
+\end{tblr}
+\caption{Use Case Specification - Post Comment}
+\end{table}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{SRS/diagrams/activity_diagrams/UC_13_Post_Comment.png}
+    \caption{Activity Diagram for UC-13}
+    \label{fig:ad_uc13}
+\end{figure}
+
+\subsection{UC-14 - Reply to Comment}
+\begin{table}[H]
+\centering
+\begin{tblr}{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    colspec = {Q[l,3cm] Q[l,11cm]}
+}
+\textbf{Name} & Reply to Comment \\
+\textbf{Description} & This use case describes how a user replies to an existing comment in a nested discussion thread. \\
+\textbf{Actor} & User \\
+\textbf{Trigger} & When the user submits a reply to a comment. \\
+\textbf{Pre-condition} & The user is logged in to the system. \newline The parent comment exists and can receive replies. \\
+\textbf{Post-condition} & The reply is created as a nested comment. \newline The discussion thread is updated. \\
+\end{tblr}
+\caption{Use Case Specification - Reply to Comment}
+\end{table}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{SRS/diagrams/activity_diagrams/UC_14_Reply_To_Comment.png}
+    \caption{Activity Diagram for UC-14}
+    \label{fig:ad_uc14}
+\end{figure}
+
+\subsection{UC-15 - Vote on Content}
+\begin{table}[H]
+\centering
+\begin{tblr}{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    colspec = {Q[l,3cm] Q[l,11cm]}
+}
+\textbf{Name} & Vote on Content \\
+\textbf{Description} & This use case describes how a user upvotes or downvotes a post or comment. \\
+\textbf{Actor} & User \\
+\textbf{Trigger} & When the user selects an upvote or downvote action. \\
+\textbf{Pre-condition} & The user is logged in to the system. \newline The target content is available for voting. \\
+\textbf{Post-condition} & The vote is recorded or updated. \newline The content score is recalculated. \\
+\end{tblr}
+\caption{Use Case Specification - Vote on Content}
+\end{table}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{SRS/diagrams/activity_diagrams/UC_15_Vote_On_Content.png}
+    \caption{Activity Diagram for UC-15}
+    \label{fig:ad_uc15}
+\end{figure}
+
+\subsection{UC-16 - Participate in Poll}
+\begin{table}[H]
+\centering
+\begin{tblr}{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    colspec = {Q[l,3cm] Q[l,11cm]}
+}
+\textbf{Name} & Participate in Poll \\
+\textbf{Description} & This use case describes how a user casts a vote in a community poll. \\
+\textbf{Actor} & User \\
+\textbf{Trigger} & When the user submits a poll vote. \\
+\textbf{Pre-condition} & The user is logged in to the system. \newline The poll is open for voting. \\
+\textbf{Post-condition} & The selected poll option is recorded. \newline The poll results are updated. \\
+\end{tblr}
+\caption{Use Case Specification - Participate in Poll}
+\end{table}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{SRS/diagrams/activity_diagrams/UC_16_Participate_In_Poll.png}
+    \caption{Activity Diagram for UC-16}
+    \label{fig:ad_uc16}
+\end{figure}
+
+\subsection{UC-17 - Save Post}
+\begin{table}[H]
+\centering
+\begin{tblr}{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    colspec = {Q[l,3cm] Q[l,11cm]}
+}
+\textbf{Name} & Save Post \\
+\textbf{Description} & This use case describes how a user bookmarks a post for later viewing. \\
+\textbf{Actor} & User \\
+\textbf{Trigger} & When the user clicks the ``Save'' action on a post. \\
+\textbf{Pre-condition} & The user is logged in to the system. \newline The target post exists and is visible to the user. \\
+\textbf{Post-condition} & The post is added to the user's saved list. \newline The saved state is available in the account. \\
+\end{tblr}
+\caption{Use Case Specification - Save Post}
+\end{table}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{SRS/diagrams/activity_diagrams/UC_17_Save_Post.png}
+    \caption{Activity Diagram for UC-17}
+    \label{fig:ad_uc17}
+\end{figure}
+
+\subsection{UC-18 - Hide Post}
+\begin{table}[H]
+\centering
+\begin{tblr}{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    colspec = {Q[l,3cm] Q[l,11cm]}
+}
+\textbf{Name} & Hide Post \\
+\textbf{Description} & This use case describes how a user hides a post from their personal feed. \\
+\textbf{Actor} & User \\
+\textbf{Trigger} & When the user clicks the ``Hide'' action on a post. \\
+\textbf{Pre-condition} & The user is logged in to the system. \newline The target post is visible in the user's feed. \\
+\textbf{Post-condition} & The post is hidden from the user's feed. \newline The hidden-post record is stored for the account. \\
+\end{tblr}
+\caption{Use Case Specification - Hide Post}
+\end{table}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{SRS/diagrams/activity_diagrams/UC_18_Hide_Post.png}
+    \caption{Activity Diagram for UC-18}
+    \label{fig:ad_uc18}
+\end{figure}
+
+\subsection{UC-19 - Manage Drafts}
+\begin{table}[H]
+\centering
+\begin{tblr}{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    colspec = {Q[l,3cm] Q[l,11cm]}
+}
+\textbf{Name} & Manage Drafts \\
+\textbf{Description} & This use case describes how a user saves unfinished posts as drafts and publishes them later. \\
+\textbf{Actor} & User \\
+\textbf{Trigger} & When the user saves, edits, opens, or publishes a draft. \\
+\textbf{Pre-condition} & The user is logged in to the system. \newline The user has draft access. \\
+\textbf{Post-condition} & The draft is saved, updated, or deleted after publishing. \newline A published draft becomes a normal post. \\
+\end{tblr}
+\caption{Use Case Specification - Manage Drafts}
+\end{table}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{SRS/diagrams/activity_diagrams/UC_19_Manage_Drafts.png}
+    \caption{Activity Diagram for UC-19}
+    \label{fig:ad_uc19}
+\end{figure}
+
+\subsection{UC-20 - Private Messaging}
+\begin{table}[H]
+\centering
+\begin{tblr}{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    colspec = {Q[l,3cm] Q[l,11cm]}
+}
+\textbf{Name} & Private Messaging \\
+\textbf{Description} & This use case describes how users exchange instant one-to-one messages through the messaging system. \\
+\textbf{Actor} & User \\
+\textbf{Trigger} & When the user opens a conversation and sends a message. \\
+\textbf{Pre-condition} & The user is logged in to the system. \newline The conversation channel exists and is accessible. \\
+\textbf{Post-condition} & The message is delivered to the conversation members. \newline The channel read state is updated. \\
+\end{tblr}
+\caption{Use Case Specification - Private Messaging}
+\end{table}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{SRS/diagrams/activity_diagrams/UC_20_Private_Messaging.png}
+    \caption{Activity Diagram for UC-20}
+    \label{fig:ad_uc20}
+\end{figure}
+
+\subsection{UC-21 - Manage Notifications}
+\begin{table}[H]
+\centering
+\begin{tblr}{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    colspec = {Q[l,3cm] Q[l,11cm]}
+}
+\textbf{Name} & Manage Notifications \\
+\textbf{Description} & This use case describes how a user views and clears system notifications. \\
+\textbf{Actor} & User \\
+\textbf{Trigger} & When the user opens the notifications page or marks notifications as read. \\
+\textbf{Pre-condition} & The user is logged in to the system. \newline Notifications exist for the account. \\
+\textbf{Post-condition} & The selected notifications are marked as read or deleted. \newline The notification list is refreshed. \\
+\end{tblr}
+\caption{Use Case Specification - Manage Notifications}
+\end{table}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{SRS/diagrams/activity_diagrams/UC_21_Manage_Notifications.png}
+    \caption{Activity Diagram for UC-21}
+    \label{fig:ad_uc21}
+\end{figure}
+
+\subsection{UC-22 - Report Violation}
+\begin{table}[H]
+\centering
+\begin{tblr}{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    colspec = {Q[l,3cm] Q[l,11cm]}
+}
+\textbf{Name} & Report Violation \\
+\textbf{Description} & This use case describes how a user reports inappropriate content or behavior for review. \\
+\textbf{Actor} & User \\
+\textbf{Trigger} & When the user submits a report form. \\
+\textbf{Pre-condition} & The user is logged in to the system. \newline The reported target is available. \\
+\textbf{Post-condition} & The report is stored in the moderation queue. \newline The report can be reviewed by moderators or admins. \\
+\end{tblr}
+\caption{Use Case Specification - Report Violation}
+\end{table}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{SRS/diagrams/activity_diagrams/UC_22_Report_Violation.png}
+    \caption{Activity Diagram for UC-22}
+    \label{fig:ad_uc22}
+\end{figure}
+
+\subsection{UC-23 - Create Community}
+\begin{table}[H]
+\centering
+\begin{tblr}{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    colspec = {Q[l,3cm] Q[l,11cm]}
+}
+\textbf{Name} & Create Community \\
+\textbf{Description} & This use case describes how a user creates a new community and becomes its owner. \\
+\textbf{Actor} & User \\
+\textbf{Trigger} & When the user submits the create community form. \\
+\textbf{Pre-condition} & The user is logged in to the system. \newline The community name is available and valid. \\
+\textbf{Post-condition} & The community is created successfully. \newline The creator becomes the owner and first member. \\
+\end{tblr}
+\caption{Use Case Specification - Create Community}
+\end{table}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{SRS/diagrams/activity_diagrams/UC_23_Create_Community.png}
+    \caption{Activity Diagram for UC-23}
+    \label{fig:ad_uc23}
+\end{figure}
+
+\subsection{UC-24 - Approve / Reject Post}
+\begin{table}[H]
+\centering
+\begin{tblr}{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    colspec = {Q[l,3cm] Q[l,11cm]}
+}
+\textbf{Name} & Approve / Reject Post \\
+\textbf{Description} & This use case describes how a moderator reviews pending or edited posts and decides whether to publish them. \\
+\textbf{Actor} & Moderator \\
+\textbf{Trigger} & When the moderator opens the moderation queue and chooses approve or reject. \\
+\textbf{Pre-condition} & The moderator is logged in to the system. \newline The target post is pending review or edited. \\
+\textbf{Post-condition} & The post is approved or rejected. \newline The moderation result is stored and reflected in the community. \\
+\end{tblr}
+\caption{Use Case Specification - Approve / Reject Post}
+\end{table}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{SRS/diagrams/activity_diagrams/UC_24_Approve_Reject_Post.png}
+    \caption{Activity Diagram for UC-24}
+    \label{fig:ad_uc24}
+\end{figure}
+
+\subsection{UC-25 - Ban / Mute User}
+\begin{table}[H]
+\centering
+\begin{tblr}{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    colspec = {Q[l,3cm] Q[l,11cm]}
+}
+\textbf{Name} & Ban / Mute User \\
+\textbf{Description} & This use case describes how a moderator restricts a user's participation in a community. \\
+\textbf{Actor} & Moderator \\
+\textbf{Trigger} & When the moderator chooses to ban or mute a user. \\
+\textbf{Pre-condition} & The moderator is logged in to the system. \newline The target user belongs to the community. \\
+\textbf{Post-condition} & The ban or mute restriction is stored. \newline The user is prevented from performing the restricted actions. \\
+\end{tblr}
+\caption{Use Case Specification - Ban / Mute User}
+\end{table}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{SRS/diagrams/activity_diagrams/UC_25_Ban_Mute_User.png}
+    \caption{Activity Diagram for UC-25}
+    \label{fig:ad_uc25}
+\end{figure}
+
+\subsection{UC-26 - Configure Community}
+\begin{table}[H]
+\centering
+\begin{tblr}{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    colspec = {Q[l,3cm] Q[l,11cm]}
+}
+\textbf{Name} & Configure Community \\
+\textbf{Description} & This use case describes how a community owner updates rules, privacy, and appearance settings. \\
+\textbf{Actor} & Owner \\
+\textbf{Trigger} & When the owner opens the community settings page and saves changes. \\
+\textbf{Pre-condition} & The owner is logged in to the system. \newline The owner has permission to manage the community. \\
+\textbf{Post-condition} & The community configuration is updated. \newline The new settings are applied to the community. \\
+\end{tblr}
+\caption{Use Case Specification - Configure Community}
+\end{table}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{SRS/diagrams/activity_diagrams/UC_26_Configure_Community.png}
+    \caption{Activity Diagram for UC-26}
+    \label{fig:ad_uc26}
+\end{figure}
+
+\subsection{UC-27 - Assign Roles}
+\begin{table}[H]
+\centering
+\begin{tblr}{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    colspec = {Q[l,3cm] Q[l,11cm]}
+}
+\textbf{Name} & Assign Roles \\
+\textbf{Description} & This use case describes how a community owner appoints moderators or other roles for members. \\
+\textbf{Actor} & Owner \\
+\textbf{Trigger} & When the owner invites or activates a role for another member. \\
+\textbf{Pre-condition} & The owner is logged in to the system. \newline The target member belongs to the community. \\
+\textbf{Post-condition} & The role assignment is stored successfully. \newline The target member gains the new permissions. \\
+\end{tblr}
+\caption{Use Case Specification - Assign Roles}
+\end{table}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{SRS/diagrams/activity_diagrams/UC_27_Assign_Roles.png}
+    \caption{Activity Diagram for UC-27}
+    \label{fig:ad_uc27}
+\end{figure}
+
+\subsection{UC-28 - Handle Global Reports}
+\begin{table}[H]
+\centering
+\begin{tblr}{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    colspec = {Q[l,3cm] Q[l,11cm]}
+}
+\textbf{Name} & Handle Global Reports \\
+\textbf{Description} & This use case describes how a system admin reviews and acts on platform-wide violation reports. \\
+\textbf{Actor} & System Admin \\
+\textbf{Trigger} & When the admin opens the global reports dashboard. \\
+\textbf{Pre-condition} & The admin is logged in to the system. \newline There are reports available for review. \\
+\textbf{Post-condition} & The selected reports are reviewed or deleted. \newline The report queue is updated. \\
+\end{tblr}
+\caption{Use Case Specification - Handle Global Reports}
+\end{table}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{SRS/diagrams/activity_diagrams/UC_28_Handle_Global_Reports.png}
+    \caption{Activity Diagram for UC-28}
+    \label{fig:ad_uc28}
+\end{figure}
+
+\subsection{UC-29 - Manage Platform}
+\begin{table}[H]
+\centering
+\begin{tblr}{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    colspec = {Q[l,3cm] Q[l,11cm]}
+}
+\textbf{Name} & Manage Platform \\
+\textbf{Description} & This use case describes how a system admin manages users and communities globally. \\
+\textbf{Actor} & System Admin \\
+\textbf{Trigger} & When the admin opens the platform management area and selects a target entity. \\
+\textbf{Pre-condition} & The admin is logged in to the system. \newline The admin has global management privileges. \\
+\textbf{Post-condition} & The selected user or community is banned or unbanned. \newline The platform state is updated accordingly. \\
+\end{tblr}
+\caption{Use Case Specification - Manage Platform}
+\end{table}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{SRS/diagrams/activity_diagrams/UC_29_Manage_Platform.png}
+    \caption{Activity Diagram for UC-29}
+    \label{fig:ad_uc29}
+\end{figure}
+
+\subsection{UC-30 - View Analytics}
+\begin{table}[H]
+\centering
+\begin{tblr}{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rows = {valign=m},
+    colspec = {Q[l,3cm] Q[l,11cm]}
+}
+\textbf{Name} & View Analytics \\
+\textbf{Description} & This use case describes how a system admin reviews platform usage and performance metrics. \\
+\textbf{Actor} & System Admin \\
+\textbf{Trigger} & When the admin opens the analytics dashboard. \\
+\textbf{Pre-condition} & The admin is logged in to the system. \newline Analytics data is available for the selected period. \\
+\textbf{Post-condition} & The analytics dashboard is displayed with current metrics. \newline The admin can review user, content, and moderation statistics. \\
+\end{tblr}
+\caption{Use Case Specification - View Analytics}
+\end{table}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{SRS/diagrams/activity_diagrams/UC_30_View_Analytics.png}
+    \caption{Activity Diagram for UC-30}
+    \label{fig:ad_uc30}
+\end{figure}

@@ -1,0 +1,65 @@
+\begin{longtblr}[
+    caption = {Business Rules for UC-28 - Handle Global Reports},
+    label = {tab:uc28_business_rules}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rowhead = 1,
+    rows = {valign=m, cmd=\nopagebreak},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[c,1.8cm] Q[c,1.5cm] Q[c,3.0cm] Q[l,7.5cm]}
+}
+\textbf{ID} & \textbf{Activity} & \textbf{Rule Type} & \textbf{Description} \\
+
+BR-UC28-01 & (1--3, 5) & Authorization Rules &
+\textbf{Open the Global Reports Dashboard and Validate Admin Access:}
+\begin{itemize}
+    \item The global reports routes require authentication and admin privileges.
+    \item if the requester is not an admin, then the system returns a forbidden response.
+    \item The dashboard and report detail actions are only available through the admin reports routes.
+\end{itemize} \\
+
+BR-UC28-02 & (2--3, 6) & Validation Rules &
+\textbf{Validate the Report Filter Request:}
+\begin{itemize}
+    \item The controller binds the query to \texttt{GetReportsFilterQuery}.
+    \item The request may include reporter ID, target ID, target type, reason, date range, page, and page size.
+    \item if the query cannot be bound, then the controller returns a bad request response.
+\end{itemize} \\
+
+BR-UC28-03 & (3, 7) & Workflow Rules &
+\textbf{Load Report Details and Filtered Results:}
+\begin{itemize}
+    \item The service loads reports using \textbf{\textit{GetReportsFilter()}}.
+    \item The admin can open a single report using \textbf{\textit{GetReportByIDAdmin()}}.
+\end{itemize} \\
+
+BR-UC28-04 & (4, 8) & Validation Rules &
+\textbf{Validate Selected Report IDs for Deletion:}
+\begin{itemize}
+    \item The controller binds batch deletion requests to \texttt{DeleteReportsRequest}.
+    \item The request must contain at least one report ID.
+    \item if the batch list is empty or the request is invalid, then the controller returns a bad request response.
+\end{itemize} \\
+
+BR-UC28-05 & (4, 8) & Workflow Rules &
+\textbf{Delete Single or Multiple Reports:}
+\begin{itemize}
+    \item The admin can delete one report using \textbf{\textit{DeleteReportByIDAdmin()}}.
+    \item The admin can delete multiple reports using \textbf{\textit{DeleteReportsByIDAdmin()}}.
+    \item The service deletes the selected report records after validation succeeds.
+\end{itemize} \\
+
+BR-UC28-06 & (9) & Message Rules &
+\textbf{Return the Updated Report List:}
+\begin{itemize}
+    \item The controller returns the updated report state or success response after the selected reports are deleted.
+\end{itemize} \\
+
+BR-UC28-07 & (9) & Message Rules &
+\textbf{Return Report Management Error:}
+\begin{itemize}
+    \item if authentication, permission, validation, lookup, or persistence checks fail, then the controller returns the corresponding error response.
+\end{itemize} \\
+\end{longtblr}

@@ -1,0 +1,57 @@
+\begin{longtblr}[
+    caption = {Business Rules for UC-11 - Edit Post},
+    label = {tab:uc11_business_rules}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rowhead = 1,
+    rows = {valign=m, cmd=\nopagebreak},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[c,1.8cm] Q[c,1.5cm] Q[c,3.0cm] Q[l,7.5cm]}
+}
+\textbf{ID} & \textbf{Activity} & \textbf{Rule Type} & \textbf{Description} \\
+
+BR-UC11-01 & (2--4) & Authorization Rules &
+\textbf{Load Post and Verify Ownership:}
+\begin{itemize}
+    \item The controller requires an authenticated user for the edit request.
+    \item if \textbf{authUser == null}, then the controller returns a forbidden response.
+    \item if JSON binding fails for \texttt{UpdatePostRequest}, then the controller returns a bad-request response.
+    \item The service loads the post by ID and if \textbf{post.AuthorID != userID}, then the service returns a forbidden error.
+\end{itemize} \\
+
+BR-UC11-02 & (5--6) & Workflow Rules &
+\textbf{Apply Title, Text, and Tag Changes:}
+\begin{itemize}
+    \item The system updates \textbf{title}, \textbf{text}, and \textbf{tags} only when they are provided in the request.
+    \item if no editable field changes, then the system returns the current post without writing a new record.
+    \item if the post was previously approved, then the system marks \textbf{is\_edited = true}.
+\end{itemize} \\
+
+BR-UC11-03 & (7--9) & Workflow Rules &
+\textbf{Handle Media Changes Through Post Media Endpoints:}
+\begin{itemize}
+    \item if the user removes images, then the system calls \textbf{\textit{RemoveImagesFromPost()}} after validating \texttt{public\_ids} and author ownership.
+    \item if the user adds images, then the system calls \textbf{\textit{AddImagesToPost()}} and uploads the files with \textbf{\textit{UploadImages()}} before pushing them into \texttt{content.images}.
+    \item if the user removes videos, then the system calls \textbf{\textit{RemoveVideosFromPost()}} and deletes the matched Cloudinary assets after the database update.
+    \item if the user adds videos, then the system calls \textbf{\textit{AddVideosToPost()}} and uploads the files with \textbf{\textit{UploadVideos()}} before pushing them into \texttt{content.videos}.
+    \item if new videos are added, then the system also sets \textbf{type = video}.
+\end{itemize} \\
+
+BR-UC11-04 & (10--13) & Workflow Rules &
+\textbf{Persist Edit Result and Media Side Effects:}
+\begin{itemize}
+    \item The system updates the post record with the new content and \textbf{updated\_at} timestamp.
+    \item The system publishes a \textbf{PostUpdatedEvent} for moderation.
+    \item if image or video upload fails, then the system returns the error and does not finish the edit flow.
+    \item if video removal is requested, then the system only removes IDs that already exist in the post.
+\end{itemize} \\
+
+BR-UC11-05 & (14) & Message Rules &
+\textbf{Return the Updated Post:}
+\begin{itemize}
+    \item The system returns the refreshed post after the update or media change succeeds.
+    \item if any validation, ownership, or persistence step fails, then the controller returns the corresponding error message.
+\end{itemize} \\
+\end{longtblr}

@@ -1,0 +1,74 @@
+\begin{longtblr}[
+    caption = {Business Rules for UC-10 - Create Post},
+    label = {tab:uc10_business_rules}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rowhead = 1,
+    rows = {valign=m, cmd=\nopagebreak},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[c,1.8cm] Q[c,1.5cm] Q[c,3.0cm] Q[l,7.5cm]}
+}
+\textbf{ID} & \textbf{Activity} & \textbf{Rule Type} & \textbf{Description} \\
+
+BR-UC10-01 & (5) & Validation Rules &
+\textbf{Validate Create Post Request:}
+\begin{itemize}
+    \item if \textbf{authUser == null}, then the controller returns a forbidden response.
+    \item if JSON binding fails for \texttt{CreatePostRequest}, then the controller returns a bad request response.
+    \item the DTO requires \textbf{community\_id}, \textbf{title}, and \textbf{type}; if any required field is missing, binding fails.
+    \item \textbf{type} must be one of \texttt{text}, \texttt{poll}, \texttt{image}, or \texttt{video}.
+\end{itemize} \\
+
+BR-UC10-02 & (6) & Authorization Rules &
+\textbf{Validate Author and Community Membership:}
+\begin{itemize}
+    \item if \textbf{communityID == null} or cannot be parsed to an ObjectID, then the service returns an invalid ID error.
+    \item if the community does not exist, then the service returns the repository error.
+    \item if the author does not exist, then the service returns the repository error.
+    \item if \textbf{communityRepo.IsUserBanned() == true}, then the service returns a banned-from-community error.
+\end{itemize} \\
+
+BR-UC10-03 & (6) & Workflow Rules &
+\textbf{Determine Moderation State:}
+\begin{itemize}
+    \item if \textbf{author.Role == AdminRole}, then set \textbf{initialStatus = ModerationSkipped}.
+    \item if \textbf{community.CreateByID == userID}, then set \textbf{initialStatus = ModerationSkipped}.
+    \item if any community moderator has \textbf{mod.UserID == userID}, then set \textbf{initialStatus = ModerationSkipped}.
+    \item if \textbf{community.Setting.PostRequireApproval == true} and the author is not admin/mod/creator, then set \textbf{initialStatus = ModerationPending}.
+    \item otherwise, set \textbf{initialStatus = ModerationPending} for AI moderation.
+\end{itemize} \\
+
+BR-UC10-04 & (7) & Workflow Rules &
+\textbf{Create Post Record:}
+\begin{itemize}
+    \item The system creates a \textbf{Post} with \textbf{AuthorID}, \textbf{CommunityID}, \textbf{Title}, \textbf{Type}, \textbf{Content.text}, \textbf{Tags}, and \textbf{ModerationStatus}.
+    \item The system initializes \textbf{VotesCount}, \textbf{CommentsCount}, \textbf{HotScore}, and flag fields such as \textbf{IsDeleted}, \textbf{IsHidden}, \textbf{IsDraft}, and \textbf{IsBan}.
+    \item if \textbf{type == poll} and \textbf{req.Poll != null}, then the system creates poll options and attaches poll data to the post content.
+    \item The system persists the post through the post repository.
+\end{itemize} \\
+
+BR-UC10-05 & (8--9) & Workflow Rules &
+\textbf{Attach Media to Post:}
+\begin{itemize}
+    \item if images are attached, then the system uploads them using \textbf{\textit{UploadImages()}} and pushes them into \textbf{content.images}.
+    \item if videos are attached, then the system uploads them using \textbf{\textit{UploadVideos()}} and pushes them into \textbf{content.videos}.
+    \item if media upload fails, then the system returns the upload error and does not complete the attach step.
+\end{itemize} \\
+
+BR-UC10-06 & (10) & Workflow Rules &
+\textbf{Trigger Moderation and Return Post:}
+\begin{itemize}
+    \item The system increments the author's post count after the post is created.
+    \item The system auto-upvotes the post for the creator using \textbf{\textit{VoteOnTargetByAuthor()}}.
+    \item The system publishes a post-created event to trigger moderation workflow.
+    \item The system returns the created post using \textbf{\textit{GetPostByID()}}.
+\end{itemize} \\
+
+BR-UC10-07 & (11) & Message Rules &
+\textbf{Return Error Message:}
+\begin{itemize}
+    \item if validation, authorization, or persistence fails, then the controller returns the corresponding error message.
+\end{itemize} \\
+\end{longtblr}

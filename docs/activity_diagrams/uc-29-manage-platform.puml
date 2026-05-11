@@ -1,0 +1,22 @@
+@startuml UC_29_Manage_Platform
+title UC-29: Manage Platform
+
+|Admin|
+start
+:(1) Open the admin portal;
+:(2) Log in with admin credentials;
+
+|System|
+:(3) Validate admin authentication;
+:(4) Issue admin access and refresh tokens;
+:(5) Allow access to the dashboard and admin tools;
+
+|Admin|
+:(6) Log out when finished;
+
+|System|
+:(7) Revoke the active admin session;
+:(8) Confirm logout;
+
+stop
+@enduml

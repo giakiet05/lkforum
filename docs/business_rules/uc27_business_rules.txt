@@ -1,0 +1,69 @@
+\begin{longtblr}[
+    caption = {Business Rules for UC-27 - Assign Roles},
+    label = {tab:uc27_business_rules}
+]{
+    width=\textwidth,
+    hlines,
+    vlines,
+    rowhead = 1,
+    rows = {valign=m, cmd=\nopagebreak},
+    row{1} = {font=\bfseries, halign=c},
+    colspec = {Q[c,1.8cm] Q[c,1.5cm] Q[c,3.0cm] Q[l,7.5cm]}
+}
+\textbf{ID} & \textbf{Activity} & \textbf{Rule Type} & \textbf{Description} \\
+
+BR-UC27-01 & (1--3, 4) & Authorization Rules &
+\textbf{Open the Role Management Panel and Validate Creator Access:}
+\begin{itemize}
+    \item The role assignment actions require authentication.
+    \item The service allows adding moderators only when the requester is the community creator.
+    \item The target user must be invited from the creator's community role management flow.
+    \item if \textbf{authUser == null} or the requester is not the creator, then the system returns a forbidden response.
+\end{itemize} \\
+
+BR-UC27-02 & (2--3, 4) & Validation Rules &
+\textbf{Validate the Moderator Invitation Request:}
+\begin{itemize}
+    \item The controller binds the request to \texttt{AddModeratorRequest}.
+    \item The request must include the community ID and at least one moderator user ID.
+    \item The target user IDs are resolved from the invited usernames in the current UI flow.
+    \item if the request payload cannot be bound or contains no target users, then the controller returns a bad request response.
+\end{itemize} \\
+
+BR-UC27-03 & (5) & Constraint Rules &
+\textbf{Prevent Duplicate Active Moderators:}
+\begin{itemize}
+    \item The service rejects a user who is already an active moderator.
+    \item Existing inactive invitations for the same user are removed before a new invite is stored.
+    \item if the moderator already exists as active, then the service returns \texttt{ErrModeratorAlreadyExists}.
+\end{itemize} \\
+
+BR-UC27-04 & (5) & Workflow Rules &
+\textbf{Add the Moderator Invitation Record:}
+\begin{itemize}
+    \item The service loads the community and the invited user before storing the role change.
+    \item The service creates a \texttt{Moderator} entry with \textbf{IsActive = false} and the current assignment time.
+    \item The community record is replaced after the invitation is appended.
+    \item The service publishes a \texttt{ModeratorAddedEvent} after persistence succeeds.
+\end{itemize} \\
+
+BR-UC27-05 & (6) & Workflow Rules &
+\textbf{Activate the Moderator Role:}
+\begin{itemize}
+    \item The invited user can activate the moderator role through the activation endpoint.
+    \item The repository marks the matching moderator entry as active and refreshes the assignment timestamp.
+    \item if the invitation cannot be matched, then the repository returns a bad request error.
+\end{itemize} \\
+
+BR-UC27-06 & (7) & Message Rules &
+\textbf{Return the Updated Role List:}
+\begin{itemize}
+    \item The controller returns the updated role state after the invitation or activation succeeds.
+\end{itemize} \\
+
+BR-UC27-07 & (7) & Message Rules &
+\textbf{Return Role Assignment Error:}
+\begin{itemize}
+    \item if authentication, permission, validation, duplicate-role, lookup, or persistence checks fail, then the controller returns the corresponding error response.
+\end{itemize} \\
+\end{longtblr}

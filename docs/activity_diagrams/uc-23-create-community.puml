@@ -1,0 +1,18 @@
+@startuml UC_23_Create_Community
+title UC-23: Create Community
+
+|User|
+start
+:(1) Open Create Community;
+:(2) Enter community name and description;
+:(3) Choose community type and optional style media;
+:(4) Submit the form;
+
+|System|
+:(5) Validate authentication and community name rules;
+:(6) Create the community record;
+:(7) Add the creator as the first member;
+:(8) Return the new community;
+
+stop
+@enduml

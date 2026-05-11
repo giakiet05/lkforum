@@ -1,0 +1,28 @@
+@startuml UC_09_Search_Content
+title UC-09: Search Content
+
+|User|
+start
+:(1) Open the search page;
+:(2) Enter a keyword;
+:(3) Submit the search;
+
+|System|
+:(4) Normalize the query;
+:(5) Search communities, users, and posts in parallel;
+if (Any results found?) then (Yes)
+  :(6) Return matched results;
+else (No)
+  :(7) Return an empty result set;
+endif
+
+|User|
+:(8) Review the results;
+if (Open a result?) then (Yes)
+  |System|
+  :(9) Load the selected post, user profile, or community page;
+else (No)
+endif
+
+stop
+@enduml

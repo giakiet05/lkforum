@@ -1,0 +1,21 @@
+@startuml UC_25_Ban_Mute_User
+title UC-25: Ban / Mute User
+
+|User|
+start
+:(1) Open the restricted users panel;
+:(2) Select Ban or Mute for a member;
+:(3) Enter duration, reason, and note;
+:(4) Submit the action;
+
+|System|
+:(5) Validate moderator permissions and target user;
+if (Ban action?) then (Yes)
+  :(6) Store the ban record;
+else (No)
+  :(7) Store the mute record;
+endif
+:(8) Return the updated restriction state;
+
+stop
+@enduml
